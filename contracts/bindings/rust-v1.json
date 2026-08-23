@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "contract": "plenora-storage-rust-bindings-v1",
+  "artifact": "plenora-storage-core",
+  "operations": {
+    "storage.test@1": "plenora_storage_core::Engine::test",
+    "storage.list@1": "plenora_storage_core::Engine::list",
+    "storage.stat@1": "plenora_storage_core::Engine::stat",
+    "storage.get@1": "plenora_storage_core::Engine::get",
+    "storage.put@1": "plenora_storage_core::Engine::put",
+    "storage.copy@1": "plenora_storage_core::Engine::copy",
+    "storage.delete@1": "plenora_storage_core::Engine::delete"
+  },
+  "lifecycle": {
+    "close": "plenora_storage_core::Engine::close",
+    "is_closed": "plenora_storage_core::Engine::is_closed"
+  },
+  "discovery": "plenora_storage_core::Engine::capabilities"
+}

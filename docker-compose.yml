@@ -1,0 +1,95 @@
+name: plenora-storage-tools
+
+services:
+  minio:
+    image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: plenora-dev
+      MINIO_ROOT_PASSWORD: plenora-dev-secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
+  minio-init:
+    image: minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+    depends_on:
+      - minio
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        until mc alias set local http://minio:9000 plenora-dev plenora-dev-secret;
+        do sleep 1; done;
+        mc mb --ignore-existing local/plenora-test
+
+  sftp:
+    image: atmoz/sftp@sha256:0960390462a4441dbb63698d7c185b76a41ffcee7b78ff4adf275f3e66f9c475
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        chown -R 1000:100 /home/plenora/upload &&
+        exec /entrypoint 'plenora:plenora-sftp-secret:::upload'
+    ports:
+      - "2222:22"
+    volumes:
+      - sftp-data:/home/plenora/upload
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep sshd >/dev/null"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  ftp:
+    image: stilliard/pure-ftpd@sha256:83fdc47e6b912a16aa2bbb30c9f577af64705331acbf7d87ab83aabfa4701089
+    environment:
+      FTP_USER_NAME: plenora
+      FTP_USER_PASS: plenora-ftp-secret
+      FTP_USER_HOME: /home/plenora
+      FTP_PASSIVE_PORTS: "30000:30009"
+      PUBLICHOST: ftp
+    ports:
+      - "2121:21"
+      - "30000-30009:30000-30009"
+    volumes:
+      - ftp-data:/home/plenora
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/21'"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  storage-rust:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
+      sftp:
+        condition: service_healthy
+      ftp:
+        condition: service_healthy
+    environment:
+      PLENORA_MINIO_TEST: "1"
+      PLENORA_MINIO_ENDPOINT: "http://minio:9000"
+      PLENORA_MINIO_BUCKET: "plenora-test"
+      PLENORA_MINIO_CREDENTIALS: '{"access_key_id":"plenora-dev","secret_access_key":"plenora-dev-secret"}'
+      PLENORA_SFTP_TEST: "1"
+      PLENORA_SFTP_ENDPOINT: "sftp"
+      PLENORA_SFTP_CREDENTIALS: '{"username":"plenora","password":"plenora-sftp-secret"}'
+      PLENORA_FTP_TEST: "1"
+      PLENORA_FTP_ENDPOINT: "ftp"
+      PLENORA_FTP_CREDENTIALS: '{"username":"plenora","password":"plenora-ftp-secret"}'
+    volumes:
+      - .:/workspace
+      - rust-cargo-registry:/usr/local/cargo/registry
+      - rust-target:/workspace/target
+
+volumes:
+  ftp-data:
+  minio-data:
+  rust-cargo-registry:
+  rust-target:
+  sftp-data:

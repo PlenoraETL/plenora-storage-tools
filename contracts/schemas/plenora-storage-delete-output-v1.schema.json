@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.plenora.dev/storage/plenora-storage-delete-output-v1.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["key", "deleted"],
+  "properties": {
+    "key": {"$ref": "plenora-storage-common-v1.schema.json#/$defs/key"},
+    "deleted": {"type": "boolean"}
+  }
+}

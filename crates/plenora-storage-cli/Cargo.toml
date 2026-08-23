@@ -1,0 +1,27 @@
+[package]
+name = "plenora-storage-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "plenora-storage"
+path = "src/main.rs"
+
+[dependencies]
+clap.workspace = true
+futures-util.workspace = true
+plenora-storage-core = { path = "../plenora-storage-core" }
+plenora-storage-ftp = { path = "../plenora-storage-ftp" }
+plenora-storage-s3 = { path = "../plenora-storage-s3" }
+plenora-storage-sftp = { path = "../plenora-storage-sftp" }
+serde.workspace = true
+serde_json.workspace = true
+time.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

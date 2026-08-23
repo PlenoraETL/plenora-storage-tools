@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.plenora.dev/storage/plenora-storage-capability-attributes-v1.schema.json",
+  "title": "Plenora storage capability attributes v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "providers", "transfer"],
+  "properties": {
+    "contract": {"const": "plenora-storage-capability-attributes-v1"},
+    "providers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["provider", "config_contract", "operations", "attributes"],
+        "properties": {
+          "provider": {"type": "string"},
+          "config_contract": {"type": "string"},
+          "operations": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+          "attributes": {"type": "object", "additionalProperties": {"type": "string"}}
+        }
+      }
+    },
+    "transfer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["streaming", "integrity"],
+      "properties": {
+        "streaming": {"type": "boolean"},
+        "integrity": {"const": "sha256"}
+      }
+    }
+  }
+}

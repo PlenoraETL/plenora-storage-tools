@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.plenora.dev/storage/plenora-storage-get-input-v1.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "connection", "key", "artifact_sink"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "connection": {"$ref": "plenora-storage-connection-v1.schema.json"},
+    "key": {"$ref": "plenora-storage-common-v1.schema.json#/$defs/key"},
+    "artifact_sink": {"type": "string", "minLength": 1, "maxLength": 512}
+  }
+}

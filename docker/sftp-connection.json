@@ -1,0 +1,11 @@
+{
+  "provider": "sftp",
+  "config_contract": "plenora-storage-sftp-connection-v1",
+  "config": {
+    "host": "sftp",
+    "port": 22,
+    "root": "upload",
+    "host_key_sha256": null
+  },
+  "credential_ref": "env:PLENORA_SFTP_CREDENTIALS"
+}

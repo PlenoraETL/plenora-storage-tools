@@ -1,0 +1,26 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  docker-conformance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Rust image
+        run: docker compose build storage-rust
+      - name: Start storage test services
+        run: docker compose up -d --wait minio sftp ftp
+      - name: Provision test bucket
+        run: docker compose run --rm minio-init
+      - name: Verify Rust, contracts, and CLI
+        run: docker compose run --rm --no-deps storage-rust
+      - name: Stop test services
+        if: always()
+        run: docker compose down

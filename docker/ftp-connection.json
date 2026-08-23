@@ -1,0 +1,11 @@
+{
+  "provider": "ftp",
+  "config_contract": "plenora-storage-ftp-connection-v1",
+  "config": {
+    "host": "ftp",
+    "port": 21,
+    "root": ".",
+    "mode": "passive"
+  },
+  "credential_ref": "env:PLENORA_FTP_CREDENTIALS"
+}

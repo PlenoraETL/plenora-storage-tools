@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.plenora.dev/storage/plenora-storage-stat-input-v1.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "connection", "key"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "connection": {"$ref": "plenora-storage-connection-v1.schema.json"},
+    "key": {"$ref": "plenora-storage-common-v1.schema.json#/$defs/key"}
+  }
+}

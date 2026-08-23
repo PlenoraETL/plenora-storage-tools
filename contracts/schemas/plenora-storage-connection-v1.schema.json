@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.plenora.dev/storage/plenora-storage-connection-v1.schema.json",
+  "title": "Plenora storage provider connection v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["provider", "config_contract", "config", "credential_ref"],
+  "properties": {
+    "provider": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
+    "config_contract": {"type": "string", "pattern": "^plenora-[a-z0-9-]+-v[1-9][0-9]*$"},
+    "config": {"type": "object"},
+    "credential_ref": {"type": "string", "minLength": 1, "maxLength": 512}
+  }
+}

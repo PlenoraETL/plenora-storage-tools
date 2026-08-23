@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.plenora.dev/storage/plenora-storage-s3-connection-v1.schema.json",
+  "title": "Plenora S3-compatible connection configuration v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["endpoint", "bucket"],
+  "properties": {
+    "endpoint": {"type": "string", "format": "uri", "maxLength": 2048},
+    "bucket": {"type": "string", "minLength": 1, "maxLength": 255},
+    "region": {"type": "string", "minLength": 1, "maxLength": 128, "default": "us-east-1"},
+    "virtual_hosted_style": {"type": "boolean", "default": false}
+  }
+}

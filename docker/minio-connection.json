@@ -1,0 +1,11 @@
+{
+  "provider": "s3",
+  "config_contract": "plenora-storage-s3-connection-v1",
+  "config": {
+    "endpoint": "http://minio:9000",
+    "bucket": "plenora-test",
+    "region": "us-east-1",
+    "virtual_hosted_style": false
+  },
+  "credential_ref": "env:PLENORA_MINIO_CREDENTIALS"
+}

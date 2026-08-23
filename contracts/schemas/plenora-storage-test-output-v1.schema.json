@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.plenora.dev/storage/plenora-storage-test-output-v1.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["provider", "reachable"],
+  "properties": {
+    "provider": {"type": "string"},
+    "reachable": {"type": "boolean"}
+  }
+}

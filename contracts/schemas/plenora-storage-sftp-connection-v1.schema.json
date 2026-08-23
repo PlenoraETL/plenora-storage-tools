@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.plenora.dev/storage/plenora-storage-sftp-connection-v1.schema.json",
+  "title": "Plenora SFTP connection configuration v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["host"],
+  "properties": {
+    "host": {"type": "string", "minLength": 1, "maxLength": 253},
+    "port": {"type": "integer", "minimum": 1, "maximum": 65535, "default": 22},
+    "root": {"type": "string", "minLength": 1, "maxLength": 4096, "default": "."},
+    "host_key_sha256": {
+      "type": ["string", "null"],
+      "pattern": "^SHA256:[A-Za-z0-9+/]{43}=?$"
+    }
+  }
+}

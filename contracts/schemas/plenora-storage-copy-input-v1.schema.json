@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.plenora.dev/storage/plenora-storage-copy-input-v1.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "connection", "source_key", "destination_key", "overwrite"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "connection": {"$ref": "plenora-storage-connection-v1.schema.json"},
+    "source_key": {"$ref": "plenora-storage-common-v1.schema.json#/$defs/key"},
+    "destination_key": {"$ref": "plenora-storage-common-v1.schema.json#/$defs/key"},
+    "overwrite": {"type": "boolean"}
+  }
+}

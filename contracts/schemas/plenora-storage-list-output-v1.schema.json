@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.plenora.dev/storage/plenora-storage-list-output-v1.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["objects", "truncated", "next_start_after"],
+  "properties": {
+    "objects": {"type": "array", "items": {"$ref": "plenora-storage-common-v1.schema.json#/$defs/object"}},
+    "truncated": {"type": "boolean"},
+    "next_start_after": {"type": ["string", "null"]}
+  }
+}

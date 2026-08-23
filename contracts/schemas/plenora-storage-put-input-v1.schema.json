@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.plenora.dev/storage/plenora-storage-put-input-v1.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "connection", "key", "artifact_source", "overwrite"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "connection": {"$ref": "plenora-storage-connection-v1.schema.json"},
+    "key": {"$ref": "plenora-storage-common-v1.schema.json#/$defs/key"},
+    "artifact_source": {"type": "string", "minLength": 1, "maxLength": 512},
+    "overwrite": {"type": "boolean"},
+    "content_type": {"type": ["string", "null"], "maxLength": 255},
+    "content_length": {"type": ["integer", "null"], "minimum": 0},
+    "metadata": {
+      "type": "object",
+      "maxProperties": 64,
+      "propertyNames": {"maxLength": 128},
+      "additionalProperties": {"type": "string", "maxLength": 2048}
+    }
+  }
+}
