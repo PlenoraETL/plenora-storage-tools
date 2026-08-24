@@ -2,8 +2,8 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use plenora_storage_core::{
     CopyRequest, CredentialMaterial, CredentialResolver, DeleteRequest, Engine, EngineConfig,
-    ExecutionControl, GetRequest, ListRequest, ProviderConnection, PutRequest, StatRequest,
-    StorageResult,
+    ExecutionControl, GetRequest, ListRequest, ProviderConnection, PublicationPolicy, PutRequest,
+    StatRequest, StorageProvider, StorageResult,
 };
 use plenora_storage_ftp::{CONFIG_CONTRACT, FtpProvider};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -17,6 +17,75 @@ impl CredentialResolver for TestCredentials {
             ("password".to_owned(), "plenora-ftp-secret".to_owned()),
         ])))
     }
+}
+
+#[test]
+fn ftp_capabilities_do_not_claim_atomic_publication() {
+    let capability = FtpProvider::new(Arc::new(TestCredentials)).capabilities();
+    assert_eq!(
+        capability.attributes.get("put_create_if_absent_atomic"),
+        Some(&"false".to_owned())
+    );
+    assert_eq!(
+        capability.attributes.get("copy_create_if_absent_atomic"),
+        Some(&"false".to_owned())
+    );
+    assert_eq!(
+        capability.attributes.get("overwrite_false"),
+        Some(&"rejected".to_owned())
+    );
+    assert_eq!(
+        capability.attributes.get("atomic_publication"),
+        Some(&"false".to_owned())
+    );
+}
+
+#[tokio::test]
+async fn ftp_rejects_unavailable_publication_policies_before_connecting() -> StorageResult<()> {
+    let engine = engine(true)?;
+    let control = ExecutionControl::default();
+    let mut source = tokio::io::empty();
+    let error = engine
+        .put(
+            &connection(),
+            &PutRequest {
+                key: "must-not-exist.bin".to_owned(),
+                overwrite: false,
+                publication_policy: PublicationPolicy::BestEffort,
+                content_type: None,
+                content_length: Some(0),
+                metadata: BTreeMap::new(),
+            },
+            &mut source,
+            &control,
+        )
+        .await
+        .expect_err("FTP create-if-absent must be rejected before connecting");
+    assert_eq!(error.code, "FTP_CREATE_IF_ABSENT_UNSUPPORTED");
+    assert_eq!(
+        error.remote_effect,
+        plenora_storage_core::RemoteEffect::None
+    );
+
+    let error = engine
+        .copy(
+            &connection(),
+            &CopyRequest {
+                source_key: "a".to_owned(),
+                destination_key: "b".to_owned(),
+                overwrite: true,
+                publication_policy: PublicationPolicy::AtomicRequired,
+            },
+            &control,
+        )
+        .await
+        .expect_err("FTP atomic publication must be rejected before connecting");
+    assert_eq!(error.code, "FTP_ATOMIC_PUBLICATION_UNSUPPORTED");
+    assert_eq!(
+        error.remote_effect,
+        plenora_storage_core::RemoteEffect::None
+    );
+    Ok(())
 }
 
 fn connection() -> ProviderConnection {
@@ -36,6 +105,7 @@ fn connection() -> ProviderConnection {
 
 fn engine(allow_insecure_ftp: bool) -> StorageResult<Engine> {
     let mut engine = Engine::new(EngineConfig {
+        allow_experimental_contracts: true,
         allow_insecure_http: false,
         allow_insecure_ftp,
         allow_private_network: true,
@@ -86,7 +156,8 @@ async fn ftp_contract_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
             &connection,
             &PutRequest {
                 key: source_key.clone(),
-                overwrite: false,
+                overwrite: true,
+                publication_policy: PublicationPolicy::BestEffort,
                 content_type: None,
                 content_length: Some(payload.len() as u64),
                 metadata: BTreeMap::new(),
@@ -114,7 +185,7 @@ async fn ftp_contract_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
             &connection,
             &ListRequest {
                 prefix: Some(prefix.clone()),
-                start_after: None,
+                cursor: None,
                 max_items: Some(10),
             },
             &control,
@@ -145,7 +216,8 @@ async fn ftp_contract_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
             &CopyRequest {
                 source_key: source_key.clone(),
                 destination_key: copied_key.clone(),
-                overwrite: false,
+                overwrite: true,
+                publication_policy: PublicationPolicy::BestEffort,
             },
             &control,
         )

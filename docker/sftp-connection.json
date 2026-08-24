@@ -5,7 +5,8 @@
     "host": "sftp",
     "port": 22,
     "root": "upload",
-    "host_key_sha256": null
+    "host_key_sha256": null,
+    "atomic_rename": true
   },
   "credential_ref": "env:PLENORA_SFTP_CREDENTIALS"
 }

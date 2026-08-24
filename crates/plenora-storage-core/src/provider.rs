@@ -3,8 +3,8 @@ use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::{
     CopyRequest, DeleteRequest, DeleteResult, EngineConfig, ExecutionControl, GetRequest,
-    ListRequest, ListResult, ObjectMetadata, ProviderCapabilities, ProviderConnection, PutRequest,
-    StatRequest, StorageResult, TestResult, TransferResult,
+    ObjectMetadata, ProviderCapabilities, ProviderConnection, ProviderListRequest,
+    ProviderListResult, PutRequest, StatRequest, StorageResult, TestResult, TransferResult,
 };
 
 pub struct OperationContext<'a> {
@@ -27,9 +27,9 @@ pub trait StorageProvider: Send + Sync {
     async fn list(
         &self,
         connection: &ProviderConnection,
-        request: &ListRequest,
+        request: &ProviderListRequest,
         context: &OperationContext<'_>,
-    ) -> StorageResult<ListResult>;
+    ) -> StorageResult<ProviderListResult>;
 
     async fn stat(
         &self,

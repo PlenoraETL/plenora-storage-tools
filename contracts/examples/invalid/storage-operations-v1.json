@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "name": "put requires explicit overwrite",
+      "schema": "plenora-storage-put-input-v1.schema.json",
+      "instance": {
+        "schema_version": 1,
+        "connection": {"provider": "s3", "config_contract": "plenora-storage-s3-connection-v1", "config": {}, "credential_ref": "secret://storage/test"},
+        "key": "a.bin",
+        "artifact_source": {"reference": "artifact://input/a", "metadata": {"content_type": null, "size": null, "sha256": null}},
+        "publication_policy": "atomic_required"
+      }
+    },
+    {
+      "name": "copy requires explicit overwrite",
+      "schema": "plenora-storage-copy-input-v1.schema.json",
+      "instance": {
+        "schema_version": 1,
+        "connection": {"provider": "s3", "config_contract": "plenora-storage-s3-connection-v1", "config": {}, "credential_ref": "secret://storage/test"},
+        "source_key": "a.bin",
+        "destination_key": "b.bin",
+        "publication_policy": "atomic_required"
+      }
+    },
+    {
+      "name": "get rejects a Windows path",
+      "schema": "plenora-storage-get-input-v1.schema.json",
+      "instance": {
+        "schema_version": 1,
+        "connection": {"provider": "s3", "config_contract": "plenora-storage-s3-connection-v1", "config": {}, "credential_ref": "secret://storage/test"},
+        "key": "a.bin",
+        "artifact_sink": {"reference": "C:\\private\\a.bin", "overwrite": false, "metadata": {"content_type": null, "size": null, "sha256": null}}
+      }
+    },
+    {
+      "name": "put rejects traversal in an artifact reference",
+      "schema": "plenora-storage-put-input-v1.schema.json",
+      "instance": {
+        "schema_version": 1,
+        "connection": {"provider": "s3", "config_contract": "plenora-storage-s3-connection-v1", "config": {}, "credential_ref": "secret://storage/test"},
+        "key": "a.bin",
+        "artifact_source": {"reference": "artifact://input/../private", "metadata": {"content_type": null, "size": null, "sha256": null}},
+        "overwrite": false,
+        "publication_policy": "atomic_required"
+      }
+    },
+    {
+      "name": "connection rejects inline passwords",
+      "schema": "plenora-storage-test-input-v1.schema.json",
+      "instance": {
+        "schema_version": 1,
+        "connection": {"provider": "ftp", "config_contract": "plenora-storage-ftp-connection-v1", "config": {"password": "do-not-persist"}, "credential_ref": "secret://storage/test"}
+      }
+    },
+    {
+      "name": "connection rejects case-varied inline credentials",
+      "schema": "plenora-storage-test-input-v1.schema.json",
+      "instance": {
+        "schema_version": 1,
+        "connection": {"provider": "ftp", "config_contract": "plenora-storage-ftp-connection-v1", "config": {"Password": "do-not-persist"}, "credential_ref": "secret://storage/test"}
+      }
+    },
+    {
+      "name": "connection rejects a raw credential value",
+      "schema": "plenora-storage-test-input-v1.schema.json",
+      "instance": {
+        "schema_version": 1,
+        "connection": {"provider": "ftp", "config_contract": "plenora-storage-ftp-connection-v1", "config": {}, "credential_ref": "do-not-persist"}
+      }
+    },
+    {
+      "name": "delete requires explicit missing behavior",
+      "schema": "plenora-storage-delete-input-v1.schema.json",
+      "instance": {
+        "schema_version": 1,
+        "connection": {"provider": "s3", "config_contract": "plenora-storage-s3-connection-v1", "config": {}, "credential_ref": "secret://storage/test"},
+        "key": "a.bin"
+      }
+    }
+  ]
+}

@@ -16,6 +16,7 @@ printf '%s' 'plenora-storage-cli conformance' > "${cli_tmp}/input.txt"
 
 set +e
 "${cli_bin}" --format json \
+  --allow-experimental-contracts \
   test --connection docker/minio-connection.json \
   > "${cli_tmp}/error.json" 2> "${cli_tmp}/error.stderr"
 error_code=$?
@@ -27,20 +28,20 @@ grep -q '"status":"error"' "${cli_tmp}/error.json"
 grep -q '"category":"invalid_configuration"' "${cli_tmp}/error.json"
 
 "${cli_bin}" \
-  --format json --allow-insecure-http --allow-private-network \
+  --format json --allow-experimental-contracts --allow-insecure-http --allow-private-network \
   test --connection docker/minio-connection.json
 "${cli_bin}" \
-  --format json --allow-insecure-http --allow-private-network \
+  --format json --allow-experimental-contracts --allow-insecure-http --allow-private-network \
   put --connection docker/minio-connection.json --key "${cli_key}" \
-  --input "${cli_tmp}/input.txt" --overwrite
+  --input "${cli_tmp}/input.txt" --overwrite true --publication-policy atomic-required
 "${cli_bin}" \
-  --format json --allow-insecure-http --allow-private-network \
+  --format json --allow-experimental-contracts --allow-insecure-http --allow-private-network \
   get --connection docker/minio-connection.json --key "${cli_key}" \
-  --output "${cli_tmp}/output.txt"
+  --output "${cli_tmp}/output.txt" --overwrite true
 cmp "${cli_tmp}/input.txt" "${cli_tmp}/output.txt"
 "${cli_bin}" \
-  --format json --allow-insecure-http --allow-private-network \
-  delete --connection docker/minio-connection.json --key "${cli_key}"
+  --format json --allow-experimental-contracts --allow-insecure-http --allow-private-network \
+  delete --connection docker/minio-connection.json --key "${cli_key}" --ignore-missing false
 
 run_cli_roundtrip() {
   provider="$1"
@@ -52,18 +53,18 @@ run_cli_roundtrip() {
     test --connection "${connection}"
   "${cli_bin}" --format json "$@" \
     put --connection "${connection}" --key "${key}" \
-    --input "${cli_tmp}/input.txt" --overwrite
+    --input "${cli_tmp}/input.txt" --overwrite true --publication-policy best-effort
   "${cli_bin}" --format json "$@" \
     get --connection "${connection}" --key "${key}" \
-    --output "${cli_tmp}/output-${provider}.txt"
+    --output "${cli_tmp}/output-${provider}.txt" --overwrite true
   cmp "${cli_tmp}/input.txt" "${cli_tmp}/output-${provider}.txt"
   "${cli_bin}" --format json "$@" \
-    delete --connection "${connection}" --key "${key}"
+    delete --connection "${connection}" --key "${key}" --ignore-missing false
 }
 
 run_cli_roundtrip \
   sftp docker/sftp-connection.json \
-  --allow-private-network --allow-unverified-ssh
+  --allow-experimental-contracts --allow-private-network --allow-unverified-ssh
 run_cli_roundtrip \
   ftp docker/ftp-connection.json \
-  --allow-private-network --allow-insecure-ftp
+  --allow-experimental-contracts --allow-private-network --allow-insecure-ftp

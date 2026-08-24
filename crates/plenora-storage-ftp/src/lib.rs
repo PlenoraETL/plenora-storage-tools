@@ -6,11 +6,11 @@ use std::{collections::BTreeMap, sync::Arc, time::SystemTime};
 
 use async_trait::async_trait;
 use plenora_storage_core::{
-    CopyRequest, CredentialResolver, DeleteRequest, DeleteResult, ErrorCategory, ErrorPhase,
-    GetRequest, IntegrityMetadata, ListRequest, ListResult, ObjectMetadata, OperationContext,
-    ProviderCapabilities, ProviderConnection, PutRequest, RemoteEffect, RetryDisposition,
-    StatRequest, StorageError, StorageProvider, StorageResult, TestResult, TransferResult,
-    validate_network_target,
+    ArtifactMetadata, CopyRequest, CredentialResolver, DeleteRequest, DeleteResult, ErrorCategory,
+    ErrorPhase, GetRequest, IntegrityMetadata, ObjectMetadata, OperationContext,
+    ProviderCapabilities, ProviderConnection, ProviderListRequest, ProviderListResult,
+    PublicationPolicy, PutRequest, RemoteEffect, RetryDisposition, StatRequest, StorageError,
+    StorageProvider, StorageResult, TestResult, TransferResult, validate_network_target,
 };
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -139,7 +139,13 @@ impl StorageProvider for FtpProvider {
                 ("authentication".to_owned(), "password".to_owned()),
                 ("streaming_get".to_owned(), "true".to_owned()),
                 ("streaming_put".to_owned(), "true".to_owned()),
-                ("conditional_write".to_owned(), "false".to_owned()),
+                ("put_create_if_absent_atomic".to_owned(), "false".to_owned()),
+                (
+                    "copy_create_if_absent_atomic".to_owned(),
+                    "false".to_owned(),
+                ),
+                ("overwrite_false".to_owned(), "rejected".to_owned()),
+                ("atomic_publication".to_owned(), "false".to_owned()),
             ]),
         }
     }
@@ -180,9 +186,9 @@ impl StorageProvider for FtpProvider {
     async fn list(
         &self,
         connection: &ProviderConnection,
-        request: &ListRequest,
+        request: &ProviderListRequest,
         context: &OperationContext<'_>,
-    ) -> StorageResult<ListResult> {
+    ) -> StorageResult<ProviderListResult> {
         let limit = list_limit(request, context)?;
         validate_prefix(request.prefix.as_deref().unwrap_or_default())?;
         if let Some(start_after) = request.start_after.as_deref() {
@@ -260,7 +266,7 @@ impl StorageProvider for FtpProvider {
         let next_start_after = truncated
             .then(|| objects.last().map(|object| object.key.clone()))
             .flatten();
-        Ok(ListResult {
+        Ok(ProviderListResult {
             objects,
             truncated,
             next_start_after,
@@ -315,8 +321,10 @@ impl StorageProvider for FtpProvider {
                 false,
             )
             .await?;
+        // Once bytes are offered to the caller-owned sink, failures can leave
+        // an externally visible partial artifact.
         let (bytes_transferred, digest) =
-            copy_with_control(&mut stream, sink, context, false).await?;
+            copy_with_control(&mut stream, sink, context, true).await?;
         context
             .control
             .run(
@@ -325,10 +333,10 @@ impl StorageProvider for FtpProvider {
                         .ftp
                         .finalize_retr_stream(stream)
                         .await
-                        .map_err(|error| map_ftp_error(error, ErrorPhase::Commit, false))
+                        .map_err(|error| map_ftp_error(error, ErrorPhase::Commit, true))
                 },
                 ErrorPhase::Commit,
-                false,
+                true,
             )
             .await?;
         Ok(transfer_result(
@@ -345,6 +353,7 @@ impl StorageProvider for FtpProvider {
         source: &mut (dyn AsyncRead + Send + Unpin),
         context: &OperationContext<'_>,
     ) -> StorageResult<TransferResult> {
+        validate_ftp_publication(request.overwrite, request.publication_policy)?;
         validate_key(&request.key)?;
         validate_file_metadata(request)?;
         let mut remote = context
@@ -356,9 +365,6 @@ impl StorageProvider for FtpProvider {
             )
             .await?;
         ensure_parent_directories(&mut remote.ftp, &request.key, context).await?;
-        if !request.overwrite && ftp_exists(&mut remote.ftp, &request.key).await? {
-            return Err(conflict_error("FTP_CREATE_CONFLICT"));
-        }
         let mut stream = context
             .control
             .run(
@@ -467,6 +473,7 @@ impl StorageProvider for FtpProvider {
         request: &CopyRequest,
         context: &OperationContext<'_>,
     ) -> StorageResult<ObjectMetadata> {
+        validate_ftp_publication(request.overwrite, request.publication_policy)?;
         validate_key(&request.source_key)?;
         validate_key(&request.destination_key)?;
         let mut source_remote = context
@@ -491,11 +498,6 @@ impl StorageProvider for FtpProvider {
             context,
         )
         .await?;
-        if !request.overwrite
-            && ftp_exists(&mut destination_remote.ftp, &request.destination_key).await?
-        {
-            return Err(conflict_error("FTP_COPY_CONFLICT"));
-        }
         let mut source = source_remote
             .ftp
             .retr_as_stream(&request.source_key)
@@ -595,6 +597,35 @@ fn validate_file_metadata(request: &PutRequest) -> StorageResult<()> {
     if request.content_type.is_some() || !request.metadata.is_empty() {
         return Err(StorageError::unsupported(
             "FTP does not preserve object content type or custom metadata",
+        )
+        .with_provider(PROVIDER_ID));
+    }
+    Ok(())
+}
+
+fn validate_ftp_publication(
+    overwrite: bool,
+    publication_policy: PublicationPolicy,
+) -> StorageResult<()> {
+    if !overwrite {
+        return Err(StorageError::new(
+            ErrorCategory::Unsupported,
+            ErrorPhase::Validate,
+            RemoteEffect::None,
+            RetryDisposition::Never,
+            "FTP_CREATE_IF_ABSENT_UNSUPPORTED",
+            "FTP cannot guarantee atomic create-if-absent and rejects overwrite=false",
+        )
+        .with_provider(PROVIDER_ID));
+    }
+    if publication_policy == PublicationPolicy::AtomicRequired {
+        return Err(StorageError::new(
+            ErrorCategory::Unsupported,
+            ErrorPhase::Validate,
+            RemoteEffect::None,
+            RetryDisposition::Never,
+            "FTP_ATOMIC_PUBLICATION_UNSUPPORTED",
+            "FTP cannot guarantee atomic publication",
         )
         .with_provider(PROVIDER_ID));
     }
@@ -724,7 +755,10 @@ where
     Ok((transferred, digest))
 }
 
-fn list_limit(request: &ListRequest, context: &OperationContext<'_>) -> StorageResult<usize> {
+fn list_limit(
+    request: &ProviderListRequest,
+    context: &OperationContext<'_>,
+) -> StorageResult<usize> {
     let limit = request.max_items.unwrap_or(1_000);
     if limit == 0 || limit > context.policy.max_list_items {
         return Err(StorageError::new(
@@ -755,13 +789,19 @@ fn format_system_time(value: SystemTime) -> Option<String> {
 }
 
 fn transfer_result(key: String, bytes_transferred: u64, digest: Sha256) -> TransferResult {
+    let checksum = IntegrityMetadata {
+        algorithm: "sha256".to_owned(),
+        value: format!("{:x}", digest.finalize()),
+    };
     TransferResult {
         key,
         bytes_transferred,
-        checksum: IntegrityMetadata {
-            algorithm: "sha256".to_owned(),
-            value: format!("{:x}", digest.finalize()),
+        artifact: ArtifactMetadata {
+            content_type: None,
+            size: Some(bytes_transferred),
+            sha256: Some(checksum.value.clone()),
         },
+        checksum,
         etag: None,
         version: None,
     }
@@ -861,7 +901,7 @@ fn transfer_io_error(phase: ErrorPhase, mutating: bool) -> StorageError {
         ErrorCategory::Io,
         phase,
         if mutating {
-            RemoteEffect::Partial
+            RemoteEffect::Unknown
         } else {
             RemoteEffect::None
         },
@@ -876,23 +916,11 @@ fn transfer_io_error(phase: ErrorPhase, mutating: bool) -> StorageError {
     .with_provider(PROVIDER_ID)
 }
 
-fn conflict_error(code: &'static str) -> StorageError {
-    StorageError::new(
-        ErrorCategory::Conflict,
-        ErrorPhase::Prepare,
-        RemoteEffect::None,
-        RetryDisposition::Never,
-        code,
-        "FTP destination already exists",
-    )
-    .with_provider(PROVIDER_ID)
-}
-
 fn transfer_limit_error() -> StorageError {
     StorageError::new(
         ErrorCategory::ResourceLimit,
         ErrorPhase::Read,
-        RemoteEffect::Partial,
+        RemoteEffect::Unknown,
         RetryDisposition::RequiresRecovery,
         "TRANSFER_LIMIT_EXCEEDED",
         "storage transfer exceeds the engine byte limit",

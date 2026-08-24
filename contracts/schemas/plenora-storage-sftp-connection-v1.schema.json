@@ -12,6 +12,7 @@
     "host_key_sha256": {
       "type": ["string", "null"],
       "pattern": "^SHA256:[A-Za-z0-9+/]{43}=?$"
-    }
+    },
+    "atomic_rename": {"type": "boolean", "default": false}
   }
 }

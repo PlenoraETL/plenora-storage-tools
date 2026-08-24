@@ -7,6 +7,8 @@
     "schema_version": {"const": 1},
     "connection": {"$ref": "plenora-storage-connection-v1.schema.json"},
     "key": {"$ref": "plenora-storage-common-v1.schema.json#/$defs/key"},
-    "artifact_sink": {"type": "string", "minLength": 1, "maxLength": 512}
+    "artifact_sink": {
+      "$ref": "plenora-storage-common-v1.schema.json#/$defs/artifactSinkReference"
+    }
   }
 }

@@ -7,7 +7,11 @@
     "schema_version": {"const": 1},
     "connection": {"$ref": "plenora-storage-connection-v1.schema.json"},
     "prefix": {"type": ["string", "null"], "maxLength": 4096},
-    "start_after": {"type": ["string", "null"], "maxLength": 4096},
+    "cursor": {
+      "type": ["string", "null"],
+      "maxLength": 512,
+      "pattern": "^cursor://[0-9a-f]{64}$"
+    },
     "max_items": {"type": ["integer", "null"], "minimum": 1}
   }
 }

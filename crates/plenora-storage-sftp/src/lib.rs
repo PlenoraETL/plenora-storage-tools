@@ -2,15 +2,22 @@
 
 #![forbid(unsafe_code)]
 
-use std::{collections::BTreeMap, sync::Arc, time::SystemTime};
+use std::{
+    collections::BTreeMap,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+    time::SystemTime,
+};
 
 use async_trait::async_trait;
 use plenora_storage_core::{
-    CopyRequest, CredentialResolver, DeleteRequest, DeleteResult, ErrorCategory, ErrorPhase,
-    GetRequest, IntegrityMetadata, ListRequest, ListResult, ObjectMetadata, OperationContext,
-    ProviderCapabilities, ProviderConnection, PutRequest, RemoteEffect, RetryDisposition,
-    StatRequest, StorageError, StorageProvider, StorageResult, TestResult, TransferResult,
-    validate_network_target,
+    ArtifactMetadata, CopyRequest, CredentialResolver, DeleteRequest, DeleteResult, ErrorCategory,
+    ErrorPhase, GetRequest, IntegrityMetadata, ObjectMetadata, OperationContext,
+    ProviderCapabilities, ProviderConnection, ProviderListRequest, ProviderListResult,
+    PublicationPolicy, PutRequest, RemoteEffect, RetryDisposition, StatRequest, StorageError,
+    StorageProvider, StorageResult, TestResult, TransferResult, validate_network_target,
 };
 use russh::{
     client,
@@ -27,6 +34,7 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 pub const PROVIDER_ID: &str = "sftp";
 pub const CONFIG_CONTRACT: &str = "plenora-storage-sftp-connection-v1";
+static TEMPORARY_NAME_NONCE: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -38,6 +46,8 @@ pub struct SftpConnectionConfig {
     pub root: String,
     #[serde(default)]
     pub host_key_sha256: Option<String>,
+    #[serde(default)]
+    pub atomic_rename: bool,
 }
 
 const fn default_port() -> u16 {
@@ -183,7 +193,16 @@ impl StorageProvider for SftpProvider {
                 ("host_key_verification".to_owned(), "sha256-pin".to_owned()),
                 ("streaming_get".to_owned(), "true".to_owned()),
                 ("streaming_put".to_owned(), "true".to_owned()),
-                ("conditional_write".to_owned(), "true".to_owned()),
+                ("put_create_if_absent_atomic".to_owned(), "true".to_owned()),
+                ("copy_create_if_absent_atomic".to_owned(), "true".to_owned()),
+                (
+                    "atomic_publication".to_owned(),
+                    "qualified_by_connection".to_owned(),
+                ),
+                (
+                    "atomic_required".to_owned(),
+                    "overwrite_true_only".to_owned(),
+                ),
             ]),
         }
     }
@@ -224,9 +243,9 @@ impl StorageProvider for SftpProvider {
     async fn list(
         &self,
         connection: &ProviderConnection,
-        request: &ListRequest,
+        request: &ProviderListRequest,
         context: &OperationContext<'_>,
-    ) -> StorageResult<ListResult> {
+    ) -> StorageResult<ProviderListResult> {
         let limit = list_limit(request, context)?;
         validate_prefix(request.prefix.as_deref().unwrap_or_default())?;
         if let Some(start_after) = request.start_after.as_deref() {
@@ -288,7 +307,7 @@ impl StorageProvider for SftpProvider {
         let next_start_after = truncated
             .then(|| objects.last().map(|object| object.key.clone()))
             .flatten();
-        Ok(ListResult {
+        Ok(ProviderListResult {
             objects,
             truncated,
             next_start_after,
@@ -359,8 +378,9 @@ impl StorageProvider for SftpProvider {
                 false,
             )
             .await?;
-        let (bytes_transferred, digest) =
-            copy_with_control(&mut file, sink, context, false).await?;
+        // Once bytes are offered to the caller-owned sink, failures can leave
+        // an externally visible partial artifact.
+        let (bytes_transferred, digest) = copy_with_control(&mut file, sink, context, true).await?;
         Ok(transfer_result(
             request.key.clone(),
             bytes_transferred,
@@ -375,6 +395,8 @@ impl StorageProvider for SftpProvider {
         source: &mut (dyn AsyncRead + Send + Unpin),
         context: &OperationContext<'_>,
     ) -> StorageResult<TransferResult> {
+        let atomic_publish =
+            validate_sftp_publication(connection, request.overwrite, request.publication_policy)?;
         validate_key(&request.key)?;
         validate_file_metadata(request)?;
         let remote = context
@@ -385,12 +407,17 @@ impl StorageProvider for SftpProvider {
                 false,
             )
             .await?;
-        let path = remote_path(&remote.root, &request.key);
-        ensure_parent_directories(&remote.sftp, &path, context).await?;
-        let flags = if request.overwrite {
-            OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE
+        let destination_path = remote_path(&remote.root, &request.key);
+        ensure_parent_directories(&remote.sftp, &destination_path, context).await?;
+        let write_path = if atomic_publish {
+            temporary_path(&destination_path)
         } else {
+            destination_path.clone()
+        };
+        let flags = if atomic_publish || !request.overwrite {
             OpenFlags::CREATE | OpenFlags::EXCLUDE | OpenFlags::WRITE
+        } else {
+            OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE
         };
         let mut file = context
             .control
@@ -398,7 +425,7 @@ impl StorageProvider for SftpProvider {
                 async {
                     remote
                         .sftp
-                        .open_with_flags(path, flags)
+                        .open_with_flags(write_path.clone(), flags)
                         .await
                         .map_err(|error| {
                             if request.overwrite {
@@ -415,12 +442,20 @@ impl StorageProvider for SftpProvider {
         let transfer = copy_with_control(source, &mut file, context, true).await;
         let (bytes_transferred, digest) = match transfer {
             Ok(result) => result,
-            Err(error) => return Err(error),
+            Err(error) => {
+                if atomic_publish {
+                    let _ = remote.sftp.remove_file(&write_path).await;
+                }
+                return Err(error);
+            }
         };
         if request
             .content_length
             .is_some_and(|expected| expected != bytes_transferred)
         {
+            if atomic_publish {
+                let _ = remote.sftp.remove_file(&write_path).await;
+            }
             return Err(StorageError::new(
                 ErrorCategory::InvalidConfiguration,
                 ErrorPhase::Commit,
@@ -446,6 +481,22 @@ impl StorageProvider for SftpProvider {
                 true,
             )
             .await?;
+        if atomic_publish {
+            context
+                .control
+                .run(
+                    async {
+                        remote
+                            .sftp
+                            .rename(&write_path, &destination_path)
+                            .await
+                            .map_err(|error| map_sftp_error(error, ErrorPhase::Commit, true))
+                    },
+                    ErrorPhase::Commit,
+                    true,
+                )
+                .await?;
+        }
         Ok(transfer_result(
             request.key.clone(),
             bytes_transferred,
@@ -504,6 +555,8 @@ impl StorageProvider for SftpProvider {
         request: &CopyRequest,
         context: &OperationContext<'_>,
     ) -> StorageResult<ObjectMetadata> {
+        let atomic_publish =
+            validate_sftp_publication(connection, request.overwrite, request.publication_policy)?;
         validate_key(&request.source_key)?;
         validate_key(&request.destination_key)?;
         let remote = context
@@ -522,14 +575,19 @@ impl StorageProvider for SftpProvider {
             .open(source_path)
             .await
             .map_err(|error| map_sftp_error(error, ErrorPhase::Read, false))?;
-        let flags = if request.overwrite {
-            OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE
+        let write_path = if atomic_publish {
+            temporary_path(&destination_path)
         } else {
+            destination_path.clone()
+        };
+        let flags = if atomic_publish || !request.overwrite {
             OpenFlags::CREATE | OpenFlags::EXCLUDE | OpenFlags::WRITE
+        } else {
+            OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE
         };
         let mut destination = remote
             .sftp
-            .open_with_flags(destination_path.clone(), flags)
+            .open_with_flags(write_path.clone(), flags)
             .await
             .map_err(|error| {
                 if request.overwrite {
@@ -556,6 +614,22 @@ impl StorageProvider for SftpProvider {
                 true,
             )
             .await?;
+        if atomic_publish {
+            context
+                .control
+                .run(
+                    async {
+                        remote
+                            .sftp
+                            .rename(&write_path, &destination_path)
+                            .await
+                            .map_err(|error| map_sftp_error(error, ErrorPhase::Commit, true))
+                    },
+                    ErrorPhase::Commit,
+                    true,
+                )
+                .await?;
+        }
         let metadata = remote
             .sftp
             .metadata(destination_path)
@@ -634,6 +708,34 @@ fn validate_file_metadata(request: &PutRequest) -> StorageResult<()> {
         .with_provider(PROVIDER_ID));
     }
     Ok(())
+}
+
+fn validate_sftp_publication(
+    connection: &ProviderConnection,
+    overwrite: bool,
+    publication_policy: PublicationPolicy,
+) -> StorageResult<bool> {
+    if publication_policy != PublicationPolicy::AtomicRequired {
+        return Ok(false);
+    }
+    let config = parse_config(connection)?;
+    if !config.atomic_rename || !overwrite {
+        return Err(StorageError::new(
+            ErrorCategory::Unsupported,
+            ErrorPhase::Validate,
+            RemoteEffect::None,
+            RetryDisposition::Never,
+            "SFTP_ATOMIC_PUBLICATION_UNAVAILABLE",
+            "SFTP atomic publication requires a qualified atomic rename connection and overwrite=true",
+        )
+        .with_provider(PROVIDER_ID));
+    }
+    Ok(true)
+}
+
+fn temporary_path(destination: &str) -> String {
+    let nonce = TEMPORARY_NAME_NONCE.fetch_add(1, Ordering::Relaxed);
+    format!("{destination}.plenora-tmp-{}-{nonce}", std::process::id())
 }
 
 fn remote_path(root: &str, key: &str) -> String {
@@ -761,7 +863,10 @@ where
     Ok((transferred, digest))
 }
 
-fn list_limit(request: &ListRequest, context: &OperationContext<'_>) -> StorageResult<usize> {
+fn list_limit(
+    request: &ProviderListRequest,
+    context: &OperationContext<'_>,
+) -> StorageResult<usize> {
     let limit = request.max_items.unwrap_or(1_000);
     if limit == 0 || limit > context.policy.max_list_items {
         return Err(StorageError::new(
@@ -792,13 +897,19 @@ fn format_system_time(value: SystemTime) -> Option<String> {
 }
 
 fn transfer_result(key: String, bytes_transferred: u64, digest: Sha256) -> TransferResult {
+    let checksum = IntegrityMetadata {
+        algorithm: "sha256".to_owned(),
+        value: format!("{:x}", digest.finalize()),
+    };
     TransferResult {
         key,
         bytes_transferred,
-        checksum: IntegrityMetadata {
-            algorithm: "sha256".to_owned(),
-            value: format!("{:x}", digest.finalize()),
+        artifact: ArtifactMetadata {
+            content_type: None,
+            size: Some(bytes_transferred),
+            sha256: Some(checksum.value.clone()),
         },
+        checksum,
         etag: None,
         version: None,
     }
@@ -899,7 +1010,7 @@ fn transfer_io_error(phase: ErrorPhase, mutating: bool) -> StorageError {
         ErrorCategory::Io,
         phase,
         if mutating {
-            RemoteEffect::Partial
+            RemoteEffect::Unknown
         } else {
             RemoteEffect::None
         },
@@ -934,7 +1045,7 @@ fn transfer_limit_error() -> StorageError {
     StorageError::new(
         ErrorCategory::ResourceLimit,
         ErrorPhase::Read,
-        RemoteEffect::Partial,
+        RemoteEffect::Unknown,
         RetryDisposition::RequiresRecovery,
         "TRANSFER_LIMIT_EXCEEDED",
         "storage transfer exceeds the engine byte limit",

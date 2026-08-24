@@ -26,4 +26,10 @@ Le operazioni v1 sono `storage.test`, `storage.list`, `storage.stat`,
   `retry.kind: requires_recovery`.
 
 `schemas/` contiene gli schemi Draft 2020-12. `bindings/rust-v1.json` collega
-le operazioni agli export Rust documentati.
+le operazioni agli export Rust documentati. Gli esempi in `examples/valid` e
+`examples/invalid` sono verificati dai test; la matrice completa e le decisioni
+ancora aperte sono in `STORAGE-OPERATIONS-1.0-PROPOSAL.md`.
+
+Il bordo runtime è intenzionalmente transport-neutral: il crate esporta i DTO,
+i selector e la validazione fail-closed, ma l'adapter concreto e la risoluzione
+degli artifact appartengono all'applicazione consumer.

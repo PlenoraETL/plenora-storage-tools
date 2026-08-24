@@ -12,8 +12,12 @@ async-trait.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+time.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
+
+[dev-dependencies]
+jsonschema.workspace = true
 
 [lints]
 workspace = true

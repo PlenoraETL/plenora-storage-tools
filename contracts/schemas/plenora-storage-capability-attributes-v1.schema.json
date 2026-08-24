@@ -9,25 +9,47 @@
     "contract": {"const": "plenora-storage-capability-attributes-v1"},
     "providers": {
       "type": "array",
+      "uniqueItems": true,
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["provider", "config_contract", "operations", "attributes"],
         "properties": {
-          "provider": {"type": "string"},
-          "config_contract": {"type": "string"},
-          "operations": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
-          "attributes": {"type": "object", "additionalProperties": {"type": "string"}}
+          "provider": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
+          "config_contract": {
+            "type": "string",
+            "pattern": "^plenora-[a-z0-9-]+-v[1-9][0-9]*$"
+          },
+          "operations": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {"enum": ["test", "list", "stat", "get", "put", "copy", "delete"]}
+          },
+          "attributes": {
+            "type": "object",
+            "maxProperties": 32,
+            "additionalProperties": {"type": "string", "maxLength": 256}
+          }
         }
       }
     },
     "transfer": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["streaming", "integrity"],
+      "required": ["mode", "integrity"],
       "properties": {
-        "streaming": {"type": "boolean"},
-        "integrity": {"const": "sha256"}
+        "mode": {
+          "enum": [
+            "none",
+            "streaming_source",
+            "streaming_sink",
+            "local_file_source",
+            "local_file_sink",
+            "runtime_artifact_source",
+            "runtime_artifact_sink"
+          ]
+        },
+        "integrity": {"enum": ["none", "sha256"]}
       }
     }
   }

@@ -13,15 +13,16 @@ use async_trait::async_trait;
 use futures_util::StreamExt;
 use object_store::{
     Attribute, AttributeValue, Attributes, CopyMode, CopyOptions, ObjectMeta, ObjectStore,
-    ObjectStoreExt, PutMultipartOptions, WriteMultipart,
+    ObjectStoreExt, PutMode, PutMultipartOptions, PutOptions, WriteMultipart,
     aws::{AmazonS3, AmazonS3Builder},
     path::Path,
 };
 use plenora_storage_core::{
-    CopyRequest, CredentialResolver, DeleteRequest, DeleteResult, ErrorCategory, ErrorPhase,
-    GetRequest, IntegrityMetadata, ListRequest, ListResult, ObjectMetadata, OperationContext,
-    ProviderCapabilities, ProviderConnection, PutRequest, RemoteEffect, RetryDisposition,
-    StatRequest, StorageError, StorageProvider, StorageResult, TestResult, TransferResult,
+    ArtifactMetadata, CopyRequest, CredentialResolver, DeleteRequest, DeleteResult, ErrorCategory,
+    ErrorPhase, GetRequest, IntegrityMetadata, ObjectMetadata, OperationContext,
+    ProviderCapabilities, ProviderConnection, ProviderListRequest, ProviderListResult, PutRequest,
+    RemoteEffect, RetryDisposition, StatRequest, StorageError, StorageProvider, StorageResult,
+    TestResult, TransferResult,
 };
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -109,7 +110,14 @@ impl StorageProvider for S3Provider {
                 ("api".to_owned(), "s3-compatible".to_owned()),
                 ("streaming_get".to_owned(), "true".to_owned()),
                 ("streaming_put".to_owned(), "true".to_owned()),
-                ("conditional_streaming_put".to_owned(), "false".to_owned()),
+                ("put_create_if_absent_atomic".to_owned(), "true".to_owned()),
+                (
+                    "copy_create_if_absent_atomic".to_owned(),
+                    "false".to_owned(),
+                ),
+                ("copy_overwrite_false".to_owned(), "rejected".to_owned()),
+                ("conditional_put".to_owned(), "native".to_owned()),
+                ("atomic_publication".to_owned(), "true".to_owned()),
                 ("list_order".to_owned(), "lexicographic".to_owned()),
             ]),
         }
@@ -143,9 +151,9 @@ impl StorageProvider for S3Provider {
     async fn list(
         &self,
         connection: &ProviderConnection,
-        request: &ListRequest,
+        request: &ProviderListRequest,
         context: &OperationContext<'_>,
-    ) -> StorageResult<ListResult> {
+    ) -> StorageResult<ProviderListResult> {
         let limit = request.max_items.unwrap_or(1_000);
         if limit == 0 || limit > context.policy.max_list_items {
             return Err(StorageError::new(
@@ -185,7 +193,7 @@ impl StorageProvider for S3Provider {
                     let next_start_after = truncated
                         .then(|| objects.last().map(|object| object.key.clone()))
                         .flatten();
-                    Ok(ListResult {
+                    Ok(ProviderListResult {
                         objects,
                         truncated,
                         next_start_after,
@@ -252,28 +260,31 @@ impl StorageProvider for S3Provider {
         let mut transferred = 0_u64;
         let mut digest = Sha256::new();
         loop {
+            let sink_has_bytes = transferred > 0;
             let chunk = context
                 .control
                 .run(
                     async {
-                        stream
-                            .next()
-                            .await
-                            .transpose()
-                            .map_err(|error| map_store_error(error, ErrorPhase::Read, false))
+                        stream.next().await.transpose().map_err(|error| {
+                            map_store_error(error, ErrorPhase::Read, sink_has_bytes)
+                        })
                     },
                     ErrorPhase::Read,
-                    false,
+                    sink_has_bytes,
                 )
                 .await?;
             let Some(chunk) = chunk else {
                 break;
             };
-            transferred = transferred
+            let next_transferred = transferred
                 .checked_add(chunk.len() as u64)
                 .ok_or_else(transfer_limit_error)?;
-            if transferred > context.policy.max_transfer_bytes {
-                return Err(transfer_limit_error());
+            if next_transferred > context.policy.max_transfer_bytes {
+                return Err(if sink_has_bytes {
+                    artifact_sink_limit_error()
+                } else {
+                    transfer_limit_error()
+                });
             }
             context
                 .control
@@ -283,17 +294,18 @@ impl StorageProvider for S3Provider {
                             StorageError::new(
                                 ErrorCategory::Io,
                                 ErrorPhase::Write,
-                                RemoteEffect::None,
-                                RetryDisposition::Never,
+                                RemoteEffect::Unknown,
+                                RetryDisposition::RequiresRecovery,
                                 "ARTIFACT_WRITE_FAILED",
-                                "artifact sink write failed",
+                                "artifact sink write failed and may be partial",
                             )
                         })
                     },
                     ErrorPhase::Write,
-                    false,
+                    true,
                 )
                 .await?;
+            transferred = next_transferred;
             digest.update(&chunk);
         }
         context
@@ -304,21 +316,27 @@ impl StorageProvider for S3Provider {
                         StorageError::new(
                             ErrorCategory::Io,
                             ErrorPhase::Write,
-                            RemoteEffect::None,
-                            RetryDisposition::Never,
+                            RemoteEffect::Unknown,
+                            RetryDisposition::RequiresRecovery,
                             "ARTIFACT_FLUSH_FAILED",
-                            "artifact sink flush failed",
+                            "artifact sink flush failed and its published state is ambiguous",
                         )
                     })
                 },
                 ErrorPhase::Write,
-                false,
+                true,
             )
             .await?;
+        let checksum = sha256_metadata(digest);
         Ok(TransferResult {
             key: request.key.clone(),
             bytes_transferred: transferred,
-            checksum: sha256_metadata(digest),
+            artifact: ArtifactMetadata {
+                content_type: None,
+                size: Some(transferred),
+                sha256: Some(checksum.value.clone()),
+            },
+            checksum,
             etag,
             version,
         })
@@ -331,12 +349,6 @@ impl StorageProvider for S3Provider {
         source: &mut (dyn AsyncRead + Send + Unpin),
         context: &OperationContext<'_>,
     ) -> StorageResult<TransferResult> {
-        if !request.overwrite {
-            return Err(StorageError::unsupported(
-                "S3 streaming put requires explicit overwrite=true in contract v1",
-            )
-            .with_provider(PROVIDER_ID));
-        }
         if request
             .content_length
             .is_some_and(|length| length > context.policy.max_transfer_bytes)
@@ -346,6 +358,82 @@ impl StorageProvider for S3Provider {
         validate_metadata(request)?;
         let path = required_path(&request.key)?;
         let store = self.store(connection, context).await?;
+        if !request.overwrite {
+            let mut payload = Vec::new();
+            let mut buffer = vec![0_u8; 64 * 1024];
+            let mut digest = Sha256::new();
+            loop {
+                let read = context
+                    .control
+                    .run(
+                        async {
+                            source.read(&mut buffer).await.map_err(|_| {
+                                StorageError::new(
+                                    ErrorCategory::Io,
+                                    ErrorPhase::Read,
+                                    RemoteEffect::None,
+                                    RetryDisposition::Safe,
+                                    "ARTIFACT_READ_FAILED",
+                                    "artifact source read failed before conditional publication",
+                                )
+                            })
+                        },
+                        ErrorPhase::Read,
+                        false,
+                    )
+                    .await?;
+                if read == 0 {
+                    break;
+                }
+                if payload.len().saturating_add(read) as u64 > context.policy.max_transfer_bytes {
+                    return Err(transfer_limit_error());
+                }
+                digest.update(&buffer[..read]);
+                payload.extend_from_slice(&buffer[..read]);
+            }
+            let transferred = payload.len() as u64;
+            if request
+                .content_length
+                .is_some_and(|expected| expected != transferred)
+            {
+                return Err(StorageError::invalid_configuration(
+                    "CONTENT_LENGTH_MISMATCH",
+                    "artifact length differs from declared content_length",
+                )
+                .with_provider(PROVIDER_ID));
+            }
+            let options = PutOptions {
+                mode: PutMode::Create,
+                attributes: put_attributes(request),
+                ..PutOptions::default()
+            };
+            let result = context
+                .control
+                .run(
+                    async {
+                        store
+                            .put_opts(&path, payload.into(), options)
+                            .await
+                            .map_err(|error| map_store_error(error, ErrorPhase::Commit, true))
+                    },
+                    ErrorPhase::Commit,
+                    true,
+                )
+                .await?;
+            let checksum = sha256_metadata(digest);
+            return Ok(TransferResult {
+                key: request.key.clone(),
+                bytes_transferred: transferred,
+                artifact: ArtifactMetadata {
+                    content_type: request.content_type.clone(),
+                    size: Some(transferred),
+                    sha256: Some(checksum.value.clone()),
+                },
+                checksum,
+                etag: result.e_tag,
+                version: result.version,
+            });
+        }
         let options = PutMultipartOptions {
             attributes: put_attributes(request),
             ..PutMultipartOptions::default()
@@ -448,10 +536,16 @@ impl StorageProvider for S3Provider {
                 true,
             )
             .await?;
+        let checksum = sha256_metadata(digest);
         Ok(TransferResult {
             key: request.key.clone(),
             bytes_transferred: transferred,
-            checksum: sha256_metadata(digest),
+            artifact: ArtifactMetadata {
+                content_type: request.content_type.clone(),
+                size: Some(transferred),
+                sha256: Some(checksum.value.clone()),
+            },
+            checksum,
             etag: result.e_tag,
             version: result.version,
         })
@@ -517,8 +611,13 @@ impl StorageProvider for S3Provider {
         context: &OperationContext<'_>,
     ) -> StorageResult<ObjectMetadata> {
         if !request.overwrite {
-            return Err(StorageError::unsupported(
-                "S3 copy requires explicit overwrite=true in contract v1",
+            return Err(StorageError::new(
+                ErrorCategory::Unsupported,
+                ErrorPhase::Validate,
+                RemoteEffect::None,
+                RetryDisposition::Never,
+                "S3_COPY_CREATE_IF_ABSENT_UNSUPPORTED",
+                "this S3 adapter cannot guarantee atomic create-if-absent for copy",
             )
             .with_provider(PROVIDER_ID));
         }
@@ -750,6 +849,18 @@ fn transfer_limit_error() -> StorageError {
         RetryDisposition::Never,
         "TRANSFER_LIMIT_EXCEEDED",
         "storage transfer exceeds the engine byte limit",
+    )
+    .with_provider(PROVIDER_ID)
+}
+
+fn artifact_sink_limit_error() -> StorageError {
+    StorageError::new(
+        ErrorCategory::ResourceLimit,
+        ErrorPhase::Write,
+        RemoteEffect::Unknown,
+        RetryDisposition::RequiresRecovery,
+        "TRANSFER_LIMIT_EXCEEDED",
+        "storage transfer exceeded the engine byte limit after publishing sink bytes",
     )
     .with_provider(PROVIDER_ID)
 }

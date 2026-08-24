@@ -3,7 +3,59 @@
   "$id": "https://schemas.plenora.dev/storage/plenora-storage-common-v1.schema.json",
   "title": "Plenora storage shared definitions v1",
   "$defs": {
-    "key": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "artifactMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["content_type", "size", "sha256"],
+      "properties": {
+        "content_type": {
+          "type": ["string", "null"],
+          "minLength": 3,
+          "maxLength": 255,
+          "pattern": "^[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+$"
+        },
+        "size": {"type": ["integer", "null"], "minimum": 0},
+        "sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^[^\\\\\\u0000]+$",
+      "not": {"pattern": "(^/)|((^|/)\\.\\.(/|$))"}
+    },
+    "artifactReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "metadata"],
+      "properties": {
+        "reference": {
+          "type": "string",
+          "minLength": 12,
+          "maxLength": 512,
+          "pattern": "^artifact://[A-Za-z0-9][A-Za-z0-9._~!$&'()*+,;=:@/?#%-]*$",
+          "not": {"pattern": "(^|/)\\.\\.(/|$)"}
+        },
+        "metadata": {"$ref": "#/$defs/artifactMetadata"}
+      }
+    },
+    "artifactSinkReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "overwrite", "metadata"],
+      "properties": {
+        "reference": {
+          "type": "string",
+          "minLength": 12,
+          "maxLength": 512,
+          "pattern": "^artifact://[A-Za-z0-9][A-Za-z0-9._~!$&'()*+,;=:@/?#%-]*$",
+          "not": {"pattern": "(^|/)\\.\\.(/|$)"}
+        },
+        "overwrite": {"type": "boolean"},
+        "metadata": {"$ref": "#/$defs/artifactMetadata"}
+      }
+    },
     "object": {
       "type": "object",
       "additionalProperties": false,
@@ -28,11 +80,12 @@
     "transfer": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["key", "bytes_transferred", "checksum", "etag", "version"],
+      "required": ["key", "bytes_transferred", "checksum", "artifact", "etag", "version"],
       "properties": {
         "key": {"$ref": "#/$defs/key"},
         "bytes_transferred": {"type": "integer", "minimum": 0},
         "checksum": {"$ref": "#/$defs/integrity"},
+        "artifact": {"$ref": "#/$defs/artifactMetadata"},
         "etag": {"type": ["string", "null"]},
         "version": {"type": ["string", "null"]}
       }

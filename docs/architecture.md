@@ -30,6 +30,15 @@ La connessione esterna contiene:
 I segreti risolti non vengono serializzati né inclusi negli errori. I byte di
 `get` e `put` attraversano stream; il JSON contiene soltanto metadati.
 
+Il Runtime Binding 1.0 transport-neutral risolve `credential_ref` e i
+riferimenti `artifact://` tramite trait applicativi, valida
+capability/selector/versione/contratto/content type, collega deadline e
+cancellazione e invoca realmente l'Engine. Restituisce il risultato completo o
+un `plenora-error-v1`, preservando identità contrattuale e correlation ID. Il
+core non dipende da `plenora-runtime-tools` e non implementa l'handler del
+trasporto: ownership, autorizzazione e lifecycle restano nel composition root
+dell'applicazione.
+
 ## Semantica comune
 
 Il nucleo comune standardizza soltanto ciò che può essere osservato in modo
@@ -40,6 +49,17 @@ e un'operazione non supportata fallisce chiuso.
 S3 è object storage; SFTP/FTPS sono filesystem remoti; SharePoint espone
 documenti e cartelle. Il core non promette directory, rename atomico, ETag
 universali o versioning equivalente.
+
+I cursori di `storage.list` sono token opachi di massimo 512 byte, mantenuti in
+memoria per 15 minuti e limitati a 1024 token attivi per Engine. Sono vincolati
+a provider, fingerprint della connessione, prefix e `max_items`; un cambio di
+scope fallisce chiuso. Scadono al timeout, all'eviction o alla chiusura/riavvio
+dell'Engine e non promettono snapshot isolation durante mutazioni concorrenti.
+
+`etag`, version ID del provider e SHA-256 sono metadati distinti e opzionali.
+La libreria non sintetizza i primi due e non li tratta come digest. Il campo
+SHA-256 viene valorizzato soltanto quando i byte sono realmente attraversati e
+calcolati dalla superficie.
 
 ## Lifecycle ed effetti
 

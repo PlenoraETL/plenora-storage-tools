@@ -2,8 +2,8 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use plenora_storage_core::{
     CopyRequest, CredentialMaterial, CredentialResolver, DeleteRequest, Engine, EngineConfig,
-    ExecutionControl, GetRequest, ListRequest, ProviderConnection, PutRequest, StatRequest,
-    StorageResult,
+    ExecutionControl, GetRequest, ListRequest, ProviderConnection, PublicationPolicy, PutRequest,
+    StatRequest, StorageProvider, StorageResult,
 };
 use plenora_storage_sftp::{CONFIG_CONTRACT, SftpProvider};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -28,14 +28,63 @@ fn connection() -> ProviderConnection {
                 .unwrap_or_else(|_| "sftp".to_owned()),
             "port": 22,
             "root": "upload",
-            "host_key_sha256": null
+            "host_key_sha256": null,
+            "atomic_rename": true
         }),
         credential_ref: "test:sftp".to_owned(),
     }
 }
 
+#[test]
+fn sftp_capabilities_qualify_atomic_publication() {
+    let capability = SftpProvider::new(Arc::new(TestCredentials)).capabilities();
+    assert_eq!(
+        capability.attributes.get("put_create_if_absent_atomic"),
+        Some(&"true".to_owned())
+    );
+    assert_eq!(
+        capability.attributes.get("copy_create_if_absent_atomic"),
+        Some(&"true".to_owned())
+    );
+    assert_eq!(
+        capability.attributes.get("atomic_publication"),
+        Some(&"qualified_by_connection".to_owned())
+    );
+}
+
+#[tokio::test]
+async fn sftp_rejects_atomic_publication_when_connection_is_unqualified() -> StorageResult<()> {
+    let engine = engine(true)?;
+    let mut unqualified = connection();
+    unqualified.config["atomic_rename"] = serde_json::json!(false);
+    let mut source = tokio::io::empty();
+    let error = engine
+        .put(
+            &unqualified,
+            &PutRequest {
+                key: "must-not-exist.bin".to_owned(),
+                overwrite: true,
+                publication_policy: PublicationPolicy::AtomicRequired,
+                content_type: None,
+                content_length: Some(0),
+                metadata: BTreeMap::new(),
+            },
+            &mut source,
+            &ExecutionControl::default(),
+        )
+        .await
+        .expect_err("an unqualified SFTP connection must reject atomic publication");
+    assert_eq!(error.code, "SFTP_ATOMIC_PUBLICATION_UNAVAILABLE");
+    assert_eq!(
+        error.remote_effect,
+        plenora_storage_core::RemoteEffect::None
+    );
+    Ok(())
+}
+
 fn engine(allow_unverified_ssh: bool) -> StorageResult<Engine> {
     let mut engine = Engine::new(EngineConfig {
+        allow_experimental_contracts: true,
         allow_insecure_http: false,
         allow_insecure_ftp: false,
         allow_private_network: true,
@@ -86,7 +135,8 @@ async fn sftp_contract_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
             &connection,
             &PutRequest {
                 key: source_key.clone(),
-                overwrite: false,
+                overwrite: true,
+                publication_policy: PublicationPolicy::AtomicRequired,
                 content_type: None,
                 content_length: Some(payload.len() as u64),
                 metadata: BTreeMap::new(),
@@ -114,7 +164,7 @@ async fn sftp_contract_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
             &connection,
             &ListRequest {
                 prefix: Some(prefix.clone()),
-                start_after: None,
+                cursor: None,
                 max_items: Some(10),
             },
             &control,
@@ -145,7 +195,8 @@ async fn sftp_contract_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
             &CopyRequest {
                 source_key: source_key.clone(),
                 destination_key: copied_key.clone(),
-                overwrite: false,
+                overwrite: true,
+                publication_policy: PublicationPolicy::AtomicRequired,
             },
             &control,
         )

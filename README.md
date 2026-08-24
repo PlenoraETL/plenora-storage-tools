@@ -2,7 +2,7 @@
 
 Libreria Rust provider-neutral per accedere a sistemi di storage attraverso
 contratti pubblici versionati. Gli adapter iniziali sono SFTP, FTP e
-S3-compatible. La conformance locale usa container reali per tutti e tre.
+S3-compatible. La verifica locale usa container reali per tutti e tre.
 
 > **Stato del progetto:** sperimentale. Contratti e API possono cambiare; non
 > viene ancora dichiarata alcuna garanzia di compatibilità con prodotti o
@@ -12,10 +12,10 @@ S3-compatible. La conformance locale usa container reali per tutti e tre.
 
 | Superficie | Stato | Artefatto |
 | --- | --- | --- |
-| Rust | iniziale | `plenora-storage-core` + adapter registrati |
-| CLI | iniziale | `plenora-storage` |
-| Runtime | pianificata | riferimenti credential/artifact opachi |
-| Python SDK | pianificata | successiva alla stabilizzazione dei contratti |
+| Rust | sperimentale | `plenora-storage-core` + adapter registrati |
+| CLI | sperimentale | `plenora-storage` |
+| Runtime | sperimentale | binding transport-neutral; adapter di trasporto posseduto dal consumer |
+| Python SDK | non richiesta | fuori dal profilo storage v1 |
 
 Le operazioni iniziali sono `storage.test`, `storage.list`, `storage.stat`,
 `storage.get`, `storage.put`, `storage.copy` e `storage.delete`. Il core non
@@ -33,6 +33,13 @@ comandi di trasferimento aggiungono `--input` o `--output` per il file locale.
 I file in `docker/*-connection.json` mostrano configurazioni complete per
 SFTP, FTP e S3-compatible. `credential_ref` punta a un resolver dell'host; non
 contiene il segreto.
+
+Le operazioni v1 richiedono l'opt-in `--allow-experimental-contracts`. I valori
+`--overwrite true|false`, `--publication-policy
+best-effort|atomic-required` e `--ignore-missing true|false` sono obbligatori
+dove applicabili: il protocollo non assume un default per una decisione
+distruttiva. FTP rifiuta sempre `overwrite=false` e `atomic-required`, invece
+di degradare a check-then-write.
 
 ## Sicurezza
 
@@ -60,9 +67,9 @@ docker compose run --rm --no-deps storage-rust
 Per probe manuali:
 
 ```powershell
-docker compose run --rm --no-deps storage-rust target/debug/plenora-storage --format json --allow-insecure-http --allow-private-network test --connection docker/minio-connection.json
-docker compose run --rm --no-deps storage-rust target/debug/plenora-storage --format json --allow-private-network --allow-unverified-ssh test --connection docker/sftp-connection.json
-docker compose run --rm --no-deps storage-rust target/debug/plenora-storage --format json --allow-private-network --allow-insecure-ftp test --connection docker/ftp-connection.json
+docker compose run --rm --no-deps storage-rust target/debug/plenora-storage --format json --allow-experimental-contracts --allow-insecure-http --allow-private-network test --connection docker/minio-connection.json
+docker compose run --rm --no-deps storage-rust target/debug/plenora-storage --format json --allow-experimental-contracts --allow-private-network --allow-unverified-ssh test --connection docker/sftp-connection.json
+docker compose run --rm --no-deps storage-rust target/debug/plenora-storage --format json --allow-experimental-contracts --allow-private-network --allow-insecure-ftp test --connection docker/ftp-connection.json
 ```
 
 La console MinIO è esposta su `http://localhost:9001`; l'API S3 è esposta su
@@ -81,7 +88,12 @@ cargo test --workspace --all-targets --locked
 ## Contratti
 
 I contratti component-owned vivono sotto `contracts/`. Il profilo comune di
-riferimento è `plenora-storage-tools-profile-v1` in `plenora-contracts`.
+riferimento è `plenora-storage-tools-profile-v1` in `plenora-contracts`. La
+matrice e le decisioni ratificabili sono in
+`contracts/STORAGE-OPERATIONS-1.0-PROPOSAL.md`; esempi validi e invalidi sono
+eseguiti dai test black-box del crate core. L'artefatto resta sperimentale fino
+a una futura release qualificata: qui non viene pubblicato alcun claim di
+conformità.
 
 ## Licenza
 

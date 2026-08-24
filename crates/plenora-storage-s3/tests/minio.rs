@@ -2,8 +2,8 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use plenora_storage_core::{
     CopyRequest, CredentialMaterial, CredentialResolver, DeleteRequest, Engine, EngineConfig,
-    ExecutionControl, GetRequest, ListRequest, ProviderConnection, PutRequest, StatRequest,
-    StorageError, StorageResult,
+    ExecutionControl, GetRequest, ListRequest, ProviderConnection, PublicationPolicy, PutRequest,
+    StatRequest, StorageError, StorageProvider, StorageResult,
 };
 use plenora_storage_s3::{CONFIG_CONTRACT, S3Provider};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -23,6 +23,27 @@ impl CredentialResolver for MinioCredentials {
             ),
         ])))
     }
+}
+
+#[test]
+fn s3_capabilities_claim_only_native_qualified_guarantees() {
+    let capability = S3Provider::new(Arc::new(MinioCredentials)).capabilities();
+    assert_eq!(
+        capability.attributes.get("put_create_if_absent_atomic"),
+        Some(&"true".to_owned())
+    );
+    assert_eq!(
+        capability.attributes.get("copy_create_if_absent_atomic"),
+        Some(&"false".to_owned())
+    );
+    assert_eq!(
+        capability.attributes.get("conditional_put"),
+        Some(&"native".to_owned())
+    );
+    assert_eq!(
+        capability.attributes.get("atomic_publication"),
+        Some(&"true".to_owned())
+    );
 }
 
 fn required_env(name: &str, default: &str) -> String {
@@ -47,6 +68,7 @@ fn connection() -> ProviderConnection {
 
 fn engine() -> StorageResult<Engine> {
     let mut engine = Engine::new(EngineConfig {
+        allow_experimental_contracts: true,
         allow_insecure_http: true,
         allow_insecure_ftp: false,
         allow_private_network: true,
@@ -66,7 +88,10 @@ async fn s3_contract_roundtrip_against_minio() -> Result<(), Box<dyn std::error:
     let engine = engine()?;
     let connection = connection();
     let control = ExecutionControl::default();
-    let prefix = format!("conformance/{}/", std::process::id());
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_nanos();
+    let prefix = format!("conformance/{}-{nonce}/", std::process::id());
     let source_key = format!("{prefix}source.bin");
     let copied_key = format!("{prefix}copy.bin");
     let payload = b"plenora-storage-tools minio conformance".to_vec();
@@ -85,7 +110,8 @@ async fn s3_contract_roundtrip_against_minio() -> Result<(), Box<dyn std::error:
             &connection,
             &PutRequest {
                 key: source_key.clone(),
-                overwrite: true,
+                overwrite: false,
+                publication_policy: PublicationPolicy::AtomicRequired,
                 content_type: Some("application/octet-stream".to_owned()),
                 content_length: Some(payload.len() as u64),
                 metadata: BTreeMap::from([("plenora-test".to_owned(), "true".to_owned())]),
@@ -96,6 +122,28 @@ async fn s3_contract_roundtrip_against_minio() -> Result<(), Box<dyn std::error:
         .await?;
     producer_task.await??;
     assert_eq!(put.bytes_transferred, payload.len() as u64);
+
+    let mut duplicate_source = tokio::io::empty();
+    let duplicate = engine
+        .put(
+            &connection,
+            &PutRequest {
+                key: source_key.clone(),
+                overwrite: false,
+                publication_policy: PublicationPolicy::AtomicRequired,
+                content_type: None,
+                content_length: Some(0),
+                metadata: BTreeMap::new(),
+            },
+            &mut duplicate_source,
+            &control,
+        )
+        .await
+        .expect_err("native create-if-absent must reject an existing object");
+    assert_eq!(
+        duplicate.remote_effect,
+        plenora_storage_core::RemoteEffect::None
+    );
 
     let stat = engine
         .stat(
@@ -113,7 +161,7 @@ async fn s3_contract_roundtrip_against_minio() -> Result<(), Box<dyn std::error:
             &connection,
             &ListRequest {
                 prefix: Some(prefix.clone()),
-                start_after: None,
+                cursor: None,
                 max_items: Some(10),
             },
             &control,
@@ -141,6 +189,25 @@ async fn s3_contract_roundtrip_against_minio() -> Result<(), Box<dyn std::error:
     assert_eq!(consumer_task.await??, payload);
     assert_eq!(get.checksum, put.checksum);
 
+    let rejected_copy = engine
+        .copy(
+            &connection,
+            &CopyRequest {
+                source_key: source_key.clone(),
+                destination_key: copied_key.clone(),
+                overwrite: false,
+                publication_policy: PublicationPolicy::AtomicRequired,
+            },
+            &control,
+        )
+        .await
+        .expect_err("unsupported conditional copy must fail before mutation");
+    assert_eq!(rejected_copy.code, "S3_COPY_CREATE_IF_ABSENT_UNSUPPORTED");
+    assert_eq!(
+        rejected_copy.remote_effect,
+        plenora_storage_core::RemoteEffect::None
+    );
+
     let copied = engine
         .copy(
             &connection,
@@ -148,6 +215,7 @@ async fn s3_contract_roundtrip_against_minio() -> Result<(), Box<dyn std::error:
                 source_key: source_key.clone(),
                 destination_key: copied_key.clone(),
                 overwrite: true,
+                publication_policy: PublicationPolicy::AtomicRequired,
             },
             &control,
         )
@@ -176,7 +244,10 @@ async fn insecure_minio_requires_explicit_policy() -> Result<(), StorageError> {
     if std::env::var("PLENORA_MINIO_TEST").as_deref() != Ok("1") {
         return Ok(());
     }
-    let mut engine = Engine::new(EngineConfig::default());
+    let mut engine = Engine::new(EngineConfig {
+        allow_experimental_contracts: true,
+        ..EngineConfig::default()
+    });
     engine.register_provider(Arc::new(S3Provider::new(Arc::new(MinioCredentials))))?;
     let error = engine
         .test(&connection(), &ExecutionControl::default())

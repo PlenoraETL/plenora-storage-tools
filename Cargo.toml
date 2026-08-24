@@ -21,6 +21,7 @@ async-trait = "0.1"
 bytes = "1.11"
 clap = { version = "4.5", features = ["derive"] }
 futures-util = "0.3"
+jsonschema = { version = "0.50.0", default-features = false }
 object_store = { version = "0.14.1", default-features = false, features = ["aws"] }
 russh = { version = "0.62.7", default-features = false, features = ["aws-lc-rs"] }
 russh-sftp = "2.4.0"

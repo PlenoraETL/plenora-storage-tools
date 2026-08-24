@@ -13,7 +13,8 @@ use futures_util::FutureExt;
 use plenora_storage_core::{
     COMPONENT_ID, CopyRequest, DeleteRequest, Engine, EngineConfig, EnvironmentCredentialResolver,
     ErrorCategory, ErrorPhase, ExecutionControl, GetRequest, ListRequest, ProviderConnection,
-    PutRequest, RemoteEffect, RetryDisposition, StatRequest, StorageError, StorageResult, Surface,
+    PublicationPolicy, PutRequest, RemoteEffect, RetryDisposition, StatRequest, StorageError,
+    StorageResult, Surface,
 };
 use plenora_storage_ftp::FtpProvider;
 use plenora_storage_s3::S3Provider;
@@ -37,6 +38,8 @@ struct Cli {
     #[arg(long, global = true)]
     deadline: Option<String>,
     #[arg(long, global = true)]
+    allow_experimental_contracts: bool,
+    #[arg(long, global = true)]
     allow_insecure_http: bool,
     #[arg(long, global = true)]
     allow_insecure_ftp: bool,
@@ -57,6 +60,21 @@ enum OutputFormat {
     Json,
 }
 
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum CliPublicationPolicy {
+    BestEffort,
+    AtomicRequired,
+}
+
+impl From<CliPublicationPolicy> for PublicationPolicy {
+    fn from(value: CliPublicationPolicy) -> Self {
+        match value {
+            CliPublicationPolicy::BestEffort => Self::BestEffort,
+            CliPublicationPolicy::AtomicRequired => Self::AtomicRequired,
+        }
+    }
+}
+
 #[derive(Subcommand)]
 enum Command {
     Capabilities,
@@ -67,7 +85,7 @@ enum Command {
         #[arg(long)]
         prefix: Option<String>,
         #[arg(long)]
-        start_after: Option<String>,
+        cursor: Option<String>,
         #[arg(long)]
         max_items: Option<usize>,
     },
@@ -84,7 +102,7 @@ enum Command {
         key: String,
         #[arg(long)]
         output: PathBuf,
-        #[arg(long)]
+        #[arg(long, action = clap::ArgAction::Set, required = true)]
         overwrite: bool,
     },
     Put {
@@ -94,8 +112,10 @@ enum Command {
         key: String,
         #[arg(long)]
         input: PathBuf,
-        #[arg(long)]
+        #[arg(long, action = clap::ArgAction::Set, required = true)]
         overwrite: bool,
+        #[arg(long, value_enum)]
+        publication_policy: CliPublicationPolicy,
         #[arg(long)]
         content_type: Option<String>,
     },
@@ -106,15 +126,17 @@ enum Command {
         source_key: String,
         #[arg(long)]
         destination_key: String,
-        #[arg(long)]
+        #[arg(long, action = clap::ArgAction::Set, required = true)]
         overwrite: bool,
+        #[arg(long, value_enum)]
+        publication_policy: CliPublicationPolicy,
     },
     Delete {
         #[command(flatten)]
         connection: ConnectionArgs,
         #[arg(long)]
         key: String,
-        #[arg(long)]
+        #[arg(long, action = clap::ArgAction::Set, required = true)]
         ignore_missing: bool,
     },
 }
@@ -207,6 +229,7 @@ async fn run() -> ExitCode {
     };
 
     let mut engine = Engine::new(EngineConfig {
+        allow_experimental_contracts: cli.allow_experimental_contracts,
         allow_insecure_http: cli.allow_insecure_http,
         allow_insecure_ftp: cli.allow_insecure_ftp,
         allow_private_network: cli.allow_private_network,
@@ -256,7 +279,7 @@ async fn execute(engine: &Engine, command: Command, control: &ExecutionControl) 
         Command::Capabilities => value_result(
             "capabilities",
             "plenora-capabilities-v2",
-            engine.capabilities_for(&[Surface::Rust, Surface::Cli]),
+            engine.capabilities_for(Surface::Cli),
         ),
         Command::Test(args) => {
             let connection = connection_or_error("test", args.connection).await?;
@@ -269,7 +292,7 @@ async fn execute(engine: &Engine, command: Command, control: &ExecutionControl) 
         Command::List {
             connection,
             prefix,
-            start_after,
+            cursor,
             max_items,
         } => {
             let connection = connection_or_error("list", connection.connection).await?;
@@ -281,7 +304,7 @@ async fn execute(engine: &Engine, command: Command, control: &ExecutionControl) 
                         &connection,
                         &ListRequest {
                             prefix,
-                            start_after,
+                            cursor,
                             max_items,
                         },
                         control,
@@ -314,16 +337,20 @@ async fn execute(engine: &Engine, command: Command, control: &ExecutionControl) 
             key,
             input,
             overwrite,
+            publication_policy,
             content_type,
         } => {
             let connection = connection_or_error("put", connection.connection).await?;
             let result = put_from_file(
                 engine,
                 &connection,
-                key,
-                &input,
-                overwrite,
-                content_type,
+                PutFileOptions {
+                    key,
+                    input,
+                    overwrite,
+                    publication_policy: publication_policy.into(),
+                    content_type,
+                },
                 control,
             )
             .await;
@@ -334,6 +361,7 @@ async fn execute(engine: &Engine, command: Command, control: &ExecutionControl) 
             source_key,
             destination_key,
             overwrite,
+            publication_policy,
         } => {
             let connection = connection_or_error("copy", connection.connection).await?;
             operation_result(
@@ -346,6 +374,7 @@ async fn execute(engine: &Engine, command: Command, control: &ExecutionControl) 
                             source_key,
                             destination_key,
                             overwrite,
+                            publication_policy: publication_policy.into(),
                         },
                         control,
                     )
@@ -461,16 +490,21 @@ async fn get_to_file(
     }
 }
 
+struct PutFileOptions {
+    key: String,
+    input: PathBuf,
+    overwrite: bool,
+    publication_policy: PublicationPolicy,
+    content_type: Option<String>,
+}
+
 async fn put_from_file(
     engine: &Engine,
     connection: &ProviderConnection,
-    key: String,
-    input: &Path,
-    overwrite: bool,
-    content_type: Option<String>,
+    options: PutFileOptions,
     control: &ExecutionControl,
 ) -> StorageResult<plenora_storage_core::TransferResult> {
-    let metadata = fs::metadata(input)
+    let metadata = fs::metadata(&options.input)
         .await
         .map_err(|_| artifact_io_error("INPUT_METADATA_FAILED"))?;
     if !metadata.is_file() {
@@ -479,16 +513,17 @@ async fn put_from_file(
             "upload input must be a regular file",
         ));
     }
-    let mut file = fs::File::open(input)
+    let mut file = fs::File::open(&options.input)
         .await
         .map_err(|_| artifact_io_error("INPUT_OPEN_FAILED"))?;
     engine
         .put(
             connection,
             &PutRequest {
-                key,
-                overwrite,
-                content_type,
+                key: options.key,
+                overwrite: options.overwrite,
+                publication_policy: options.publication_policy,
+                content_type: options.content_type,
                 content_length: Some(metadata.len()),
                 metadata: std::collections::BTreeMap::new(),
             },

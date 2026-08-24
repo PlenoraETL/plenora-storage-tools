@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "schema": "plenora-storage-test-input-v1.schema.json",
+      "instance": {
+        "schema_version": 1,
+        "connection": {
+          "provider": "s3",
+          "config_contract": "plenora-storage-s3-connection-v1",
+          "config": {"endpoint": "https://s3.example.invalid", "bucket": "example"},
+          "credential_ref": "secret://storage/test"
+        }
+      }
+    },
+    {
+      "schema": "plenora-storage-test-output-v1.schema.json",
+      "instance": {"provider": "s3", "reachable": true}
+    },
+    {
+      "schema": "plenora-storage-list-input-v1.schema.json",
+      "instance": {
+        "schema_version": 1,
+        "connection": {
+          "provider": "s3",
+          "config_contract": "plenora-storage-s3-connection-v1",
+          "config": {"endpoint": "https://s3.example.invalid", "bucket": "example"},
+          "credential_ref": "secret://storage/test"
+        },
+        "prefix": "incoming/",
+        "cursor": null,
+        "max_items": 100
+      }
+    },
+    {
+      "schema": "plenora-storage-list-output-v1.schema.json",
+      "instance": {
+        "objects": [{"key": "incoming/a.bin", "size": 17, "last_modified": null, "etag": null, "version": null}],
+        "truncated": false,
+        "next_cursor": null
+      }
+    },
+    {
+      "schema": "plenora-storage-stat-input-v1.schema.json",
+      "instance": {
+        "schema_version": 1,
+        "connection": {
+          "provider": "s3",
+          "config_contract": "plenora-storage-s3-connection-v1",
+          "config": {"endpoint": "https://s3.example.invalid", "bucket": "example"},
+          "credential_ref": "secret://storage/test"
+        },
+        "key": "incoming/a.bin"
+      }
+    },
+    {
+      "schema": "plenora-storage-stat-output-v1.schema.json",
+      "instance": {"key": "incoming/a.bin", "size": 17, "last_modified": null, "etag": null, "version": null}
+    },
+    {
+      "schema": "plenora-storage-get-input-v1.schema.json",
+      "instance": {
+        "schema_version": 1,
+        "connection": {
+          "provider": "s3",
+          "config_contract": "plenora-storage-s3-connection-v1",
+          "config": {"endpoint": "https://s3.example.invalid", "bucket": "example"},
+          "credential_ref": "secret://storage/test"
+        },
+        "key": "incoming/a.bin",
+        "artifact_sink": {
+          "reference": "artifact://output/storage-get-vector",
+          "overwrite": false,
+          "metadata": {"content_type": "application/octet-stream", "size": 17, "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}
+        }
+      }
+    },
+    {
+      "schema": "plenora-storage-get-output-v1.schema.json",
+      "instance": {
+        "key": "incoming/a.bin",
+        "bytes_transferred": 17,
+        "checksum": {"algorithm": "sha256", "value": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+        "artifact": {"content_type": "application/octet-stream", "size": 17, "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+        "etag": null,
+        "version": null
+      }
+    },
+    {
+      "schema": "plenora-storage-put-input-v1.schema.json",
+      "instance": {
+        "schema_version": 1,
+        "connection": {
+          "provider": "s3",
+          "config_contract": "plenora-storage-s3-connection-v1",
+          "config": {"endpoint": "https://s3.example.invalid", "bucket": "example"},
+          "credential_ref": "secret://storage/test"
+        },
+        "key": "outgoing/a.bin",
+        "artifact_source": {
+          "reference": "artifact://input/storage-put-vector",
+          "metadata": {"content_type": "application/octet-stream", "size": 17, "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}
+        },
+        "overwrite": false,
+        "publication_policy": "atomic_required",
+        "content_type": "application/octet-stream",
+        "content_length": 17,
+        "metadata": {"source": "vector"}
+      }
+    },
+    {
+      "schema": "plenora-storage-put-output-v1.schema.json",
+      "instance": {
+        "key": "outgoing/a.bin",
+        "bytes_transferred": 17,
+        "checksum": {"algorithm": "sha256", "value": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+        "artifact": {"content_type": "application/octet-stream", "size": 17, "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+        "etag": null,
+        "version": null
+      }
+    },
+    {
+      "schema": "plenora-storage-copy-input-v1.schema.json",
+      "instance": {
+        "schema_version": 1,
+        "connection": {
+          "provider": "s3",
+          "config_contract": "plenora-storage-s3-connection-v1",
+          "config": {"endpoint": "https://s3.example.invalid", "bucket": "example"},
+          "credential_ref": "secret://storage/test"
+        },
+        "source_key": "incoming/a.bin",
+        "destination_key": "outgoing/a.bin",
+        "overwrite": false,
+        "publication_policy": "atomic_required"
+      }
+    },
+    {
+      "schema": "plenora-storage-copy-output-v1.schema.json",
+      "instance": {"key": "outgoing/a.bin", "size": 17, "last_modified": null, "etag": null, "version": null}
+    },
+    {
+      "schema": "plenora-storage-delete-input-v1.schema.json",
+      "instance": {
+        "schema_version": 1,
+        "connection": {
+          "provider": "s3",
+          "config_contract": "plenora-storage-s3-connection-v1",
+          "config": {"endpoint": "https://s3.example.invalid", "bucket": "example"},
+          "credential_ref": "secret://storage/test"
+        },
+        "key": "outgoing/a.bin",
+        "ignore_missing": false
+      }
+    },
+    {
+      "schema": "plenora-storage-delete-output-v1.schema.json",
+      "instance": {"key": "outgoing/a.bin", "deleted": true}
+    }
+  ]
+}
