@@ -70,6 +70,80 @@
       }
     },
     {
+      "name": "stat rejects a key with an empty segment",
+      "schema": "plenora-storage-stat-input-v1.schema.json",
+      "instance": {
+        "schema_version": 1,
+        "connection": {"provider": "s3", "config_contract": "plenora-storage-s3-connection-v1", "config": {}, "credential_ref": "secret://storage/test"},
+        "key": "incoming//a.bin"
+      }
+    },
+    {
+      "name": "stat rejects a key with a current-directory segment",
+      "schema": "plenora-storage-stat-input-v1.schema.json",
+      "instance": {
+        "schema_version": 1,
+        "connection": {"provider": "s3", "config_contract": "plenora-storage-s3-connection-v1", "config": {}, "credential_ref": "secret://storage/test"},
+        "key": "incoming/./a.bin"
+      }
+    },
+    {
+      "name": "list rejects an absolute prefix",
+      "schema": "plenora-storage-list-input-v1.schema.json",
+      "instance": {
+        "schema_version": 1,
+        "connection": {"provider": "s3", "config_contract": "plenora-storage-s3-connection-v1", "config": {}, "credential_ref": "secret://storage/test"},
+        "prefix": "/incoming/"
+      }
+    },
+    {
+      "name": "list rejects a traversal prefix",
+      "schema": "plenora-storage-list-input-v1.schema.json",
+      "instance": {
+        "schema_version": 1,
+        "connection": {"provider": "s3", "config_contract": "plenora-storage-s3-connection-v1", "config": {}, "credential_ref": "secret://storage/test"},
+        "prefix": "../secret/"
+      }
+    },
+    {
+      "name": "get rejects an artifact reference with no opaque body",
+      "schema": "plenora-storage-get-input-v1.schema.json",
+      "instance": {
+        "schema_version": 1,
+        "connection": {"provider": "s3", "config_contract": "plenora-storage-s3-connection-v1", "config": {}, "credential_ref": "secret://storage/test"},
+        "key": "a.bin",
+        "artifact_sink": {"reference": "artifact://", "overwrite": false, "metadata": {"content_type": null, "size": null, "sha256": null}}
+      }
+    },
+    {
+      "name": "put rejects a content type that is not a media type",
+      "schema": "plenora-storage-put-input-v1.schema.json",
+      "instance": {
+        "schema_version": 1,
+        "connection": {"provider": "s3", "config_contract": "plenora-storage-s3-connection-v1", "config": {}, "credential_ref": "secret://storage/test"},
+        "key": "a.bin",
+        "artifact_source": {"reference": "artifact://input/a", "metadata": {"content_type": "octet-stream", "size": null, "sha256": null}},
+        "overwrite": false,
+        "publication_policy": "atomic_required"
+      }
+    },
+    {
+      "name": "connection rejects nested configuration that could hide a secret",
+      "schema": "plenora-storage-test-input-v1.schema.json",
+      "instance": {
+        "schema_version": 1,
+        "connection": {"provider": "ftp", "config_contract": "plenora-storage-ftp-connection-v1", "config": {"auth": {"password": "do-not-persist"}}, "credential_ref": "secret://storage/test"}
+      }
+    },
+    {
+      "name": "connection rejects a delimited inline credential name",
+      "schema": "plenora-storage-test-input-v1.schema.json",
+      "instance": {
+        "schema_version": 1,
+        "connection": {"provider": "ftp", "config_contract": "plenora-storage-ftp-connection-v1", "config": {"db_password": "do-not-persist"}, "credential_ref": "secret://storage/test"}
+      }
+    },
+    {
       "name": "delete requires explicit missing behavior",
       "schema": "plenora-storage-delete-input-v1.schema.json",
       "instance": {

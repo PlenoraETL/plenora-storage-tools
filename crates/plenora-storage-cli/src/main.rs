@@ -51,6 +51,8 @@ struct Cli {
     max_transfer_bytes: u64,
     #[arg(long, global = true, default_value_t = 10_000)]
     max_list_items: usize,
+    #[arg(long, global = true, default_value_t = plenora_storage_core::DEFAULT_MAX_BUFFERED_PUT_BYTES)]
+    max_buffered_put_bytes: u64,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -236,6 +238,7 @@ async fn run() -> ExitCode {
         allow_unverified_ssh: cli.allow_unverified_ssh,
         max_transfer_bytes: cli.max_transfer_bytes,
         max_list_items: cli.max_list_items,
+        max_buffered_put_bytes: cli.max_buffered_put_bytes,
     });
     if let Err(error) = engine.register_provider(Arc::new(S3Provider::new(Arc::new(
         EnvironmentCredentialResolver,
@@ -451,16 +454,11 @@ async fn get_to_file(
     overwrite: bool,
     control: &ExecutionControl,
 ) -> StorageResult<plenora_storage_core::TransferResult> {
-    if !overwrite && fs::try_exists(output).await.map_err(file_probe_error)? {
-        return Err(StorageError::new(
-            ErrorCategory::Conflict,
-            ErrorPhase::Prepare,
-            RemoteEffect::None,
-            RetryDisposition::Never,
-            "OUTPUT_EXISTS",
-            "output destination already exists",
-        ));
-    }
+    // Every local admission check runs before the staging file is created, so a
+    // request the Engine would reject produces no filesystem effect at all.
+    engine.preflight(connection, &[&key])?;
+    // The artifact is always staged first, so a failed download never publishes
+    // a partial file and the destination only ever appears complete.
     let temporary = temporary_output_path(output)?;
     let mut file = fs::OpenOptions::new()
         .create_new(true)
@@ -471,23 +469,93 @@ async fn get_to_file(
     let result = engine
         .get(connection, &GetRequest { key }, &mut file, control)
         .await;
-    match result {
-        Ok(result) => {
-            file.sync_all()
-                .await
-                .map_err(|_| artifact_io_error("OUTPUT_STAGING_SYNC_FAILED"))?;
-            drop(file);
-            fs::rename(&temporary, output)
-                .await
-                .map_err(|_| artifact_io_error("OUTPUT_PUBLISH_FAILED"))?;
-            Ok(result)
-        }
-        Err(error) => {
-            drop(file);
-            let _ = fs::remove_file(&temporary).await;
-            Err(error)
-        }
+    let downloaded = match result {
+        Ok(result) => file
+            .sync_all()
+            .await
+            .map_err(|_| artifact_io_error("OUTPUT_STAGING_SYNC_FAILED"))
+            .map(|()| result),
+        Err(error) => Err(error),
+    };
+    drop(file);
+    let published = match downloaded {
+        Ok(result) => publish_output(&temporary, output, overwrite)
+            .await
+            .map(|()| result),
+        Err(error) => Err(error),
+    };
+    match published {
+        Ok(result) => Ok(result),
+        // The staging file is the only place downloaded bytes ever landed, so
+        // removing it undoes the whole local effect. A removal that fails leaves
+        // an incomplete artifact behind and is reported alongside the cause,
+        // never in place of it.
+        Err(error) => Err(if fs::remove_file(&temporary).await.is_ok() {
+            error.rolled_back()
+        } else {
+            error.cleanup_unconfirmed("staging_remove_failed")
+        }),
     }
+}
+
+/// Publishes a staged artifact.
+///
+/// With `overwrite=false` the destination is created by linking the staged file
+/// into place. The link fails if anything already holds that name, so there is
+/// no probe window, and no file this command did not create is ever replaced or
+/// removed. With `overwrite=true` the replacement is a rename, which is atomic
+/// on both Unix and Windows.
+async fn publish_output(temporary: &Path, output: &Path, overwrite: bool) -> StorageResult<()> {
+    if overwrite {
+        return fs::rename(temporary, output)
+            .await
+            .map_err(|error| publish_error(&error));
+    }
+    fs::hard_link(temporary, output)
+        .await
+        .map_err(|error| publish_error(&error))?;
+    // The artifact is published at this point. A staging file that cannot be
+    // removed is a hidden leftover, never a partial artifact, so it does not
+    // turn a successful publication into a failure.
+    let _ = fs::remove_file(temporary).await;
+    Ok(())
+}
+
+fn publish_error(error: &std::io::Error) -> StorageError {
+    use std::io::ErrorKind;
+    let (category, code, message) = match error.kind() {
+        ErrorKind::AlreadyExists => (
+            ErrorCategory::Conflict,
+            "OUTPUT_EXISTS",
+            "output destination already exists",
+        ),
+        ErrorKind::PermissionDenied => (
+            ErrorCategory::Authorization,
+            "OUTPUT_PUBLISH_DENIED",
+            "publishing the artifact to the output destination was denied",
+        ),
+        // Create-if-absent needs a link-capable filesystem. Degrading to a probe
+        // plus rename would silently drop the no-clobber guarantee, so the
+        // limitation is reported instead.
+        ErrorKind::Unsupported => (
+            ErrorCategory::Unsupported,
+            "OUTPUT_ATOMIC_PUBLISH_UNSUPPORTED",
+            "the output filesystem cannot publish an artifact atomically",
+        ),
+        _ => (
+            ErrorCategory::Io,
+            "OUTPUT_PUBLISH_FAILED",
+            "publishing the artifact to the output destination failed",
+        ),
+    };
+    StorageError::new(
+        category,
+        ErrorPhase::Commit,
+        RemoteEffect::None,
+        RetryDisposition::Never,
+        code,
+        message,
+    )
 }
 
 struct PutFileOptions {
@@ -542,10 +610,6 @@ fn temporary_output_path(output: &Path) -> StorageResult<PathBuf> {
         filename.to_string_lossy(),
         std::process::id()
     )))
-}
-
-fn file_probe_error(_: std::io::Error) -> StorageError {
-    artifact_io_error("OUTPUT_PROBE_FAILED")
 }
 
 fn artifact_io_error(code: &'static str) -> StorageError {

@@ -2,19 +2,18 @@
 
 #![forbid(unsafe_code)]
 
-use std::{
-    borrow::Cow,
-    collections::BTreeMap,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    sync::Arc,
-};
+mod list_validation;
+
+use std::{borrow::Cow, collections::BTreeMap, net::SocketAddr, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use futures_util::StreamExt;
 use object_store::{
-    Attribute, AttributeValue, Attributes, CopyMode, CopyOptions, ObjectMeta, ObjectStore,
-    ObjectStoreExt, PutMode, PutMultipartOptions, PutOptions, WriteMultipart,
+    Attribute, AttributeValue, Attributes, ClientConfigKey, ClientOptions, CopyMode, CopyOptions,
+    ObjectMeta, ObjectStore, ObjectStoreExt, PutMode, PutMultipartOptions, PutOptions,
+    WriteMultipart,
     aws::{AmazonS3, AmazonS3Builder},
+    client::{HttpClient, HttpConnector},
     path::Path,
 };
 use plenora_storage_core::{
@@ -22,12 +21,13 @@ use plenora_storage_core::{
     ErrorPhase, GetRequest, IntegrityMetadata, ObjectMetadata, OperationContext,
     ProviderCapabilities, ProviderConnection, ProviderListRequest, ProviderListResult, PutRequest,
     RemoteEffect, RetryDisposition, StatRequest, StorageError, StorageProvider, StorageResult,
-    TestResult, TransferResult,
+    TestResult, TransferResult, resolve_network_target, validate_object_key,
+    validate_object_prefix,
 };
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use url::{Host, Url};
+use url::Url;
 
 pub const PROVIDER_ID: &str = "s3";
 pub const CONFIG_CONTRACT: &str = "plenora-storage-s3-connection-v1";
@@ -57,14 +57,28 @@ impl S3Provider {
         Self { credentials }
     }
 
+    /// Runs endpoint validation, DNS resolution, credential resolution and store
+    /// construction under the caller's deadline and cancellation, as the other
+    /// adapters already do for their connect phase.
+    async fn connect(
+        &self,
+        connection: &ProviderConnection,
+        context: &OperationContext<'_>,
+    ) -> StorageResult<AmazonS3> {
+        context
+            .control
+            .run(self.store(connection, context), ErrorPhase::Connect, false)
+            .await
+    }
+
     async fn store(
         &self,
         connection: &ProviderConnection,
         context: &OperationContext<'_>,
     ) -> StorageResult<AmazonS3> {
         let config = parse_config(connection)?;
-        validate_endpoint(&config.endpoint, context).await?;
-        validate_bucket(&config.bucket)?;
+        let url = validate_endpoint(&config.endpoint, context)?;
+        let pinned = self.pinned_addresses(&url, &config, context).await?;
         let credential = self
             .credentials
             .resolve(&connection.credential_ref)
@@ -82,9 +96,108 @@ impl S3Provider {
         if let Some(token) = credential.optional("session_token") {
             builder = builder.with_token(token.to_owned());
         }
+        // Installed unconditionally: the connector also refuses redirects and
+        // proxies, which an endpoint reached by literal address needs just as
+        // much as one reached by name.
+        builder = builder.with_http_connector(PinnedDnsConnector { pinned });
         builder
             .build()
             .map_err(|error| map_store_error(error, ErrorPhase::Connect, false))
+    }
+
+    /// Resolves and validates every host the S3 client will actually contact,
+    /// and returns the addresses the HTTP client must be pinned to.
+    ///
+    /// Validating a name and letting the HTTP client resolve it again would let
+    /// a second, attacker-controlled resolution reach an address the policy just
+    /// rejected.
+    async fn pinned_addresses(
+        &self,
+        url: &Url,
+        config: &S3ConnectionConfig,
+        context: &OperationContext<'_>,
+    ) -> StorageResult<Vec<(String, Vec<SocketAddr>)>> {
+        let host = url.host_str().ok_or_else(|| {
+            StorageError::invalid_configuration(
+                "S3_ENDPOINT_HOST_MISSING",
+                "S3 endpoint lacks a host",
+            )
+            .with_provider(PROVIDER_ID)
+        })?;
+        let port = url.port_or_known_default().ok_or_else(|| {
+            StorageError::invalid_configuration(
+                "S3_ENDPOINT_PORT_UNKNOWN",
+                "S3 endpoint has no resolvable port",
+            )
+            .with_provider(PROVIDER_ID)
+        })?;
+        // With virtual hosted style the bucket becomes part of the request host,
+        // so that name is validated and pinned too.
+        let mut hosts = vec![host.to_owned()];
+        if config.virtual_hosted_style {
+            hosts.push(format!("{}.{host}", config.bucket));
+        }
+        let mut pinned = Vec::new();
+        for host in hosts {
+            let addresses =
+                resolve_network_target(&host, port, context.policy.allow_private_network)
+                    .await
+                    .map_err(|error| error.with_provider(PROVIDER_ID))?;
+            // A literal address needs no pinning: no name is ever resolved.
+            if host.parse::<std::net::IpAddr>().is_err() {
+                pinned.push((host, addresses));
+            }
+        }
+        Ok(pinned)
+    }
+}
+
+/// Builds the HTTP client `object_store` runs on, with the endpoint names bound
+/// to the addresses the network policy already validated.
+#[derive(Debug)]
+struct PinnedDnsConnector {
+    pinned: Vec<(String, Vec<SocketAddr>)>,
+}
+
+/// Mirrors the `object_store` client defaults this connector replaces.
+const CLIENT_TIMEOUT: Duration = Duration::from_secs(30);
+const CLIENT_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+const CLIENT_USER_AGENT: &str = concat!("plenora-storage-tools/", env!("CARGO_PKG_VERSION"));
+
+impl HttpConnector for PinnedDnsConnector {
+    fn connect(&self, options: &ClientOptions) -> object_store::Result<HttpClient> {
+        // The plaintext authorization stays with `ClientOptions` so that
+        // replacing the connector cannot silently re-enable HTTP.
+        let allow_http = options
+            .get_config_value(&ClientConfigKey::AllowHttp)
+            .is_some_and(|value| value == "true");
+        let mut builder = reqwest::Client::builder()
+            .https_only(!allow_http)
+            // Redirects and proxies would resolve a host this connector never
+            // validated, which is exactly the bypass the pinning exists to
+            // prevent, so both are refused.
+            .redirect(reqwest::redirect::Policy::none())
+            .no_proxy()
+            .user_agent(CLIENT_USER_AGENT)
+            .timeout(CLIENT_TIMEOUT)
+            .connect_timeout(CLIENT_CONNECT_TIMEOUT)
+            .http1_only()
+            // Transparent compression rewrites `Content-Length`, which the
+            // object size accounting depends on.
+            .no_gzip()
+            .no_brotli()
+            .no_zstd()
+            .no_deflate();
+        for (host, addresses) in &self.pinned {
+            builder = builder.resolve_to_addrs(host, addresses);
+        }
+        let client = builder
+            .build()
+            .map_err(|error| object_store::Error::Generic {
+                store: "S3",
+                source: Box::new(error),
+            })?;
+        Ok(HttpClient::new(list_validation::ValidatingClient(client)))
     }
 }
 
@@ -128,7 +241,7 @@ impl StorageProvider for S3Provider {
         connection: &ProviderConnection,
         context: &OperationContext<'_>,
     ) -> StorageResult<TestResult> {
-        let store = self.store(connection, context).await?;
+        let store = self.connect(connection, context).await?;
         context
             .control
             .run(
@@ -166,9 +279,13 @@ impl StorageProvider for S3Provider {
             )
             .with_provider(PROVIDER_ID));
         }
-        let prefix = optional_path(request.prefix.as_deref())?;
-        let offset = optional_path(request.start_after.as_deref())?;
-        let store = self.store(connection, context).await?;
+        let prefix = optional_prefix_path(request.prefix.as_deref())?;
+        let offset = request
+            .start_after
+            .as_deref()
+            .map(required_path)
+            .transpose()?;
+        let store = self.connect(connection, context).await?;
         context
             .control
             .run(
@@ -184,7 +301,19 @@ impl StorageProvider for S3Provider {
                         };
                         let metadata = result
                             .map_err(|error| map_store_error(error, ErrorPhase::Read, false))?;
-                        objects.push(public_metadata(metadata));
+                        let object = public_metadata(metadata)?;
+                        // S3 lists strictly increasing keys. A key that does not
+                        // advance proves the path layer normalized a remote name
+                        // — a trailing-slash marker, for example — so the page
+                        // would report a name the bucket does not hold and the
+                        // cursor would skip entries.
+                        if objects
+                            .last()
+                            .is_some_and(|last: &ObjectMetadata| last.key >= object.key)
+                        {
+                            return Err(unrepresentable_key_error());
+                        }
+                        objects.push(object);
                     }
                     let truncated = objects.len() > limit;
                     if truncated {
@@ -212,7 +341,7 @@ impl StorageProvider for S3Provider {
         context: &OperationContext<'_>,
     ) -> StorageResult<ObjectMetadata> {
         let path = required_path(&request.key)?;
-        let store = self.store(connection, context).await?;
+        let store = self.connect(connection, context).await?;
         context
             .control
             .run(
@@ -220,8 +349,8 @@ impl StorageProvider for S3Provider {
                     store
                         .head(&path)
                         .await
-                        .map(public_metadata)
                         .map_err(|error| map_store_error(error, ErrorPhase::Read, false))
+                        .and_then(public_metadata)
                 },
                 ErrorPhase::Read,
                 false,
@@ -237,7 +366,7 @@ impl StorageProvider for S3Provider {
         context: &OperationContext<'_>,
     ) -> StorageResult<TransferResult> {
         let path = required_path(&request.key)?;
-        let store = self.store(connection, context).await?;
+        let store = self.connect(connection, context).await?;
         let result = context
             .control
             .run(
@@ -357,8 +486,21 @@ impl StorageProvider for S3Provider {
         }
         validate_metadata(request)?;
         let path = required_path(&request.key)?;
-        let store = self.store(connection, context).await?;
+        let store = self.connect(connection, context).await?;
         if !request.overwrite {
+            // Native create-if-absent is a single conditional PUT, so the whole
+            // artifact must be buffered. That memory is bounded separately from
+            // the streaming transfer limit.
+            let buffered_limit = context
+                .policy
+                .max_buffered_put_bytes
+                .min(context.policy.max_transfer_bytes);
+            if request
+                .content_length
+                .is_some_and(|length| length > buffered_limit)
+            {
+                return Err(buffered_put_limit_error());
+            }
             let mut payload = Vec::new();
             let mut buffer = vec![0_u8; 64 * 1024];
             let mut digest = Sha256::new();
@@ -385,8 +527,8 @@ impl StorageProvider for S3Provider {
                 if read == 0 {
                     break;
                 }
-                if payload.len().saturating_add(read) as u64 > context.policy.max_transfer_bytes {
-                    return Err(transfer_limit_error());
+                if payload.len().saturating_add(read) as u64 > buffered_limit {
+                    return Err(buffered_put_limit_error());
                 }
                 digest.update(&buffer[..read]);
                 payload.extend_from_slice(&buffer[..read]);
@@ -477,20 +619,14 @@ impl StorageProvider for S3Provider {
                 .await
             {
                 Ok(read) => read,
-                Err(error) => {
-                    let _ = writer.abort().await;
-                    return Err(error);
-                }
+                Err(error) => return Err(abort_multipart(writer, error).await),
             };
             if read == 0 {
                 break;
             }
             transferred = match transferred.checked_add(read as u64) {
                 Some(total) if total <= context.policy.max_transfer_bytes => total,
-                _ => {
-                    let _ = writer.abort().await;
-                    return Err(transfer_limit_error());
-                }
+                _ => return Err(abort_multipart(writer, transfer_limit_error()).await),
             };
             digest.update(&buffer[..read]);
             writer.write(&buffer[..read]);
@@ -508,20 +644,19 @@ impl StorageProvider for S3Provider {
                 )
                 .await
             {
-                let _ = writer.abort().await;
-                return Err(error);
+                return Err(abort_multipart(writer, error).await);
             }
         }
         if request
             .content_length
             .is_some_and(|expected| expected != transferred)
         {
-            let _ = writer.abort().await;
-            return Err(StorageError::invalid_configuration(
+            let error = StorageError::invalid_configuration(
                 "CONTENT_LENGTH_MISMATCH",
                 "artifact length differs from declared content_length",
             )
-            .with_provider(PROVIDER_ID));
+            .with_provider(PROVIDER_ID);
+            return Err(abort_multipart(writer, error).await);
         }
         let result = context
             .control
@@ -558,7 +693,7 @@ impl StorageProvider for S3Provider {
         context: &OperationContext<'_>,
     ) -> StorageResult<DeleteResult> {
         let path = required_path(&request.key)?;
-        let store = self.store(connection, context).await?;
+        let store = self.connect(connection, context).await?;
         let head = context
             .control
             .run(
@@ -629,7 +764,7 @@ impl StorageProvider for S3Provider {
                 "copy source and destination must differ",
             ));
         }
-        let store = self.store(connection, context).await?;
+        let store = self.connect(connection, context).await?;
         context
             .control
             .run(
@@ -647,6 +782,9 @@ impl StorageProvider for S3Provider {
                 true,
             )
             .await?;
+        // The destination is published from here on. The mapping is applied to
+        // the outcome of `run`, so a deadline or cancellation raised during the
+        // read-back is also reported as committed rather than unknown.
         context
             .control
             .run(
@@ -654,27 +792,44 @@ impl StorageProvider for S3Provider {
                     store
                         .head(&destination)
                         .await
-                        .map(public_metadata)
                         .map_err(|error| map_store_error(error, ErrorPhase::Read, false))
+                        .and_then(public_metadata)
                 },
-                ErrorPhase::Read,
-                false,
+                ErrorPhase::Cleanup,
+                true,
             )
             .await
+            .map_err(|_| committed_verification_error())
     }
 }
 
 fn parse_config(connection: &ProviderConnection) -> StorageResult<S3ConnectionConfig> {
-    serde_json::from_value(connection.config.clone()).map_err(|_| {
-        StorageError::invalid_configuration(
-            "S3_CONFIG_INVALID",
-            "S3 connection configuration is invalid",
-        )
-        .with_provider(PROVIDER_ID)
-    })
+    let config: S3ConnectionConfig =
+        serde_json::from_value(connection.config.clone()).map_err(|_| configuration_error())?;
+    // Serde alone accepts values that `plenora-storage-s3-connection-v1`
+    // rejects, so the schema bounds are enforced here as well.
+    // Lengths are counted in code points, as JSON Schema `maxLength` does.
+    let valid = (1..=2_048).contains(&config.endpoint.chars().count())
+        && (1..=255).contains(&config.bucket.chars().count())
+        && !config.bucket.chars().any(char::is_whitespace)
+        && (1..=128).contains(&config.region.chars().count())
+        && !config.region.chars().any(char::is_whitespace);
+    if valid {
+        Ok(config)
+    } else {
+        Err(configuration_error())
+    }
 }
 
-async fn validate_endpoint(endpoint: &str, context: &OperationContext<'_>) -> StorageResult<()> {
+fn configuration_error() -> StorageError {
+    StorageError::invalid_configuration(
+        "S3_CONFIG_INVALID",
+        "S3 connection configuration is invalid",
+    )
+    .with_provider(PROVIDER_ID)
+}
+
+fn validate_endpoint(endpoint: &str, context: &OperationContext<'_>) -> StorageResult<Url> {
     let url = Url::parse(endpoint).map_err(|_| {
         StorageError::invalid_configuration("S3_ENDPOINT_INVALID", "S3 endpoint URL is invalid")
             .with_provider(PROVIDER_ID)
@@ -704,101 +859,62 @@ async fn validate_endpoint(endpoint: &str, context: &OperationContext<'_>) -> St
             .with_provider(PROVIDER_ID));
         }
     }
-    let host = url.host().ok_or_else(|| {
-        StorageError::invalid_configuration("S3_ENDPOINT_HOST_MISSING", "S3 endpoint lacks a host")
-            .with_provider(PROVIDER_ID)
-    })?;
-    if context.policy.allow_private_network {
-        return Ok(());
-    }
-    match host {
-        Host::Ipv4(address) if !is_public_ipv4(address) => private_endpoint_error(),
-        Host::Ipv6(address) if !is_public_ipv6(address) => private_endpoint_error(),
-        Host::Domain(domain) => {
-            let port = url.port_or_known_default().ok_or_else(|| {
-                StorageError::invalid_configuration(
-                    "S3_ENDPOINT_PORT_UNKNOWN",
-                    "S3 endpoint has no resolvable port",
-                )
-            })?;
-            let addresses = tokio::net::lookup_host((domain, port)).await.map_err(|_| {
-                StorageError::new(
-                    ErrorCategory::Transient,
-                    ErrorPhase::Connect,
-                    RemoteEffect::None,
-                    RetryDisposition::Safe,
-                    "DNS_RESOLUTION_FAILED",
-                    "S3 endpoint DNS resolution failed",
-                )
-                .with_provider(PROVIDER_ID)
-            })?;
-            if addresses
-                .into_iter()
-                .any(|address| !is_public_address(address.ip()))
-            {
-                return private_endpoint_error();
-            }
-            Ok(())
-        }
-        _ => Ok(()),
-    }
-}
-
-fn private_endpoint_error<T>() -> StorageResult<T> {
-    Err(StorageError::invalid_configuration(
-        "PRIVATE_NETWORK_FORBIDDEN",
-        "private-network storage endpoint requires explicit engine authorization",
-    )
-    .with_provider(PROVIDER_ID))
-}
-
-fn validate_bucket(bucket: &str) -> StorageResult<()> {
-    if bucket.is_empty() || bucket.len() > 255 || bucket.chars().any(char::is_whitespace) {
+    if url.host_str().is_none() {
         return Err(StorageError::invalid_configuration(
-            "S3_BUCKET_INVALID",
-            "S3 bucket name is invalid",
+            "S3_ENDPOINT_HOST_MISSING",
+            "S3 endpoint lacks a host",
         )
         .with_provider(PROVIDER_ID));
     }
-    Ok(())
+    Ok(url)
 }
 
 fn required_path(value: &str) -> StorageResult<Path> {
-    if value.is_empty() || value.len() > 4_096 {
-        return Err(StorageError::invalid_configuration(
-            "OBJECT_KEY_INVALID_LENGTH",
-            "storage object key length is outside public bounds",
-        ));
-    }
+    validate_object_key(value).map_err(|error| error.with_provider(PROVIDER_ID))?;
     Path::parse(value).map_err(|_| {
         StorageError::invalid_configuration(
             "OBJECT_KEY_INVALID",
             "storage object key is not a normalized relative path",
         )
+        .with_provider(PROVIDER_ID)
     })
 }
 
-fn optional_path(value: Option<&str>) -> StorageResult<Option<Path>> {
-    value.map(required_path).transpose()
+/// An empty prefix means "the whole namespace" for every provider, so it maps to
+/// no prefix rather than being rejected as an invalid path.
+fn optional_prefix_path(value: Option<&str>) -> StorageResult<Option<Path>> {
+    let Some(prefix) = value else {
+        return Ok(None);
+    };
+    validate_object_prefix(prefix).map_err(|error| error.with_provider(PROVIDER_ID))?;
+    if prefix.is_empty() {
+        return Ok(None);
+    }
+    Path::parse(prefix).map(Some).map_err(|_| {
+        StorageError::invalid_configuration(
+            "OBJECT_PREFIX_INVALID",
+            "storage object prefix is not a normalized relative path",
+        )
+        .with_provider(PROVIDER_ID)
+    })
 }
 
 fn validate_metadata(request: &PutRequest) -> StorageResult<()> {
+    // Lengths are counted in code points, as JSON Schema `maxLength` does.
     if request.metadata.len() > 64
         || request
             .metadata
             .iter()
-            .any(|(key, value)| key.len() > 128 || value.len() > 2_048)
+            .any(|(key, value)| key.chars().count() > 128 || value.chars().count() > 2_048)
     {
         return Err(StorageError::invalid_configuration(
             "OBJECT_METADATA_TOO_LARGE",
             "object metadata exceeds public bounds",
         ));
     }
-    if request
-        .content_type
-        .as_ref()
-        .is_some_and(|content_type| content_type.len() > 255 || !content_type.contains('/'))
-    {
+    if request.content_type.as_ref().is_some_and(|content_type| {
+        content_type.chars().count() > 255 || !content_type.contains('/')
+    }) {
         return Err(StorageError::invalid_configuration(
             "CONTENT_TYPE_INVALID",
             "object content type is invalid",
@@ -824,14 +940,33 @@ fn put_attributes(request: &PutRequest) -> Attributes {
     attributes
 }
 
-fn public_metadata(metadata: ObjectMeta) -> ObjectMetadata {
-    ObjectMetadata {
-        key: metadata.location.to_string(),
+/// Publishes provider metadata only when the backend key is a valid public key.
+///
+/// A bucket can hold names that the public contract cannot express; emitting one
+/// would produce an invalid `storage.list` output and a cursor the next page
+/// rejects.
+fn public_metadata(metadata: ObjectMeta) -> StorageResult<ObjectMetadata> {
+    let key = metadata.location.to_string();
+    validate_object_key(&key).map_err(|_| unrepresentable_key_error())?;
+    Ok(ObjectMetadata {
+        key,
         size: metadata.size,
         last_modified: Some(metadata.last_modified.to_rfc3339()),
         etag: metadata.e_tag,
         version: metadata.version,
-    }
+    })
+}
+
+fn unrepresentable_key_error() -> StorageError {
+    StorageError::new(
+        ErrorCategory::Protocol,
+        ErrorPhase::Read,
+        RemoteEffect::None,
+        RetryDisposition::Never,
+        "OBJECT_KEY_UNREPRESENTABLE",
+        "storage backend returned a name that is not a valid public object key",
+    )
+    .with_provider(PROVIDER_ID)
 }
 
 fn sha256_metadata(digest: Sha256) -> IntegrityMetadata {
@@ -853,6 +988,48 @@ fn transfer_limit_error() -> StorageError {
     .with_provider(PROVIDER_ID)
 }
 
+fn buffered_put_limit_error() -> StorageError {
+    StorageError::new(
+        ErrorCategory::ResourceLimit,
+        ErrorPhase::Read,
+        RemoteEffect::None,
+        RetryDisposition::Never,
+        "BUFFERED_PUT_LIMIT_EXCEEDED",
+        "conditional upload exceeds the engine in-memory buffering limit",
+    )
+    .with_provider(PROVIDER_ID)
+}
+
+/// Independent budget for cleanup after a failure.
+///
+/// The caller's deadline may already have expired, and a cleanup that hangs must
+/// not extend the operation without bound.
+const CLEANUP_BUDGET: Duration = Duration::from_secs(10);
+
+/// Aborts a started multipart upload and states the outcome the abort actually
+/// achieved, instead of assuming the uploaded parts were removed.
+///
+/// The original cause is preserved either way: replacing it with a generic
+/// cleanup error would hide why the upload failed.
+async fn abort_multipart(writer: WriteMultipart, error: StorageError) -> StorageError {
+    match tokio::time::timeout(CLEANUP_BUDGET, writer.abort()).await {
+        Ok(Ok(())) => error.rolled_back(),
+        _ => error.cleanup_unconfirmed("multipart_abort_failed"),
+    }
+}
+
+fn committed_verification_error() -> StorageError {
+    StorageError::new(
+        ErrorCategory::Execution,
+        ErrorPhase::Cleanup,
+        RemoteEffect::Committed,
+        RetryDisposition::RequiresRecovery,
+        "S3_COMMITTED_METADATA_UNAVAILABLE",
+        "S3 destination was published but its metadata could not be read back",
+    )
+    .with_provider(PROVIDER_ID)
+}
+
 fn artifact_sink_limit_error() -> StorageError {
     StorageError::new(
         ErrorCategory::ResourceLimit,
@@ -866,6 +1043,18 @@ fn artifact_sink_limit_error() -> StorageError {
 }
 
 fn map_store_error(error: object_store::Error, phase: ErrorPhase, mutating: bool) -> StorageError {
+    // Preserve local response-validation failures through object_store's HTTP
+    // error wrappers, without exposing backend URLs or response contents.
+    let mut cause: &dyn std::error::Error = &error;
+    loop {
+        if let Some(error) = cause.downcast_ref::<StorageError>() {
+            return error.clone();
+        }
+        let Some(source) = cause.source() else {
+            break;
+        };
+        cause = source;
+    }
     let (category, effect, retry, code, message) = match error {
         object_store::Error::NotFound { .. } => (
             ErrorCategory::NotFound,
@@ -930,54 +1119,9 @@ fn map_store_error(error: object_store::Error, phase: ErrorPhase, mutating: bool
     StorageError::new(category, phase, effect, retry, code, message).with_provider(PROVIDER_ID)
 }
 
-fn is_public_address(address: IpAddr) -> bool {
-    match address {
-        IpAddr::V4(address) => is_public_ipv4(address),
-        IpAddr::V6(address) => is_public_ipv6(address),
-    }
-}
-
-fn is_public_ipv4(address: Ipv4Addr) -> bool {
-    let octets = address.octets();
-    !(address.is_private()
-        || address.is_loopback()
-        || address.is_link_local()
-        || address.is_broadcast()
-        || address.is_documentation()
-        || address.is_unspecified()
-        || address.is_multicast()
-        || octets[0] == 0
-        || (octets[0] == 100 && (64..=127).contains(&octets[1]))
-        || (octets[0] == 192 && octets[1] == 0 && octets[2] == 0)
-        || (octets[0] == 198 && (18..=19).contains(&octets[1]))
-        || octets[0] >= 240)
-}
-
-fn is_public_ipv6(address: Ipv6Addr) -> bool {
-    if let Some(mapped) = address.to_ipv4_mapped() {
-        return is_public_ipv4(mapped);
-    }
-    let segments = address.segments();
-    !(address.is_loopback()
-        || address.is_unspecified()
-        || address.is_multicast()
-        || (segments[0] & 0xfe00) == 0xfc00
-        || (segments[0] & 0xffc0) == 0xfe80
-        || (segments[0] == 0x2001 && segments[1] == 0x0db8))
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{is_public_address, required_path};
-    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-
-    #[test]
-    fn private_addresses_are_blocked() {
-        assert!(!is_public_address(IpAddr::V4(Ipv4Addr::LOCALHOST)));
-        assert!(!is_public_address(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1))));
-        assert!(!is_public_address(IpAddr::V6(Ipv6Addr::LOCALHOST)));
-        assert!(is_public_address(IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1))));
-    }
+    use super::{optional_prefix_path, required_path};
 
     #[test]
     fn object_keys_are_relative_and_normalized() {
@@ -985,5 +1129,20 @@ mod tests {
         assert!(required_path("").is_err());
         assert!(required_path(&"x".repeat(4_097)).is_err());
         assert!(required_path("../secret").is_err());
+        assert!(required_path("folder//object.bin").is_err());
+        assert!(required_path("folder/./object.bin").is_err());
+        assert!(required_path("folder/").is_err());
+    }
+
+    #[test]
+    fn an_empty_prefix_means_the_whole_namespace() {
+        assert_eq!(optional_prefix_path(Some("")).expect("empty prefix"), None);
+        assert!(
+            optional_prefix_path(Some("incoming/"))
+                .expect("prefix")
+                .is_some()
+        );
+        assert!(optional_prefix_path(Some("/absolute")).is_err());
+        assert!(optional_prefix_path(Some("../secret")).is_err());
     }
 }

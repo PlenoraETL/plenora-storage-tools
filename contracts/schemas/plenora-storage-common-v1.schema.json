@@ -23,7 +23,13 @@
       "minLength": 1,
       "maxLength": 4096,
       "pattern": "^[^\\\\\\u0000]+$",
-      "not": {"pattern": "(^/)|((^|/)\\.\\.(/|$))"}
+      "not": {"pattern": "(^/)|(/$)|(//)|((^|/)\\.\\.?(/|$))"}
+    },
+    "prefix": {
+      "type": "string",
+      "maxLength": 4096,
+      "pattern": "^[^\\\\\\u0000]*$",
+      "not": {"pattern": "(^/)|(//)|((^|/)\\.\\.?(/|$))"}
     },
     "artifactReference": {
       "type": "object",

@@ -15,6 +15,7 @@ use crate::{
     ExecutionControl, GetRequest, ListRequest, ListResult, ObjectMetadata, OperationContext,
     ProviderConnection, ProviderListRequest, PutRequest, RemoteEffect, RetryDisposition,
     StatRequest, StorageError, StorageProvider, StorageResult, Surface, TestResult, TransferResult,
+    validate_object_key, validate_object_prefix,
 };
 
 pub const LIST_CURSOR_TTL_SECONDS: u64 = 900;
@@ -44,7 +45,14 @@ pub struct EngineConfig {
     pub allow_unverified_ssh: bool,
     pub max_transfer_bytes: u64,
     pub max_list_items: usize,
+    /// Upper bound for a single upload that a provider must buffer in memory to
+    /// obtain a conditional publication. It is deliberately far below
+    /// `max_transfer_bytes`, which streams and therefore costs no memory.
+    pub max_buffered_put_bytes: u64,
 }
+
+/// Default in-memory bound for buffered, conditional uploads.
+pub const DEFAULT_MAX_BUFFERED_PUT_BYTES: u64 = 67_108_864;
 
 impl Default for EngineConfig {
     fn default() -> Self {
@@ -56,6 +64,7 @@ impl Default for EngineConfig {
             allow_unverified_ssh: false,
             max_transfer_bytes: 1_073_741_824,
             max_list_items: 10_000,
+            max_buffered_put_bytes: DEFAULT_MAX_BUFFERED_PUT_BYTES,
         }
     }
 }
@@ -126,10 +135,25 @@ impl Engine {
         self.closed.load(Ordering::Acquire)
     }
 
+    /// Runs the local admission checks of an operation without contacting the
+    /// provider.
+    ///
+    /// A consumer that must create an external effect before invoking the
+    /// Engine — resolving an artifact sink, for example — calls this first so
+    /// that a locally invalid request cannot produce that effect.
+    pub fn preflight(&self, connection: &ProviderConnection, keys: &[&str]) -> StorageResult<()> {
+        self.provider(connection)?;
+        for key in keys {
+            validate_object_key(key)?;
+        }
+        Ok(())
+    }
+
     fn provider(&self, connection: &ProviderConnection) -> StorageResult<&dyn StorageProvider> {
         if self.is_closed() {
             return Err(StorageError::engine_closed());
         }
+        connection.validate()?;
         if !self.config.allow_experimental_contracts {
             return Err(StorageError::invalid_configuration(
                 "EXPERIMENTAL_CONTRACT_OPT_IN_REQUIRED",
@@ -176,6 +200,7 @@ impl Engine {
         control: &ExecutionControl,
     ) -> StorageResult<ListResult> {
         let provider = self.provider(connection)?;
+        validate_object_prefix(request.prefix.as_deref().unwrap_or_default())?;
         let start_after = request
             .cursor
             .as_deref()
@@ -207,7 +232,9 @@ impl Engine {
         request: &StatRequest,
         control: &ExecutionControl,
     ) -> StorageResult<ObjectMetadata> {
-        self.provider(connection)?
+        let provider = self.provider(connection)?;
+        validate_object_key(&request.key)?;
+        provider
             .stat(connection, request, &self.context(control))
             .await
     }
@@ -222,7 +249,9 @@ impl Engine {
     where
         W: AsyncWrite + Send + Unpin,
     {
-        self.provider(connection)?
+        let provider = self.provider(connection)?;
+        validate_object_key(&request.key)?;
+        provider
             .get(connection, request, sink, &self.context(control))
             .await
     }
@@ -237,7 +266,9 @@ impl Engine {
     where
         R: AsyncRead + Send + Unpin,
     {
-        self.provider(connection)?
+        let provider = self.provider(connection)?;
+        validate_object_key(&request.key)?;
+        provider
             .put(connection, request, source, &self.context(control))
             .await
     }
@@ -248,7 +279,9 @@ impl Engine {
         request: &DeleteRequest,
         control: &ExecutionControl,
     ) -> StorageResult<DeleteResult> {
-        self.provider(connection)?
+        let provider = self.provider(connection)?;
+        validate_object_key(&request.key)?;
+        provider
             .delete(connection, request, &self.context(control))
             .await
     }
@@ -259,7 +292,19 @@ impl Engine {
         request: &CopyRequest,
         control: &ExecutionControl,
     ) -> StorageResult<ObjectMetadata> {
-        self.provider(connection)?
+        let provider = self.provider(connection)?;
+        validate_object_key(&request.source_key)?;
+        validate_object_key(&request.destination_key)?;
+        // Held here rather than in each adapter: a self-copy that reaches a
+        // filesystem provider opens the destination for truncation while the
+        // source is still open, destroying the object it was asked to copy.
+        if request.source_key == request.destination_key {
+            return Err(StorageError::invalid_configuration(
+                "COPY_TARGET_EQUALS_SOURCE",
+                "copy source and destination must differ",
+            ));
+        }
+        provider
             .copy(connection, request, &self.context(control))
             .await
     }

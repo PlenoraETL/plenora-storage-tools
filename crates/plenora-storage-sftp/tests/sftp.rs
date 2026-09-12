@@ -91,6 +91,7 @@ fn engine(allow_unverified_ssh: bool) -> StorageResult<Engine> {
         allow_unverified_ssh,
         max_transfer_bytes: 16 * 1024 * 1024,
         max_list_items: 100,
+        max_buffered_put_bytes: 16 * 1024 * 1024,
     });
     engine.register_provider(Arc::new(SftpProvider::new(Arc::new(TestCredentials))))?;
     Ok(engine)

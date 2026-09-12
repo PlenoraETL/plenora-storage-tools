@@ -344,6 +344,13 @@ impl MemoryArtifacts {
             .insert(reference.to_owned(), bytes.to_vec());
     }
 
+    fn has_sink(&self, reference: &str) -> bool {
+        self.sinks
+            .lock()
+            .expect("sinks lock")
+            .contains_key(reference)
+    }
+
     fn sink_bytes(&self, reference: &str) -> Vec<u8> {
         self.sinks
             .lock()
@@ -753,6 +760,123 @@ async fn list_cursor_is_opaque_bounded_and_scoped_to_connection_and_parameters()
         .await
         .expect_err("cursor reuse with another scope must fail");
     assert_eq!(mismatch.code, "LIST_CURSOR_SCOPE_MISMATCH");
+}
+
+#[tokio::test]
+async fn a_locally_invalid_get_never_touches_the_artifact_sink() {
+    let engine = engine();
+    let artifacts = MemoryArtifacts::default();
+    let binding = RuntimeBinding::new(&engine, &artifacts, &TestSecrets);
+    // Opening a sink can create or truncate a consumer-owned destination, so a
+    // request the Engine would reject locally must not reach the resolver.
+    let unknown_provider = binding
+        .invoke(
+            invocation(
+                "storage.get",
+                json!({
+                    "schema_version": 1,
+                    "connection": {
+                        "provider": "not-registered",
+                        "config_contract": "plenora-storage-memory-connection-v1",
+                        "config": {},
+                        "credential_ref": "secret://storage/test"
+                    },
+                    "key": "objects/a.bin",
+                    "artifact_sink": {"reference": "artifact://sink/untouched", "overwrite": true, "metadata": artifact_metadata(b"")}
+                }),
+            ),
+            CancellationToken::new(),
+        )
+        .await;
+    assert_error(&unknown_provider, "UNSUPPORTED");
+    assert!(!artifacts.has_sink("artifact://sink/untouched"));
+}
+
+#[tokio::test]
+async fn missing_get_preserves_the_effect_of_overwriting_an_artifact() {
+    let engine = engine();
+    let artifacts = MemoryArtifacts::default();
+    let reference = "artifact://sink/existing";
+    artifacts.sinks.lock().expect("sinks").insert(
+        reference.to_owned(),
+        Arc::new(Mutex::new(b"original content".to_vec())),
+    );
+    let binding = RuntimeBinding::new(&engine, &artifacts, &TestSecrets);
+    let response = binding
+        .invoke(
+            invocation(
+                "storage.get",
+                json!({
+                    "schema_version": 1, "connection": connection(), "key": "missing.bin",
+                    "artifact_sink": {"reference": reference, "overwrite": true,
+                        "metadata": {"content_type": null, "size": null, "sha256": null}}
+                }),
+            ),
+            CancellationToken::new(),
+        )
+        .await;
+    assert_error(&response, "OBJECT_NOT_FOUND");
+    assert!(artifacts.sink_bytes(reference).is_empty());
+    assert_eq!(response.payload["remote_effect"], "unknown");
+    assert_eq!(response.payload["retry"]["kind"], "requires_recovery");
+}
+
+#[tokio::test]
+async fn engine_operations_enforce_the_public_connection_contract() {
+    let engine = engine();
+    let control = ExecutionControl::default();
+    let base = ProviderConnection {
+        provider: "memory".to_owned(),
+        config_contract: "plenora-storage-memory-connection-v1".to_owned(),
+        config: json!({}),
+        credential_ref: "secret://storage/test".to_owned(),
+    };
+
+    let inline_secret = ProviderConnection {
+        config: json!({"db_password": "do-not-persist"}),
+        ..base.clone()
+    };
+    assert_eq!(
+        engine
+            .test(&inline_secret, &control)
+            .await
+            .expect_err("inline secrets must be rejected by the Rust surface")
+            .code,
+        "STORAGE_CONNECTION_INLINE_SECRET_FORBIDDEN"
+    );
+
+    let raw_credential = ProviderConnection {
+        credential_ref: "do-not-persist".to_owned(),
+        ..base.clone()
+    };
+    assert_eq!(
+        engine
+            .test(&raw_credential, &control)
+            .await
+            .expect_err("a raw credential value must be rejected")
+            .code,
+        "STORAGE_CREDENTIAL_REFERENCE_INVALID"
+    );
+
+    // A self-copy would truncate the source on a filesystem provider, so it is
+    // refused before any adapter is reached.
+    assert_eq!(
+        engine
+            .copy(
+                &base,
+                &CopyRequest {
+                    source_key: "objects/a.bin".to_owned(),
+                    destination_key: "objects/a.bin".to_owned(),
+                    overwrite: true,
+                    publication_policy: plenora_storage_core::PublicationPolicy::BestEffort,
+                },
+                &control,
+            )
+            .await
+            .expect_err("a self-copy must be refused")
+            .code,
+        "COPY_TARGET_EQUALS_SOURCE"
+    );
 }
 
 fn assert_success(result: &plenora_storage_core::RuntimeResultEnvelope, contract: &str) {

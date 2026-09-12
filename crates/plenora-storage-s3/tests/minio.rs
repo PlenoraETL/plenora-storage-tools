@@ -75,6 +75,7 @@ fn engine() -> StorageResult<Engine> {
         allow_unverified_ssh: false,
         max_transfer_bytes: 16 * 1024 * 1024,
         max_list_items: 100,
+        max_buffered_put_bytes: 16 * 1024 * 1024,
     });
     engine.register_provider(Arc::new(S3Provider::new(Arc::new(MinioCredentials))))?;
     Ok(engine)
@@ -254,5 +255,91 @@ async fn insecure_minio_requires_explicit_policy() -> Result<(), StorageError> {
         .await
         .expect_err("HTTP MinIO must be denied by the default engine policy");
     assert_eq!(error.code, "INSECURE_HTTP_FORBIDDEN");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_single_trailing_slash_object_is_rejected_before_path_normalization()
+-> Result<(), Box<dyn std::error::Error>> {
+    use object_store::{
+        aws::{AwsAuthorizer, AwsCredential},
+        client::{HttpRequest, HttpRequestBody, HttpService},
+    };
+
+    if std::env::var("PLENORA_MINIO_TEST").as_deref() != Ok("1") {
+        return Ok(());
+    }
+    let mut connection = connection();
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_nanos();
+    let bucket = format!("review-raw-keys-{nonce}");
+    connection.config["bucket"] = serde_json::json!(bucket);
+    let endpoint = connection.config["endpoint"]
+        .as_str()
+        .expect("endpoint")
+        .trim_end_matches('/');
+    let bucket_url = format!("{endpoint}/{bucket}");
+    let object_url = format!("{bucket_url}/folder/");
+    let credential = AwsCredential {
+        key_id: required_env("PLENORA_MINIO_ACCESS_KEY", "plenora-dev"),
+        secret_key: required_env("PLENORA_MINIO_SECRET_KEY", "plenora-dev-secret"),
+        token: None,
+    };
+    let client = reqwest::Client::builder().no_proxy().build()?;
+    let send = |method: reqwest::Method, url: String| {
+        let client = &client;
+        let credential = &credential;
+        async move {
+            // Bypass object_store::Path deliberately: the server must receive
+            // the trailing slash literally, including during cleanup.
+            let mut request = HttpRequest::new(HttpRequestBody::empty());
+            *request.method_mut() = method;
+            *request.uri_mut() = url.parse()?;
+            AwsAuthorizer::new(credential, "s3", "us-east-1").try_authorize(&mut request, None)?;
+            let response = client.call(request).await?;
+            let status = response.status();
+            response.into_body().bytes().await?;
+            Ok::<_, Box<dyn std::error::Error>>(status)
+        }
+    };
+    assert!(
+        send(reqwest::Method::PUT, bucket_url.clone())
+            .await?
+            .is_success()
+    );
+    assert!(
+        send(reqwest::Method::PUT, object_url.clone())
+            .await?
+            .is_success()
+    );
+    let result = engine()?
+        .list(
+            &connection,
+            &ListRequest {
+                prefix: None,
+                cursor: None,
+                max_items: Some(10),
+            },
+            &ExecutionControl::default(),
+        )
+        .await;
+    assert!(
+        send(reqwest::Method::DELETE, object_url)
+            .await?
+            .is_success()
+    );
+    assert!(
+        send(reqwest::Method::DELETE, bucket_url)
+            .await?
+            .is_success()
+    );
+    let error = result.expect_err("the raw folder/ key must never be reported as folder");
+    assert_eq!(error.code, "OBJECT_KEY_UNREPRESENTABLE");
+    assert_eq!(
+        error.category,
+        plenora_storage_core::ErrorCategory::Protocol
+    );
+    assert_eq!(error.retry, plenora_storage_core::RetryDisposition::Never);
     Ok(())
 }

@@ -1,47 +1,59 @@
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 use crate::{
     ErrorCategory, ErrorPhase, RemoteEffect, RetryDisposition, StorageError, StorageResult,
 };
 
-pub async fn validate_network_target(
+/// Resolves a network target once and returns the exact addresses the caller
+/// must connect to.
+///
+/// Callers must dial the returned addresses rather than the original host name.
+/// Validating a name and then letting the transport resolve it again would let
+/// a second, attacker-controlled resolution reach a private address that the
+/// policy just rejected.
+pub async fn resolve_network_target(
     host: &str,
     port: u16,
     allow_private_network: bool,
-) -> StorageResult<()> {
+) -> StorageResult<Vec<SocketAddr>> {
     if host.is_empty() || port == 0 {
         return Err(StorageError::invalid_configuration(
             "NETWORK_TARGET_INVALID",
             "network host and port must be valid",
         ));
     }
-    if allow_private_network {
-        return Ok(());
-    }
     if let Ok(address) = host.parse::<IpAddr>() {
-        return if is_public_address(address) {
-            Ok(())
-        } else {
-            private_target_error()
-        };
+        if !allow_private_network && !is_public_address(address) {
+            return private_target_error();
+        }
+        return Ok(vec![SocketAddr::new(address, port)]);
     }
-    let addresses = tokio::net::lookup_host((host, port)).await.map_err(|_| {
-        StorageError::new(
-            ErrorCategory::Transient,
-            ErrorPhase::Connect,
-            RemoteEffect::None,
-            RetryDisposition::Safe,
-            "DNS_RESOLUTION_FAILED",
-            "storage endpoint DNS resolution failed",
-        )
-    })?;
-    if addresses
-        .into_iter()
-        .any(|address| !is_public_address(address.ip()))
+    let addresses = tokio::net::lookup_host((host, port))
+        .await
+        .map_err(|_| dns_resolution_error())?
+        .collect::<Vec<_>>();
+    if addresses.is_empty() {
+        return Err(dns_resolution_error());
+    }
+    if !allow_private_network
+        && addresses
+            .iter()
+            .any(|address| !is_public_address(address.ip()))
     {
         return private_target_error();
     }
-    Ok(())
+    Ok(addresses)
+}
+
+fn dns_resolution_error() -> StorageError {
+    StorageError::new(
+        ErrorCategory::Transient,
+        ErrorPhase::Connect,
+        RemoteEffect::None,
+        RetryDisposition::Safe,
+        "DNS_RESOLUTION_FAILED",
+        "storage endpoint DNS resolution failed",
+    )
 }
 
 fn private_target_error<T>() -> StorageResult<T> {
@@ -89,7 +101,7 @@ fn is_public_ipv6(address: Ipv6Addr) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::is_public_address;
+    use super::{is_public_address, resolve_network_target};
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
     #[test]
@@ -98,5 +110,37 @@ mod tests {
         assert!(!is_public_address(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1))));
         assert!(!is_public_address(IpAddr::V6(Ipv6Addr::LOCALHOST)));
         assert!(is_public_address(IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1))));
+    }
+
+    #[tokio::test]
+    async fn resolution_returns_the_addresses_the_caller_must_dial() {
+        let public = resolve_network_target("1.1.1.1", 443, false)
+            .await
+            .expect("a public literal address is allowed");
+        assert_eq!(public.len(), 1);
+        assert_eq!(public[0].port(), 443);
+        assert_eq!(public[0].ip(), IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1)));
+
+        assert_eq!(
+            resolve_network_target("127.0.0.1", 9_000, false)
+                .await
+                .expect_err("a private literal address must fail closed")
+                .code,
+            "PRIVATE_NETWORK_FORBIDDEN"
+        );
+        assert_eq!(
+            resolve_network_target("127.0.0.1", 9_000, true)
+                .await
+                .expect("an authorized private address still resolves")
+                .len(),
+            1
+        );
+        assert_eq!(
+            resolve_network_target("", 443, true)
+                .await
+                .expect_err("an empty host is invalid")
+                .code,
+            "NETWORK_TARGET_INVALID"
+        );
     }
 }

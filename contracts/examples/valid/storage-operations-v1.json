@@ -33,6 +33,21 @@
       }
     },
     {
+      "schema": "plenora-storage-list-input-v1.schema.json",
+      "instance": {
+        "schema_version": 1,
+        "connection": {
+          "provider": "s3",
+          "config_contract": "plenora-storage-s3-connection-v1",
+          "config": {"endpoint": "https://s3.example.invalid", "bucket": "example"},
+          "credential_ref": "secret://storage/test"
+        },
+        "prefix": "",
+        "cursor": null,
+        "max_items": 100
+      }
+    },
+    {
       "schema": "plenora-storage-list-output-v1.schema.json",
       "instance": {
         "objects": [{"key": "incoming/a.bin", "size": 17, "last_modified": null, "etag": null, "version": null}],

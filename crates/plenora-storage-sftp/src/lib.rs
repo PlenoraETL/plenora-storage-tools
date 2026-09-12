@@ -8,7 +8,7 @@ use std::{
         Arc,
         atomic::{AtomicU64, Ordering},
     },
-    time::SystemTime,
+    time::{Duration, SystemTime},
 };
 
 use async_trait::async_trait;
@@ -17,14 +17,15 @@ use plenora_storage_core::{
     ErrorPhase, GetRequest, IntegrityMetadata, ObjectMetadata, OperationContext,
     ProviderCapabilities, ProviderConnection, ProviderListRequest, ProviderListResult,
     PublicationPolicy, PutRequest, RemoteEffect, RetryDisposition, StatRequest, StorageError,
-    StorageProvider, StorageResult, TestResult, TransferResult, validate_network_target,
+    StorageProvider, StorageResult, TestResult, TransferResult, directory_may_contain,
+    key_matches_prefix, resolve_network_target, validate_object_key, validate_object_prefix,
 };
 use russh::{
     client,
     keys::{HashAlg, PublicKey},
 };
 use russh_sftp::{
-    client::{SftpSession, error::Error as SftpError, fs::Metadata},
+    client::{RawSftpSession, SftpSession, error::Error as SftpError, fs::Metadata},
     protocol::{OpenFlags, StatusCode},
 };
 use serde::Deserialize;
@@ -68,14 +69,15 @@ impl SftpProvider {
         Self { credentials }
     }
 
-    async fn connect(
+    async fn connect_ssh(
         &self,
         connection: &ProviderConnection,
         context: &OperationContext<'_>,
-    ) -> StorageResult<SftpConnection> {
+    ) -> StorageResult<(client::Handle<SshClient>, String)> {
         let config = parse_config(connection)?;
-        validate_root(&config.root)?;
-        validate_network_target(
+        // The transport dials these addresses, never the host name again: a
+        // second resolution could reach an address the policy just rejected.
+        let addresses = resolve_network_target(
             &config.host,
             config.port,
             context.policy.allow_private_network,
@@ -101,7 +103,7 @@ impl SftpProvider {
         };
         let mut ssh = client::connect(
             Arc::new(client::Config::default()),
-            (config.host.as_str(), config.port),
+            addresses.as_slice(),
             handler,
         )
         .await
@@ -121,6 +123,15 @@ impl SftpProvider {
             )
             .with_provider(PROVIDER_ID));
         }
+        Ok((ssh, config.root))
+    }
+
+    async fn connect(
+        &self,
+        connection: &ProviderConnection,
+        context: &OperationContext<'_>,
+    ) -> StorageResult<SftpConnection> {
+        let (ssh, root) = self.connect_ssh(connection, context).await?;
         let channel = ssh
             .channel_open_session()
             .await
@@ -135,7 +146,7 @@ impl SftpProvider {
         Ok(SftpConnection {
             _ssh: ssh,
             sftp,
-            root: config.root,
+            root,
         })
     }
 }
@@ -251,55 +262,69 @@ impl StorageProvider for SftpProvider {
         if let Some(start_after) = request.start_after.as_deref() {
             validate_key(start_after)?;
         }
-        let remote = context
+        let prefix = request.prefix.as_deref().unwrap_or_default();
+        // The high-level read_dir collects every batch before returning. A
+        // raw session lets us enforce the scan budget between READDIR responses.
+        let (_ssh, listing, root) = context
             .control
             .run(
-                self.connect(connection, context),
+                async {
+                    let (ssh, root) = self.connect_ssh(connection, context).await?;
+                    let channel = ssh
+                        .channel_open_session()
+                        .await
+                        .map_err(map_ssh_connect_error)?;
+                    channel
+                        .request_subsystem(true, "sftp")
+                        .await
+                        .map_err(map_ssh_connect_error)?;
+                    let listing = RawSftpSession::new(channel.into_stream());
+                    listing
+                        .init()
+                        .await
+                        .map_err(|error| map_sftp_error(error, ErrorPhase::Connect, false))?;
+                    Ok((ssh, listing, root))
+                },
                 ErrorPhase::Connect,
                 false,
             )
             .await?;
-        let mut stack = vec![remote.root.clone()];
-        let mut objects = Vec::new();
+        let mut stack = vec![root.clone()];
+        // Only the smallest `limit + 1` matching keys are retained, so page size
+        // bounds memory instead of the whole matching namespace.
+        let mut selected = BTreeMap::new();
+        let mut scanned = 0_usize;
         while let Some(directory) = stack.pop() {
-            let entries = context
-                .control
-                .run(
-                    async {
-                        remote
-                            .sftp
-                            .read_dir(&directory)
-                            .await
-                            .map_err(|error| map_sftp_error(error, ErrorPhase::Read, false))
-                    },
-                    ErrorPhase::Read,
-                    false,
-                )
-                .await?;
-            for entry in entries {
-                let metadata = entry.metadata();
+            scan_directory(&listing, &directory, context, &mut scanned, |entry| {
+                let metadata = entry.attrs;
+                validate_key(&entry.filename)?;
+                let path = remote_path(&directory, &entry.filename);
+                let key = relative_key(&root, &path)?;
                 if metadata.file_type().is_dir() {
-                    stack.push(entry.path());
-                } else if metadata.file_type().is_file() {
-                    let key = relative_key(&remote.root, &entry.path())?;
-                    if request
-                        .prefix
+                    // Directories that cannot hold a matching key are not
+                    // entered at all.
+                    if directory_may_contain(&key, prefix) {
+                        stack.push(path);
+                    }
+                } else if metadata.file_type().is_file()
+                    && key_matches_prefix(&key, prefix)
+                    && request
+                        .start_after
                         .as_ref()
-                        .is_none_or(|prefix| key.starts_with(prefix))
-                        && request
-                            .start_after
-                            .as_ref()
-                            .is_none_or(|offset| key > *offset)
+                        .is_none_or(|offset| key > *offset)
+                {
+                    selected.insert(key.clone(), public_metadata(key, &metadata));
+                    if selected.len() > limit.saturating_add(1)
+                        && let Some(highest) = selected.keys().next_back().cloned()
                     {
-                        objects.push(public_metadata(key, &metadata));
-                        if objects.len() > context.policy.max_list_items {
-                            return Err(list_scan_limit_error());
-                        }
+                        selected.remove(&highest);
                     }
                 }
-            }
+                Ok(())
+            })
+            .await?;
         }
-        objects.sort_by(|left, right| left.key.cmp(&right.key));
+        let mut objects = selected.into_values().collect::<Vec<_>>();
         let truncated = objects.len() > limit;
         if truncated {
             objects.truncate(limit);
@@ -419,7 +444,7 @@ impl StorageProvider for SftpProvider {
         } else {
             OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE
         };
-        let mut file = context
+        let opened = context
             .control
             .run(
                 async {
@@ -431,32 +456,37 @@ impl StorageProvider for SftpProvider {
                             if request.overwrite {
                                 map_sftp_error(error, ErrorPhase::Prepare, true)
                             } else {
-                                conflict_error("SFTP_CREATE_CONFLICT")
+                                map_exclusive_open_error(error, "SFTP_CREATE_CONFLICT")
                             }
                         })
                 },
                 ErrorPhase::Prepare,
                 true,
             )
-            .await?;
+            .await;
+        // Deliberately no cleanup on this path. An exclusive create can fail
+        // precisely because the name is already held, and this operation cannot
+        // prove it owns a file it did not open. Deleting it would be a
+        // destructive guess; the error already reports an ambiguous outcome.
+        let mut file = opened?;
         let transfer = copy_with_control(source, &mut file, context, true).await;
         let (bytes_transferred, digest) = match transfer {
             Ok(result) => result,
             Err(error) => {
-                if atomic_publish {
-                    let _ = remote.sftp.remove_file(&write_path).await;
-                }
-                return Err(error);
+                return Err(discard_staged_object(
+                    &remote.sftp,
+                    atomic_publish,
+                    &write_path,
+                    error,
+                )
+                .await);
             }
         };
         if request
             .content_length
             .is_some_and(|expected| expected != bytes_transferred)
         {
-            if atomic_publish {
-                let _ = remote.sftp.remove_file(&write_path).await;
-            }
-            return Err(StorageError::new(
+            let error = StorageError::new(
                 ErrorCategory::InvalidConfiguration,
                 ErrorPhase::Commit,
                 RemoteEffect::Partial,
@@ -464,9 +494,12 @@ impl StorageProvider for SftpProvider {
                 "CONTENT_LENGTH_MISMATCH",
                 "artifact length differs from declared content_length",
             )
-            .with_provider(PROVIDER_ID));
+            .with_provider(PROVIDER_ID);
+            return Err(
+                discard_staged_object(&remote.sftp, atomic_publish, &write_path, error).await,
+            );
         }
-        context
+        if let Err(error) = context
             .control
             .run(
                 async {
@@ -480,9 +513,14 @@ impl StorageProvider for SftpProvider {
                 ErrorPhase::Commit,
                 true,
             )
-            .await?;
-        if atomic_publish {
-            context
+            .await
+        {
+            return Err(
+                discard_staged_object(&remote.sftp, atomic_publish, &write_path, error).await,
+            );
+        }
+        if atomic_publish
+            && let Err(error) = context
                 .control
                 .run(
                     async {
@@ -495,7 +533,9 @@ impl StorageProvider for SftpProvider {
                     ErrorPhase::Commit,
                     true,
                 )
-                .await?;
+                .await
+        {
+            return Err(discard_staged_object(&remote.sftp, true, &write_path, error).await);
         }
         Ok(transfer_result(
             request.key.clone(),
@@ -559,6 +599,15 @@ impl StorageProvider for SftpProvider {
             validate_sftp_publication(connection, request.overwrite, request.publication_policy)?;
         validate_key(&request.source_key)?;
         validate_key(&request.destination_key)?;
+        // A self-copy would open the destination for truncation while the
+        // source is still open, destroying the object being copied.
+        if request.source_key == request.destination_key {
+            return Err(StorageError::invalid_configuration(
+                "COPY_TARGET_EQUALS_SOURCE",
+                "copy source and destination must differ",
+            )
+            .with_provider(PROVIDER_ID));
+        }
         let remote = context
             .control
             .run(
@@ -570,11 +619,20 @@ impl StorageProvider for SftpProvider {
         let source_path = remote_path(&remote.root, &request.source_key);
         let destination_path = remote_path(&remote.root, &request.destination_key);
         ensure_parent_directories(&remote.sftp, &destination_path, context).await?;
-        let mut source = remote
-            .sftp
-            .open(source_path)
-            .await
-            .map_err(|error| map_sftp_error(error, ErrorPhase::Read, false))?;
+        let mut source = context
+            .control
+            .run(
+                async {
+                    remote
+                        .sftp
+                        .open(source_path)
+                        .await
+                        .map_err(|error| map_sftp_error(error, ErrorPhase::Read, false))
+                },
+                ErrorPhase::Read,
+                false,
+            )
+            .await?;
         let write_path = if atomic_publish {
             temporary_path(&destination_path)
         } else {
@@ -585,19 +643,35 @@ impl StorageProvider for SftpProvider {
         } else {
             OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE
         };
-        let mut destination = remote
-            .sftp
-            .open_with_flags(write_path.clone(), flags)
-            .await
-            .map_err(|error| {
-                if request.overwrite {
-                    map_sftp_error(error, ErrorPhase::Prepare, true)
-                } else {
-                    conflict_error("SFTP_COPY_CONFLICT")
-                }
-            })?;
-        copy_with_control(&mut source, &mut destination, context, true).await?;
-        context
+        let opened = context
+            .control
+            .run(
+                async {
+                    remote
+                        .sftp
+                        .open_with_flags(write_path.clone(), flags)
+                        .await
+                        .map_err(|error| {
+                            if request.overwrite {
+                                map_sftp_error(error, ErrorPhase::Prepare, true)
+                            } else {
+                                map_exclusive_open_error(error, "SFTP_COPY_CONFLICT")
+                            }
+                        })
+                },
+                ErrorPhase::Prepare,
+                true,
+            )
+            .await;
+        // Deliberately no cleanup on this path, for the same reason as `put`:
+        // the operation cannot prove it owns a file it did not open.
+        let mut destination = opened?;
+        if let Err(error) = copy_with_control(&mut source, &mut destination, context, true).await {
+            return Err(
+                discard_staged_object(&remote.sftp, atomic_publish, &write_path, error).await,
+            );
+        }
+        if let Err(error) = context
             .control
             .run(
                 async {
@@ -613,9 +687,14 @@ impl StorageProvider for SftpProvider {
                 ErrorPhase::Commit,
                 true,
             )
-            .await?;
-        if atomic_publish {
-            context
+            .await
+        {
+            return Err(
+                discard_staged_object(&remote.sftp, atomic_publish, &write_path, error).await,
+            );
+        }
+        if atomic_publish
+            && let Err(error) = context
                 .control
                 .run(
                     async {
@@ -628,76 +707,88 @@ impl StorageProvider for SftpProvider {
                     ErrorPhase::Commit,
                     true,
                 )
-                .await?;
+                .await
+        {
+            return Err(discard_staged_object(&remote.sftp, true, &write_path, error).await);
         }
-        let metadata = remote
-            .sftp
-            .metadata(destination_path)
+        // The destination is published from here on: a failed read-back must
+        // not be reported as an operation without a remote effect.
+        let metadata = context
+            .control
+            .run(
+                async {
+                    remote
+                        .sftp
+                        .metadata(destination_path)
+                        .await
+                        .map_err(|error| map_sftp_error(error, ErrorPhase::Read, false))
+                },
+                ErrorPhase::Cleanup,
+                true,
+            )
             .await
-            .map_err(|error| map_sftp_error(error, ErrorPhase::Read, false))?;
+            .map_err(|_| committed_verification_error())?;
         Ok(public_metadata(request.destination_key.clone(), &metadata))
     }
 }
 
 fn parse_config(connection: &ProviderConnection) -> StorageResult<SftpConnectionConfig> {
-    serde_json::from_value(connection.config.clone()).map_err(|_| {
-        StorageError::invalid_configuration(
-            "SFTP_CONFIGURATION_INVALID",
-            "SFTP configuration does not match its public contract",
-        )
-        .with_provider(PROVIDER_ID)
-    })
+    let config: SftpConnectionConfig =
+        serde_json::from_value(connection.config.clone()).map_err(|_| configuration_error())?;
+    // Serde alone accepts values that `plenora-storage-sftp-connection-v1`
+    // rejects, so the schema bounds are enforced here as well.
+    // Lengths are counted in code points, as JSON Schema `maxLength` does.
+    let valid = (1..=253).contains(&config.host.chars().count())
+        && !config.host.contains(char::is_whitespace)
+        && !config.host.contains('\0')
+        && config.port > 0
+        && is_valid_root(&config.root)
+        && config
+            .host_key_sha256
+            .as_ref()
+            .is_none_or(|value| is_ssh_sha256_fingerprint(value));
+    if valid {
+        Ok(config)
+    } else {
+        Err(configuration_error())
+    }
 }
 
-fn validate_root(root: &str) -> StorageResult<()> {
-    if root.is_empty()
-        || root.len() > 4_096
-        || root.contains('\\')
-        || root.contains('\0')
-        || root.split('/').any(|part| part == "..")
-    {
-        return Err(StorageError::invalid_configuration(
-            "SFTP_ROOT_INVALID",
-            "SFTP root path is invalid",
-        )
-        .with_provider(PROVIDER_ID));
-    }
-    Ok(())
+fn configuration_error() -> StorageError {
+    StorageError::invalid_configuration(
+        "SFTP_CONFIGURATION_INVALID",
+        "SFTP configuration does not match its public contract",
+    )
+    .with_provider(PROVIDER_ID)
+}
+
+fn is_valid_root(root: &str) -> bool {
+    (1..=4_096).contains(&root.chars().count())
+        && !root.contains('\\')
+        && !root.contains('\0')
+        && !root.split('/').any(|part| part == "..")
+}
+
+/// Matches the `host_key_sha256` pattern of the SFTP connection contract. It is
+/// checked even when unverified host keys are authorized, so that relaxing the
+/// policy cannot also relax the configuration contract.
+fn is_ssh_sha256_fingerprint(value: &str) -> bool {
+    let Some(encoded) = value.strip_prefix("SHA256:") else {
+        return false;
+    };
+    let body = encoded.strip_suffix('=').unwrap_or(encoded);
+    body.len() == 43
+        && body
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'/'))
 }
 
 fn validate_key(key: &str) -> StorageResult<()> {
-    if key.is_empty()
-        || key.len() > 4_096
-        || key.starts_with('/')
-        || key.contains('\\')
-        || key.contains('\0')
-        || key
-            .split('/')
-            .any(|part| part.is_empty() || matches!(part, "." | ".."))
-    {
-        return Err(StorageError::invalid_configuration(
-            "OBJECT_KEY_INVALID",
-            "storage object key must be a normalized relative path",
-        )
-        .with_provider(PROVIDER_ID));
-    }
-    Ok(())
+    validate_object_key(key).map_err(|error| error.with_provider(PROVIDER_ID))
 }
 
 fn validate_prefix(prefix: &str) -> StorageResult<()> {
-    if prefix.len() > 4_096
-        || prefix.starts_with('/')
-        || prefix.contains('\\')
-        || prefix.contains('\0')
-        || prefix.split('/').any(|part| part == "..")
-    {
-        return Err(StorageError::invalid_configuration(
-            "OBJECT_PREFIX_INVALID",
-            "storage object prefix is invalid",
-        )
-        .with_provider(PROVIDER_ID));
-    }
-    Ok(())
+    validate_object_prefix(prefix).map_err(|error| error.with_provider(PROVIDER_ID))
 }
 
 fn validate_file_metadata(request: &PutRequest) -> StorageResult<()> {
@@ -733,9 +824,23 @@ fn validate_sftp_publication(
     Ok(true)
 }
 
+/// Builds a staging name that no other client can collide with.
+///
+/// A process id and a local counter are not enough: two clients on different
+/// machines can produce the same pair, and an exclusive create that loses that
+/// race would report a conflict against a file it does not own.
 fn temporary_path(destination: &str) -> String {
     let nonce = TEMPORARY_NAME_NONCE.fetch_add(1, Ordering::Relaxed);
-    format!("{destination}.plenora-tmp-{}-{nonce}", std::process::id())
+    let elapsed = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_or(0, |value| value.as_nanos());
+    let mut digest = Sha256::new();
+    digest.update(destination.as_bytes());
+    digest.update(std::process::id().to_le_bytes());
+    digest.update(nonce.to_le_bytes());
+    digest.update(elapsed.to_le_bytes());
+    let unique = format!("{:x}", digest.finalize());
+    format!("{destination}.plenora-tmp-{}", &unique[..32])
 }
 
 fn remote_path(root: &str, key: &str) -> String {
@@ -757,6 +862,56 @@ fn relative_key(root: &str, path: &str) -> StorageResult<String> {
         .to_owned();
     validate_key(&key)?;
     Ok(key)
+}
+
+async fn scan_directory<F>(
+    listing: &RawSftpSession,
+    directory: &str,
+    context: &OperationContext<'_>,
+    scanned: &mut usize,
+    mut visit: F,
+) -> StorageResult<()>
+where
+    F: FnMut(russh_sftp::protocol::File) -> StorageResult<()> + Send,
+{
+    context
+        .control
+        .run(
+            async {
+                let handle = listing
+                    .opendir(directory)
+                    .await
+                    .map_err(|error| map_sftp_error(error, ErrorPhase::Read, false))?
+                    .handle;
+                loop {
+                    let batch = match listing.readdir(&handle).await {
+                        Ok(batch) => batch,
+                        Err(SftpError::Status(status)) if status.status_code == StatusCode::Eof => {
+                            break;
+                        }
+                        Err(error) => return Err(map_sftp_error(error, ErrorPhase::Read, false)),
+                    };
+                    for entry in batch.files {
+                        if matches!(entry.filename.as_str(), "." | "..") {
+                            continue;
+                        }
+                        if *scanned >= context.policy.max_list_items {
+                            return Err(list_scan_limit_error());
+                        }
+                        *scanned += 1;
+                        visit(entry)?;
+                    }
+                }
+                listing
+                    .close(handle)
+                    .await
+                    .map_err(|error| map_sftp_error(error, ErrorPhase::Read, false))?;
+                Ok(())
+            },
+            ErrorPhase::Read,
+            false,
+        )
+        .await
 }
 
 async fn ensure_parent_directories(
@@ -1029,6 +1184,59 @@ fn mutation_io_error(phase: ErrorPhase) -> StorageError {
     transfer_io_error(phase, true)
 }
 
+/// Independent budget for cleanup after a failure.
+///
+/// The caller's deadline may already have expired, and a cleanup that hangs must
+/// not extend the operation without bound.
+const CLEANUP_BUDGET: Duration = Duration::from_secs(10);
+
+/// Removes an unpublished staging object and restates the outcome.
+///
+/// A confirmed removal turns an ambiguous failure into a rolled back one; an
+/// unconfirmed removal is reported rather than leaving a `.plenora-tmp-*` object
+/// behind silently. The original cause is preserved either way.
+async fn discard_staged_object(
+    sftp: &SftpSession,
+    staged: bool,
+    write_path: &str,
+    error: StorageError,
+) -> StorageError {
+    if !staged {
+        return error;
+    }
+    match tokio::time::timeout(CLEANUP_BUDGET, sftp.remove_file(write_path)).await {
+        Ok(Ok(())) => error.rolled_back(),
+        _ => error.cleanup_unconfirmed("staging_remove_failed"),
+    }
+}
+
+fn committed_verification_error() -> StorageError {
+    StorageError::new(
+        ErrorCategory::Execution,
+        ErrorPhase::Cleanup,
+        RemoteEffect::Committed,
+        RetryDisposition::RequiresRecovery,
+        "SFTP_COMMITTED_METADATA_UNAVAILABLE",
+        "SFTP destination was published but its metadata could not be read back",
+    )
+    .with_provider(PROVIDER_ID)
+}
+
+/// Maps a failed exclusive create.
+///
+/// Only the generic failure status proves the destination already exists, which
+/// is how SFTP v3 reports a rejected exclusive create. Permission, unsupported
+/// and transport failures are reported as themselves, so a timeout raised after
+/// the server created the file is never announced as a conflict without effect.
+fn map_exclusive_open_error(error: SftpError, code: &'static str) -> StorageError {
+    match &error {
+        SftpError::Status(status) if status.status_code == StatusCode::Failure => {
+            conflict_error(code)
+        }
+        _ => map_sftp_error(error, ErrorPhase::Prepare, true),
+    }
+}
+
 fn conflict_error(code: &'static str) -> StorageError {
     StorageError::new(
         ErrorCategory::Conflict,
@@ -1060,14 +1268,24 @@ fn list_scan_limit_error() -> StorageError {
         RemoteEffect::None,
         RetryDisposition::Never,
         "LIST_SCAN_LIMIT_EXCEEDED",
-        "SFTP listing exceeds the engine scan limit",
+        "SFTP listing visited more directory entries than the engine scan limit",
     )
     .with_provider(PROVIDER_ID)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{remote_path, validate_key};
+    use super::{remote_path, scan_directory, validate_key};
+    use plenora_storage_core::{EngineConfig, ExecutionControl, OperationContext};
+    use russh_sftp::{
+        client::RawSftpSession,
+        protocol::{File, Handle, Name, StatusCode},
+        server::Handler,
+    };
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
 
     #[test]
     fn keys_cannot_escape_the_remote_root() {
@@ -1075,5 +1293,65 @@ mod tests {
         assert!(validate_key("../secret").is_err());
         assert!(validate_key("/absolute").is_err());
         assert_eq!(remote_path("upload", "a/b"), "upload/a/b");
+    }
+
+    struct EndlessDirectory(Arc<AtomicUsize>);
+
+    impl Handler for EndlessDirectory {
+        type Error = StatusCode;
+        fn unimplemented(&self) -> Self::Error {
+            StatusCode::OpUnsupported
+        }
+        async fn opendir(&mut self, id: u32, _path: String) -> Result<Handle, Self::Error> {
+            Ok(Handle {
+                id,
+                handle: "directory".to_owned(),
+            })
+        }
+        async fn readdir(&mut self, id: u32, _handle: String) -> Result<Name, Self::Error> {
+            let count = self.0.fetch_add(1, Ordering::SeqCst);
+            Ok(Name {
+                id,
+                files: vec![File::dummy(format!("file-{count}"))],
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn listing_stops_between_batches_without_waiting_for_directory_eof() {
+        let requests = Arc::new(AtomicUsize::new(0));
+        let (client, server) = tokio::io::duplex(4096);
+        let server = tokio::spawn(russh_sftp::server::run(
+            server,
+            EndlessDirectory(requests.clone()),
+        ));
+        let listing = RawSftpSession::new(client);
+        listing.init().await.expect("init");
+        let policy = EngineConfig {
+            max_list_items: 2,
+            ..EngineConfig::default()
+        };
+        let control = ExecutionControl::default()
+            .with_deadline(std::time::Instant::now() + std::time::Duration::from_secs(2));
+        let mut visited = Vec::new();
+        let error = scan_directory(
+            &listing,
+            ".",
+            &OperationContext {
+                policy: &policy,
+                control: &control,
+            },
+            &mut 0,
+            |file| {
+                visited.push(file.filename);
+                Ok(())
+            },
+        )
+        .await
+        .expect_err("scan bound before EOF");
+        server.abort();
+        assert_eq!(error.code, "LIST_SCAN_LIMIT_EXCEEDED");
+        assert_eq!(visited, ["file-0", "file-1"]);
+        assert_eq!(requests.load(Ordering::SeqCst), 3);
     }
 }

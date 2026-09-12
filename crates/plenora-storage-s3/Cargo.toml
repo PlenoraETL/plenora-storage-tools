@@ -12,6 +12,8 @@ async-trait.workspace = true
 futures-util.workspace = true
 object_store.workspace = true
 plenora-storage-core = { path = "../plenora-storage-core" }
+reqwest.workspace = true
+quick-xml.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

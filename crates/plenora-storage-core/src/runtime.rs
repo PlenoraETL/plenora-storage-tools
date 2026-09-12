@@ -310,15 +310,49 @@ impl<'a> RuntimeBinding<'a> {
                 validate_operation_schema_version(input.schema_version)?;
                 input.artifact_sink.validate()?;
                 self.authorize_connection(&input.connection)?;
-                let mut sink = self.artifacts.open_sink(&input.artifact_sink).await?;
+                // Opening a sink can create or truncate a consumer-owned
+                // destination, so every local admission check runs first.
+                self.engine
+                    .preflight(&input.connection, &[&input.request.key])?;
+                // Checked before the call so that a request cancelled while
+                // still local reports no effect, while a cancellation during
+                // the open reports the ambiguous one the resolver may have
+                // produced.
+                control.check(ErrorPhase::Prepare, false)?;
+                let mut sink = control
+                    .run(
+                        self.artifacts.open_sink(&input.artifact_sink),
+                        ErrorPhase::Prepare,
+                        true,
+                    )
+                    .await?;
                 let result = self
                     .engine
                     .get(&input.connection, &input.request, &mut sink, &control)
-                    .await?;
-                sink.shutdown()
                     .await
-                    .map_err(|_| artifact_finalize_error())?;
-                validate_transfer_metadata(&input.artifact_sink.metadata, &result, true)?;
+                    // The provider only knows about its own effects. Opening
+                    // the artifact may already have created or truncated it,
+                    // even if the provider fails before writing any bytes.
+                    .map_err(|error| {
+                        error
+                            .with_outcome(RemoteEffect::Unknown, RetryDisposition::RequiresRecovery)
+                    })?;
+                // Integrity is checked before the sink is finalized: a sink that
+                // publishes on shutdown must not commit bytes that do not match
+                // the declared metadata. The sink already holds bytes, so the
+                // published state of the artifact is ambiguous.
+                validate_transfer_metadata(
+                    &input.artifact_sink.metadata,
+                    &result,
+                    RemoteEffect::Unknown,
+                )?;
+                control
+                    .run(
+                        async { sink.shutdown().await.map_err(|_| artifact_finalize_error()) },
+                        ErrorPhase::Commit,
+                        true,
+                    )
+                    .await?;
                 serialize_result(result)?
             }
             "storage.put" => {
@@ -327,12 +361,27 @@ impl<'a> RuntimeBinding<'a> {
                 input.artifact_source.validate()?;
                 apply_put_metadata(&mut input)?;
                 self.authorize_connection(&input.connection)?;
-                let mut source = self.artifacts.open_source(&input.artifact_source).await?;
+                self.engine
+                    .preflight(&input.connection, &[&input.request.key])?;
+                let mut source = control
+                    .run(
+                        self.artifacts.open_source(&input.artifact_source),
+                        ErrorPhase::Prepare,
+                        false,
+                    )
+                    .await?;
                 let result = self
                     .engine
                     .put(&input.connection, &input.request, &mut source, &control)
                     .await?;
-                validate_transfer_metadata(&input.artifact_source.metadata, &result, true)?;
+                // The upload succeeded, so the object is committed with content
+                // that does not match the declared metadata. Reporting an
+                // ambiguous outcome here would understate a known one.
+                validate_transfer_metadata(
+                    &input.artifact_source.metadata,
+                    &result,
+                    RemoteEffect::Committed,
+                )?;
                 serialize_result(result)?
             }
             "storage.copy" => {
@@ -360,8 +409,11 @@ impl<'a> RuntimeBinding<'a> {
         Ok((descriptor, result))
     }
 
+    /// Validates the whole public connection before the application's secret
+    /// authority is consulted, so a malformed or secret-bearing connection never
+    /// reaches it.
     fn authorize_connection(&self, connection: &crate::ProviderConnection) -> StorageResult<()> {
-        validate_secret_reference(&connection.credential_ref)?;
+        connection.validate()?;
         self.secrets.authorize(&connection.credential_ref)
     }
 }
@@ -427,21 +479,7 @@ fn validate_payload_security(payload: &Value) -> StorageResult<()> {
     fn visit(key: Option<&str>, value: &Value) -> bool {
         match value {
             Value::Object(object) => object.iter().any(|(child_key, child)| {
-                let normalized = child_key.to_ascii_lowercase();
-                let secret = matches!(
-                    normalized.as_str(),
-                    "password"
-                        | "passwd"
-                        | "credentials"
-                        | "secret"
-                        | "token"
-                        | "api_key"
-                        | "authorization"
-                        | "private_key"
-                        | "access_key"
-                        | "secret_key"
-                );
-                secret || visit(Some(child_key), child)
+                crate::is_secret_field_name(child_key) || visit(Some(child_key), child)
             }),
             Value::Array(items) => items.iter().any(|child| visit(key, child)),
             Value::String(text) => {
@@ -471,35 +509,6 @@ fn is_local_path(value: &str) -> bool {
             .replace('\\', "/")
             .split('/')
             .any(|segment| segment == "..")
-}
-
-fn validate_secret_reference(reference: &str) -> StorageResult<()> {
-    let Some((scheme, protected)) = reference.split_once(':') else {
-        return Err(secret_reference_error());
-    };
-    if scheme.len() < 2
-        || scheme.len() > 32
-        || !scheme.bytes().enumerate().all(|(index, byte)| {
-            index == 0 && byte.is_ascii_lowercase()
-                || index > 0
-                    && (byte.is_ascii_lowercase()
-                        || byte.is_ascii_digit()
-                        || matches!(byte, b'+' | b'.' | b'-'))
-        })
-        || protected.is_empty()
-        || protected.contains(char::is_whitespace)
-        || protected.contains('\\')
-    {
-        return Err(secret_reference_error());
-    }
-    Ok(())
-}
-
-fn secret_reference_error() -> StorageError {
-    StorageError::invalid_configuration(
-        "SECRET_REFERENCE_INVALID",
-        "runtime credential reference must use an opaque protected-reference scheme",
-    )
 }
 
 fn apply_put_metadata(input: &mut PutInput) -> StorageResult<()> {
@@ -536,7 +545,7 @@ fn apply_put_metadata(input: &mut PutInput) -> StorageResult<()> {
 fn validate_transfer_metadata(
     expected: &crate::ArtifactMetadata,
     result: &TransferResult,
-    remote_started: bool,
+    remote_effect: RemoteEffect,
 ) -> StorageResult<()> {
     let mismatch = expected
         .size
@@ -554,15 +563,11 @@ fn validate_transfer_metadata(
         return Err(StorageError::new(
             ErrorCategory::Conflict,
             ErrorPhase::Commit,
-            if remote_started {
-                RemoteEffect::Unknown
-            } else {
-                RemoteEffect::None
-            },
-            if remote_started {
-                RetryDisposition::RequiresRecovery
-            } else {
+            remote_effect,
+            if remote_effect == RemoteEffect::None {
                 RetryDisposition::Never
+            } else {
+                RetryDisposition::RequiresRecovery
             },
             "ARTIFACT_INTEGRITY_MISMATCH",
             "artifact size, content type or SHA-256 differs from declared metadata",

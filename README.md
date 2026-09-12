@@ -46,10 +46,26 @@ di degradare a check-then-write.
 - HTTPS, verifica della host key SSH e reti pubbliche sono il default.
 - HTTP, FTP in chiaro, reti private e host key SSH non verificata richiedono
   autorizzazioni separate dell'host.
-- Le richieste contengono `credential_ref`, mai access key o segreti inline.
+- L'endpoint viene risolto una sola volta e la connessione usa gli indirizzi
+  già validati, quindi una seconda risoluzione non può raggiungere un
+  indirizzo che la policy ha appena rifiutato. Per lo stesso motivo il client
+  S3 non segue redirect e non usa proxy, e il canale dati FTP passivo riusa
+  l'indirizzo di controllo già validato prendendo dalla risposta PASV soltanto
+  la porta.
+- Le richieste contengono `credential_ref`, mai access key o segreti inline. Il
+  divieto è applicato dal core su ogni operazione, non solo dal runtime, e la
+  configurazione è una mappa piatta di valori scalari, così un segreto non può
+  nascondersi sotto il livello in cui i nomi vengono ispezionati.
 - Gli errori pubblici sono tipizzati e redatti.
 - Upload e download hanno limiti espliciti e non pubblicano file locali
-  parziali.
+  parziali. Con `--overwrite false` la pubblicazione crea la destinazione con
+  un link atomico che fallisce se il nome è già occupato: non esiste finestra
+  di probe e nessun file non creato da questo comando viene mai sostituito o
+  rimosso. Richiede un filesystem che supporti gli hard link.
+- Le upload condizionali (`overwrite=false` su S3) devono essere bufferizzate in
+  memoria e hanno un limite dedicato, `--max-buffered-put-bytes`, distinto da
+  `--max-transfer-bytes`, che riguarda i trasferimenti in streaming.
+- `copy` rifiuta sorgente e destinazione uguali prima di qualunque mutazione.
 
 ## Sviluppo Docker
 

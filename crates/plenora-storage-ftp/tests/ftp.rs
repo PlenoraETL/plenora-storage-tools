@@ -112,6 +112,7 @@ fn engine(allow_insecure_ftp: bool) -> StorageResult<Engine> {
         allow_unverified_ssh: false,
         max_transfer_bytes: 16 * 1024 * 1024,
         max_list_items: 100,
+        max_buffered_put_bytes: 16 * 1024 * 1024,
     });
     engine.register_provider(Arc::new(FtpProvider::new(Arc::new(TestCredentials))))?;
     Ok(engine)

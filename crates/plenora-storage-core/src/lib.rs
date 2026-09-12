@@ -20,19 +20,22 @@ pub use capability::{
 pub use control::{CancellationToken, ExecutionControl};
 pub use credentials::{CredentialMaterial, CredentialResolver, EnvironmentCredentialResolver};
 pub use engine::{
-    Engine, EngineConfig, LIST_CURSOR_MAX_ACTIVE, LIST_CURSOR_MAX_BYTES, LIST_CURSOR_TTL_SECONDS,
+    DEFAULT_MAX_BUFFERED_PUT_BYTES, Engine, EngineConfig, LIST_CURSOR_MAX_ACTIVE,
+    LIST_CURSOR_MAX_BYTES, LIST_CURSOR_TTL_SECONDS,
 };
 pub use error::{
     ErrorCategory, ErrorPhase, RemoteEffect, RetryDisposition, StorageError, StorageResult,
 };
 pub use model::{
-    ArtifactMetadata, ArtifactReference, ArtifactSinkReference, CopyInput, CopyRequest,
-    DeleteInput, DeleteRequest, DeleteResult, GetInput, GetRequest, IntegrityMetadata, ListInput,
-    ListRequest, ListResult, OPERATION_SCHEMA_VERSION, ObjectMetadata, ProviderConnection,
-    ProviderListRequest, ProviderListResult, PublicationPolicy, PutInput, PutRequest, StatInput,
-    StatRequest, TestInput, TestResult, TransferResult, validate_operation_schema_version,
+    ArtifactMetadata, ArtifactReference, ArtifactSinkReference, CONNECTION_CONFIG_MAX_PROPERTIES,
+    CopyInput, CopyRequest, DeleteInput, DeleteRequest, DeleteResult, GetInput, GetRequest,
+    IntegrityMetadata, ListInput, ListRequest, ListResult, OBJECT_KEY_MAX_CHARS,
+    OPERATION_SCHEMA_VERSION, ObjectMetadata, ProviderConnection, ProviderListRequest,
+    ProviderListResult, PublicationPolicy, PutInput, PutRequest, StatInput, StatRequest, TestInput,
+    TestResult, TransferResult, directory_may_contain, is_secret_field_name, key_matches_prefix,
+    validate_object_key, validate_object_prefix, validate_operation_schema_version,
 };
-pub use network::validate_network_target;
+pub use network::resolve_network_target;
 pub use provider::{OperationContext, StorageProvider};
 pub use runtime::{
     ArtifactResolver, ArtifactRole, ArtifactSink, ArtifactSource, ERROR_CONTENT_TYPE,

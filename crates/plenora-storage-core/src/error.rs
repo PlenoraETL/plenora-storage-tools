@@ -100,6 +100,49 @@ impl StorageError {
         self
     }
 
+    /// Restates the remote outcome of an error whose publication state became
+    /// known only after the error was produced.
+    #[must_use]
+    pub fn with_outcome(mut self, remote_effect: RemoteEffect, retry: RetryDisposition) -> Self {
+        self.remote_effect = remote_effect;
+        self.retry = retry;
+        self
+    }
+
+    /// Adds a redacted, machine-readable detail. Details never carry hosts,
+    /// paths or credential material.
+    #[must_use]
+    pub fn with_detail(mut self, name: impl Into<String>, value: &'static str) -> Self {
+        self.details
+            .insert(name.into(), Value::String(value.to_owned()));
+        self
+    }
+
+    /// Restates an error whose effect was undone by a verified cleanup.
+    ///
+    /// Only a cause that could behave differently on its own becomes retryable:
+    /// a rolled back configuration or resource-limit failure would deterministically
+    /// fail again.
+    #[must_use]
+    pub fn rolled_back(self) -> Self {
+        let retry = match self.category {
+            ErrorCategory::Cancelled
+            | ErrorCategory::Timeout
+            | ErrorCategory::Transient
+            | ErrorCategory::Io => RetryDisposition::Safe,
+            _ => RetryDisposition::Never,
+        };
+        self.with_outcome(RemoteEffect::RolledBack, retry)
+    }
+
+    /// Restates an error whose cleanup could not be confirmed, keeping the
+    /// original cause instead of replacing it with a generic cleanup failure.
+    #[must_use]
+    pub fn cleanup_unconfirmed(self, cleanup: &'static str) -> Self {
+        self.with_detail("cleanup", cleanup)
+            .with_outcome(RemoteEffect::Unknown, RetryDisposition::RequiresRecovery)
+    }
+
     #[must_use]
     pub fn invalid_configuration(code: impl Into<String>, message: impl Into<String>) -> Self {
         Self::new(
