@@ -640,7 +640,7 @@ fn capability_attributes_match_the_component_owned_schema() {
     assert_eq!(capability.interfaces.len(), 1);
     assert_eq!(capability.interfaces[0].kind, Surface::Runtime);
     for operation in capability.operations {
-        assert_eq!(operation.status, CapabilityStatus::Experimental);
+        assert_eq!(operation.status, CapabilityStatus::Available);
         assert_eq!(operation.surfaces, [Surface::Runtime]);
         assert!(validator.is_valid(&Value::Object(operation.attributes.into_iter().collect())));
     }

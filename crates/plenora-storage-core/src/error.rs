@@ -143,6 +143,22 @@ impl StorageError {
             .with_outcome(RemoteEffect::Unknown, RetryDisposition::RequiresRecovery)
     }
 
+    /// Parent directories are effects too, even if the destination was never
+    /// opened or its staging file was successfully removed.
+    #[must_use]
+    pub fn with_preparation_effect(mut self, may_have_created_directories: bool) -> Self {
+        if may_have_created_directories {
+            if matches!(
+                self.remote_effect,
+                RemoteEffect::None | RemoteEffect::RolledBack
+            ) {
+                self = self.with_outcome(RemoteEffect::Unknown, RetryDisposition::RequiresRecovery);
+            }
+            self = self.with_detail("preparation", "directories_may_remain");
+        }
+        self
+    }
+
     #[must_use]
     pub fn invalid_configuration(code: impl Into<String>, message: impl Into<String>) -> Self {
         Self::new(

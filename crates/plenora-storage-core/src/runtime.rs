@@ -140,6 +140,12 @@ pub struct RuntimeInvocation {
 pub struct RuntimeRequestMetadata {
     #[serde(rename = "plenora.message.id")]
     pub message_id: String,
+    #[serde(
+        rename = "plenora.message.causation_id",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub causation_id: Option<String>,
     #[serde(rename = "plenora.capability.name")]
     pub capability_name: String,
     #[serde(rename = "plenora.capability.version")]
@@ -171,6 +177,12 @@ pub struct RuntimeResultEnvelope {
 pub struct RuntimeResultMetadata {
     #[serde(rename = "plenora.message.id")]
     pub message_id: String,
+    #[serde(
+        rename = "plenora.message.causation_id",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub causation_id: Option<String>,
     #[serde(rename = "plenora.capability.operation")]
     pub operation: String,
     #[serde(rename = "plenora.operation.version")]
@@ -224,11 +236,25 @@ impl<'a> RuntimeBinding<'a> {
         cancellation: CancellationToken,
     ) -> RuntimeResultEnvelope {
         let identity = RuntimeResultMetadata {
-            message_id: invocation.metadata.message_id.clone(),
-            operation: invocation.metadata.operation.clone(),
-            operation_version: invocation.metadata.operation_version.clone(),
+            message_id: public_uuid(&invocation.metadata.message_id),
+            causation_id: invocation
+                .metadata
+                .causation_id
+                .as_deref()
+                .filter(|value| canonical_uuid(value))
+                .map(str::to_owned),
+            operation: RUNTIME_OPERATIONS
+                .iter()
+                .find(|item| item.operation == invocation.metadata.operation)
+                .map_or("storage.unknown", |item| item.operation)
+                .to_owned(),
+            operation_version: invocation
+                .metadata
+                .operation_version
+                .parse::<u32>()
+                .map_or_else(|_| "0".to_owned(), |version| version.to_string()),
             output_contract: ERROR_CONTRACT.to_owned(),
-            correlation_id: invocation.metadata.correlation_id.clone(),
+            correlation_id: public_uuid(&invocation.metadata.correlation_id),
         };
         match self.invoke_inner(&invocation, cancellation).await {
             Ok((descriptor, payload)) => RuntimeResultEnvelope {
@@ -263,6 +289,23 @@ impl<'a> RuntimeBinding<'a> {
         invocation: &RuntimeInvocation,
         cancellation: CancellationToken,
     ) -> StorageResult<(&'static RuntimeOperationDescriptor, Value)> {
+        if !canonical_uuid(&invocation.metadata.message_id)
+            || !canonical_uuid(&invocation.metadata.correlation_id)
+            || invocation
+                .metadata
+                .causation_id
+                .as_deref()
+                .is_some_and(|value| !canonical_uuid(value))
+        {
+            return Err(StorageError::new(
+                ErrorCategory::Protocol,
+                ErrorPhase::Validate,
+                RemoteEffect::None,
+                RetryDisposition::Never,
+                "RUNTIME_IDENTITY_INVALID",
+                "runtime identities must be canonical lowercase hyphenated UUIDs",
+            ));
+        }
         validate_payload_security(&invocation.payload)?;
         let capability_version = parse_version(&invocation.metadata.capability_version)?;
         let operation_version = parse_version(&invocation.metadata.operation_version)?;
@@ -618,7 +661,33 @@ pub fn validate_runtime_route(
 }
 
 fn route_error(message: &'static str) -> StorageError {
-    StorageError::invalid_configuration("RUNTIME_ROUTE_INVALID", message)
+    StorageError::new(
+        ErrorCategory::Protocol,
+        ErrorPhase::Validate,
+        RemoteEffect::None,
+        RetryDisposition::Never,
+        "RUNTIME_ROUTE_INVALID",
+        message,
+    )
+}
+
+fn canonical_uuid(value: &str) -> bool {
+    value.len() == 36
+        && value.bytes().enumerate().all(|(index, byte)| {
+            if matches!(index, 8 | 13 | 18 | 23) {
+                byte == b'-'
+            } else {
+                byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)
+            }
+        })
+}
+
+fn public_uuid(value: &str) -> String {
+    if canonical_uuid(value) {
+        value.to_owned()
+    } else {
+        "00000000-0000-0000-0000-000000000000".to_owned()
+    }
 }
 
 #[cfg(test)]

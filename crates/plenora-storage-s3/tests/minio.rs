@@ -82,10 +82,47 @@ fn engine() -> StorageResult<Engine> {
 }
 
 #[tokio::test]
+#[ignore = "requires the Docker storage fixtures"]
+async fn https_verifies_the_server_certificate_and_hostname()
+-> Result<(), Box<dyn std::error::Error>> {
+    let endpoint = std::env::var("PLENORA_MINIO_TLS_ENDPOINT")?;
+    let mut connection = connection();
+    connection.config["endpoint"] = serde_json::json!(endpoint);
+    let mut engine = Engine::new(EngineConfig {
+        allow_experimental_contracts: true,
+        allow_private_network: true,
+        ..EngineConfig::default()
+    });
+    engine.register_provider(Arc::new(S3Provider::new(Arc::new(MinioCredentials))))?;
+    assert!(
+        engine
+            .test(&connection, &ExecutionControl::default())
+            .await?
+            .reachable
+    );
+    connection.config["endpoint"] = serde_json::json!("https://minio-tls-invalid:9000");
+    let control = ExecutionControl::default()
+        .with_deadline(std::time::Instant::now() + std::time::Duration::from_secs(10));
+    let error = engine
+        .test(&connection, &control)
+        .await
+        .expect_err("wrong certificate hostname");
+    assert_ne!(error.category, plenora_storage_core::ErrorCategory::Timeout);
+    assert_eq!(
+        error.remote_effect,
+        plenora_storage_core::RemoteEffect::None
+    );
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore = "requires the Docker storage fixtures"]
 async fn s3_contract_roundtrip_against_minio() -> Result<(), Box<dyn std::error::Error>> {
-    if std::env::var("PLENORA_MINIO_TEST").as_deref() != Ok("1") {
-        return Ok(());
-    }
+    assert_eq!(
+        std::env::var("PLENORA_MINIO_TEST").as_deref(),
+        Ok("1"),
+        "integration fixture must be explicitly enabled"
+    );
     let engine = engine()?;
     let connection = connection();
     let control = ExecutionControl::default();
@@ -241,10 +278,13 @@ async fn s3_contract_roundtrip_against_minio() -> Result<(), Box<dyn std::error:
 }
 
 #[tokio::test]
+#[ignore = "requires the Docker storage fixtures"]
 async fn insecure_minio_requires_explicit_policy() -> Result<(), StorageError> {
-    if std::env::var("PLENORA_MINIO_TEST").as_deref() != Ok("1") {
-        return Ok(());
-    }
+    assert_eq!(
+        std::env::var("PLENORA_MINIO_TEST").as_deref(),
+        Ok("1"),
+        "integration fixture must be explicitly enabled"
+    );
     let mut engine = Engine::new(EngineConfig {
         allow_experimental_contracts: true,
         ..EngineConfig::default()
@@ -259,6 +299,7 @@ async fn insecure_minio_requires_explicit_policy() -> Result<(), StorageError> {
 }
 
 #[tokio::test]
+#[ignore = "requires the Docker storage fixtures"]
 async fn a_single_trailing_slash_object_is_rejected_before_path_normalization()
 -> Result<(), Box<dyn std::error::Error>> {
     use object_store::{
@@ -266,9 +307,11 @@ async fn a_single_trailing_slash_object_is_rejected_before_path_normalization()
         client::{HttpRequest, HttpRequestBody, HttpService},
     };
 
-    if std::env::var("PLENORA_MINIO_TEST").as_deref() != Ok("1") {
-        return Ok(());
-    }
+    assert_eq!(
+        std::env::var("PLENORA_MINIO_TEST").as_deref(),
+        Ok("1"),
+        "integration fixture must be explicitly enabled"
+    );
     let mut connection = connection();
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?

@@ -18,6 +18,16 @@ pub trait StorageProvider: Send + Sync {
     fn config_contract(&self) -> &'static str;
     fn capabilities(&self) -> ProviderCapabilities;
 
+    /// Performs local provider admission before a caller opens an artifact sink.
+    /// Implementations must not resolve credentials or perform network I/O here.
+    fn validate_connection(
+        &self,
+        connection: &ProviderConnection,
+        _policy: &EngineConfig,
+    ) -> StorageResult<()> {
+        connection.validate()
+    }
+
     async fn test(
         &self,
         connection: &ProviderConnection,

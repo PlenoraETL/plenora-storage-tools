@@ -203,6 +203,23 @@ impl HttpConnector for PinnedDnsConnector {
 
 #[async_trait]
 impl StorageProvider for S3Provider {
+    fn validate_connection(
+        &self,
+        connection: &ProviderConnection,
+        policy: &plenora_storage_core::EngineConfig,
+    ) -> StorageResult<()> {
+        let config = parse_config(connection)?;
+        let control = plenora_storage_core::ExecutionControl::default();
+        validate_endpoint(
+            &config.endpoint,
+            &OperationContext {
+                policy,
+                control: &control,
+            },
+        )?;
+        Ok(())
+    }
+
     fn id(&self) -> &'static str {
         PROVIDER_ID
     }

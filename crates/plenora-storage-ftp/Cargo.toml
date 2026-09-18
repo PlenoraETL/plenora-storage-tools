@@ -1,15 +1,18 @@
 [package]
 name = "plenora-storage-ftp"
+description = "Plenora provider-neutral storage ftp"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
+readme = "../../README.md"
 
 [dependencies]
 async-trait.workspace = true
-plenora-storage-core = { path = "../plenora-storage-core" }
+plenora-storage-core = { path = "../plenora-storage-core", version = "0.1.0" }
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

@@ -1,0 +1,50 @@
+{
+  "date": "2026-09-18",
+  "status": "candidate_not_promoted",
+  "baseline_revision": "9b7188e7d83e65da30ba18724a6b000efae5bc70",
+  "source_state": "uncommitted changes",
+  "source_sha256": "3ed3d72c3dbd2fb5d55cca3e23540d81350b6ff42810fe5d31991ee2cc004386",
+  "vm": "192.168.2.134",
+  "vm_workspace": "/home/marco/plenora-storage-release-20260918",
+  "rust_toolchain": "1.92.0",
+  "linux_tests": {"passed": 57, "failed": 0, "ignored": 0},
+  "windows_tests": {"passed": 48, "failed": 0, "ignored": 9},
+  "format": "PASS",
+  "clippy_all_targets_all_features": "PASS",
+  "cargo_audit": {
+    "version": "0.22.2",
+    "vulnerabilities": 0,
+    "warnings": 0,
+    "database_revision": "2b34578f89884736e0fcbd42f7ba8d6b10b4a0ce"
+  },
+  "cargo_deny": {"version": "0.20.2", "advisories": "PASS", "bans": "PASS", "licenses": "PASS", "sources": "PASS"},
+  "artifacts": [
+    {
+      "target": "x86_64-unknown-linux-gnu",
+      "binary_sha256": "f5637de699c8ee56a256aec0630c5ca98db74633648b4dce4580db7cb0510074f",
+      "external_rust_consumer": "PASS",
+      "extracted_cli_compilation": "PASS",
+      "cli_regressions": "PASS",
+      "live_provider_operations": {"s3": 7, "sftp": 7, "ftp": 7},
+      "live_payload_bytes": 8388617,
+      "empty_objects": "PASS",
+      "concurrent_create_if_absent_s3_sftp": "PASS",
+      "preparation_failure_effects_sftp_ftp": "PASS"
+    },
+    {
+      "target": "x86_64-pc-windows-msvc",
+      "binary_sha256": "c1a860bbed3acb0441f8ac66fb6a1aba7bb3d66dae148e55bcb2de12db0dde60",
+      "external_rust_consumer": "PASS",
+      "extracted_cli_compilation": "PASS",
+      "cli_regressions": "PASS",
+      "live_provider_operations": "not run on Windows"
+    }
+  ],
+  "local_evidence_directory": "target/release-readiness/evidence",
+  "local_artifact_directory": "dist/0.1.0",
+  "remaining_gates": [
+    "Remote commit response loss and multipart finish interruption qualification",
+    "Full profile adoption manifest v4 and contract promotion",
+    "Final committed source and release pipeline execution"
+  ]
+}

@@ -1,7 +1,9 @@
 # Plenora Storage Operations 1.0 — proposta
 
-Stato del contratto: **normative e ratificabile**. Stato dell'artefatto:
-**experimental**, fino a una release qualificata.
+Stato del contratto: **normative e ratificabile**. L'implementazione 0.1.0
+promuove le sette operazioni ad **available** con manifest di adozione v4 e
+gate di qualifica descritti in `docs/contract-adoption.md`. Le note sullo
+stato experimental nel seguito documentano la fase precedente alla release.
 
 Questa proposta definisce il bordo osservabile delle sette operazioni storage.
 Non è una dichiarazione di conformità, non stabilizza una release e non assegna

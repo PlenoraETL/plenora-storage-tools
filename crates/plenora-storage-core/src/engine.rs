@@ -38,6 +38,8 @@ struct CursorState {
 // explicit prevents enabling one insecure transport from enabling another.
 #[allow(clippy::struct_excessive_bools)]
 pub struct EngineConfig {
+    /// Retained for source compatibility. The qualified v1 catalog is available
+    /// without experimental opt-in; this flag does not relax transport policy.
     pub allow_experimental_contracts: bool,
     pub allow_insecure_http: bool,
     pub allow_insecure_ftp: bool,
@@ -154,12 +156,6 @@ impl Engine {
             return Err(StorageError::engine_closed());
         }
         connection.validate()?;
-        if !self.config.allow_experimental_contracts {
-            return Err(StorageError::invalid_configuration(
-                "EXPERIMENTAL_CONTRACT_OPT_IN_REQUIRED",
-                "storage v1 operations require explicit experimental-contract authorization",
-            ));
-        }
         let provider = self.providers.get(&connection.provider).ok_or_else(|| {
             StorageError::unsupported(format!(
                 "storage provider '{}' is not available in this artifact",
@@ -173,6 +169,7 @@ impl Engine {
             )
             .with_provider(&connection.provider));
         }
+        provider.validate_connection(connection, &self.config)?;
         Ok(provider.as_ref())
     }
 
@@ -268,6 +265,19 @@ impl Engine {
     {
         let provider = self.provider(connection)?;
         validate_object_key(&request.key)?;
+        if request
+            .content_length
+            .is_some_and(|length| length > self.config.max_transfer_bytes)
+        {
+            return Err(StorageError::new(
+                ErrorCategory::ResourceLimit,
+                ErrorPhase::Validate,
+                RemoteEffect::None,
+                RetryDisposition::Never,
+                "TRANSFER_LIMIT_EXCEEDED",
+                "declared upload size exceeds the engine byte limit",
+            ));
+        }
         provider
             .put(connection, request, source, &self.context(control))
             .await

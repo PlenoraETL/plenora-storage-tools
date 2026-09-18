@@ -53,6 +53,7 @@ pub struct OperationCapability {
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum CapabilityStatus {
+    Available,
     Experimental,
 }
 
@@ -155,7 +156,7 @@ fn operation(
     OperationCapability {
         id: id.to_owned(),
         version: 1,
-        status: CapabilityStatus::Experimental,
+        status: CapabilityStatus::Available,
         surfaces: vec![surface],
         input: PayloadCapability {
             contract: format!("plenora-storage-{action}-input-v1"),
@@ -219,7 +220,7 @@ mod tests {
         );
         assert_eq!(document.operations.len(), 7);
         assert!(document.operations.iter().all(|operation| {
-            operation.status == super::CapabilityStatus::Experimental
+            operation.status == super::CapabilityStatus::Available
                 && operation.surfaces == [Surface::Rust]
         }));
         assert!(

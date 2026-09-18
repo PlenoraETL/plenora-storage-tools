@@ -4,17 +4,17 @@ Libreria Rust provider-neutral per accedere a sistemi di storage attraverso
 contratti pubblici versionati. Gli adapter iniziali sono SFTP, FTP e
 S3-compatible. La verifica locale usa container reali per tutti e tre.
 
-> **Stato del progetto:** sperimentale. Contratti e API possono cambiare; non
-> viene ancora dichiarata alcuna garanzia di compatibilità con prodotti o
-> versioni specifiche dei provider.
+> **Release 0.1.0:** operazioni v1 disponibili su Rust, CLI e binding runtime.
+> La qualifica copre MinIO, OpenSSH e Pure-FTPd nelle versioni bloccate nel
+> compose. Perimetro e gate di distribuzione: [release-readiness](docs/release-readiness.md).
 
 ## Superfici iniziali
 
 | Superficie | Stato | Artefatto |
 | --- | --- | --- |
-| Rust | sperimentale | `plenora-storage-core` + adapter registrati |
-| CLI | sperimentale | `plenora-storage` |
-| Runtime | sperimentale | binding transport-neutral; adapter di trasporto posseduto dal consumer |
+| Rust | disponibile v1 | `plenora-storage-core` + adapter registrati |
+| CLI | disponibile v1 | `plenora-storage` |
+| Runtime | disponibile v1 | binding transport-neutral; adapter di trasporto posseduto dal consumer |
 | Python SDK | non richiesta | fuori dal profilo storage v1 |
 
 Le operazioni iniziali sono `storage.test`, `storage.list`, `storage.stat`,
@@ -34,12 +34,19 @@ I file in `docker/*-connection.json` mostrano configurazioni complete per
 SFTP, FTP e S3-compatible. `credential_ref` punta a un resolver dell'host; non
 contiene il segreto.
 
-Le operazioni v1 richiedono l'opt-in `--allow-experimental-contracts`. I valori
+Le operazioni v1 non richiedono più `--allow-experimental-contracts`; il flag
+resta accettato per compatibilità. Le policy di rete restano indipendenti. I valori
 `--overwrite true|false`, `--publication-policy
 best-effort|atomic-required` e `--ignore-missing true|false` sono obbligatori
 dove applicabili: il protocollo non assume un default per una decisione
 distruttiva. FTP rifiuta sempre `overwrite=false` e `atomic-required`, invece
 di degradare a check-then-write.
+
+Per elenchi su più pagine usare `list --all --max-items 100`: la CLI mantiene
+la sessione per l'intera enumerazione e restituisce un solo envelope JSON.
+Il totale resta limitato da `--max-list-items`. Senza `--all`, una pagina
+incompleta produce un errore esplicito; `--cursor` non è riutilizzabile tra
+processi. La libreria Rust conserva la paginazione per Engine.
 
 ## Sicurezza
 
@@ -75,10 +82,15 @@ restano in esecuzione finché non vengono fermati con `docker compose down`.
 
 ```powershell
 docker compose build storage-rust
-docker compose up -d --wait minio sftp ftp
-docker compose run --rm minio-init
+bash scripts/prepare-fixtures.sh
 docker compose run --rm --no-deps storage-rust
 ```
+
+La preparazione richiede Bash, OpenSSL e Docker Compose (su Windows usare
+WSL o la VM). Genera una CA temporanea per MinIO HTTPS e legge il fingerprint
+SSH della fixture. `verify.sh` abilita anche i test `ignored`, verifica le
+sette operazioni sui tre provider e controlla conflitti e limiti. Senza
+fixture, `cargo test` segnala esplicitamente i test d'integrazione esclusi.
 
 Per probe manuali:
 
@@ -107,10 +119,22 @@ I contratti component-owned vivono sotto `contracts/`. Il profilo comune di
 riferimento è `plenora-storage-tools-profile-v1` in `plenora-contracts`. La
 matrice e le decisioni ratificabili sono in
 `contracts/STORAGE-OPERATIONS-1.0-PROPOSAL.md`; esempi validi e invalidi sono
-eseguiti dai test black-box del crate core. L'artefatto resta sperimentale fino
-a una futura release qualificata: qui non viene pubblicato alcun claim di
-conformità.
+eseguiti dai test black-box del crate core. Ogni build produce un manifest di
+adozione v4 associato ai digest dei crate e della CLI. La
+[matrice di adozione](docs/contract-adoption.md) descrive regole ed evidenze.
 
 ## Licenza
 
-MIT OR Apache-2.0.
+MIT OR Apache-2.0; testi inclusi in ogni crate.
+
+## Candidati di release
+
+`cargo fetch --locked`, poi `python scripts/build_release.py` producono binari,
+cinque crate, contratti e SHA-256 in `dist/`. Il flag `--allow-dirty` serve solo
+per candidati locali da modifiche non committate. La verifica compila un
+consumer esterno e la CLI dagli archivi estratti. La procedura operativa e i
+limiti supportati sono in [docs/release.md](docs/release.md).
+
+La distribuzione richiede `release-qualification.json` con stato
+`qualified_for_publication`, generato solo dopo i gate sul commit definitivo.
+Una build riuscita da sola non sostituisce questa qualifica.

@@ -21,7 +21,7 @@ use plenora_storage_s3::S3Provider;
 use plenora_storage_sftp::SftpProvider;
 use serde_json::{Value, json};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
-use tokio::fs;
+use tokio::{fs, io::AsyncReadExt};
 
 const CLI_PROTOCOL_VERSION: u32 = 2;
 
@@ -37,7 +37,11 @@ struct Cli {
     version: bool,
     #[arg(long, global = true)]
     deadline: Option<String>,
-    #[arg(long, global = true)]
+    #[arg(
+        long,
+        global = true,
+        help = "Compatibility option; qualified v1 operations no longer require experimental opt-in"
+    )]
     allow_experimental_contracts: bool,
     #[arg(long, global = true)]
     allow_insecure_http: bool,
@@ -90,6 +94,9 @@ enum Command {
         cursor: Option<String>,
         #[arg(long)]
         max_items: Option<usize>,
+        /// Follow pages in this process, bounded by --max-list-items.
+        #[arg(long)]
+        all: bool,
     },
     Stat {
         #[command(flatten)]
@@ -162,8 +169,8 @@ async fn main() -> ExitCode {
                 StorageError::new(
                     ErrorCategory::Internal,
                     ErrorPhase::Cleanup,
-                    RemoteEffect::None,
-                    RetryDisposition::Never,
+                    RemoteEffect::Unknown,
+                    RetryDisposition::RequiresRecovery,
                     "UNHANDLED_PANIC",
                     "storage command failed unexpectedly",
                 ),
@@ -259,6 +266,18 @@ async fn run() -> ExitCode {
         Ok(control) => control,
         Err(error) => return emit_error("cli-parse", "plenora-cli-error-v1", error),
     };
+    #[cfg(unix)]
+    {
+        let cancellation = control.cancellation.clone();
+        tokio::spawn(async move {
+            if let Ok(mut signal) =
+                tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            {
+                signal.recv().await;
+                cancellation.cancel();
+            }
+        });
+    }
     let cancellation = control.cancellation.clone();
     tokio::spawn(async move {
         if tokio::signal::ctrl_c().await.is_ok() {
@@ -266,7 +285,7 @@ async fn run() -> ExitCode {
         }
     });
 
-    let outcome = execute(&engine, command, &control).await;
+    let outcome = execute(&engine, command, &control, cli.max_list_items).await;
     engine.close();
     match outcome {
         Ok((command, contract, result)) => emit_success(command, contract, result),
@@ -277,7 +296,12 @@ async fn run() -> ExitCode {
 type CliOutcome =
     Result<(&'static str, &'static str, Value), (&'static str, &'static str, Box<StorageError>)>;
 
-async fn execute(engine: &Engine, command: Command, control: &ExecutionControl) -> CliOutcome {
+async fn execute(
+    engine: &Engine,
+    command: Command,
+    control: &ExecutionControl,
+    list_budget: usize,
+) -> CliOutcome {
     match command {
         Command::Capabilities => value_result(
             "capabilities",
@@ -285,7 +309,7 @@ async fn execute(engine: &Engine, command: Command, control: &ExecutionControl) 
             engine.capabilities_for(Surface::Cli),
         ),
         Command::Test(args) => {
-            let connection = connection_or_error("test", args.connection).await?;
+            let connection = connection_or_error("test", args.connection, control).await?;
             operation_result(
                 "test",
                 "plenora-storage-test-output-v1",
@@ -297,26 +321,29 @@ async fn execute(engine: &Engine, command: Command, control: &ExecutionControl) 
             prefix,
             cursor,
             max_items,
+            all,
         } => {
-            let connection = connection_or_error("list", connection.connection).await?;
+            let connection = connection_or_error("list", connection.connection, control).await?;
             operation_result(
                 "list",
                 "plenora-storage-list-output-v1",
-                engine
-                    .list(
-                        &connection,
-                        &ListRequest {
-                            prefix,
-                            cursor,
-                            max_items,
-                        },
-                        control,
-                    )
-                    .await,
+                list_for_cli(
+                    engine,
+                    &connection,
+                    ListRequest {
+                        prefix,
+                        cursor,
+                        max_items,
+                    },
+                    control,
+                    all,
+                    list_budget,
+                )
+                .await,
             )
         }
         Command::Stat { connection, key } => {
-            let connection = connection_or_error("stat", connection.connection).await?;
+            let connection = connection_or_error("stat", connection.connection, control).await?;
             operation_result(
                 "stat",
                 "plenora-storage-stat-output-v1",
@@ -331,7 +358,7 @@ async fn execute(engine: &Engine, command: Command, control: &ExecutionControl) 
             output,
             overwrite,
         } => {
-            let connection = connection_or_error("get", connection.connection).await?;
+            let connection = connection_or_error("get", connection.connection, control).await?;
             let result = get_to_file(engine, &connection, key, &output, overwrite, control).await;
             operation_result("get", "plenora-storage-get-output-v1", result)
         }
@@ -343,7 +370,7 @@ async fn execute(engine: &Engine, command: Command, control: &ExecutionControl) 
             publication_policy,
             content_type,
         } => {
-            let connection = connection_or_error("put", connection.connection).await?;
+            let connection = connection_or_error("put", connection.connection, control).await?;
             let result = put_from_file(
                 engine,
                 &connection,
@@ -366,7 +393,7 @@ async fn execute(engine: &Engine, command: Command, control: &ExecutionControl) 
             overwrite,
             publication_policy,
         } => {
-            let connection = connection_or_error("copy", connection.connection).await?;
+            let connection = connection_or_error("copy", connection.connection, control).await?;
             operation_result(
                 "copy",
                 "plenora-storage-copy-output-v1",
@@ -389,7 +416,7 @@ async fn execute(engine: &Engine, command: Command, control: &ExecutionControl) 
             key,
             ignore_missing,
         } => {
-            let connection = connection_or_error("delete", connection.connection).await?;
+            let connection = connection_or_error("delete", connection.connection, control).await?;
             operation_result(
                 "delete",
                 "plenora-storage-delete-output-v1",
@@ -408,17 +435,74 @@ async fn execute(engine: &Engine, command: Command, control: &ExecutionControl) 
     }
 }
 
+async fn list_for_cli(
+    engine: &Engine,
+    connection: &ProviderConnection,
+    mut request: ListRequest,
+    control: &ExecutionControl,
+    all: bool,
+    budget: usize,
+) -> StorageResult<plenora_storage_core::ListResult> {
+    if request.cursor.is_some() {
+        return Err(StorageError::invalid_configuration(
+            "CLI_CURSOR_SESSION_REQUIRED",
+            "list cursors belong to one Engine; use list --all to follow pages in one invocation",
+        ));
+    }
+    let mut objects = Vec::new();
+    loop {
+        let page = engine.list(connection, &request, control).await?;
+        if page.objects.len() > budget.saturating_sub(objects.len()) {
+            return Err(StorageError::new(
+                ErrorCategory::ResourceLimit,
+                ErrorPhase::Read,
+                RemoteEffect::None,
+                RetryDisposition::Never,
+                "CLI_LIST_LIMIT_EXCEEDED",
+                "complete listing exceeds --max-list-items; narrow the prefix or increase the limit",
+            ));
+        }
+        if page.truncated && !all {
+            return Err(StorageError::invalid_configuration(
+                "CLI_LIST_PAGINATION_REQUIRED",
+                "listing has more pages; use list --all to follow them in one invocation",
+            ));
+        }
+        if page.truncated && (page.objects.is_empty() || page.next_cursor.is_none()) {
+            return Err(StorageError::new(
+                ErrorCategory::Protocol,
+                ErrorPhase::Read,
+                RemoteEffect::None,
+                RetryDisposition::Never,
+                "LIST_PAGE_INVALID",
+                "truncated listing did not advance",
+            ));
+        }
+        objects.extend(page.objects);
+        if !page.truncated {
+            return Ok(plenora_storage_core::ListResult {
+                objects,
+                truncated: false,
+                next_cursor: None,
+            });
+        }
+        request.cursor = page.next_cursor;
+    }
+}
+
 async fn connection_or_error(
     command: &'static str,
     path: PathBuf,
+    control: &ExecutionControl,
 ) -> Result<ProviderConnection, (&'static str, &'static str, Box<StorageError>)> {
-    load_connection(&path)
+    control
+        .run(load_connection(&path), ErrorPhase::Read, false)
         .await
         .map_err(|error| (command, "plenora-cli-error-v1", Box::new(error)))
 }
 
 async fn load_connection(path: &Path) -> StorageResult<ProviderConnection> {
-    let data = fs::read(path).await.map_err(|_| {
+    let read_error = || {
         StorageError::new(
             ErrorCategory::Io,
             ErrorPhase::Read,
@@ -427,7 +511,23 @@ async fn load_connection(path: &Path) -> StorageResult<ProviderConnection> {
             "CONNECTION_FILE_READ_FAILED",
             "connection file could not be read",
         )
-    })?;
+    };
+    if !fs::metadata(path)
+        .await
+        .map_err(|_| read_error())?
+        .is_file()
+    {
+        return Err(StorageError::invalid_configuration(
+            "CONNECTION_NOT_REGULAR_FILE",
+            "connection input must be a regular file",
+        ));
+    }
+    let file = fs::File::open(path).await.map_err(|_| read_error())?;
+    let mut data = Vec::new();
+    file.take(1_048_577)
+        .read_to_end(&mut data)
+        .await
+        .map_err(|_| read_error())?;
     if data.len() > 1_048_576 {
         return Err(StorageError::new(
             ErrorCategory::ResourceLimit,
@@ -457,6 +557,7 @@ async fn get_to_file(
     // Every local admission check runs before the staging file is created, so a
     // request the Engine would reject produces no filesystem effect at all.
     engine.preflight(connection, &[&key])?;
+    control.check(ErrorPhase::Prepare, false)?;
     // The artifact is always staged first, so a failed download never publishes
     // a partial file and the destination only ever appears complete.
     let temporary = temporary_output_path(output)?;
@@ -641,7 +742,9 @@ fn execution_control(deadline: Option<&str>) -> StorageResult<ExecutionControl> 
         let duration: std::time::Duration = (deadline - now).try_into().map_err(|_| {
             StorageError::invalid_configuration("DEADLINE_INVALID", "deadline is out of range")
         })?;
-        Instant::now() + duration
+        Instant::now().checked_add(duration).ok_or_else(|| {
+            StorageError::invalid_configuration("DEADLINE_INVALID", "deadline is out of range")
+        })?
     };
     Ok(control.with_deadline(instant))
 }

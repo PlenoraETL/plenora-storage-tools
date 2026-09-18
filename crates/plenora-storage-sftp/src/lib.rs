@@ -26,7 +26,7 @@ use russh::{
 };
 use russh_sftp::{
     client::{RawSftpSession, SftpSession, error::Error as SftpError, fs::Metadata},
-    protocol::{OpenFlags, StatusCode},
+    protocol::{OpenFlags, Packet, StatusCode},
 };
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -143,11 +143,7 @@ impl SftpProvider {
         let sftp = SftpSession::new(channel.into_stream())
             .await
             .map_err(|error| map_sftp_error(error, ErrorPhase::Connect, false))?;
-        Ok(SftpConnection {
-            _ssh: ssh,
-            sftp,
-            root,
-        })
+        Ok(SftpConnection { ssh, sftp, root })
     }
 }
 
@@ -175,13 +171,93 @@ impl client::Handler for SshClient {
 }
 
 struct SftpConnection {
-    _ssh: client::Handle<SshClient>,
+    ssh: client::Handle<SshClient>,
     sftp: SftpSession,
     root: String,
 }
 
+impl SftpConnection {
+    /// Negotiate the atomic replacement primitive before creating any directories
+    /// or files. The high-level client only exposes the non-replacing v3 rename.
+    async fn atomic_session(&self) -> StorageResult<RawSftpSession> {
+        let channel = self
+            .ssh
+            .channel_open_session()
+            .await
+            .map_err(map_ssh_connect_error)?;
+        channel
+            .request_subsystem(true, "sftp")
+            .await
+            .map_err(map_ssh_connect_error)?;
+        let session = RawSftpSession::new(channel.into_stream());
+        qualify_atomic_session(&session).await?;
+        Ok(session)
+    }
+}
+
+async fn qualify_atomic_session(session: &RawSftpSession) -> StorageResult<()> {
+    let version = session
+        .init()
+        .await
+        .map_err(|error| map_sftp_error(error, ErrorPhase::Connect, false))?;
+    if version
+        .extensions
+        .get("posix-rename@openssh.com")
+        .map(String::as_str)
+        != Some("1")
+    {
+        return Err(StorageError::unsupported(
+            "SFTP atomic replacement requires posix-rename@openssh.com version 1",
+        )
+        .with_provider(PROVIDER_ID));
+    }
+    Ok(())
+}
+
+async fn atomic_replace(
+    session: &RawSftpSession,
+    source: &str,
+    destination: &str,
+) -> StorageResult<()> {
+    let mut payload = Vec::new();
+    for path in [source, destination] {
+        let length = u32::try_from(path.len()).map_err(|_| configuration_error())?;
+        payload.extend_from_slice(&length.to_be_bytes());
+        payload.extend_from_slice(path.as_bytes());
+    }
+    let response = session
+        .extended("posix-rename@openssh.com", payload)
+        .await
+        .map_err(|error| map_sftp_error(error, ErrorPhase::Commit, true))?;
+    match response {
+        Packet::Status(status) if status.status_code == StatusCode::Ok => Ok(()),
+        Packet::Status(status) => Err(map_sftp_error(status.into(), ErrorPhase::Commit, true)),
+        _ => Err(map_sftp_error(
+            SftpError::UnexpectedPacket,
+            ErrorPhase::Commit,
+            true,
+        )),
+    }
+}
+
 #[async_trait]
 impl StorageProvider for SftpProvider {
+    fn validate_connection(
+        &self,
+        connection: &ProviderConnection,
+        policy: &plenora_storage_core::EngineConfig,
+    ) -> StorageResult<()> {
+        let config = parse_config(connection)?;
+        if config.host_key_sha256.is_none() && !policy.allow_unverified_ssh {
+            return Err(StorageError::invalid_configuration(
+                "SFTP_HOST_KEY_REQUIRED",
+                "SFTP requires a pinned SHA-256 host key fingerprint",
+            )
+            .with_provider(PROVIDER_ID));
+        }
+        Ok(())
+    }
+
     fn id(&self) -> &'static str {
         PROVIDER_ID
     }
@@ -420,59 +496,104 @@ impl StorageProvider for SftpProvider {
         source: &mut (dyn AsyncRead + Send + Unpin),
         context: &OperationContext<'_>,
     ) -> StorageResult<TransferResult> {
-        let atomic_publish =
-            validate_sftp_publication(connection, request.overwrite, request.publication_policy)?;
-        validate_key(&request.key)?;
-        validate_file_metadata(request)?;
-        let remote = context
-            .control
-            .run(
-                self.connect(connection, context),
-                ErrorPhase::Connect,
-                false,
-            )
-            .await?;
-        let destination_path = remote_path(&remote.root, &request.key);
-        ensure_parent_directories(&remote.sftp, &destination_path, context).await?;
-        let write_path = if atomic_publish {
-            temporary_path(&destination_path)
-        } else {
-            destination_path.clone()
-        };
-        let flags = if atomic_publish || !request.overwrite {
-            OpenFlags::CREATE | OpenFlags::EXCLUDE | OpenFlags::WRITE
-        } else {
-            OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE
-        };
-        let opened = context
-            .control
-            .run(
-                async {
-                    remote
-                        .sftp
-                        .open_with_flags(write_path.clone(), flags)
-                        .await
-                        .map_err(|error| {
-                            if request.overwrite {
-                                map_sftp_error(error, ErrorPhase::Prepare, true)
-                            } else {
-                                map_exclusive_open_error(error, "SFTP_CREATE_CONFLICT")
-                            }
-                        })
-                },
-                ErrorPhase::Prepare,
-                true,
-            )
-            .await;
-        // Deliberately no cleanup on this path. An exclusive create can fail
-        // precisely because the name is already held, and this operation cannot
-        // prove it owns a file it did not open. Deleting it would be a
-        // destructive guess; the error already reports an ambiguous outcome.
-        let mut file = opened?;
-        let transfer = copy_with_control(source, &mut file, context, true).await;
-        let (bytes_transferred, digest) = match transfer {
-            Ok(result) => result,
-            Err(error) => {
+        let mut parent_effect = false;
+        let result = async {
+            if request
+                .content_length
+                .is_some_and(|length| length > context.policy.max_transfer_bytes)
+            {
+                return Err(transfer_limit_error()
+                    .with_outcome(RemoteEffect::None, RetryDisposition::Never));
+            }
+            let atomic_publish = validate_sftp_publication(
+                connection,
+                request.overwrite,
+                request.publication_policy,
+            )?;
+            validate_key(&request.key)?;
+            validate_file_metadata(request)?;
+            let remote = context
+                .control
+                .run(
+                    self.connect(connection, context),
+                    ErrorPhase::Connect,
+                    false,
+                )
+                .await?;
+            let atomic = if atomic_publish {
+                Some(
+                    context
+                        .control
+                        .run(remote.atomic_session(), ErrorPhase::Connect, false)
+                        .await?,
+                )
+            } else {
+                None
+            };
+            let destination_path = remote_path(&remote.root, &request.key);
+            ensure_parent_directories(&remote.sftp, &destination_path, context, &mut parent_effect)
+                .await?;
+            let write_path = if atomic_publish {
+                temporary_path(&destination_path)
+            } else {
+                destination_path.clone()
+            };
+            let flags = if atomic_publish || !request.overwrite {
+                OpenFlags::CREATE | OpenFlags::EXCLUDE | OpenFlags::WRITE
+            } else {
+                OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE
+            };
+            let opened = context
+                .control
+                .run(
+                    async {
+                        remote
+                            .sftp
+                            .open_with_flags(write_path.clone(), flags)
+                            .await
+                            .map_err(|error| {
+                                if request.overwrite {
+                                    map_sftp_error(error, ErrorPhase::Prepare, true)
+                                } else {
+                                    map_exclusive_open_error(error, "SFTP_CREATE_CONFLICT")
+                                }
+                            })
+                    },
+                    ErrorPhase::Prepare,
+                    true,
+                )
+                .await;
+            // Deliberately no cleanup on this path. An exclusive create can fail
+            // precisely because the name is already held, and this operation cannot
+            // prove it owns a file it did not open. Deleting it would be a
+            // destructive guess; the error already reports an ambiguous outcome.
+            let mut file = opened?;
+            let transfer = copy_with_control(source, &mut file, context, true).await;
+            let (bytes_transferred, digest) = match transfer {
+                Ok(result) => result,
+                Err(error) => {
+                    return Err(discard_staged_object(
+                        &remote.sftp,
+                        atomic_publish,
+                        &write_path,
+                        error,
+                    )
+                    .await);
+                }
+            };
+            if request
+                .content_length
+                .is_some_and(|expected| expected != bytes_transferred)
+            {
+                let error = StorageError::new(
+                    ErrorCategory::InvalidConfiguration,
+                    ErrorPhase::Commit,
+                    RemoteEffect::Partial,
+                    RetryDisposition::RequiresRecovery,
+                    "CONTENT_LENGTH_MISMATCH",
+                    "artifact length differs from declared content_length",
+                )
+                .with_provider(PROVIDER_ID);
                 return Err(discard_staged_object(
                     &remote.sftp,
                     atomic_publish,
@@ -481,67 +602,50 @@ impl StorageProvider for SftpProvider {
                 )
                 .await);
             }
-        };
-        if request
-            .content_length
-            .is_some_and(|expected| expected != bytes_transferred)
-        {
-            let error = StorageError::new(
-                ErrorCategory::InvalidConfiguration,
-                ErrorPhase::Commit,
-                RemoteEffect::Partial,
-                RetryDisposition::RequiresRecovery,
-                "CONTENT_LENGTH_MISMATCH",
-                "artifact length differs from declared content_length",
-            )
-            .with_provider(PROVIDER_ID);
-            return Err(
-                discard_staged_object(&remote.sftp, atomic_publish, &write_path, error).await,
-            );
-        }
-        if let Err(error) = context
-            .control
-            .run(
-                async {
-                    file.sync_all()
-                        .await
-                        .map_err(|_| mutation_io_error(ErrorPhase::Commit))?;
-                    file.shutdown()
-                        .await
-                        .map_err(|_| mutation_io_error(ErrorPhase::Commit))
-                },
-                ErrorPhase::Commit,
-                true,
-            )
-            .await
-        {
-            return Err(
-                discard_staged_object(&remote.sftp, atomic_publish, &write_path, error).await,
-            );
-        }
-        if atomic_publish
-            && let Err(error) = context
+            if let Err(error) = context
                 .control
                 .run(
                     async {
-                        remote
-                            .sftp
-                            .rename(&write_path, &destination_path)
+                        file.sync_all()
                             .await
-                            .map_err(|error| map_sftp_error(error, ErrorPhase::Commit, true))
+                            .map_err(|_| mutation_io_error(ErrorPhase::Commit))?;
+                        file.shutdown()
+                            .await
+                            .map_err(|_| mutation_io_error(ErrorPhase::Commit))
                     },
                     ErrorPhase::Commit,
                     true,
                 )
                 .await
-        {
-            return Err(discard_staged_object(&remote.sftp, true, &write_path, error).await);
+            {
+                return Err(discard_staged_object(
+                    &remote.sftp,
+                    atomic_publish,
+                    &write_path,
+                    error,
+                )
+                .await);
+            }
+            if let Some(session) = atomic.as_ref()
+                && let Err(error) = context
+                    .control
+                    .run(
+                        atomic_replace(session, &write_path, &destination_path),
+                        ErrorPhase::Commit,
+                        true,
+                    )
+                    .await
+            {
+                return Err(discard_staged_object(&remote.sftp, true, &write_path, error).await);
+            }
+            Ok(transfer_result(
+                request.key.clone(),
+                bytes_transferred,
+                digest,
+            ))
         }
-        Ok(transfer_result(
-            request.key.clone(),
-            bytes_transferred,
-            digest,
-        ))
+        .await;
+        result.map_err(|error: StorageError| error.with_preparation_effect(parent_effect))
     }
 
     async fn delete(
@@ -595,140 +699,163 @@ impl StorageProvider for SftpProvider {
         request: &CopyRequest,
         context: &OperationContext<'_>,
     ) -> StorageResult<ObjectMetadata> {
-        let atomic_publish =
-            validate_sftp_publication(connection, request.overwrite, request.publication_policy)?;
-        validate_key(&request.source_key)?;
-        validate_key(&request.destination_key)?;
-        // A self-copy would open the destination for truncation while the
-        // source is still open, destroying the object being copied.
-        if request.source_key == request.destination_key {
-            return Err(StorageError::invalid_configuration(
-                "COPY_TARGET_EQUALS_SOURCE",
-                "copy source and destination must differ",
-            )
-            .with_provider(PROVIDER_ID));
-        }
-        let remote = context
-            .control
-            .run(
-                self.connect(connection, context),
-                ErrorPhase::Connect,
-                false,
-            )
-            .await?;
-        let source_path = remote_path(&remote.root, &request.source_key);
-        let destination_path = remote_path(&remote.root, &request.destination_key);
-        ensure_parent_directories(&remote.sftp, &destination_path, context).await?;
-        let mut source = context
-            .control
-            .run(
-                async {
-                    remote
-                        .sftp
-                        .open(source_path)
-                        .await
-                        .map_err(|error| map_sftp_error(error, ErrorPhase::Read, false))
-                },
-                ErrorPhase::Read,
-                false,
-            )
-            .await?;
-        let write_path = if atomic_publish {
-            temporary_path(&destination_path)
-        } else {
-            destination_path.clone()
-        };
-        let flags = if atomic_publish || !request.overwrite {
-            OpenFlags::CREATE | OpenFlags::EXCLUDE | OpenFlags::WRITE
-        } else {
-            OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE
-        };
-        let opened = context
-            .control
-            .run(
-                async {
-                    remote
-                        .sftp
-                        .open_with_flags(write_path.clone(), flags)
-                        .await
-                        .map_err(|error| {
-                            if request.overwrite {
-                                map_sftp_error(error, ErrorPhase::Prepare, true)
-                            } else {
-                                map_exclusive_open_error(error, "SFTP_COPY_CONFLICT")
-                            }
-                        })
-                },
-                ErrorPhase::Prepare,
-                true,
-            )
-            .await;
-        // Deliberately no cleanup on this path, for the same reason as `put`:
-        // the operation cannot prove it owns a file it did not open.
-        let mut destination = opened?;
-        if let Err(error) = copy_with_control(&mut source, &mut destination, context, true).await {
-            return Err(
-                discard_staged_object(&remote.sftp, atomic_publish, &write_path, error).await,
-            );
-        }
-        if let Err(error) = context
-            .control
-            .run(
-                async {
-                    destination
-                        .sync_all()
-                        .await
-                        .map_err(|_| mutation_io_error(ErrorPhase::Commit))?;
-                    destination
-                        .shutdown()
-                        .await
-                        .map_err(|_| mutation_io_error(ErrorPhase::Commit))
-                },
-                ErrorPhase::Commit,
-                true,
-            )
-            .await
-        {
-            return Err(
-                discard_staged_object(&remote.sftp, atomic_publish, &write_path, error).await,
-            );
-        }
-        if atomic_publish
-            && let Err(error) = context
+        let mut parent_effect = false;
+        let result = async {
+            let atomic_publish = validate_sftp_publication(
+                connection,
+                request.overwrite,
+                request.publication_policy,
+            )?;
+            validate_key(&request.source_key)?;
+            validate_key(&request.destination_key)?;
+            // A self-copy would open the destination for truncation while the
+            // source is still open, destroying the object being copied.
+            if request.source_key == request.destination_key {
+                return Err(StorageError::invalid_configuration(
+                    "COPY_TARGET_EQUALS_SOURCE",
+                    "copy source and destination must differ",
+                )
+                .with_provider(PROVIDER_ID));
+            }
+            let remote = context
+                .control
+                .run(
+                    self.connect(connection, context),
+                    ErrorPhase::Connect,
+                    false,
+                )
+                .await?;
+            let atomic = if atomic_publish {
+                Some(
+                    context
+                        .control
+                        .run(remote.atomic_session(), ErrorPhase::Connect, false)
+                        .await?,
+                )
+            } else {
+                None
+            };
+            let source_path = remote_path(&remote.root, &request.source_key);
+            let destination_path = remote_path(&remote.root, &request.destination_key);
+            ensure_parent_directories(&remote.sftp, &destination_path, context, &mut parent_effect)
+                .await?;
+            let mut source = context
                 .control
                 .run(
                     async {
                         remote
                             .sftp
-                            .rename(&write_path, &destination_path)
+                            .open(source_path)
                             .await
-                            .map_err(|error| map_sftp_error(error, ErrorPhase::Commit, true))
+                            .map_err(|error| map_sftp_error(error, ErrorPhase::Read, false))
+                    },
+                    ErrorPhase::Read,
+                    false,
+                )
+                .await?;
+            let write_path = if atomic_publish {
+                temporary_path(&destination_path)
+            } else {
+                destination_path.clone()
+            };
+            let flags = if atomic_publish || !request.overwrite {
+                OpenFlags::CREATE | OpenFlags::EXCLUDE | OpenFlags::WRITE
+            } else {
+                OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE
+            };
+            let opened = context
+                .control
+                .run(
+                    async {
+                        remote
+                            .sftp
+                            .open_with_flags(write_path.clone(), flags)
+                            .await
+                            .map_err(|error| {
+                                if request.overwrite {
+                                    map_sftp_error(error, ErrorPhase::Prepare, true)
+                                } else {
+                                    map_exclusive_open_error(error, "SFTP_COPY_CONFLICT")
+                                }
+                            })
+                    },
+                    ErrorPhase::Prepare,
+                    true,
+                )
+                .await;
+            // Deliberately no cleanup on this path, for the same reason as `put`:
+            // the operation cannot prove it owns a file it did not open.
+            let mut destination = opened?;
+            if let Err(error) =
+                copy_with_control(&mut source, &mut destination, context, true).await
+            {
+                return Err(discard_staged_object(
+                    &remote.sftp,
+                    atomic_publish,
+                    &write_path,
+                    error,
+                )
+                .await);
+            }
+            if let Err(error) = context
+                .control
+                .run(
+                    async {
+                        destination
+                            .sync_all()
+                            .await
+                            .map_err(|_| mutation_io_error(ErrorPhase::Commit))?;
+                        destination
+                            .shutdown()
+                            .await
+                            .map_err(|_| mutation_io_error(ErrorPhase::Commit))
                     },
                     ErrorPhase::Commit,
                     true,
                 )
                 .await
-        {
-            return Err(discard_staged_object(&remote.sftp, true, &write_path, error).await);
+            {
+                return Err(discard_staged_object(
+                    &remote.sftp,
+                    atomic_publish,
+                    &write_path,
+                    error,
+                )
+                .await);
+            }
+            if let Some(session) = atomic.as_ref()
+                && let Err(error) = context
+                    .control
+                    .run(
+                        atomic_replace(session, &write_path, &destination_path),
+                        ErrorPhase::Commit,
+                        true,
+                    )
+                    .await
+            {
+                return Err(discard_staged_object(&remote.sftp, true, &write_path, error).await);
+            }
+            // The destination is published from here on: a failed read-back must
+            // not be reported as an operation without a remote effect.
+            let metadata = context
+                .control
+                .run(
+                    async {
+                        remote
+                            .sftp
+                            .metadata(destination_path)
+                            .await
+                            .map_err(|error| map_sftp_error(error, ErrorPhase::Read, false))
+                    },
+                    ErrorPhase::Cleanup,
+                    true,
+                )
+                .await
+                .map_err(|_| committed_verification_error())?;
+            Ok(public_metadata(request.destination_key.clone(), &metadata))
         }
-        // The destination is published from here on: a failed read-back must
-        // not be reported as an operation without a remote effect.
-        let metadata = context
-            .control
-            .run(
-                async {
-                    remote
-                        .sftp
-                        .metadata(destination_path)
-                        .await
-                        .map_err(|error| map_sftp_error(error, ErrorPhase::Read, false))
-                },
-                ErrorPhase::Cleanup,
-                true,
-            )
-            .await
-            .map_err(|_| committed_verification_error())?;
-        Ok(public_metadata(request.destination_key.clone(), &metadata))
+        .await;
+        result.map_err(|error: StorageError| error.with_preparation_effect(parent_effect))
     }
 }
 
@@ -918,6 +1045,7 @@ async fn ensure_parent_directories(
     sftp: &SftpSession,
     path: &str,
     context: &OperationContext<'_>,
+    parent_effect: &mut bool,
 ) -> StorageResult<()> {
     let Some((parent, _)) = path.rsplit_once('/') else {
         return Ok(());
@@ -949,6 +1077,7 @@ async fn ensure_parent_directories(
             )
             .await?;
         if !exists {
+            *parent_effect = true;
             context
                 .control
                 .run(
@@ -1275,11 +1404,17 @@ fn list_scan_limit_error() -> StorageError {
 
 #[cfg(test)]
 mod tests {
-    use super::{remote_path, scan_directory, validate_key};
-    use plenora_storage_core::{EngineConfig, ExecutionControl, OperationContext};
+    use super::{
+        atomic_replace, discard_staged_object, qualify_atomic_session, remote_path, scan_directory,
+        validate_key,
+    };
+    use plenora_storage_core::{
+        EngineConfig, ErrorCategory, ErrorPhase, ExecutionControl, OperationContext, RemoteEffect,
+        RetryDisposition,
+    };
     use russh_sftp::{
-        client::RawSftpSession,
-        protocol::{File, Handle, Name, StatusCode},
+        client::{RawSftpSession, SftpSession},
+        protocol::{File, Handle, Name, Packet, Status, StatusCode, Version},
         server::Handler,
     };
     use std::sync::{
@@ -1296,6 +1431,165 @@ mod tests {
     }
 
     struct EndlessDirectory(Arc<AtomicUsize>);
+
+    struct InterruptedCommit {
+        state: Arc<AtomicUsize>,
+        commit: bool,
+        reached: Arc<tokio::sync::Notify>,
+    }
+
+    impl Handler for InterruptedCommit {
+        type Error = StatusCode;
+
+        fn unimplemented(&self) -> Self::Error {
+            StatusCode::OpUnsupported
+        }
+
+        async fn init(
+            &mut self,
+            _version: u32,
+            _extensions: std::collections::HashMap<String, String>,
+        ) -> Result<Version, Self::Error> {
+            let mut version = Version::new();
+            version
+                .extensions
+                .insert("posix-rename@openssh.com".to_owned(), "1".to_owned());
+            Ok(version)
+        }
+
+        async fn extended(
+            &mut self,
+            _id: u32,
+            request: String,
+            data: Vec<u8>,
+        ) -> Result<Packet, Self::Error> {
+            assert_eq!(request, "posix-rename@openssh.com");
+            assert_eq!(data, b"\0\0\0\x07staging\0\0\0\x05final");
+            if self.commit {
+                self.state.store(1, Ordering::SeqCst);
+            }
+            self.reached.notify_one();
+            std::future::pending().await // Simulate a lost response, not an explicit rejection.
+        }
+
+        async fn remove(&mut self, id: u32, path: String) -> Result<Status, Self::Error> {
+            assert_eq!(
+                path, "staging",
+                "cleanup must never remove the final object"
+            );
+            if self
+                .state
+                .compare_exchange(0, 2, Ordering::SeqCst, Ordering::SeqCst)
+                .is_err()
+            {
+                return Err(StatusCode::NoSuchFile);
+            }
+            Ok(Status {
+                id,
+                status_code: StatusCode::Ok,
+                error_message: String::new(),
+                language_tag: String::new(),
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn interrupted_atomic_commit_preserves_final_object_and_reports_provable_effects() {
+        for committed in [false, true] {
+            for cancellation in [false, true] {
+                let state = Arc::new(AtomicUsize::new(0));
+                let reached = Arc::new(tokio::sync::Notify::new());
+                let (client, server) = tokio::io::duplex(4096);
+                let commit_server = tokio::spawn(russh_sftp::server::run(
+                    server,
+                    InterruptedCommit {
+                        state: state.clone(),
+                        commit: committed,
+                        reached: reached.clone(),
+                    },
+                ));
+                let raw = RawSftpSession::new(client);
+                qualify_atomic_session(&raw).await.unwrap();
+                let (client, server) = tokio::io::duplex(4096);
+                let cleanup_server = tokio::spawn(russh_sftp::server::run(
+                    server,
+                    InterruptedCommit {
+                        state: state.clone(),
+                        commit: committed,
+                        reached: reached.clone(),
+                    },
+                ));
+                let cleanup = SftpSession::new(client).await.unwrap();
+                let control = ExecutionControl::default()
+                    .with_deadline(std::time::Instant::now() + std::time::Duration::from_secs(2));
+                let token = control.cancellation.clone();
+                let (outcome, ()) = tokio::join!(
+                    control.run(
+                        atomic_replace(&raw, "staging", "final"),
+                        ErrorPhase::Commit,
+                        true
+                    ),
+                    async {
+                        reached.notified().await;
+                        if cancellation {
+                            token.cancel();
+                        }
+                    }
+                );
+                let error =
+                    discard_staged_object(&cleanup, true, "staging", outcome.unwrap_err()).await;
+                assert_eq!(
+                    error.category,
+                    if cancellation {
+                        ErrorCategory::Cancelled
+                    } else {
+                        ErrorCategory::Timeout
+                    }
+                );
+                assert_eq!(
+                    error.remote_effect,
+                    if committed {
+                        RemoteEffect::Unknown
+                    } else {
+                        RemoteEffect::RolledBack
+                    }
+                );
+                assert_eq!(
+                    error.retry,
+                    if committed {
+                        RetryDisposition::RequiresRecovery
+                    } else {
+                        RetryDisposition::Safe
+                    }
+                );
+                assert_eq!(state.load(Ordering::SeqCst), if committed { 1 } else { 2 });
+                commit_server.abort();
+                cleanup_server.abort();
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn atomic_publication_rejects_a_server_without_posix_rename() {
+        let (client, server) = tokio::io::duplex(4096);
+        let server = tokio::spawn(russh_sftp::server::run(
+            server,
+            EndlessDirectory(Arc::new(AtomicUsize::new(0))),
+        ));
+        let session = RawSftpSession::new(client);
+        let error = qualify_atomic_session(&session)
+            .await
+            .expect_err("extension is mandatory");
+        server.abort();
+        assert_eq!(
+            error.category,
+            plenora_storage_core::ErrorCategory::Unsupported
+        );
+        assert_eq!(
+            error.remote_effect,
+            plenora_storage_core::RemoteEffect::None
+        );
+    }
 
     impl Handler for EndlessDirectory {
         type Error = StatusCode;

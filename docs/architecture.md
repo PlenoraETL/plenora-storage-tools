@@ -56,6 +56,9 @@ a provider, fingerprint della connessione, prefix e `max_items`; un cambio di
 scope fallisce chiuso. Scadono al timeout, all'eviction o alla chiusura/riavvio
 dell'Engine e non promettono snapshot isolation durante mutazioni concorrenti.
 
+La CLI esaurisce i cursori nello stesso processo tramite `list --all`, con
+un budget totale sui risultati. Non emette cursori inutilizzabili dopo l'uscita.
+
 I provider filesystem non hanno una list paginata nativa: enumerano l'albero e
 potano le directory che non possono contenere il prefix richiesto. `max_list_items`
 è quindi un budget di scansione sulle entry visitate, non sui risultati; la
@@ -99,6 +102,13 @@ al commit riporta `committed`, mai `none`. Dopo un rollback verificato solo una
 causa transitoria resta ritentabile: una configurazione invalida o un limite
 superato fallirebbero di nuovo in modo deterministico. Le pulizie hanno un
 budget di tempo proprio, perché la deadline del chiamante può essere già scaduta.
+
+Se la preparazione può avere creato directory, un rollback del solo file non
+è un rollback completo: l'errore conserva `unknown`/`requires_recovery` e
+`details.preparation=directories_may_remain`. La pubblicazione atomica SFTP
+di sostituzione negozia `posix-rename@openssh.com` v1 prima di mutare lo storage;
+un server privo dell'estensione viene rifiutato. La creazione esclusiva usa
+invece il flag SFTP `EXCL`, senza probe seguito da scrittura.
 
 Una pulizia rimuove soltanto ciò di cui l'operazione può dimostrare la
 proprietà. Se una creazione esclusiva fallisce, il percorso non viene toccato:

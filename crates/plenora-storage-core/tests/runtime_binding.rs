@@ -416,7 +416,7 @@ impl SecretResolver for TestSecrets {
 
 fn engine() -> Engine {
     let mut engine = Engine::new(EngineConfig {
-        allow_experimental_contracts: true,
+        allow_experimental_contracts: false,
         ..EngineConfig::default()
     });
     engine
@@ -442,7 +442,8 @@ fn invocation(operation: &str, payload: Value) -> RuntimeInvocation {
     RuntimeInvocation {
         content_type: JSON_CONTENT_TYPE.to_owned(),
         metadata: RuntimeRequestMetadata {
-            message_id: format!("message-{operation}"),
+            message_id: "11111111-1111-4111-8111-111111111111".to_owned(),
+            causation_id: None,
             capability_name: "plenora.storage-tools".to_owned(),
             capability_version: "1".to_owned(),
             operation: operation.to_owned(),
@@ -450,7 +451,7 @@ fn invocation(operation: &str, payload: Value) -> RuntimeInvocation {
             input_contract: descriptor.input_contract.to_owned(),
             deadline: None,
             idempotency_key: None,
-            correlation_id: "correlation-7".to_owned(),
+            correlation_id: "22222222-2222-4222-8222-222222222222".to_owned(),
         },
         payload,
     }
@@ -632,6 +633,55 @@ async fn runtime_route_and_security_mismatches_fail_closed() {
 }
 
 #[tokio::test]
+async fn runtime_uuids_are_canonical_and_causation_is_preserved() {
+    let engine = engine();
+    let artifacts = MemoryArtifacts::default();
+    let binding = RuntimeBinding::new(&engine, &artifacts, &TestSecrets);
+    let base = invocation(
+        "storage.test",
+        json!({"schema_version": 1, "connection": connection()}),
+    );
+    for invalid in [
+        "message-7",
+        "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA",
+        "11111111111141118111111111111111",
+        "11111111-1111-4111-8111-11111111111z",
+    ] {
+        for field in 0..3 {
+            let mut request = base.clone();
+            match field {
+                0 => request.metadata.message_id = invalid.to_owned(),
+                1 => request.metadata.correlation_id = invalid.to_owned(),
+                _ => request.metadata.causation_id = Some(invalid.to_owned()),
+            }
+            let result = binding.invoke(request, CancellationToken::new()).await;
+            assert_eq!(result.payload["code"], "RUNTIME_IDENTITY_INVALID");
+            assert_eq!(result.payload["category"], "protocol");
+            assert_eq!(result.payload["remote_effect"], "none");
+            assert!(!serde_json::to_string(&result).unwrap().contains(invalid));
+        }
+    }
+    let mut valid = base;
+    valid.metadata.causation_id = Some("33333333-3333-4333-8333-333333333333".to_owned());
+    let serialized = serde_json::to_value(&valid).unwrap();
+    assert_eq!(
+        serialized["metadata"]["plenora.message.causation_id"],
+        valid.metadata.causation_id.as_deref().unwrap()
+    );
+    let result = binding
+        .invoke(valid.clone(), CancellationToken::new())
+        .await;
+    assert_success(&result, "plenora-storage-test-output-v1");
+    assert_eq!(result.metadata.message_id, valid.metadata.message_id);
+    assert_eq!(result.metadata.causation_id, valid.metadata.causation_id);
+    let mut alternate = serialized;
+    let metadata = alternate["metadata"].as_object_mut().unwrap();
+    let value = metadata.remove("plenora.message.id").unwrap();
+    metadata.insert("message_id".to_owned(), value);
+    assert!(serde_json::from_value::<RuntimeInvocation>(alternate).is_err());
+}
+
+#[tokio::test]
 async fn runtime_deadline_and_cancellation_preserve_ambiguous_remote_effect() {
     let engine = engine();
     let artifacts = MemoryArtifacts::default();
@@ -722,7 +772,7 @@ async fn list_cursor_is_opaque_bounded_and_scoped_to_connection_and_parameters()
                 "content_length": null, "metadata": {}
             }),
         );
-        request.metadata.message_id = format!("put-{key}");
+        request.metadata.message_id = format!("11111111-1111-4111-8111-{:012x}", key.as_bytes()[2]);
         assert_eq!(
             binding
                 .invoke(request, CancellationToken::new())
@@ -882,13 +932,19 @@ async fn engine_operations_enforce_the_public_connection_contract() {
 fn assert_success(result: &plenora_storage_core::RuntimeResultEnvelope, contract: &str) {
     assert_eq!(result.content_type, JSON_CONTENT_TYPE);
     assert_eq!(result.metadata.output_contract, contract);
-    assert_eq!(result.metadata.correlation_id, "correlation-7");
+    assert_eq!(
+        result.metadata.correlation_id,
+        "22222222-2222-4222-8222-222222222222"
+    );
 }
 
 fn assert_error(result: &plenora_storage_core::RuntimeResultEnvelope, code: &str) {
     assert_eq!(result.content_type, ERROR_CONTENT_TYPE);
     assert_eq!(result.metadata.output_contract, ERROR_CONTRACT);
-    assert_eq!(result.metadata.correlation_id, "correlation-7");
+    assert_eq!(
+        result.metadata.correlation_id,
+        "22222222-2222-4222-8222-222222222222"
+    );
     assert_eq!(result.payload["code"], code);
 }
 

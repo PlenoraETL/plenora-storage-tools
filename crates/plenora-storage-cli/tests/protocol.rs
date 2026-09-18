@@ -1,6 +1,50 @@
-use std::process::{Command, Output};
+use std::{
+    collections::HashMap,
+    process::{Command, Output},
+};
 
 use serde_json::Value;
+
+struct Schemas(HashMap<String, Value>);
+
+impl jsonschema::Retrieve for Schemas {
+    fn retrieve(
+        &self,
+        uri: &jsonschema::Uri<String>,
+    ) -> Result<Value, Box<dyn std::error::Error + Send + Sync>> {
+        self.0
+            .get(uri.as_str())
+            .cloned()
+            .ok_or_else(|| "unknown contract reference".into())
+    }
+}
+
+fn validate_common(name: &str, value: &Value) {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../contracts/upstream");
+    let mut documents = HashMap::new();
+    for file in [
+        "cli-envelope-v2.schema.json",
+        "error-v1.schema.json",
+        "capabilities-v2.schema.json",
+    ] {
+        let document: Value =
+            serde_json::from_slice(&std::fs::read(root.join(file)).expect("pinned schema"))
+                .expect("JSON schema");
+        documents.insert(
+            document["$id"].as_str().expect("schema ID").to_owned(),
+            document,
+        );
+    }
+    let schema = documents[&format!("https://schemas.plenora.dev/{name}")].clone();
+    let validator = jsonschema::draft202012::options()
+        .with_retriever(Schemas(documents))
+        .build(&schema)
+        .expect("valid schema");
+    assert!(
+        validator.is_valid(value),
+        "public output violates {name}: {value}"
+    );
+}
 
 fn run(arguments: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_plenora-storage"))
@@ -14,7 +58,9 @@ fn single_json_line(output: &Output) -> Value {
     let stdout = std::str::from_utf8(&output.stdout).expect("stdout must be UTF-8");
     assert!(stdout.ends_with('\n'));
     assert_eq!(stdout.lines().count(), 1, "stdout must contain one line");
-    serde_json::from_str(stdout).expect("stdout must contain one JSON document")
+    let value = serde_json::from_str(stdout).expect("stdout must contain one JSON document");
+    validate_common("cli-envelope-v2.schema.json", &value);
+    value
 }
 
 #[test]
@@ -22,6 +68,7 @@ fn capabilities_are_machine_readable_and_cli_only() {
     let output = run(&["--format", "json", "capabilities"]);
     assert!(output.status.success());
     let envelope = single_json_line(&output);
+    validate_common("capabilities-v2.schema.json", &envelope["result"]);
     assert_eq!(envelope["protocol_version"], 2);
     assert_eq!(envelope["status"], "ok");
     assert_eq!(envelope["result"]["interfaces"][0]["kind"], "cli");
@@ -30,7 +77,7 @@ fn capabilities_are_machine_readable_and_cli_only() {
         .expect("operations must be an array");
     assert_eq!(operations.len(), 7);
     assert!(operations.iter().all(|operation| {
-        operation["status"] == "experimental" && operation["surfaces"] == serde_json::json!(["cli"])
+        operation["status"] == "available" && operation["surfaces"] == serde_json::json!(["cli"])
     }));
 }
 

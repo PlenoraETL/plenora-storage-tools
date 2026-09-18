@@ -1,18 +1,22 @@
 [package]
 name = "plenora-storage-s3"
+description = "Plenora provider-neutral storage s3"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
+readme = "../../README.md"
 
 [dependencies]
 async-trait.workspace = true
 futures-util.workspace = true
 object_store.workspace = true
-plenora-storage-core = { path = "../plenora-storage-core" }
+plenora-storage-core = { path = "../plenora-storage-core", version = "0.1.0" }
 reqwest.workspace = true
+rustls.workspace = true
 quick-xml.workspace = true
 serde.workspace = true
 serde_json.workspace = true

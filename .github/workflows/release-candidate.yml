@@ -1,0 +1,75 @@
+name: release-candidate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependencies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - run: cargo install cargo-audit --version 0.22.2 --locked
+      - run: cargo install cargo-deny --version 0.20.2 --locked
+      - run: cargo audit --deny warnings
+      - run: cargo deny --locked check
+
+  linux:
+    needs: dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - run: docker compose build storage-rust
+      - run: bash scripts/prepare-fixtures.sh
+      - run: docker compose run --rm --no-deps storage-rust
+      - name: Build and qualify release in Debian Bookworm
+        run: |
+          docker compose run --rm --no-deps storage-rust bash -c '
+            set -euo pipefail
+            cargo fetch --locked
+            python3 scripts/build_release.py
+            cp .fixtures/ca.crt /usr/local/share/ca-certificates/plenora-storage-fixture.crt
+            update-ca-certificates
+            export PLENORA_SFTP_HOST_KEY_SHA256="$(cat .fixtures/sftp-fingerprint)"
+            export PLENORA_CLI_BIN="$PWD/dist/0.1.0/x86_64-unknown-linux-gnu/plenora-storage"
+            python3 scripts/audit_release_readiness.py
+            python3 scripts/qualify_cli.py > dist/0.1.0/x86_64-unknown-linux-gnu/qualification.json
+            python3 scripts/qualify_commit_faults.py > dist/0.1.0/x86_64-unknown-linux-gnu/commit-faults.json
+            cp target/release-readiness/results.json dist/0.1.0/x86_64-unknown-linux-gnu/cli-regressions.json
+            python3 scripts/verify_release.py dist/0.1.0
+          '
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: storage-candidate-linux
+          path: dist/
+          if-no-files-found: error
+      - if: always()
+        run: docker compose down
+
+  windows:
+    needs: dependencies
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - run: cargo test --workspace --all-targets --locked
+      - run: cargo fetch --locked
+      - run: python scripts/build_release.py
+      - name: Qualify released binary on localhost
+        shell: pwsh
+        run: |
+          $env:PLENORA_CLI_BIN = (Get-ChildItem dist -Recurse -Filter plenora-storage.exe | Select-Object -First 1).FullName
+          python scripts/audit_release_readiness.py
+          Copy-Item target/release-readiness/results.json dist/0.1.0/x86_64-pc-windows-msvc/qualification.json
+          python scripts/verify_release.py dist/0.1.0
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: storage-candidate-windows
+          path: dist/
+          if-no-files-found: error

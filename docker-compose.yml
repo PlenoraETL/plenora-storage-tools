@@ -13,16 +13,33 @@ services:
     volumes:
       - minio-data:/data
 
+  minio-tls:
+    image: quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: plenora-dev
+      MINIO_ROOT_PASSWORD: plenora-dev-secret
+    volumes:
+      - ./.fixtures/minio:/root/.minio/certs:ro
+    networks:
+      default:
+        aliases: [minio-tls-invalid]
+
   minio-init:
     image: quay.io/minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
     depends_on:
       - minio
+      - minio-tls
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
-        until mc alias set local http://minio:9000 plenora-dev plenora-dev-secret;
-        do sleep 1; done;
-        mc mb --ignore-existing local/plenora-test
+        for attempt in $$(seq 1 30); do
+          mc alias set local http://minio:9000 plenora-dev plenora-dev-secret &&
+          mc --insecure alias set secure https://minio-tls:9000 plenora-dev plenora-dev-secret &&
+          mc mb --ignore-existing local/plenora-test &&
+          mc --insecure mb --ignore-existing secure/plenora-test && exit 0;
+          sleep 1;
+        done; exit 1
 
   sftp:
     image: atmoz/sftp@sha256:0960390462a4441dbb63698d7c185b76a41ffcee7b78ff4adf275f3e66f9c475
@@ -74,6 +91,7 @@ services:
     environment:
       PLENORA_MINIO_TEST: "1"
       PLENORA_MINIO_ENDPOINT: "http://minio:9000"
+      PLENORA_MINIO_TLS_ENDPOINT: "https://minio-tls:9000"
       PLENORA_MINIO_BUCKET: "plenora-test"
       PLENORA_MINIO_CREDENTIALS: '{"access_key_id":"plenora-dev","secret_access_key":"plenora-dev-secret"}'
       PLENORA_SFTP_TEST: "1"

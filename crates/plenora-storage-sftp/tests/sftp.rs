@@ -98,10 +98,40 @@ fn engine(allow_unverified_ssh: bool) -> StorageResult<Engine> {
 }
 
 #[tokio::test]
+#[ignore = "requires the Docker storage fixtures"]
+async fn pinned_host_key_accepts_only_the_qualified_server()
+-> Result<(), Box<dyn std::error::Error>> {
+    let pin = std::env::var("PLENORA_SFTP_HOST_KEY_SHA256")?;
+    let mut connection = connection();
+    connection.config["host_key_sha256"] = serde_json::json!(pin);
+    let engine = engine(false)?;
+    assert!(
+        engine
+            .test(&connection, &ExecutionControl::default())
+            .await?
+            .reachable
+    );
+    connection.config["host_key_sha256"] =
+        serde_json::json!("SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+    let error = engine
+        .test(&connection, &ExecutionControl::default())
+        .await
+        .expect_err("wrong pin");
+    assert_eq!(
+        error.remote_effect,
+        plenora_storage_core::RemoteEffect::None
+    );
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore = "requires the Docker storage fixtures"]
 async fn unverified_host_key_requires_explicit_policy() -> Result<(), Box<dyn std::error::Error>> {
-    if std::env::var("PLENORA_SFTP_TEST").as_deref() != Ok("1") {
-        return Ok(());
-    }
+    assert_eq!(
+        std::env::var("PLENORA_SFTP_TEST").as_deref(),
+        Ok("1"),
+        "integration fixture must be explicitly enabled"
+    );
     let error = engine(false)?
         .test(&connection(), &ExecutionControl::default())
         .await
@@ -111,10 +141,13 @@ async fn unverified_host_key_requires_explicit_policy() -> Result<(), Box<dyn st
 }
 
 #[tokio::test]
+#[ignore = "requires the Docker storage fixtures"]
 async fn sftp_contract_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
-    if std::env::var("PLENORA_SFTP_TEST").as_deref() != Ok("1") {
-        return Ok(());
-    }
+    assert_eq!(
+        std::env::var("PLENORA_SFTP_TEST").as_deref(),
+        Ok("1"),
+        "integration fixture must be explicitly enabled"
+    );
     let engine = engine(true)?;
     let connection = connection();
     let control = ExecutionControl::default();
@@ -148,6 +181,24 @@ async fn sftp_contract_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     producer_task.await??;
     assert_eq!(put.bytes_transferred, payload.len() as u64);
+
+    // Replacement must work on the same key, not merely publish a new name.
+    let mut replacement = payload.as_slice();
+    engine
+        .put(
+            &connection,
+            &PutRequest {
+                key: source_key.clone(),
+                overwrite: true,
+                publication_policy: PublicationPolicy::AtomicRequired,
+                content_type: None,
+                content_length: Some(payload.len() as u64),
+                metadata: BTreeMap::new(),
+            },
+            &mut replacement,
+            &control,
+        )
+        .await?;
 
     let metadata = engine
         .stat(
@@ -203,6 +254,19 @@ async fn sftp_contract_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
     assert_eq!(copied.size, payload.len() as u64);
+
+    engine
+        .copy(
+            &connection,
+            &CopyRequest {
+                source_key: source_key.clone(),
+                destination_key: copied_key.clone(),
+                overwrite: true,
+                publication_policy: PublicationPolicy::AtomicRequired,
+            },
+            &control,
+        )
+        .await?;
 
     for key in [&source_key, &copied_key] {
         assert!(

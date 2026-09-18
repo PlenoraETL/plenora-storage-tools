@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+test -s .fixtures/ca.crt
+test -s .fixtures/sftp-fingerprint
+cp .fixtures/ca.crt /usr/local/share/ca-certificates/plenora-storage-fixture.crt
+update-ca-certificates > /tmp/plenora-storage-certificates.log
+export PLENORA_SFTP_HOST_KEY_SHA256
+PLENORA_SFTP_HOST_KEY_SHA256="$(cat .fixtures/sftp-fingerprint)"
+
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
-cargo test --workspace --all-targets --locked
+cargo test --workspace --all-targets --locked -- --include-ignored
 cargo build --quiet --locked -p plenora-storage-cli
 
 cli_tmp="$(mktemp -d)"
@@ -68,3 +75,7 @@ run_cli_roundtrip \
 run_cli_roundtrip \
   ftp docker/ftp-connection.json \
   --allow-experimental-contracts --allow-private-network --allow-insecure-ftp
+
+python3 scripts/audit_release_readiness.py
+python3 scripts/qualify_cli.py
+python3 scripts/qualify_commit_faults.py

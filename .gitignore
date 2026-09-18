@@ -1,5 +1,7 @@
 /target/
 /.env
 /dist/
+/.fixtures/
 *.part
 *.tmp
+__pycache__/

@@ -1,6 +1,7 @@
 target
 .git
 .env
+.fixtures
 dist
 *.part
 *.tmp

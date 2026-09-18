@@ -131,6 +131,22 @@ struct FtpConnection {
 
 #[async_trait]
 impl StorageProvider for FtpProvider {
+    fn validate_connection(
+        &self,
+        connection: &ProviderConnection,
+        policy: &plenora_storage_core::EngineConfig,
+    ) -> StorageResult<()> {
+        parse_config(connection)?;
+        if !policy.allow_insecure_ftp {
+            return Err(StorageError::invalid_configuration(
+                "INSECURE_FTP_FORBIDDEN",
+                "plain FTP requires explicit engine authorization",
+            )
+            .with_provider(PROVIDER_ID));
+        }
+        Ok(())
+    }
+
     fn id(&self) -> &'static str {
         PROVIDER_ID
     }
@@ -355,74 +371,87 @@ impl StorageProvider for FtpProvider {
         source: &mut (dyn AsyncRead + Send + Unpin),
         context: &OperationContext<'_>,
     ) -> StorageResult<TransferResult> {
-        validate_ftp_publication(request.overwrite, request.publication_policy)?;
-        validate_key(&request.key)?;
-        validate_file_metadata(request)?;
-        let mut remote = context
-            .control
-            .run(
-                self.connect(connection, context),
-                ErrorPhase::Connect,
-                false,
-            )
-            .await?;
-        ensure_parent_directories(&mut remote.ftp, &request.key, context).await?;
-        let mut stream = context
-            .control
-            .run(
-                async {
-                    remote
-                        .ftp
-                        .put_with_stream(&request.key)
-                        .await
-                        .map_err(|error| map_ftp_error(error, ErrorPhase::Prepare, true))
-                },
-                ErrorPhase::Prepare,
-                true,
-            )
-            .await?;
-        let transfer = copy_with_control(source, &mut stream, context, true).await;
-        let (bytes_transferred, digest) = match transfer {
-            Ok(result) => result,
-            Err(error) => {
-                abort_transfer(&mut remote.ftp, stream).await;
-                return Err(error);
+        let mut parent_effect = false;
+        let result = async {
+            if request
+                .content_length
+                .is_some_and(|length| length > context.policy.max_transfer_bytes)
+            {
+                return Err(transfer_limit_error()
+                    .with_outcome(RemoteEffect::None, RetryDisposition::Never));
             }
-        };
-        if request
-            .content_length
-            .is_some_and(|expected| expected != bytes_transferred)
-        {
-            abort_transfer(&mut remote.ftp, stream).await;
-            return Err(StorageError::new(
-                ErrorCategory::InvalidConfiguration,
-                ErrorPhase::Commit,
-                RemoteEffect::Partial,
-                RetryDisposition::RequiresRecovery,
-                "CONTENT_LENGTH_MISMATCH",
-                "artifact length differs from declared content_length",
-            )
-            .with_provider(PROVIDER_ID));
+            validate_ftp_publication(request.overwrite, request.publication_policy)?;
+            validate_key(&request.key)?;
+            validate_file_metadata(request)?;
+            let mut remote = context
+                .control
+                .run(
+                    self.connect(connection, context),
+                    ErrorPhase::Connect,
+                    false,
+                )
+                .await?;
+            ensure_parent_directories(&mut remote.ftp, &request.key, context, &mut parent_effect)
+                .await?;
+            let mut stream = context
+                .control
+                .run(
+                    async {
+                        remote
+                            .ftp
+                            .put_with_stream(&request.key)
+                            .await
+                            .map_err(|error| map_ftp_error(error, ErrorPhase::Prepare, true))
+                    },
+                    ErrorPhase::Prepare,
+                    true,
+                )
+                .await?;
+            let transfer = copy_with_control(source, &mut stream, context, true).await;
+            let (bytes_transferred, digest) = match transfer {
+                Ok(result) => result,
+                Err(error) => {
+                    abort_transfer(&mut remote.ftp, stream).await;
+                    return Err(error);
+                }
+            };
+            if request
+                .content_length
+                .is_some_and(|expected| expected != bytes_transferred)
+            {
+                abort_transfer(&mut remote.ftp, stream).await;
+                return Err(StorageError::new(
+                    ErrorCategory::InvalidConfiguration,
+                    ErrorPhase::Commit,
+                    RemoteEffect::Partial,
+                    RetryDisposition::RequiresRecovery,
+                    "CONTENT_LENGTH_MISMATCH",
+                    "artifact length differs from declared content_length",
+                )
+                .with_provider(PROVIDER_ID));
+            }
+            context
+                .control
+                .run(
+                    async {
+                        remote
+                            .ftp
+                            .finalize_put_stream(stream)
+                            .await
+                            .map_err(|error| map_ftp_error(error, ErrorPhase::Commit, true))
+                    },
+                    ErrorPhase::Commit,
+                    true,
+                )
+                .await?;
+            Ok(transfer_result(
+                request.key.clone(),
+                bytes_transferred,
+                digest,
+            ))
         }
-        context
-            .control
-            .run(
-                async {
-                    remote
-                        .ftp
-                        .finalize_put_stream(stream)
-                        .await
-                        .map_err(|error| map_ftp_error(error, ErrorPhase::Commit, true))
-                },
-                ErrorPhase::Commit,
-                true,
-            )
-            .await?;
-        Ok(transfer_result(
-            request.key.clone(),
-            bytes_transferred,
-            digest,
-        ))
+        .await;
+        result.map_err(|error: StorageError| error.with_preparation_effect(parent_effect))
     }
 
     async fn delete(
@@ -495,123 +524,131 @@ impl StorageProvider for FtpProvider {
         request: &CopyRequest,
         context: &OperationContext<'_>,
     ) -> StorageResult<ObjectMetadata> {
-        validate_ftp_publication(request.overwrite, request.publication_policy)?;
-        validate_key(&request.source_key)?;
-        validate_key(&request.destination_key)?;
-        // A self-copy would open the destination for writing while the source is
-        // still being read, destroying the object being copied.
-        if request.source_key == request.destination_key {
-            return Err(StorageError::invalid_configuration(
-                "COPY_TARGET_EQUALS_SOURCE",
-                "copy source and destination must differ",
-            )
-            .with_provider(PROVIDER_ID));
-        }
-        let mut source_remote = context
-            .control
-            .run(
-                self.connect(connection, context),
-                ErrorPhase::Connect,
-                false,
-            )
-            .await?;
-        let mut destination_remote = context
-            .control
-            .run(
-                self.connect(connection, context),
-                ErrorPhase::Connect,
-                false,
-            )
-            .await?;
-        ensure_parent_directories(
-            &mut destination_remote.ftp,
-            &request.destination_key,
-            context,
-        )
-        .await?;
-        let mut source = context
-            .control
-            .run(
-                async {
-                    source_remote
-                        .ftp
-                        .retr_as_stream(&request.source_key)
-                        .await
-                        .map_err(|error| map_ftp_error(error, ErrorPhase::Read, false))
-                },
-                ErrorPhase::Read,
-                false,
+        let mut parent_effect = false;
+        let result = async {
+            validate_ftp_publication(request.overwrite, request.publication_policy)?;
+            validate_key(&request.source_key)?;
+            validate_key(&request.destination_key)?;
+            // A self-copy would open the destination for writing while the source is
+            // still being read, destroying the object being copied.
+            if request.source_key == request.destination_key {
+                return Err(StorageError::invalid_configuration(
+                    "COPY_TARGET_EQUALS_SOURCE",
+                    "copy source and destination must differ",
+                )
+                .with_provider(PROVIDER_ID));
+            }
+            let mut source_remote = context
+                .control
+                .run(
+                    self.connect(connection, context),
+                    ErrorPhase::Connect,
+                    false,
+                )
+                .await?;
+            let mut destination_remote = context
+                .control
+                .run(
+                    self.connect(connection, context),
+                    ErrorPhase::Connect,
+                    false,
+                )
+                .await?;
+            ensure_parent_directories(
+                &mut destination_remote.ftp,
+                &request.destination_key,
+                context,
+                &mut parent_effect,
             )
             .await?;
-        let opened = context
-            .control
-            .run(
-                async {
-                    destination_remote
-                        .ftp
-                        .put_with_stream(&request.destination_key)
-                        .await
-                        .map_err(|error| map_ftp_error(error, ErrorPhase::Prepare, true))
-                },
-                ErrorPhase::Prepare,
-                true,
-            )
-            .await;
-        let mut destination = match opened {
-            Ok(destination) => destination,
-            Err(error) => {
+            let mut source = context
+                .control
+                .run(
+                    async {
+                        source_remote
+                            .ftp
+                            .retr_as_stream(&request.source_key)
+                            .await
+                            .map_err(|error| map_ftp_error(error, ErrorPhase::Read, false))
+                    },
+                    ErrorPhase::Read,
+                    false,
+                )
+                .await?;
+            let opened = context
+                .control
+                .run(
+                    async {
+                        destination_remote
+                            .ftp
+                            .put_with_stream(&request.destination_key)
+                            .await
+                            .map_err(|error| map_ftp_error(error, ErrorPhase::Prepare, true))
+                    },
+                    ErrorPhase::Prepare,
+                    true,
+                )
+                .await;
+            let mut destination = match opened {
+                Ok(destination) => destination,
+                Err(error) => {
+                    abort_transfer(&mut source_remote.ftp, source).await;
+                    return Err(error);
+                }
+            };
+            if let Err(error) =
+                copy_with_control(&mut source, &mut destination, context, true).await
+            {
+                abort_transfer(&mut destination_remote.ftp, destination).await;
                 abort_transfer(&mut source_remote.ftp, source).await;
                 return Err(error);
             }
-        };
-        if let Err(error) = copy_with_control(&mut source, &mut destination, context, true).await {
-            abort_transfer(&mut destination_remote.ftp, destination).await;
-            abort_transfer(&mut source_remote.ftp, source).await;
-            return Err(error);
-        }
-        if let Err(error) = context
-            .control
-            .run(
-                async {
-                    destination_remote
-                        .ftp
-                        .finalize_put_stream(destination)
-                        .await
-                        .map_err(|error| map_ftp_error(error, ErrorPhase::Commit, true))
-                },
-                ErrorPhase::Commit,
-                true,
+            if let Err(error) = context
+                .control
+                .run(
+                    async {
+                        destination_remote
+                            .ftp
+                            .finalize_put_stream(destination)
+                            .await
+                            .map_err(|error| map_ftp_error(error, ErrorPhase::Commit, true))
+                    },
+                    ErrorPhase::Commit,
+                    true,
+                )
+                .await
+            {
+                abort_transfer(&mut source_remote.ftp, source).await;
+                return Err(error);
+            }
+            // The destination is published from here on. Draining the source
+            // transfer and reading the published metadata can still fail, but never
+            // without a remote effect.
+            context
+                .control
+                .run(
+                    async {
+                        source_remote
+                            .ftp
+                            .finalize_retr_stream(source)
+                            .await
+                            .map_err(|error| map_ftp_error(error, ErrorPhase::Cleanup, false))
+                    },
+                    ErrorPhase::Cleanup,
+                    true,
+                )
+                .await
+                .map_err(|_| committed_verification_error())?;
+            stat_file(
+                &mut destination_remote.ftp,
+                &request.destination_key,
+                context,
             )
             .await
-        {
-            abort_transfer(&mut source_remote.ftp, source).await;
-            return Err(error);
+            .map_err(|_| committed_verification_error())
         }
-        // The destination is published from here on. Draining the source
-        // transfer and reading the published metadata can still fail, but never
-        // without a remote effect.
-        context
-            .control
-            .run(
-                async {
-                    source_remote
-                        .ftp
-                        .finalize_retr_stream(source)
-                        .await
-                        .map_err(|error| map_ftp_error(error, ErrorPhase::Cleanup, false))
-                },
-                ErrorPhase::Cleanup,
-                true,
-            )
-            .await
-            .map_err(|_| committed_verification_error())?;
-        stat_file(
-            &mut destination_remote.ftp,
-            &request.destination_key,
-            context,
-        )
-        .await
-        .map_err(|_| committed_verification_error())
+        .await;
+        result.map_err(|error: StorageError| error.with_preparation_effect(parent_effect))
     }
 }
 
@@ -699,6 +736,7 @@ async fn ensure_parent_directories(
     ftp: &mut AsyncFtpStream,
     key: &str,
     context: &OperationContext<'_>,
+    parent_effect: &mut bool,
 ) -> StorageResult<()> {
     let Some((parent, _)) = key.rsplit_once('/') else {
         return Ok(());
@@ -709,7 +747,16 @@ async fn ensure_parent_directories(
             current.push('/');
         }
         current.push_str(part);
-        if !ftp_directory_exists(ftp, &current).await? {
+        if !context
+            .control
+            .run(
+                ftp_directory_exists(ftp, &current),
+                ErrorPhase::Probe,
+                false,
+            )
+            .await?
+        {
+            *parent_effect = true;
             context
                 .control
                 .run(
@@ -1161,9 +1208,76 @@ fn committed_verification_error() -> StorageError {
 
 #[cfg(test)]
 mod tests {
-    use super::{MAX_MLSD_LINE_BYTES, read_listing_line, scan_directory, validate_key};
+    use super::{
+        MAX_MLSD_LINE_BYTES, ensure_parent_directories, read_listing_line, scan_directory,
+        validate_key,
+    };
     use plenora_storage_core::{EngineConfig, ExecutionControl, OperationContext};
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+
+    #[tokio::test]
+    async fn parent_probe_obeys_deadline_and_cancellation() {
+        for cancel in [false, true] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+                .await
+                .expect("listener");
+            let address = listener.local_addr().expect("address");
+            let (sent, received) = tokio::sync::oneshot::channel();
+            let server = tokio::spawn(async move {
+                let (stream, _) = listener.accept().await.expect("accept");
+                let mut stream = BufReader::new(stream);
+                stream
+                    .get_mut()
+                    .write_all(b"220 ready\r\n")
+                    .await
+                    .expect("greeting");
+                let mut command = String::new();
+                stream.read_line(&mut command).await.expect("MLST");
+                assert_eq!(command, "MLST parent\r\n");
+                sent.send(()).expect("signal");
+                std::future::pending::<()>().await;
+            });
+            let mut ftp = suppaftp::tokio::AsyncFtpStream::connect(address)
+                .await
+                .expect("connect");
+            let control = if cancel {
+                ExecutionControl::default()
+            } else {
+                ExecutionControl::default().with_deadline(
+                    std::time::Instant::now() + std::time::Duration::from_millis(200),
+                )
+            };
+            let token = control.cancellation.clone();
+            let trigger = tokio::spawn(async move {
+                received.await.expect("probe reached");
+                if cancel {
+                    token.cancel();
+                }
+            });
+            let policy = EngineConfig::default();
+            let result = tokio::time::timeout(
+                std::time::Duration::from_secs(2),
+                ensure_parent_directories(
+                    &mut ftp,
+                    "parent/object",
+                    &OperationContext {
+                        policy: &policy,
+                        control: &control,
+                    },
+                    &mut false,
+                ),
+            )
+            .await;
+            server.abort();
+            trigger.await.expect("trigger");
+            let error = result.expect("bounded operation").expect_err("must stop");
+            assert_eq!(error.code, if cancel { "CANCELLED" } else { "TIMEOUT" });
+            assert_eq!(
+                error.remote_effect,
+                plenora_storage_core::RemoteEffect::None
+            );
+        }
+    }
 
     #[test]
     fn keys_cannot_escape_the_remote_root() {

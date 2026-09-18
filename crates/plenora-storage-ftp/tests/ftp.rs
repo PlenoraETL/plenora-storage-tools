@@ -119,10 +119,13 @@ fn engine(allow_insecure_ftp: bool) -> StorageResult<Engine> {
 }
 
 #[tokio::test]
+#[ignore = "requires the Docker storage fixtures"]
 async fn plain_ftp_requires_explicit_policy() -> Result<(), Box<dyn std::error::Error>> {
-    if std::env::var("PLENORA_FTP_TEST").as_deref() != Ok("1") {
-        return Ok(());
-    }
+    assert_eq!(
+        std::env::var("PLENORA_FTP_TEST").as_deref(),
+        Ok("1"),
+        "integration fixture must be explicitly enabled"
+    );
     let error = engine(false)?
         .test(&connection(), &ExecutionControl::default())
         .await
@@ -132,10 +135,13 @@ async fn plain_ftp_requires_explicit_policy() -> Result<(), Box<dyn std::error::
 }
 
 #[tokio::test]
+#[ignore = "requires the Docker storage fixtures"]
 async fn ftp_contract_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
-    if std::env::var("PLENORA_FTP_TEST").as_deref() != Ok("1") {
-        return Ok(());
-    }
+    assert_eq!(
+        std::env::var("PLENORA_FTP_TEST").as_deref(),
+        Ok("1"),
+        "integration fixture must be explicitly enabled"
+    );
     let engine = engine(true)?;
     let connection = connection();
     let control = ExecutionControl::default();

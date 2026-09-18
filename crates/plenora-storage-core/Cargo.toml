@@ -1,11 +1,17 @@
 [package]
 name = "plenora-storage-core"
+description = "Plenora provider-neutral storage core"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
+readme = "../../README.md"
+
+# Schema fixtures are shipped in the separate contracts archive.
+exclude = ["tests/contracts.rs", "examples/validate_adoption.rs"]
 
 [dependencies]
 async-trait.workspace = true

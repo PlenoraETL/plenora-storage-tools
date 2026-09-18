@@ -26,6 +26,9 @@ object_store = { version = "0.14.1", default-features = false, features = ["aws"
 # Only used to build the HTTP client `object_store` runs on, so that the S3
 # endpoint is dialled at the addresses the network policy validated.
 reqwest = { version = "0.13", default-features = false }
+# Minimum applies to consumers of the S3 crate as well as this lockfile.
+# Earlier 0.23.x releases are affected by RUSTSEC-2026-0285.
+rustls = { version = "0.23.45", default-features = false }
 quick-xml = { version = "0.41", features = ["serialize"] }
 russh = { version = "0.62.7", default-features = false, features = ["aws-lc-rs"] }
 russh-sftp = "2.4.0"
