@@ -8,14 +8,20 @@
         "connection": {
           "provider": "s3",
           "config_contract": "plenora-storage-s3-connection-v1",
-          "config": {"endpoint": "https://s3.example.invalid", "bucket": "example"},
+          "config": {
+            "endpoint": "https://s3.example.invalid",
+            "bucket": "example"
+          },
           "credential_ref": "secret://storage/test"
         }
       }
     },
     {
       "schema": "plenora-storage-test-output-v1.schema.json",
-      "instance": {"provider": "s3", "reachable": true}
+      "instance": {
+        "provider": "s3",
+        "reachable": true
+      }
     },
     {
       "schema": "plenora-storage-list-input-v1.schema.json",
@@ -24,7 +30,10 @@
         "connection": {
           "provider": "s3",
           "config_contract": "plenora-storage-s3-connection-v1",
-          "config": {"endpoint": "https://s3.example.invalid", "bucket": "example"},
+          "config": {
+            "endpoint": "https://s3.example.invalid",
+            "bucket": "example"
+          },
           "credential_ref": "secret://storage/test"
         },
         "prefix": "incoming/",
@@ -39,7 +48,10 @@
         "connection": {
           "provider": "s3",
           "config_contract": "plenora-storage-s3-connection-v1",
-          "config": {"endpoint": "https://s3.example.invalid", "bucket": "example"},
+          "config": {
+            "endpoint": "https://s3.example.invalid",
+            "bucket": "example"
+          },
           "credential_ref": "secret://storage/test"
         },
         "prefix": "",
@@ -50,7 +62,15 @@
     {
       "schema": "plenora-storage-list-output-v1.schema.json",
       "instance": {
-        "objects": [{"key": "incoming/a.bin", "size": 17, "last_modified": null, "etag": null, "version": null}],
+        "objects": [
+          {
+            "key": "incoming/a.bin",
+            "size": 17,
+            "last_modified": null,
+            "etag": null,
+            "version": null
+          }
+        ],
         "truncated": false,
         "next_cursor": null
       }
@@ -62,7 +82,10 @@
         "connection": {
           "provider": "s3",
           "config_contract": "plenora-storage-s3-connection-v1",
-          "config": {"endpoint": "https://s3.example.invalid", "bucket": "example"},
+          "config": {
+            "endpoint": "https://s3.example.invalid",
+            "bucket": "example"
+          },
           "credential_ref": "secret://storage/test"
         },
         "key": "incoming/a.bin"
@@ -70,7 +93,13 @@
     },
     {
       "schema": "plenora-storage-stat-output-v1.schema.json",
-      "instance": {"key": "incoming/a.bin", "size": 17, "last_modified": null, "etag": null, "version": null}
+      "instance": {
+        "key": "incoming/a.bin",
+        "size": 17,
+        "last_modified": null,
+        "etag": null,
+        "version": null
+      }
     },
     {
       "schema": "plenora-storage-get-input-v1.schema.json",
@@ -79,14 +108,21 @@
         "connection": {
           "provider": "s3",
           "config_contract": "plenora-storage-s3-connection-v1",
-          "config": {"endpoint": "https://s3.example.invalid", "bucket": "example"},
+          "config": {
+            "endpoint": "https://s3.example.invalid",
+            "bucket": "example"
+          },
           "credential_ref": "secret://storage/test"
         },
         "key": "incoming/a.bin",
         "artifact_sink": {
           "reference": "artifact://output/storage-get-vector",
           "overwrite": false,
-          "metadata": {"content_type": "application/octet-stream", "size": 17, "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}
+          "metadata": {
+            "content_type": "application/octet-stream",
+            "size": 17,
+            "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+          }
         }
       }
     },
@@ -95,8 +131,15 @@
       "instance": {
         "key": "incoming/a.bin",
         "bytes_transferred": 17,
-        "checksum": {"algorithm": "sha256", "value": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
-        "artifact": {"content_type": "application/octet-stream", "size": 17, "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+        "checksum": {
+          "algorithm": "sha256",
+          "value": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        },
+        "artifact": {
+          "content_type": "application/octet-stream",
+          "size": 17,
+          "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        },
         "etag": null,
         "version": null
       }
@@ -108,19 +151,28 @@
         "connection": {
           "provider": "s3",
           "config_contract": "plenora-storage-s3-connection-v1",
-          "config": {"endpoint": "https://s3.example.invalid", "bucket": "example"},
+          "config": {
+            "endpoint": "https://s3.example.invalid",
+            "bucket": "example"
+          },
           "credential_ref": "secret://storage/test"
         },
         "key": "outgoing/a.bin",
         "artifact_source": {
           "reference": "artifact://input/storage-put-vector",
-          "metadata": {"content_type": "application/octet-stream", "size": 17, "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}
+          "metadata": {
+            "content_type": "application/octet-stream",
+            "size": 17,
+            "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+          }
         },
         "overwrite": false,
         "publication_policy": "atomic_required",
         "content_type": "application/octet-stream",
         "content_length": 17,
-        "metadata": {"source": "vector"}
+        "metadata": {
+          "source": "vector"
+        }
       }
     },
     {
@@ -128,8 +180,15 @@
       "instance": {
         "key": "outgoing/a.bin",
         "bytes_transferred": 17,
-        "checksum": {"algorithm": "sha256", "value": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
-        "artifact": {"content_type": "application/octet-stream", "size": 17, "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+        "checksum": {
+          "algorithm": "sha256",
+          "value": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        },
+        "artifact": {
+          "content_type": "application/octet-stream",
+          "size": 17,
+          "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        },
         "etag": null,
         "version": null
       }
@@ -141,7 +200,10 @@
         "connection": {
           "provider": "s3",
           "config_contract": "plenora-storage-s3-connection-v1",
-          "config": {"endpoint": "https://s3.example.invalid", "bucket": "example"},
+          "config": {
+            "endpoint": "https://s3.example.invalid",
+            "bucket": "example"
+          },
           "credential_ref": "secret://storage/test"
         },
         "source_key": "incoming/a.bin",
@@ -152,7 +214,13 @@
     },
     {
       "schema": "plenora-storage-copy-output-v1.schema.json",
-      "instance": {"key": "outgoing/a.bin", "size": 17, "last_modified": null, "etag": null, "version": null}
+      "instance": {
+        "key": "outgoing/a.bin",
+        "size": 17,
+        "last_modified": null,
+        "etag": null,
+        "version": null
+      }
     },
     {
       "schema": "plenora-storage-delete-input-v1.schema.json",
@@ -161,7 +229,10 @@
         "connection": {
           "provider": "s3",
           "config_contract": "plenora-storage-s3-connection-v1",
-          "config": {"endpoint": "https://s3.example.invalid", "bucket": "example"},
+          "config": {
+            "endpoint": "https://s3.example.invalid",
+            "bucket": "example"
+          },
           "credential_ref": "secret://storage/test"
         },
         "key": "outgoing/a.bin",
@@ -170,7 +241,57 @@
     },
     {
       "schema": "plenora-storage-delete-output-v1.schema.json",
-      "instance": {"key": "outgoing/a.bin", "deleted": true}
+      "instance": {
+        "key": "outgoing/a.bin",
+        "deleted": true
+      }
+    },
+    {
+      "name": "local configuration",
+      "schema": "plenora-storage-local-connection-v1.schema.json",
+      "instance": {
+        "root": "/data"
+      }
+    },
+    {
+      "name": "azure configuration",
+      "schema": "plenora-storage-azure-connection-v1.schema.json",
+      "instance": {
+        "endpoint": "http://azure:10000/devstoreaccount1",
+        "account": "devstoreaccount1",
+        "container": "plenora-test"
+      }
+    },
+    {
+      "name": "gcs configuration",
+      "schema": "plenora-storage-gcs-connection-v1.schema.json",
+      "instance": {
+        "endpoint": "http://gcs:4443",
+        "bucket": "plenora-test"
+      }
+    },
+    {
+      "name": "smb configuration",
+      "schema": "plenora-storage-smb-connection-v1.schema.json",
+      "instance": {
+        "host": "smb",
+        "share": "storage"
+      }
+    },
+    {
+      "name": "webdav configuration",
+      "schema": "plenora-storage-webdav-connection-v1.schema.json",
+      "instance": {
+        "endpoint": "http://webdav:8080/"
+      }
+    },
+    {
+      "name": "ftps configuration",
+      "schema": "plenora-storage-ftps-connection-v1.schema.json",
+      "instance": {
+        "host": "ftps",
+        "root": "."
+      }
     }
   ]
 }

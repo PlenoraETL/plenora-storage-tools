@@ -1,0 +1,8 @@
+{
+  "provider": "local",
+  "config_contract": "plenora-storage-local-connection-v1",
+  "config": {
+    "root": "/data"
+  },
+  "credential_ref": "local:process"
+}

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.plenora.dev/storage/plenora-storage-gcs-connection-v1.schema.json",
+  "title": "Plenora gcs configuration v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "endpoint",
+    "bucket"
+  ],
+  "properties": {
+    "endpoint": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "format": "uri"
+    },
+    "bucket": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    }
+  }
+}

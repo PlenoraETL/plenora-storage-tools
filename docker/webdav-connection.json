@@ -1,0 +1,8 @@
+{
+  "provider": "webdav",
+  "config_contract": "plenora-storage-webdav-connection-v1",
+  "config": {
+    "endpoint": "http://webdav:8080/"
+  },
+  "credential_ref": "env:PLENORA_WEBDAV_CREDENTIALS"
+}

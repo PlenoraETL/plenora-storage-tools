@@ -83,9 +83,15 @@ def main():
                 failure = invoke(connection, flags, 'copy', '--source-key', key + '/missing',
                     '--destination-key', key + '/new-parent/child', '--overwrite', 'true',
                     '--publication-policy', policy, expected=5)
-                assert failure['remote_effect'] == 'unknown', failure
-                assert failure['retry']['kind'] == 'requires_recovery', failure
-                assert failure['details']['preparation'] == 'directories_may_remain', failure
+                if provider == 'ftp':
+                    # The byte-count preflight now checks the source before
+                    # creating destination directories.
+                    assert failure['remote_effect'] == 'none', failure
+                    assert 'preparation' not in failure['details'], failure
+                else:
+                    assert failure['remote_effect'] == 'unknown', failure
+                    assert failure['retry']['kind'] == 'requires_recovery', failure
+                    assert failure['details']['preparation'] == 'directories_may_remain', failure
             if provider != 'ftp':
                 race_key = key + '/race'
                 def create(path):

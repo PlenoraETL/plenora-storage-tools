@@ -17,6 +17,9 @@ use plenora_storage_core::{
     StorageResult, Surface,
 };
 use plenora_storage_ftp::FtpProvider;
+use plenora_storage_providers::{
+    AzureProvider, GcsProvider, LocalProvider, SmbProvider, WebDavProvider,
+};
 use plenora_storage_s3::S3Provider;
 use plenora_storage_sftp::SftpProvider;
 use serde_json::{Value, json};
@@ -261,6 +264,20 @@ async fn run() -> ExitCode {
         EnvironmentCredentialResolver,
     )))) {
         return emit_error("engine-init", "plenora-cli-error-v1", error);
+    }
+    let credentials = Arc::new(EnvironmentCredentialResolver);
+    let additional: Vec<Arc<dyn plenora_storage_core::StorageProvider>> = vec![
+        Arc::new(FtpProvider::new_ftps(credentials.clone())),
+        Arc::new(LocalProvider::new(credentials.clone())),
+        Arc::new(AzureProvider::new(credentials.clone())),
+        Arc::new(GcsProvider::new(credentials.clone())),
+        Arc::new(SmbProvider::new(credentials.clone())),
+        Arc::new(WebDavProvider::new(credentials)),
+    ];
+    for provider in additional {
+        if let Err(error) = engine.register_provider(provider) {
+            return emit_error("engine-init", "plenora-cli-error-v1", error);
+        }
     }
     let control = match execution_control(cli.deadline.as_deref()) {
         Ok(control) => control,

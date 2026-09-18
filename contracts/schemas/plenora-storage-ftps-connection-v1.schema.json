@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.plenora.dev/storage/plenora-storage-ftps-connection-v1.schema.json",
+  "title": "Plenora ftps configuration v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "host"
+  ],
+  "properties": {
+    "host": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 253
+    },
+    "port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535,
+      "default": 21
+    },
+    "root": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "default": "."
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "passive",
+        "extended_passive"
+      ],
+      "default": "passive"
+    },
+    "tls_ca_pem": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 65536
+    }
+  }
+}

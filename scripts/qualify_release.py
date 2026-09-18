@@ -8,6 +8,7 @@ import subprocess
 import sys
 
 from build_release import ROOT, digest, source_digest
+from qualify_extended_faults import EXPECTED_TESTS
 
 
 def main():
@@ -62,6 +63,24 @@ def main():
             assert all(r['status'] == 'PASS' and r['reported_effect'] == 'unknown' for r in faults['results'])
         evidence = [qualification_path, regression_path, suite_path, audit_path, deny_path,
                     folder / 'adoption-manifest-v4.json', folder / 'release-manifest.json']
+        if tuple(map(int, manifest['version'].split('.'))) >= (0, 2, 0):
+            upstream_audit_path = args.evidence / 'smb-upstream-audit.json'
+            upstream_audit = json.loads(upstream_audit_path.read_text())
+            assert upstream_audit['vulnerabilities']['count'] == 0 and not upstream_audit.get('warnings')
+            shutil.copyfile(upstream_audit_path, archive_evidence / upstream_audit_path.name)
+            evidence.append(upstream_audit_path)
+            extended_path = folder / 'extended-qualification.json'
+            extended = json.loads(extended_path.read_text())
+            assert extended['binary_sha256'] == digest(binary)
+            assert {r['provider'] for r in extended['results']} == {'local', 'ftps', 'azure', 'gcs', 'smb', 'webdav'}
+            assert all(r['status'] == 'PASS' and r['operations'] == 7 for r in extended['results'])
+            faults_extended_path = folder / 'extended-regressions.json'
+            extended_faults = json.loads(faults_extended_path.read_text())
+            assert extended_faults['binary_sha256'] == digest(binary)
+            assert {r['name'] for r in extended_faults['results']} == EXPECTED_TESTS
+            assert all(r['status'] == 'PASS' for r in extended_faults['results'])
+            qualification['results'].extend(extended['results'])
+            evidence.extend([extended_path, faults_extended_path])
         if 'linux' in target:
             evidence.append(faults_path)
         for source in [suite_path, audit_path, deny_path]:

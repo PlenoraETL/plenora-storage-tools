@@ -1,0 +1,9 @@
+{
+  "provider": "smb",
+  "config_contract": "plenora-storage-smb-connection-v1",
+  "config": {
+    "host": "smb",
+    "share": "storage"
+  },
+  "credential_ref": "env:PLENORA_SMB_CREDENTIALS"
+}

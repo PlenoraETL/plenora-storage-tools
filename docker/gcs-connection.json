@@ -1,0 +1,9 @@
+{
+  "provider": "gcs",
+  "config_contract": "plenora-storage-gcs-connection-v1",
+  "config": {
+    "endpoint": "http://gcs:4443",
+    "bucket": "plenora-test"
+  },
+  "credential_ref": "env:PLENORA_GCS_CREDENTIALS"
+}

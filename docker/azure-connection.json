@@ -1,0 +1,10 @@
+{
+  "provider": "azure",
+  "config_contract": "plenora-storage-azure-connection-v1",
+  "config": {
+    "endpoint": "http://azure:10000/devstoreaccount1",
+    "account": "devstoreaccount1",
+    "container": "plenora-test"
+  },
+  "credential_ref": "env:PLENORA_AZURE_CREDENTIALS"
+}

@@ -1,0 +1,32 @@
+[package]
+name = "plenora-storage-providers"
+description = "Local, Azure Blob, Google Cloud Storage, SMB and WebDAV adapters for Plenora"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme = "../../README.md"
+
+[dependencies]
+async-trait.workspace = true
+bytes.workspace = true
+percent-encoding = "2.3"
+cap-std.workspace = true
+futures-util.workspace = true
+object_store = { workspace = true, features = ["azure"] }
+plenora-storage-core = { path = "../plenora-storage-core", version = "0.2.0" }
+quick-xml.workspace = true
+reqwest.workspace = true
+rustls.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+smb2.workspace = true
+time.workspace = true
+tokio.workspace = true
+url.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,9 @@
+{
+  "provider": "ftps",
+  "config_contract": "plenora-storage-ftps-connection-v1",
+  "config": {
+    "host": "ftps",
+    "root": "."
+  },
+  "credential_ref": "env:PLENORA_FTPS_CREDENTIALS"
+}

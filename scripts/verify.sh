@@ -79,3 +79,8 @@ run_cli_roundtrip \
 python3 scripts/audit_release_readiness.py
 python3 scripts/qualify_cli.py
 python3 scripts/qualify_commit_faults.py
+
+python3 scripts/qualify_extended_faults.py
+if [ "${PLENORA_EXTENDED_TEST:-0}" = "1" ]; then
+  python3 scripts/qualify_extended.py
+fi

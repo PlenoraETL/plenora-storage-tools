@@ -1,12 +1,14 @@
 # plenora-storage-tools
 
-Libreria Rust provider-neutral per accedere a sistemi di storage attraverso
-contratti pubblici versionati. Gli adapter iniziali sono SFTP, FTP e
-S3-compatible. La verifica locale usa container reali per tutti e tre.
+Libreria Rust e CLI per accedere a nove sistemi di storage con gli stessi
+contratti pubblici: S3-compatible, SFTP, FTP, filesystem locale, FTPS,
+Azure Blob / ADLS Gen2, SMB, Google Cloud Storage e WebDAV.
 
-> **Release 0.1.0:** operazioni v1 disponibili su Rust, CLI e binding runtime.
-> La qualifica copre MinIO, OpenSSH e Pure-FTPd nelle versioni bloccate nel
-> compose. Perimetro e gate di distribuzione: [release-readiness](docs/release-readiness.md).
+La versione 0.2.0 aggiunge sei provider mantenendo le sette operazioni v1.
+Configurazione, credenziali, garanzie e sistemi effettivamente verificati sono
+nella [guida ai nuovi provider](docs/provider-expansion.md).
+La qualifica della release ? separata dalla build:
+[criteri di distribuzione](docs/release-readiness.md).
 
 ## Superfici iniziali
 
@@ -31,7 +33,7 @@ La libreria Rust riceve una `ProviderConnection`, una request tipizzata e un
 La CLI riceve la stessa connessione da un file JSON con `--connection`. I
 comandi di trasferimento aggiungono `--input` o `--output` per il file locale.
 I file in `docker/*-connection.json` mostrano configurazioni complete per
-SFTP, FTP e S3-compatible. `credential_ref` punta a un resolver dell'host; non
+tutti i provider. `credential_ref` punta a un resolver dell'host; non
 contiene il segreto.
 
 Le operazioni v1 non richiedono più `--allow-experimental-contracts`; il flag
@@ -39,7 +41,7 @@ resta accettato per compatibilità. Le policy di rete restano indipendenti. I va
 `--overwrite true|false`, `--publication-policy
 best-effort|atomic-required` e `--ignore-missing true|false` sono obbligatori
 dove applicabili: il protocollo non assume un default per una decisione
-distruttiva. FTP rifiuta sempre `overwrite=false` e `atomic-required`, invece
+distruttiva. FTP e FTPS rifiutano sempre `overwrite=false` e `atomic-required`, invece
 di degradare a check-then-write.
 
 Per elenchi su più pagine usare `list --all --max-items 100`: la CLI mantiene
@@ -56,7 +58,7 @@ processi. La libreria Rust conserva la paginazione per Engine.
 - L'endpoint viene risolto una sola volta e la connessione usa gli indirizzi
   già validati, quindi una seconda risoluzione non può raggiungere un
   indirizzo che la policy ha appena rifiutato. Per lo stesso motivo il client
-  S3 non segue redirect e non usa proxy, e il canale dati FTP passivo riusa
+  HTTP (S3, Azure, GCS e WebDAV) non segue redirect e non usa proxy, e il canale dati FTP passivo riusa
   l'indirizzo di controllo già validato prendendo dalla risposta PASV soltanto
   la porta.
 - Le richieste contengono `credential_ref`, mai access key o segreti inline. Il
@@ -70,7 +72,7 @@ processi. La libreria Rust conserva la paginazione per Engine.
   di probe e nessun file non creato da questo comando viene mai sostituito o
   rimosso. Richiede un filesystem che supporti gli hard link.
 - Le upload condizionali (`overwrite=false` su S3) devono essere bufferizzate in
-  memoria e hanno un limite dedicato, `--max-buffered-put-bytes`, distinto da
+  memoria. Anche local, Azure, GCS, SMB e WebDAV bufferizzano put/copy. Il limite ? `--max-buffered-put-bytes`, distinto da
   `--max-transfer-bytes`, che riguarda i trasferimenti in streaming.
 - `copy` rifiuta sorgente e destinazione uguali prima di qualunque mutazione.
 
@@ -83,13 +85,14 @@ restano in esecuzione finché non vengono fermati con `docker compose down`.
 ```powershell
 docker compose build storage-rust
 bash scripts/prepare-fixtures.sh
-docker compose run --rm --no-deps storage-rust
+bash scripts/prepare-extended-fixtures.sh
+docker compose -f docker-compose.yml -f compose.extended.yml run --rm --no-deps storage-rust
 ```
 
 La preparazione richiede Bash, OpenSSL e Docker Compose (su Windows usare
 WSL o la VM). Genera una CA temporanea per MinIO HTTPS e legge il fingerprint
 SSH della fixture. `verify.sh` abilita anche i test `ignored`, verifica le
-sette operazioni sui tre provider e controlla conflitti e limiti. Senza
+sette operazioni sui nove provider e controlla conflitti e limiti. Senza
 fixture, `cargo test` segnala esplicitamente i test d'integrazione esclusi.
 
 Per probe manuali:

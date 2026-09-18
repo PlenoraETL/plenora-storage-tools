@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.plenora.dev/storage/plenora-storage-azure-connection-v1.schema.json",
+  "title": "Plenora azure configuration v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "endpoint",
+    "account",
+    "container"
+  ],
+  "properties": {
+    "endpoint": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "format": "uri"
+    },
+    "account": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "container": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    }
+  }
+}

@@ -555,6 +555,30 @@ fn checked_in_docker_connections_match_their_provider_schemas() {
 
     for (filename, provider_schema) in [
         (
+            "local-connection.json",
+            "plenora-storage-local-connection-v1.schema.json",
+        ),
+        (
+            "ftps-connection.json",
+            "plenora-storage-ftps-connection-v1.schema.json",
+        ),
+        (
+            "azure-connection.json",
+            "plenora-storage-azure-connection-v1.schema.json",
+        ),
+        (
+            "gcs-connection.json",
+            "plenora-storage-gcs-connection-v1.schema.json",
+        ),
+        (
+            "smb-connection.json",
+            "plenora-storage-smb-connection-v1.schema.json",
+        ),
+        (
+            "webdav-connection.json",
+            "plenora-storage-webdav-connection-v1.schema.json",
+        ),
+        (
             "minio-connection.json",
             "plenora-storage-s3-connection-v1.schema.json",
         ),
@@ -601,6 +625,12 @@ fn checked_in_docker_connections_match_the_public_connection_schema() {
     let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
 
     for filename in [
+        "local-connection.json",
+        "ftps-connection.json",
+        "azure-connection.json",
+        "gcs-connection.json",
+        "smb-connection.json",
+        "webdav-connection.json",
         "minio-connection.json",
         "sftp-connection.json",
         "ftp-connection.json",

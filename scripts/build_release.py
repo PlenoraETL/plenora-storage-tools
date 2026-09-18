@@ -109,7 +109,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let credentials = Arc::new(EnvironmentCredentialResolver);
     engine.register_provider(Arc::new(plenora_storage_s3::S3Provider::new(credentials.clone())))?;
     engine.register_provider(Arc::new(plenora_storage_sftp::SftpProvider::new(credentials.clone())))?;
-    engine.register_provider(Arc::new(plenora_storage_ftp::FtpProvider::new(credentials)))?;
+    engine.register_provider(Arc::new(plenora_storage_ftp::FtpProvider::new(credentials.clone())))?;
+    engine.register_provider(Arc::new(plenora_storage_ftp::FtpProvider::new_ftps(credentials.clone())))?;
+    engine.register_provider(Arc::new(plenora_storage_providers::LocalProvider::new(credentials.clone())))?;
+    engine.register_provider(Arc::new(plenora_storage_providers::AzureProvider::new(credentials.clone())))?;
+    engine.register_provider(Arc::new(plenora_storage_providers::GcsProvider::new(credentials.clone())))?;
+    engine.register_provider(Arc::new(plenora_storage_providers::SmbProvider::new(credentials.clone())))?;
+    engine.register_provider(Arc::new(plenora_storage_providers::WebDavProvider::new(credentials.clone())))?;
     assert_eq!(engine.capabilities().operations.len(), 7);
     engine.close();
     assert!(engine.is_closed());
@@ -129,7 +135,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     with tarfile.open(archive_path, 'w:gz') as archive:
         archive.add(binary, arcname=binary_name)
         for name in ['README.md', 'LICENSE-MIT', 'LICENSE-APACHE', 'docs/release.md',
-                     'docs/contract-adoption.md', 'docs/release-readiness.md']:
+                     'docs/contract-adoption.md', 'docs/release-readiness.md', 'docs/provider-expansion.md',
+                     'crates/plenora-smb2/PROVENANCE.md', 'crates/plenora-smb2/LICENSE-MIT', 'crates/plenora-smb2/LICENSE-APACHE']:
             archive.add(ROOT / name, arcname=name)
     contracts = output / f'plenora-storage-contracts-{version}.tar.gz'
     with tarfile.open(contracts, 'w:gz') as archive:

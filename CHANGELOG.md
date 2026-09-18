@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.0
+
+- Add local filesystem, explicit FTPS, Azure Blob / ADLS Gen2 via Blob API,
+  encrypted SMB3, Google Cloud Storage JSON API and WebDAV on Rust and CLI.
+- Add versioned configuration contracts, host-resolved credentials and bounded
+  transfers; expose publication and create-if-absent guarantees per provider.
+- Preserve FTPS TLS data streams through the server acknowledgement and verify
+  transferred sizes. FTP copy checks the source before creating destination directories.
+- Reject unsafe raw listing keys, redirects, repeated continuation tokens and
+  partial WebDAV mutation responses; guard WebDAV deletion with strong ETags.
+- Add six-provider fixtures, concurrent-create and protocol-failure qualification,
+  and extend release gates to all nine providers on Linux and Windows.
+- Include a documented, narrowly patched SMB transport with upstream RustSec auditing.
+  Package all seven crates and validate the extracted artifacts.
+- Preserve 0.1.0 artifacts; cloud emulators do not qualify real cloud deployments.
+
 ## 0.1.0 — prepared for release
 
 - Add bounded CLI pagination within one process (`list --all`).

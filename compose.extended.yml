@@ -1,0 +1,29 @@
+services:
+  azure:
+    image: mcr.microsoft.com/azure-storage/azurite@sha256:647c63a91102a9d8e8000aab803436e1fc85fbb285e7ce830a82ee5d6661cf37
+    command: azurite-blob --blobHost 0.0.0.0 --skipApiVersionCheck --disableProductStyleUrl
+    ports: ["10000:10000"]
+  gcs:
+    image: fsouza/fake-gcs-server@sha256:3730da0e31f7e5186a90ec4899dc2c336104e7599df400411392ef17e684c31f
+    command: ["-scheme", "http", "-port", "4443", "-public-host", "gcs:4443", "-external-url", "http://gcs:4443"]
+    ports: ["4443:4443"]
+  ftps:
+    build: docker/extended
+    image: plenora-storage-extended-fixtures:0.2
+    command: ["ftps"]
+    ports: ["2122:21", "30100-30109:30100-30109"]
+    volumes: ["./.fixtures/extended:/certs:ro"]
+  webdav:
+    image: plenora-storage-extended-fixtures:0.2
+    command: ["webdav"]
+    ports: ["8088:8080"]
+  smb:
+    image: plenora-storage-extended-fixtures:0.2
+    command: ["smb"]
+    ports: ["1445:445"]
+  azure-init:
+    image: plenora-storage-extended-fixtures:0.2
+    command: ["azure-init"]
+  storage-rust:
+    environment:
+      PLENORA_EXTENDED_TEST: "1"
