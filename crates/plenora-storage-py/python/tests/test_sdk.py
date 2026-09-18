@@ -5,6 +5,7 @@ from pathlib import Path
 import tempfile
 import threading
 import unittest
+from types import MappingProxyType
 
 from plenora_storage import AsyncEngine, CancellationToken, Connection, Engine, EngineConfig, StorageError
 
@@ -122,6 +123,23 @@ class SDKTests(unittest.TestCase):
             engine.test(connection)
         self.assertEqual(caught.exception.code, 'CREDENTIAL_RESOLVER_FAILED')
         self.assertNotIn('sentinel', str(caught.exception))
+
+    def test_immutable_credential_mapping_is_resolved_only_on_use(self):
+        calls = []
+        def resolver(reference):
+            calls.append(reference)
+            return MappingProxyType({'username': 'fixture', 'password': 'fixture'})
+        connection = Connection('webdav', 'plenora-storage-webdav-connection-v1',
+                                {'endpoint': 'http://127.0.0.1:9/'}, 'vault:fixture')
+        with Engine(EngineConfig(allow_insecure_http=True, allow_private_network=True),
+                    credential_resolver=resolver) as engine:
+            engine.capabilities()
+            self.assertEqual(calls, [])
+            try:
+                engine.test(connection, timeout_ms=1000)
+            except StorageError as error:
+                self.assertNotEqual(error.code, 'CREDENTIAL_RESOLVER_FAILED')
+            self.assertEqual(calls, ['vault:fixture'])
 
     def test_limits_reject_upload_without_publication(self):
         with Engine(EngineConfig(max_transfer_bytes=1)) as engine, self.assertRaises(StorageError) as caught:

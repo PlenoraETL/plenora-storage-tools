@@ -90,8 +90,14 @@ class Engine:
                  credential_resolver: CredentialResolver | None = None):
         if credential_resolver is not None and not callable(credential_resolver):
             raise TypeError("credential_resolver must be callable")
+        # The public API accepts Mapping, while PyO3's BTreeMap conversion takes
+        # a concrete dict. Convert inside the callback so Rust also redacts any
+        # conversion exception, without resolving secrets during construction.
+        resolver = None
+        if credential_resolver is not None:
+            resolver = lambda reference: dict(credential_resolver(reference))
         try:
-            self._native = _native.Engine(_encode(asdict(config or EngineConfig())), credential_resolver)
+            self._native = _native.Engine(_encode(asdict(config or EngineConfig())), resolver)
         except ValueError as error:
             raise _translate(error) from None
 
