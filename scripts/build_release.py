@@ -131,6 +131,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         archive.add(binary, arcname=binary_name)
         for name in ['README.md', 'LICENSE-MIT', 'LICENSE-APACHE', 'docs/release.md',
                      'docs/contract-adoption.md', 'docs/release-readiness.md', 'docs/provider-expansion.md',
+                     'docs/STATO.md', 'docs/database-alignment.md', 'docs/architecture.md',
+                     'crates/plenora-storage-py/README.md',
                      'crates/plenora-smb2/PROVENANCE.md', 'crates/plenora-smb2/LICENSE-MIT', 'crates/plenora-smb2/LICENSE-APACHE']:
             archive.add(ROOT / name, arcname=name)
     contracts = output / f'plenora-storage-contracts-{version}.tar.gz'
