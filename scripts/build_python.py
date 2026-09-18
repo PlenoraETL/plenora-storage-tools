@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import tomllib
 import venv
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,7 +19,8 @@ def build(output, release=True):
     if release:
         command.append('--release')
     subprocess.run(command, cwd=ROOT, check=True)
-    wheels = sorted(output.glob('plenora_storage-*.whl'))
+    version = tomllib.loads((ROOT / 'Cargo.toml').read_text())['workspace']['package']['version']
+    wheels = sorted(output.glob(f'plenora_storage-{version}-*.whl'))
     if len(wheels) != 1:
         raise ValueError('expected exactly one storage wheel in the output directory')
     wheel = wheels[0]

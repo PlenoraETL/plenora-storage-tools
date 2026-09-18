@@ -11,8 +11,9 @@ repository.workspace = true
 readme = "../../README.md"
 
 [dependencies]
+hex.workspace = true
 async-trait.workspace = true
-plenora-storage-core = { path = "../plenora-storage-core", version = "0.2.1" }
+plenora-storage-core = { path = "../plenora-storage-core", version = "0.2.2" }
 russh.workspace = true
 russh-sftp.workspace = true
 serde.workspace = true
@@ -23,7 +24,7 @@ tokio.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 # Standalone SFTP builds must not rely on a TLS provider enabling this feature.
-aws-lc-rs = { version = "1.18", default-features = false, features = ["prebuilt-nasm"] }
+aws-lc-rs = { version = "1.18.1", default-features = false, features = ["prebuilt-nasm"] }
 
 [lints]
 workspace = true

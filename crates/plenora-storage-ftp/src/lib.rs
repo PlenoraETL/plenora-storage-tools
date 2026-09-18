@@ -22,7 +22,10 @@ use sha2::{Digest, Sha256};
 use suppaftp::{
     FtpError, Mode, Status,
     list::{File, ListParser},
-    tokio::{AsyncRustlsConnector, AsyncRustlsFtpStream as AsyncFtpStream},
+    tokio::{
+        AsyncRustlsConnector, AsyncRustlsFtpStream as AsyncFtpStream, AsyncRustlsStream,
+        TransferStream,
+    },
     types::FileType,
 };
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
@@ -433,9 +436,8 @@ impl StorageProvider for FtpProvider {
                 .control
                 .run(
                     async {
-                        remote
-                            .ftp
-                            .finalize_retr_stream(stream)
+                        stream
+                            .finish()
                             .await
                             .map_err(|error| map_ftp_error(error, ErrorPhase::Commit, true))
                     },
@@ -463,106 +465,95 @@ impl StorageProvider for FtpProvider {
         source: &mut (dyn AsyncRead + Send + Unpin),
         context: &OperationContext<'_>,
     ) -> StorageResult<TransferResult> {
-        let outcome =
-            async {
-                let mut parent_effect = false;
-                let result =
-                    async {
-                        if request
-                            .content_length
-                            .is_some_and(|length| length > context.policy.max_transfer_bytes)
-                        {
-                            return Err(transfer_limit_error()
-                                .with_outcome(RemoteEffect::None, RetryDisposition::Never));
-                        }
-                        validate_ftp_publication(request.overwrite, request.publication_policy)?;
-                        validate_key(&request.key)?;
-                        validate_file_metadata(request)?;
-                        let mut remote = context
-                            .control
-                            .run(
-                                self.connect(connection, context),
-                                ErrorPhase::Connect,
-                                false,
-                            )
-                            .await?;
-                        ensure_parent_directories(
-                            &mut remote.ftp,
-                            &request.key,
-                            context,
-                            &mut parent_effect,
-                        )
-                        .await?;
-                        let mut stream = context
-                            .control
-                            .run(
-                                async {
-                                    remote.ftp.put_with_stream(&request.key).await.map_err(
-                                        |error| map_ftp_error(error, ErrorPhase::Prepare, true),
-                                    )
-                                },
-                                ErrorPhase::Prepare,
-                                true,
-                            )
-                            .await?;
-                        let transfer = copy_with_control(source, &mut stream, context, true).await;
-                        let (bytes_transferred, digest) = match transfer {
-                            Ok(result) => result,
-                            Err(error) => {
-                                abort_transfer(&mut remote.ftp, stream).await;
-                                return Err(error);
-                            }
-                        };
-                        if request
-                            .content_length
-                            .is_some_and(|expected| expected != bytes_transferred)
-                        {
-                            abort_transfer(&mut remote.ftp, stream).await;
-                            return Err(StorageError::new(
-                                ErrorCategory::InvalidConfiguration,
-                                ErrorPhase::Commit,
-                                RemoteEffect::Partial,
-                                RetryDisposition::RequiresRecovery,
-                                "CONTENT_LENGTH_MISMATCH",
-                                "artifact length differs from declared content_length",
-                            )
-                            .with_provider(PROVIDER_ID));
-                        }
-                        // Keep the TLS data stream alive until the server acknowledges the
-                        // transfer. Dropping it during finalize can truncate buffered TLS
-                        // records on Windows even when the control channel returns 226.
-                        context
-                            .control
-                            .run(
-                                async {
-                                    remote.ftp.finalize_put_stream(&mut stream).await.map_err(
-                                        |error| map_ftp_error(error, ErrorPhase::Commit, true),
-                                    )
-                                },
-                                ErrorPhase::Commit,
-                                true,
-                            )
-                            .await?;
-                        let published = stat_file(&mut remote.ftp, &request.key, context)
-                            .await
-                            .map_err(|_| committed_verification_error())?;
-                        if published.size != bytes_transferred {
-                            return Err(committed_verification_error());
-                        }
-                        Ok(transfer_result(
-                            request.key.clone(),
-                            bytes_transferred,
-                            digest,
-                        ))
+        let outcome = async {
+            let mut parent_effect = false;
+            let result = async {
+                if request
+                    .content_length
+                    .is_some_and(|length| length > context.policy.max_transfer_bytes)
+                {
+                    return Err(transfer_limit_error()
+                        .with_outcome(RemoteEffect::None, RetryDisposition::Never));
+                }
+                validate_ftp_publication(request.overwrite, request.publication_policy)?;
+                validate_key(&request.key)?;
+                validate_file_metadata(request)?;
+                let mut remote = context
+                    .control
+                    .run(
+                        self.connect(connection, context),
+                        ErrorPhase::Connect,
+                        false,
+                    )
+                    .await?;
+                ensure_parent_directories(
+                    &mut remote.ftp,
+                    &request.key,
+                    context,
+                    &mut parent_effect,
+                )
+                .await?;
+                let mut stream = context
+                    .control
+                    .run(
+                        async {
+                            remote
+                                .ftp
+                                .put_with_stream(&request.key)
+                                .await
+                                .map_err(|error| map_ftp_error(error, ErrorPhase::Prepare, true))
+                        },
+                        ErrorPhase::Prepare,
+                        true,
+                    )
+                    .await?;
+                let transfer = copy_with_control(source, &mut stream, context, true).await;
+                let (bytes_transferred, digest) = match transfer {
+                    Ok(result) => result,
+                    Err(error) => {
+                        abort_transfer(&mut remote.ftp, stream).await;
+                        return Err(error);
                     }
-                    .await;
-                result.map_err(|error: StorageError| {
-                    error
-                        .with_preparation_effect(parent_effect)
-                        .with_provider(self.id())
-                })
+                };
+                if request
+                    .content_length
+                    .is_some_and(|expected| expected != bytes_transferred)
+                {
+                    abort_transfer(&mut remote.ftp, stream).await;
+                    return Err(StorageError::new(
+                        ErrorCategory::InvalidConfiguration,
+                        ErrorPhase::Commit,
+                        RemoteEffect::Partial,
+                        RetryDisposition::RequiresRecovery,
+                        "CONTENT_LENGTH_MISMATCH",
+                        "artifact length differs from declared content_length",
+                    )
+                    .with_provider(PROVIDER_ID));
+                }
+                context
+                    .control
+                    .run(finish_upload(stream), ErrorPhase::Commit, true)
+                    .await?;
+                let published = stat_file(&mut remote.ftp, &request.key, context)
+                    .await
+                    .map_err(|_| committed_verification_error())?;
+                if published.size != bytes_transferred {
+                    return Err(committed_verification_error());
+                }
+                Ok(transfer_result(
+                    request.key.clone(),
+                    bytes_transferred,
+                    digest,
+                ))
             }
             .await;
+            result.map_err(|error: StorageError| {
+                error
+                    .with_preparation_effect(parent_effect)
+                    .with_provider(self.id())
+            })
+        }
+        .await;
         outcome.map_err(|error: StorageError| error.with_provider(self.id()))
     }
 
@@ -727,17 +718,7 @@ impl StorageProvider for FtpProvider {
                     };
                 if let Err(error) = context
                     .control
-                    .run(
-                        async {
-                            destination_remote
-                                .ftp
-                                .finalize_put_stream(&mut destination)
-                                .await
-                                .map_err(|error| map_ftp_error(error, ErrorPhase::Commit, true))
-                        },
-                        ErrorPhase::Commit,
-                        true,
-                    )
+                    .run(finish_upload(destination), ErrorPhase::Commit, true)
                     .await
                 {
                     abort_transfer(&mut source_remote.ftp, source).await;
@@ -750,9 +731,8 @@ impl StorageProvider for FtpProvider {
                     .control
                     .run(
                         async {
-                            source_remote
-                                .ftp
-                                .finalize_retr_stream(source)
+                            source
+                                .finish()
                                 .await
                                 .map_err(|error| map_ftp_error(error, ErrorPhase::Cleanup, false))
                         },
@@ -1004,7 +984,9 @@ where
                     let file = ListParser::parse_mlsd(&line).map_err(|_| list_parse_error())?;
                     visit(file)?;
                 }
-                ftp.close_data_connection(reader.into_inner())
+                reader
+                    .into_inner()
+                    .finish()
                     .await
                     .map_err(|error| map_ftp_error(error, ErrorPhase::Read, false))
             },
@@ -1051,15 +1033,37 @@ async fn stat_file(
 /// must not keep a cancelled operation running without bound.
 const CLEANUP_BUDGET: Duration = Duration::from_secs(10);
 
+async fn finish_upload(mut stream: TransferStream<AsyncRustlsStream>) -> StorageResult<()> {
+    if matches!(stream.get_ref(), suppaftp::tokio::AsyncDataStream::Ssl(_)) {
+        // Keep the socket alive until the peer completes TLS shutdown. Dropping
+        // it immediately after our write shutdown can truncate queued data on
+        // Windows, even if the server subsequently reports a successful STOR.
+        stream
+            .shutdown()
+            .await
+            .map_err(|_| transfer_io_error(ErrorPhase::Commit, true))?;
+        let mut unexpected = [0_u8; 1];
+        if stream
+            .read(&mut unexpected)
+            .await
+            .map_err(|_| transfer_io_error(ErrorPhase::Commit, true))?
+            != 0
+        {
+            return Err(transfer_io_error(ErrorPhase::Commit, true));
+        }
+    }
+    stream
+        .finish()
+        .await
+        .map_err(|error| map_ftp_error(error, ErrorPhase::Commit, true))
+}
+
 /// Tears down an open data transfer.
 ///
 /// `ABOR` only closes the data connection: FTP does not promise the partially
 /// written object is removed, so the remote outcome the caller already reported
 /// stays ambiguous and is left untouched.
-async fn abort_transfer<S>(ftp: &mut AsyncFtpStream, stream: S)
-where
-    S: AsyncRead + AsyncWrite + Send + Unpin + 'static,
-{
+async fn abort_transfer(ftp: &mut AsyncFtpStream, stream: TransferStream<AsyncRustlsStream>) {
     let _ = tokio::time::timeout(CLEANUP_BUDGET, ftp.abort(stream)).await;
 }
 
@@ -1164,7 +1168,7 @@ fn format_system_time(value: SystemTime) -> Option<String> {
 fn transfer_result(key: String, bytes_transferred: u64, digest: Sha256) -> TransferResult {
     let checksum = IntegrityMetadata {
         algorithm: "sha256".to_owned(),
-        value: format!("{:x}", digest.finalize()),
+        value: hex::encode(digest.finalize()),
     };
     TransferResult {
         key,

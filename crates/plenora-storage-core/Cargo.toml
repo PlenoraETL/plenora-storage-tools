@@ -14,6 +14,7 @@ readme = "../../README.md"
 exclude = ["tests/contracts.rs", "examples/validate_adoption.rs"]
 
 [dependencies]
+hex.workspace = true
 async-trait.workspace = true
 serde.workspace = true
 serde_json.workspace = true

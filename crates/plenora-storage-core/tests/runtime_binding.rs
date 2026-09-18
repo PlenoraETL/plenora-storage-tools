@@ -39,7 +39,7 @@ impl MemoryProvider {
     }
 
     fn transfer(key: &str, bytes: &[u8], content_type: Option<String>) -> TransferResult {
-        let sha256 = format!("{:x}", Sha256::digest(bytes));
+        let sha256 = hex::encode(Sha256::digest(bytes));
         TransferResult {
             key: key.to_owned(),
             bytes_transferred: bytes.len() as u64,
@@ -461,7 +461,7 @@ fn artifact_metadata(bytes: &[u8]) -> Value {
     json!({
         "content_type": "application/octet-stream",
         "size": bytes.len(),
-        "sha256": format!("{:x}", Sha256::digest(bytes))
+        "sha256": hex::encode(Sha256::digest(bytes))
     })
 }
 

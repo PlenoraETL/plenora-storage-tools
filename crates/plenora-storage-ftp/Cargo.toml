@@ -11,8 +11,9 @@ repository.workspace = true
 readme = "../../README.md"
 
 [dependencies]
+hex.workspace = true
 async-trait.workspace = true
-plenora-storage-core = { path = "../plenora-storage-core", version = "0.2.1" }
+plenora-storage-core = { path = "../plenora-storage-core", version = "0.2.2" }
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

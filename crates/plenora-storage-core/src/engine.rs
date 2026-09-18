@@ -382,7 +382,7 @@ impl Engine {
         digest.update(start_after.as_bytes());
         digest.update(nonce.to_le_bytes());
         digest.update(std::process::id().to_le_bytes());
-        let token = format!("cursor://{:x}", digest.finalize());
+        let token = format!("cursor://{}", hex::encode(digest.finalize()));
         let mut cursors = self.cursors.lock().map_err(|_| {
             StorageError::new(
                 ErrorCategory::Internal,
@@ -426,7 +426,7 @@ fn connection_fingerprint(connection: &ProviderConnection) -> StorageResult<Stri
             "storage connection cannot be canonicalized for cursor scope",
         )
     })?;
-    Ok(format!("{:x}", Sha256::digest(encoded)))
+    Ok(hex::encode(Sha256::digest(encoded)))
 }
 
 fn cursor_error(code: &'static str, message: &'static str) -> StorageError {

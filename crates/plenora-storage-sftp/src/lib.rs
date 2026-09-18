@@ -22,7 +22,7 @@ use plenora_storage_core::{
 };
 use russh::{
     client,
-    keys::{HashAlg, PublicKey},
+    keys::{HashAlg, PublicKeyOrCertificate},
 };
 use russh_sftp::{
     client::{RawSftpSession, SftpSession, error::Error as SftpError, fs::Metadata},
@@ -157,12 +157,16 @@ impl client::Handler for SshClient {
 
     async fn check_server_key(
         &mut self,
-        server_public_key: &PublicKey,
+        server_public_key: &PublicKeyOrCertificate,
     ) -> Result<bool, Self::Error> {
+        // This connection contract pins a raw host key, not a certificate authority.
+        let PublicKeyOrCertificate::PublicKey { key, .. } = server_public_key else {
+            return Ok(false);
+        };
         if self.allow_unverified {
             return Ok(true);
         }
-        let actual = server_public_key.fingerprint(HashAlg::Sha256).to_string();
+        let actual = key.fingerprint(HashAlg::Sha256).to_string();
         Ok(self
             .expected_fingerprint
             .as_ref()
@@ -966,7 +970,7 @@ fn temporary_path(destination: &str) -> String {
     digest.update(std::process::id().to_le_bytes());
     digest.update(nonce.to_le_bytes());
     digest.update(elapsed.to_le_bytes());
-    let unique = format!("{:x}", digest.finalize());
+    let unique = hex::encode(digest.finalize());
     format!("{destination}.plenora-tmp-{}", &unique[..32])
 }
 
@@ -1183,7 +1187,7 @@ fn format_system_time(value: SystemTime) -> Option<String> {
 fn transfer_result(key: String, bytes_transferred: u64, digest: Sha256) -> TransferResult {
     let checksum = IntegrityMetadata {
         algorithm: "sha256".to_owned(),
-        value: format!("{:x}", digest.finalize()),
+        value: hex::encode(digest.finalize()),
     };
     TransferResult {
         key,
@@ -1421,6 +1425,39 @@ mod tests {
         Arc,
         atomic::{AtomicUsize, Ordering},
     };
+
+    #[tokio::test]
+    async fn host_key_pin_is_required_unless_explicitly_disabled() {
+        use russh::{
+            client::Handler as _,
+            keys::{HashAlg, PublicKey, PublicKeyOrCertificate},
+        };
+
+        let key = PublicKey::from_openssh(
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILM+rvN+ot98qgEN796jTiQfZfG1KaT0PtFDJ/XFSqti",
+        )
+        .expect("public test key");
+        let fingerprint = key.fingerprint(HashAlg::Sha256).to_string();
+        let server_key = PublicKeyOrCertificate::from(key);
+        for (expected_fingerprint, allow_unverified, accepted) in [
+            (Some(fingerprint), false, true),
+            (Some("SHA256:wrong-key".to_owned()), false, false),
+            (None, false, false),
+            (None, true, true),
+        ] {
+            let mut handler = super::SshClient {
+                expected_fingerprint,
+                allow_unverified,
+            };
+            assert_eq!(
+                handler
+                    .check_server_key(&server_key)
+                    .await
+                    .expect("host key check"),
+                accepted
+            );
+        }
+    }
 
     #[test]
     fn keys_cannot_escape_the_remote_root() {

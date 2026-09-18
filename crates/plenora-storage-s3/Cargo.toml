@@ -11,10 +11,11 @@ repository.workspace = true
 readme = "../../README.md"
 
 [dependencies]
+hex.workspace = true
 async-trait.workspace = true
 futures-util.workspace = true
 object_store.workspace = true
-plenora-storage-core = { path = "../plenora-storage-core", version = "0.2.1" }
+plenora-storage-core = { path = "../plenora-storage-core", version = "0.2.2" }
 reqwest.workspace = true
 rustls.workspace = true
 quick-xml.workspace = true

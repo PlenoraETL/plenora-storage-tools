@@ -490,7 +490,7 @@ pub fn metadata(key: &str, size: u64) -> ObjectMetadata {
     }
 }
 fn transfer(key: &str, size: u64, digest: Sha256) -> TransferResult {
-    let hash = format!("{:x}", digest.finalize());
+    let hash = hex::encode(digest.finalize());
     TransferResult {
         key: key.to_owned(),
         bytes_transferred: size,

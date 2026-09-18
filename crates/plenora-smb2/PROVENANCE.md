@@ -10,4 +10,10 @@ Keep this narrowly scoped fork until an upstream release incorporates the fix. R
 
 Mechanical adjustments: rustfmt formatting and three scoped lint annotations for upstream test/platform code; no additional behavior changes.
 
+In Plenora 0.2.2, dependency requirements were refreshed to current stable releases,
+including CCM 0.6.1 (replacing the release candidate) and lz4_flex 0.14.0.
+The declared Rust minimum follows the workspace at 1.92, with equivalent
+`is_multiple_of` substitutions required by Clippy at that minimum. The upstream archive
+hash above identifies the original source, not this modified package.
+
 Tests: removed an upstream manual test hardcoded to an unrelated private NAS; added a wire-capability regression to the existing negotiation test. Plenora tests SMB against its dedicated Samba fixture.

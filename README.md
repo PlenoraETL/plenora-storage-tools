@@ -5,6 +5,7 @@ contratti pubblici: S3-compatible, SFTP, FTP, filesystem locale, FTPS,
 Azure Blob / ADLS Gen2, SMB, Google Cloud Storage e WebDAV.
 
 L'inventario corrente deriva dal codice in [docs/STATO.md](docs/STATO.md).
+L'[aggiornamento 0.2.2](docs/dependency-update-0.2.2.md) descrive le nuove dipendenze e le migrazioni.
 Il [modello di qualità](docs/database-alignment.md) segue Database Tools.
 Configurazione, credenziali, garanzie e sistemi effettivamente verificati sono
 nella [guida ai nuovi provider](docs/provider-expansion.md).

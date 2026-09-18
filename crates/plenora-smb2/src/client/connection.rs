@@ -5239,7 +5239,7 @@ pub(crate) fn split_compound(data: &[u8]) -> Result<Vec<Vec<u8>>> {
             )));
         }
 
-        if !results.is_empty() && offset % 8 != 0 {
+        if !results.is_empty() && !offset.is_multiple_of(8) {
             return Err(Error::invalid_data(format!(
                 "compound response at offset {} is not 8-byte aligned -- must disconnect",
                 offset,

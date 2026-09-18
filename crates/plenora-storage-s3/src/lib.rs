@@ -989,7 +989,7 @@ fn unrepresentable_key_error() -> StorageError {
 fn sha256_metadata(digest: Sha256) -> IntegrityMetadata {
     IntegrityMetadata {
         algorithm: "sha256".to_owned(),
-        value: format!("{:x}", digest.finalize()),
+        value: hex::encode(digest.finalize()),
     }
 }
 
