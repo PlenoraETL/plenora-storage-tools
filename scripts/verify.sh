@@ -83,4 +83,9 @@ python3 scripts/qualify_commit_faults.py
 python3 scripts/qualify_extended_faults.py
 if [ "${PLENORA_EXTENDED_TEST:-0}" = "1" ]; then
   python3 scripts/qualify_extended.py
+  python3 scripts/build_python.py --debug
+  version="$(python3 scripts/release_version.py)"
+  target/python-sdk-test/bin/python scripts/qualify_python.py \
+    --wheel target/python-wheels/plenora_storage-"${version}"-*.whl \
+    --output target/release-readiness/python-qualification.json
 fi

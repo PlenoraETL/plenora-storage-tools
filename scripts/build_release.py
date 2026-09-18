@@ -10,6 +10,9 @@ import tarfile
 import tempfile
 import sys
 
+from build_python import build as build_python
+from render_sbom import render as render_sbom
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'contracts/upstream'))
 from conformance_checks import adoption_errors
 
@@ -47,6 +50,8 @@ def main():
     args = parser.parse_args()
     metadata = json.loads(run('cargo', 'metadata', '--locked', '--offline', '--format-version', '1', '--no-deps', capture_output=True, text=True).stdout)
     version = metadata['packages'][0]['version']
+    # Python is distributed as a tested wheel, not a Cargo consumer dependency.
+    metadata['packages'] = [p for p in metadata['packages'] if p['name'] != 'plenora-storage-py']
     target = next(line.split(': ', 1)[1] for line in run('rustc', '-vV', capture_output=True, text=True).stdout.splitlines() if line.startswith('host: '))
     target_dir = Path(metadata['target_directory'])
     output = ROOT / 'dist' / version / target
@@ -61,7 +66,7 @@ def main():
     # Cargo 1.92's temporary workspace registry can fail on Windows with
     # "no hash listed" for unpublished sibling crates. Verify the extracted
     # archives below, including the CLI, without depending on that registry.
-    command = ['cargo', 'package', '--workspace', '--locked', '--offline', '--no-verify']
+    command = ['cargo', 'package', '--workspace', '--exclude', 'plenora-storage-py', '--locked', '--offline', '--no-verify']
     if args.allow_dirty:
         command.append('--allow-dirty')
     run(*command)
@@ -103,19 +108,9 @@ def main():
         (consumer / 'Cargo.toml').write_text(manifest, encoding='utf-8')
         (consumer / 'src').mkdir()
         (consumer / 'src/main.rs').write_text('''use std::sync::Arc;
-use plenora_storage_core::{Engine, EngineConfig, EnvironmentCredentialResolver};
+use plenora_storage_core::{EngineConfig, EnvironmentCredentialResolver};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut engine = Engine::new(EngineConfig::default());
-    let credentials = Arc::new(EnvironmentCredentialResolver);
-    engine.register_provider(Arc::new(plenora_storage_s3::S3Provider::new(credentials.clone())))?;
-    engine.register_provider(Arc::new(plenora_storage_sftp::SftpProvider::new(credentials.clone())))?;
-    engine.register_provider(Arc::new(plenora_storage_ftp::FtpProvider::new(credentials.clone())))?;
-    engine.register_provider(Arc::new(plenora_storage_ftp::FtpProvider::new_ftps(credentials.clone())))?;
-    engine.register_provider(Arc::new(plenora_storage_providers::LocalProvider::new(credentials.clone())))?;
-    engine.register_provider(Arc::new(plenora_storage_providers::AzureProvider::new(credentials.clone())))?;
-    engine.register_provider(Arc::new(plenora_storage_providers::GcsProvider::new(credentials.clone())))?;
-    engine.register_provider(Arc::new(plenora_storage_providers::SmbProvider::new(credentials.clone())))?;
-    engine.register_provider(Arc::new(plenora_storage_providers::WebDavProvider::new(credentials.clone())))?;
+    let engine = plenora_storage_engine::build_engine(EngineConfig::default(), Arc::new(EnvironmentCredentialResolver))?;
     assert_eq!(engine.capabilities().operations.len(), 7);
     engine.close();
     assert!(engine.is_closed());
@@ -144,6 +139,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     filter=lambda member: None if '__pycache__' in Path(member.name).parts else member)
 
     files = [binary, archive_path, contracts] + [output / p.name for p in packages]
+    files.extend(build_python(output))
+    sbom_path = output / 'storage-sbom.cdx.json'
+    sbom_path.write_text(json.dumps(render_sbom(files), indent=2) + '\n', encoding='utf-8')
+    files.append(sbom_path)
     source = json.loads((ROOT / 'contracts/upstream/source.json').read_text())
     adoption = {
         'schema_version': 4, 'component': 'plenora-storage-tools',

@@ -1,12 +1,10 @@
+#![cfg(all(feature = "s3", feature = "sftp", feature = "ftp"))]
 use std::{collections::BTreeMap, sync::Arc};
 
 use plenora_storage_core::{
     CredentialMaterial, CredentialResolver, Engine, EngineConfig, ExecutionControl,
     ProviderConnection, PublicationPolicy, PutRequest, RemoteEffect, StorageResult,
 };
-use plenora_storage_ftp::FtpProvider;
-use plenora_storage_s3::S3Provider;
-use plenora_storage_sftp::SftpProvider;
 
 struct UnreachableCredentials;
 
@@ -17,18 +15,7 @@ impl CredentialResolver for UnreachableCredentials {
 }
 
 fn engine(policy: EngineConfig) -> Engine {
-    let mut engine = Engine::new(policy);
-    let credentials = Arc::new(UnreachableCredentials);
-    engine
-        .register_provider(Arc::new(S3Provider::new(credentials.clone())))
-        .unwrap();
-    engine
-        .register_provider(Arc::new(SftpProvider::new(credentials.clone())))
-        .unwrap();
-    engine
-        .register_provider(Arc::new(FtpProvider::new(credentials)))
-        .unwrap();
-    engine
+    plenora_storage_engine::build_engine(policy, Arc::new(UnreachableCredentials)).unwrap()
 }
 
 fn connection(provider: &str, config: serde_json::Value) -> ProviderConnection {

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.1
+
+- Share application composition and file transfers through `plenora-storage-engine`.
+- Select any provider subset with Cargo features; verify isolated builds and discovery.
+- Add a typed Python SDK backed by PyO3, synchronous and asyncio engines,
+  host credential callbacks, cancellation, deadlines and staged file downloads.
+- Build and test installed Python wheels, generate the current product inventory,
+  and include a CycloneDX dependency graph and artifact hashes in release packaging.
+- Align quality policy and executable CI gates with Database Tools.
+
 ## 0.2.0
 
 - Add local filesystem, explicit FTPS, Azure Blob / ADLS Gen2 via Blob API,

@@ -2,13 +2,14 @@ use crate::common::{
     Backend, ProviderFactory, Reader, failure, invalid, io_error, limit_error, metadata, page,
     parse, select,
 };
+use crate::keys::{portable_key, stage_name};
 use async_trait::async_trait;
 use bytes::Bytes;
 use cap_std::fs::{Dir, OpenOptions};
 use plenora_storage_core::{
     CredentialResolver, EngineConfig, ErrorCategory, ErrorPhase, ObjectMetadata, OperationContext,
     ProviderConnection, ProviderListRequest, ProviderListResult, PutRequest, RemoteEffect,
-    RetryDisposition, StorageResult, directory_may_contain, validate_object_key,
+    RetryDisposition, StorageResult, directory_may_contain,
 };
 use serde::Deserialize;
 use std::{collections::BTreeMap, io::Write, path::Path, sync::Arc};
@@ -272,42 +273,4 @@ async fn blocking<T: Send + 'static>(
     tokio::task::spawn_blocking(f)
         .await
         .map_err(|_| failure(ErrorCategory::Internal, ErrorPhase::Commit, true))?
-}
-pub fn stage_name() -> String {
-    use std::sync::atomic::{AtomicU64, Ordering};
-    static NONCE: AtomicU64 = AtomicU64::new(0);
-    let time = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    format!(
-        ".plenora-stage-{}-{time}-{}",
-        std::process::id(),
-        NONCE.fetch_add(1, Ordering::Relaxed)
-    )
-}
-pub fn portable_key(key: &str) -> StorageResult<()> {
-    validate_object_key(key)?;
-    for part in key.split('/') {
-        let stem = part
-            .split('.')
-            .next()
-            .unwrap_or_default()
-            .to_ascii_uppercase();
-        if part.ends_with(['.', ' '])
-            || part.chars().any(|connection| {
-                connection.is_control()
-                    || "<>:\"|?*".contains(connection)
-                    || ('\u{f000}'..='\u{f0ff}').contains(&connection)
-            })
-            || matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
-            || (stem.len() == 4
-                && (stem.starts_with("COM") || stem.starts_with("LPT"))
-                && stem.as_bytes()[3].is_ascii_digit())
-            || part.starts_with(".plenora-stage-")
-        {
-            return Err(invalid("FILESYSTEM_KEY_INVALID"));
-        }
-    }
-    Ok(())
 }

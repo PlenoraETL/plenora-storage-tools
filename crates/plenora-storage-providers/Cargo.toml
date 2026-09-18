@@ -9,24 +9,32 @@ authors.workspace = true
 repository.workspace = true
 readme = "../../README.md"
 
+[features]
+default = ["full"]
+full = ["local", "azure", "gcs", "smb", "webdav"]
+local = ["dep:cap-std"]
+azure = ["dep:object_store", "dep:reqwest", "dep:rustls", "dep:quick-xml", "dep:url"]
+gcs = ["dep:reqwest", "dep:rustls", "dep:url"]
+smb = ["dep:smb2"]
+webdav = ["dep:reqwest", "dep:rustls", "dep:quick-xml", "dep:url", "dep:percent-encoding"]
+
 [dependencies]
 async-trait.workspace = true
 bytes.workspace = true
-percent-encoding = "2.3"
-cap-std.workspace = true
+percent-encoding = { version = "2.3", optional = true }
+cap-std = { workspace = true, optional = true }
 futures-util.workspace = true
-object_store = { workspace = true, features = ["azure"] }
-plenora-storage-core = { path = "../plenora-storage-core", version = "0.2.0" }
-quick-xml.workspace = true
-reqwest.workspace = true
-rustls.workspace = true
+object_store = { version = "0.14.1", default-features = false, features = ["azure"], optional = true }
+plenora-storage-core = { path = "../plenora-storage-core", version = "0.2.1" }
+quick-xml = { workspace = true, optional = true }
+reqwest = { workspace = true, features = ["rustls"], optional = true }
+rustls = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
-smb2.workspace = true
-time.workspace = true
+smb2 = { workspace = true, optional = true }
 tokio.workspace = true
-url.workspace = true
+url = { workspace = true, optional = true }
 
 [lints]
 workspace = true

@@ -75,7 +75,24 @@ fn capabilities_are_machine_readable_and_cli_only() {
     let operations = envelope["result"]["operations"]
         .as_array()
         .expect("operations must be an array");
-    assert_eq!(operations.len(), 7);
+    assert_eq!(
+        operations.len(),
+        if cfg!(any(
+            feature = "local",
+            feature = "s3",
+            feature = "sftp",
+            feature = "ftp",
+            feature = "ftps",
+            feature = "azure",
+            feature = "gcs",
+            feature = "smb",
+            feature = "webdav"
+        )) {
+            7
+        } else {
+            0
+        }
+    );
     assert!(operations.iter().all(|operation| {
         operation["status"] == "available" && operation["surfaces"] == serde_json::json!(["cli"])
     }));

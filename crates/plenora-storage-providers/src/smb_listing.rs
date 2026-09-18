@@ -1,7 +1,7 @@
 //! Bounded SMB directory enumeration, without collecting a whole remote directory.
 use crate::{
     common::{failure, invalid, limit_error, metadata, select},
-    local::portable_key,
+    keys::portable_key,
 };
 use plenora_storage_core::{
     ErrorCategory, ErrorPhase, ObjectMetadata, ProviderListRequest, StorageResult,

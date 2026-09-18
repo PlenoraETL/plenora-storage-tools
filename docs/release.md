@@ -1,6 +1,6 @@
 # Qualifica e distribuzione
 
-La versione 0.2.0 riguarda Rust e CLI con nove provider; la [matrice](provider-expansion.md) descrive i sei aggiunti. Gli
+La release corrente comprende Rust, CLI e SDK Python; la [matrice](provider-expansion.md) descrive i sei aggiunti. Gli
 artefatti preparati diventano distribuibili quando `release-qualification.json`
 registra `qualified_for_publication` per i loro digest. Non pubblicare un
 artefatto prodotto da un checkout modificato o privo delle evidenze richieste.
@@ -26,8 +26,8 @@ artefatto prodotto da un checkout modificato o privo delle evidenze richieste.
 7. Ripetere le verifiche CLI sul binario finale, mantenendone il digest.
    `qualify_cli.py` copre i tre provider; `qualify_commit_faults.py` esercita
    timeout e SIGTERM durante il completamento multipart nella fixture Linux.
-8. Riunire i due target sotto `dist/0.2.0/` e chiudere con
-   `python scripts/qualify_release.py dist/0.2.0 --evidence <directory-log>`.
+8. Riunire i due target sotto `dist/<version>/` e chiudere con
+   `python scripts/qualify_release.py dist/<version> --evidence <directory-log>`.
    Il gate richiede `audit.json`, `deny.log` e i log Rust dei due target
    denominati `<target>-tests.log`. Nei target devono essere presenti
    `qualification.json`, `cli-regressions.json`, `extended-qualification.json`,
@@ -45,7 +45,7 @@ dal pacchetto core; i contratti sono distribuiti in un archivio separato.
 
 La fase di packaging usa `--no-verify` perché Cargo 1.92 su Windows può
 fallire nel registro temporaneo dei crate interni non pubblicati con
-`no hash listed`. La verifica successiva estrae i sette archivi in una
+`no hash listed`. La verifica successiva estrae gli archivi Cargo in una
 directory temporanea, compila ed esegue un consumer dei crate Rust,
 poi compila la CLI estratta con patch locali per quei medesimi archivi.
 La verifica non usa i sorgenti dei crate nel checkout.
@@ -70,8 +70,9 @@ Non è una firma digitale né una promessa di build identiche bit per bit.
 - MinIO/OpenSSH/Pure-FTPd sono le implementazioni testate, con immagini bloccate
   per digest nel compose. Non estendere il claim ad AWS o ad altri server senza
   eseguire la matrice del documento release-readiness.
-- FTP è in chiaro e richiede autorizzazione esplicita. FTPS e autenticazione SSH
-  tramite chiave privata non sono implementati; SFTP usa password e pin SHA-256.
+- FTP è in chiaro e richiede autorizzazione esplicita. FTPS esplicito verifica
+  il certificato TLS; SFTP usa password e pin SHA-256. L'autenticazione SSH
+  tramite chiave privata non è implementata.
 - Il root remoto è un namespace applicativo, non una sandbox contro symlink o
   hardlink ostili. Il server deve applicare isolamento/chroot e permessi corretti.
 - Le deadline sono cooperative. `unknown` richiede verifica dello stato remoto,
@@ -102,3 +103,16 @@ La ricevuta `release-qualification.json` lega anche i gate operativi al commit
 finale. Verificare prima `SHA256SUMS` della versione, poi quelli dei singoli
 target: i manifest, incluso quello di adozione, sono nella catena dei checksum.
 La pubblicazione è un passo separato dalla build e dalla qualifica.
+
+## Gate aggiunti dal modello Database Tools
+
+`scripts/check_features.py` verifica ogni selezione di provider, inclusa la build
+senza provider. `scripts/check_docs.py` controlla lo stato generato e le versioni.
+`python -m unittest discover -s scripts/tests` verifica l'inventario SBOM.
+Il packaging richiede `maturin==1.15.0`, costruisce la wheel con `build_python.py`
+e ne esegue i test dopo installazione in un ambiente isolato. Wheel e log hanno
+digest nel manifest. La qualifica Python live è eseguita da `qualify_python.py`
+sulla wheel finale per ciascun target. Non riutilizzare report di una wheel diversa.
+
+`storage-sbom.cdx.json` comprende il grafo Cargo.lock e i digest degli artefatti;
+la sua presenza non sostituisce `cargo audit` o l'audit del nome upstream SMB.

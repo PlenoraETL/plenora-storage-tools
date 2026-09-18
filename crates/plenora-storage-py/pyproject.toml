@@ -1,0 +1,21 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "plenora-storage"
+version = "0.2.1"
+description = "Provider-neutral storage SDK backed by the Plenora Rust engine"
+requires-python = ">=3.10"
+license = { text = "MIT OR Apache-2.0" }
+readme = "README.md"
+authors = [{ name = "PlenoraETL contributors" }]
+
+[project.urls]
+Repository = "https://github.com/PlenoraETL/plenora-storage-tools"
+
+[tool.maturin]
+python-source = "python"
+module-name = "plenora_storage._native"
+features = ["pyo3/extension-module"]
+include = ["python/plenora_storage/py.typed", "python/plenora_storage/*.pyi"]

@@ -1,13 +1,14 @@
 # plenora-storage-tools
 
-Libreria Rust e CLI per accedere a nove sistemi di storage con gli stessi
+Libreria Rust, CLI e SDK Python per accedere a nove sistemi di storage con gli stessi
 contratti pubblici: S3-compatible, SFTP, FTP, filesystem locale, FTPS,
 Azure Blob / ADLS Gen2, SMB, Google Cloud Storage e WebDAV.
 
-La versione 0.2.0 aggiunge sei provider mantenendo le sette operazioni v1.
+L'inventario corrente deriva dal codice in [docs/STATO.md](docs/STATO.md).
+Il [modello di qualità](docs/database-alignment.md) segue Database Tools.
 Configurazione, credenziali, garanzie e sistemi effettivamente verificati sono
 nella [guida ai nuovi provider](docs/provider-expansion.md).
-La qualifica della release ? separata dalla build:
+La qualifica della release è separata dalla build:
 [criteri di distribuzione](docs/release-readiness.md).
 
 ## Superfici iniziali
@@ -17,7 +18,7 @@ La qualifica della release ? separata dalla build:
 | Rust | disponibile v1 | `plenora-storage-core` + adapter registrati |
 | CLI | disponibile v1 | `plenora-storage` |
 | Runtime | disponibile v1 | binding transport-neutral; adapter di trasporto posseduto dal consumer |
-| Python SDK | non richiesta | fuori dal profilo storage v1 |
+| Python SDK | sync e asyncio | wheel `plenora-storage`; [guida](crates/plenora-storage-py/README.md) |
 
 Le operazioni iniziali sono `storage.test`, `storage.list`, `storage.stat`,
 `storage.get`, `storage.put`, `storage.copy` e `storage.delete`. Il core non
@@ -133,7 +134,8 @@ MIT OR Apache-2.0; testi inclusi in ogni crate.
 ## Candidati di release
 
 `cargo fetch --locked`, poi `python scripts/build_release.py` producono binari,
-cinque crate, contratti e SHA-256 in `dist/`. Il flag `--allow-dirty` serve solo
+crate Rust, wheel Python testata, SBOM, contratti e SHA-256 in `dist/`. Installare
+prima `maturin==1.15.0`. Il flag `--allow-dirty` serve solo
 per candidati locali da modifiche non committate. La verifica compila un
 consumer esterno e la CLI dagli archivi estratti. La procedura operativa e i
 limiti supportati sono in [docs/release.md](docs/release.md).

@@ -12,7 +12,7 @@ readme = "../../README.md"
 
 [dependencies]
 async-trait.workspace = true
-plenora-storage-core = { path = "../plenora-storage-core", version = "0.2.0" }
+plenora-storage-core = { path = "../plenora-storage-core", version = "0.2.1" }
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

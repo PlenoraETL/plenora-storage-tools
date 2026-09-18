@@ -5,7 +5,7 @@ Il riferimento immutabile è `plenora-contracts` alla revisione
 `plenora-storage-tools-profile-v1`. Gli schemi comuni copiati in
 `contracts/upstream` mantengono gli identificatori originali.
 
-La release 0.1.0 adotta le sette operazioni su Rust, CLI e Runtime Binding 1.0.
+Il profilo storage adottato comprende le sette operazioni su Rust, CLI e Runtime Binding 1.0.
 Il binding runtime è incluso nel crate core: non richiede un servizio runtime
 distribuito separatamente né un adapter di trasporto posseduto da questa libreria.
 Il composition root del consumer mantiene autorizzazione, risoluzione di
@@ -21,7 +21,7 @@ segreti e artifact, trasporto e lifecycle.
 | Runtime Binding v1 | RT-001–RT-015: route, versioni, content type, UUID canonici, controlli, artifact, risultati ed errori completi | `core/tests/runtime_binding.rs`, eseguito anche dall'archivio Cargo estratto |
 
 Non sono dichiarate deviazioni dai sei contratti nel perimetro descritto.
-Python SDK, trasporto runtime del consumer, FTPS, autenticazione SSH a chiave,
+La certificazione del profilo Python, trasporto runtime del consumer, autenticazione SSH a chiave,
 compatibilità AWS e SLO prestazionali non sono superfici o garanzie adottate.
 FTP non offre pubblicazione atomica o create-if-absent: discovery e rifiuto
 anticipato esplicitano queste limitazioni, come previsto dal profilo.
@@ -40,7 +40,7 @@ responsabile della generazione di message ID unici.
 
 `scripts/build_release.py` crea `adoption-manifest-v4.json`, lo valida contro
 lo schema bloccato e applica i controlli semantici upstream. I digest identificano
-i cinque crate, il binario e il binding runtime contenuto nel core; non un
+i crate Rust distribuiti, il binario e il binding runtime contenuto nel core; non un
 branch o un percorso di sorgenti. Lo script compila solo gli archivi estratti
 per la verifica del consumer ed esegue la suite runtime dal core distribuito.
 
@@ -54,3 +54,7 @@ Le prove di guasto coprono commit S3 ritardato e risposta persa, sia con
 deadline sia con SIGTERM, e commit SFTP interrotto prima/dopo pubblicazione.
 Non costituiscono una dimostrazione contro ogni guasto del server o filesystem;
 gli esiti non dimostrabili restano `unknown` e richiedono recovery.
+
+Lo SDK Python è distribuito e testato separatamente nella wheel; non viene
+aggiunto al manifest di adozione storage v1 come superficie certificata senza
+le prove del relativo profilo. Vedere [allineamento](database-alignment.md).

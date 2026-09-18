@@ -66,6 +66,8 @@ pub struct StorageError {
     pub remote_effect: RemoteEffect,
     pub retry: RetryDisposition,
     pub code: String,
+    /// Public operational context only: never payload bytes, credentials,
+    /// connection strings or untrusted server/callback exception text.
     pub message: String,
     pub provider: Option<String>,
     #[serde(default)]

@@ -1,0 +1,2 @@
+maturin==1.15.0
+jsonschema==4.26.0

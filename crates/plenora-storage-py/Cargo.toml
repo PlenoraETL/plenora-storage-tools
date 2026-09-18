@@ -1,0 +1,40 @@
+[package]
+name = "plenora-storage-py"
+description = "Python bindings for the Plenora storage engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "plenora_storage_native"
+crate-type = ["cdylib"]
+test = false
+doctest = false
+
+[features]
+default = ["full"]
+full = ["local", "s3", "sftp", "ftp", "ftps", "azure", "gcs", "smb", "webdav"]
+local = ["plenora-storage-engine/local"]
+s3 = ["plenora-storage-engine/s3"]
+sftp = ["plenora-storage-engine/sftp"]
+ftp = ["plenora-storage-engine/ftp"]
+ftps = ["plenora-storage-engine/ftps"]
+azure = ["plenora-storage-engine/azure"]
+gcs = ["plenora-storage-engine/gcs"]
+smb = ["plenora-storage-engine/smb"]
+webdav = ["plenora-storage-engine/webdav"]
+
+[dependencies]
+plenora-storage-core = { path = "../plenora-storage-core", version = "0.2.1" }
+plenora-storage-engine = { path = "../plenora-storage-engine", version = "0.2.1", default-features = false }
+pyo3 = { version = "=0.29.2", features = ["abi3-py310"] }
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

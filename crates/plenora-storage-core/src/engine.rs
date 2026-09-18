@@ -33,7 +33,8 @@ struct CursorState {
     expires_at: Instant,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(default, deny_unknown_fields)]
 // Each flag is an independent, fail-closed host authorization. Keeping them
 // explicit prevents enabling one insecure transport from enabling another.
 #[allow(clippy::struct_excessive_bools)]

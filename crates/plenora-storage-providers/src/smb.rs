@@ -1,6 +1,6 @@
 use crate::{
     common::{Backend, ProviderFactory, Reader, failure, invalid, metadata, page, parse},
-    local::portable_key,
+    keys::portable_key,
 };
 use async_trait::async_trait;
 use bytes::Bytes;

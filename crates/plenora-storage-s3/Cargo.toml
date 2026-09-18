@@ -14,7 +14,7 @@ readme = "../../README.md"
 async-trait.workspace = true
 futures-util.workspace = true
 object_store.workspace = true
-plenora-storage-core = { path = "../plenora-storage-core", version = "0.2.0" }
+plenora-storage-core = { path = "../plenora-storage-core", version = "0.2.1" }
 reqwest.workspace = true
 rustls.workspace = true
 quick-xml.workspace = true

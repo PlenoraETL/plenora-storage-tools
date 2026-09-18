@@ -208,7 +208,7 @@ impl Backend for GcsBackend {
             url.query_pairs_mut().append_pair("ifGenerationMatch", "0");
         }
         let boundary = loop {
-            let candidate = crate::local::stage_name();
+            let candidate = crate::keys::stage_name();
             if !data
                 .windows(candidate.len())
                 .any(|window| window == candidate.as_bytes())

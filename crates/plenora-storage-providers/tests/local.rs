@@ -1,3 +1,4 @@
+#![cfg(feature = "full")]
 use plenora_storage_core::*;
 use plenora_storage_providers::{
     AzureProvider, GcsProvider, LocalProvider, SmbProvider, WebDavProvider,

@@ -6,17 +6,16 @@ passa eventuali byte come stream. L'Engine seleziona un provider registrato e
 restituisce risultati o errori Plenora tipizzati.
 
 ```text
-Rust / CLI / runtime
+Rust / CLI / Python
         |
-        v
-plenora-storage-core  ->  Provider registry
-                              |
-                              +-> S3-compatible -> MinIO / AWS / altro S3
-                              +-> SFTP           -> server SSH/SFTP
-                              +-> FTP            -> server FTP (opt-in)
-                              +-> FTPS           (roadmap)
-                              +-> SharePoint     (roadmap)
+plenora-storage-engine -> provider selezionati dalle feature Cargo
+        |
+plenora-storage-core <- Runtime Binding del consumer
 ```
+
+Il catalogo aggiornato dei provider e dei contratti è generato in [STATO.md](STATO.md).
+I trasferimenti su file di CLI e Python condividono staging e pubblicazione.
+
 
 ## Confine pubblico
 
@@ -46,9 +45,9 @@ coerente: test della connessione, enumerazione, metadati, trasferimento,
 copia ed eliminazione. Le capacità non universali sono dichiarate dal provider
 e un'operazione non supportata fallisce chiuso.
 
-S3 è object storage; SFTP/FTPS sono filesystem remoti; SharePoint espone
-documenti e cartelle. Il core non promette directory, rename atomico, ETag
-universali o versioning equivalente.
+S3, Azure e GCS sono object storage; gli altri adapter espongono filesystem
+locali/remoti o risorse WebDAV. Il core non promette directory, rename atomico,
+ETag universali o versioning equivalente.
 
 I cursori di `storage.list` sono token opachi di massimo 512 byte, mantenuti in
 memoria per 15 minuti e limitati a 1024 token attivi per Engine. Sono vincolati
@@ -59,15 +58,11 @@ dell'Engine e non promettono snapshot isolation durante mutazioni concorrenti.
 La CLI esaurisce i cursori nello stesso processo tramite `list --all`, con
 un budget totale sui risultati. Non emette cursori inutilizzabili dopo l'uscita.
 
-I provider filesystem non hanno una list paginata nativa: enumerano l'albero e
-potano le directory che non possono contenere il prefix richiesto. `max_list_items`
-è quindi un budget di scansione sulle entry visitate, non sui risultati; la
-pagina restituita resta limitata a `max_items`. Si conservano al massimo
-`max_items + 1` risultati, lo stack delle directory entro il budget di scansione
-e un buffer di protocollo: un batch READDIR per SFTP, una riga MLSD di massimo
-32 KiB per FTP. Il limite viene verificato durante l'enumerazione, senza
-caricare prima l'intera directory. Un nome remoto che non è una chiave pubblica valida fa fallire la
-list invece di essere pubblicato o silenziosamente ignorato.
+I provider filesystem enumerano le directory e potano i rami estranei al
+prefisso. I limiti di scansione e dei buffer sono specifici del provider;
+`max_list_items` non rappresenta un limite uniforme sulle entry visitate per tutti
+gli adapter. La pagina resta limitata a `max_items`. Un nome remoto non
+rappresentabile come chiave pubblica fa fallire la list.
 
 Le chiavi e i prefissi hanno la stessa semantica su tutti i provider: percorsi
 relativi normalizzati, senza segmenti vuoti, `.` o `..`. Il prefix può essere

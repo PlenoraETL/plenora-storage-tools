@@ -1,4 +1,5 @@
 use crate::common::invalid;
+#[cfg(feature = "azure")]
 use object_store::{
     ClientOptions,
     client::{HttpClient, HttpConnector},
@@ -59,6 +60,7 @@ impl Connector {
             .build()
     }
 }
+#[cfg(feature = "azure")]
 impl HttpConnector for Connector {
     fn connect(&self, _: &ClientOptions) -> object_store::Result<HttpClient> {
         self.client()

@@ -40,6 +40,16 @@ def main():
         for item in manifest['artifacts']:
             assert sums[item['name']] == item['sha256'], item['name']
             assert (folder / item['name']).stat().st_size == item['size'], item['name']
+        if tuple(map(int, manifest['version'].split('.'))) >= (0, 2, 1):
+            sbom = json.loads((folder / 'storage-sbom.cdx.json').read_text())
+            assert sbom['bomFormat'] == 'CycloneDX' and sbom['specVersion'] == '1.6'
+            for component in sbom['components']:
+                if component['type'] == 'file':
+                    assert component['hashes'] == [{'alg': 'SHA-256', 'content': sums[component['name']]}]
+            python_report = json.loads((folder / 'python-tests.json').read_text())
+            assert python_report['status'] == 'PASS'
+            assert sums[python_report['wheel']] == python_report['wheel_sha256']
+            assert sums['python-tests.log'] == python_report['tests_log_sha256']
         adoption = json.loads((folder / 'adoption-manifest-v4.json').read_text())
         assert adoption['schema_version'] == 4 and not adoption_errors(adoption)
         for artifact in adoption['artifacts']:

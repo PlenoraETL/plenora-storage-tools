@@ -1,12 +1,12 @@
-# Release 0.2.0: criteri di distribuzione
+# Release 0.2.1: criteri di distribuzione
 
-Rust e CLI registrano nove provider. I sei aggiunti sono descritti nella
+Rust, CLI e SDK Python registrano nove provider. I sei aggiunti sono descritti nella
 [matrice operativa](provider-expansion.md). Le sette operazioni e i contratti
 pubblici v1 rimangono compatibili; ogni configurazione ha uno schema specifico.
 La ricevuta della [release 0.1.0](release-readiness-0.1.md) rimane storica e
 non qualifica automaticamente i nuovi binari.
 
-La distribuzione richiede `dist/0.2.0/release-qualification.json` con stato
+La distribuzione richiede `dist/0.2.1/release-qualification.json` con stato
 `qualified_for_publication`, generato da `scripts/qualify_release.py` sul
 commit definitivo e pulito. Un archivio costruito da un checkout modificato
 ? un candidato, anche se i test sono verdi.
@@ -26,7 +26,7 @@ commit definitivo e pulito. Un archivio costruito da un checkout modificato
   SMB usa Samba con cifratura obbligatoria e rifiuta credenziali errate.
 - Audit dipendenze, licenze e sorgenti senza eccezioni. Il controllo separato
   `audit_smb_upstream.py` cerca advisory anche sotto il nome originale `smb2`.
-- Sette archivi Cargo verificati da un consumer esterno e CLI compilata dagli
+- Archivi Cargo verificati da un consumer esterno e CLI compilata dagli
   archivi estratti; manifest, contratti e checksum coerenti sui due target.
 
 ## Matrice e limiti
@@ -42,3 +42,7 @@ La [procedura operativa](release.md) descrive build, qualifica, installazione
 e rollback. La CI produce candidati; il job Windows pubblico non ha accesso
 alla VM privata e quindi non sigilla da solo la qualifica dei provider remoti.
 Pubblicazione su registry/GitHub, tag e deployment rimangono passi separati.
+
+La qualifica include anche la wheel Python installata, i suoi test offline e
+le sette operazioni sui nove provider tramite SDK (`qualify_python.py`).
+I gate di selezione provider, documentazione generata e SBOM devono passare.

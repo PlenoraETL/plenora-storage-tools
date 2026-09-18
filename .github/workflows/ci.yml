@@ -8,6 +8,20 @@ permissions:
   contents: read
 
 jobs:
+  product-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - run: cargo fetch --locked
+      - run: python3 scripts/check_features.py
+      - run: python3 scripts/check_docs.py
+      - run: python3 -m pip install -r scripts/requirements-quality.txt
+      - run: python3 -m unittest discover -s scripts/tests -v
+      - run: python3 scripts/render_sbom.py target/storage-sbom.cdx.json
+      - run: python3 scripts/render_sbom.py target/storage-sbom.cdx.json --check
+      - run: python3 scripts/build_python.py --debug
+
   docker-conformance:
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -36,6 +50,8 @@ jobs:
       - run: cargo build --locked -p plenora-storage-cli
       - run: python scripts/audit_release_readiness.py
       - run: python scripts/qualify_extended_faults.py
+      - run: python -m pip install maturin==1.15.0
+      - run: python scripts/build_python.py --debug
 
   dependencies:
     runs-on: ubuntu-latest
