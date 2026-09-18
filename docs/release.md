@@ -57,6 +57,10 @@ Non è una firma digitale né una promessa di build identiche bit per bit.
   con opt-in, SFTP con pin, FTP). HTTPS positivo/negativo è esercitato nel gate
   Linux; non si installa la CA temporanea nello store Windows dell'utente.
   Altri target richiedono qualifica.
+- Il binario Windows MSVC dipende da Universal CRT e dal runtime x64 che
+  fornisce `VCRUNTIME140.dll`, rilevati nella tabella degli import del binario.
+  Questi componenti non sono inclusi nell'archivio: il controllo `--version`
+  sulla macchina di destinazione è parte del gate di installazione.
 - MinIO/OpenSSH/Pure-FTPd sono le implementazioni testate, con immagini bloccate
   per digest nel compose. Non estendere il claim ad AWS o ad altri server senza
   eseguire la matrice del documento release-readiness.
