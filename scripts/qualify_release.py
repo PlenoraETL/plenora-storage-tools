@@ -9,6 +9,7 @@ import sys
 
 from build_release import ROOT, digest, source_digest
 from qualify_extended_faults import EXPECTED_TESTS
+from versioning import parse_version
 
 
 def main():
@@ -63,7 +64,7 @@ def main():
             assert all(r['status'] == 'PASS' and r['reported_effect'] == 'unknown' for r in faults['results'])
         evidence = [qualification_path, regression_path, suite_path, audit_path, deny_path,
                     folder / 'adoption-manifest-v4.json', folder / 'release-manifest.json']
-        if tuple(map(int, manifest['version'].split('.'))) >= (0, 2, 1):
+        if parse_version(manifest['version']).requires((0, 2, 1)):
             python_path = folder / 'python-qualification.json'
             python_report = json.loads(python_path.read_text())
             assert python_report['version'] == manifest['version']
@@ -72,7 +73,7 @@ def main():
             assert all(r['status'] == 'PASS' and r['operations'] == 7 and r['async_stat'] == 'PASS'
                        for r in python_report['results'])
             evidence.extend([python_path, folder / 'python-tests.json', folder / 'python-tests.log', folder / 'storage-sbom.cdx.json'])
-        if tuple(map(int, manifest['version'].split('.'))) >= (0, 2, 0):
+        if parse_version(manifest['version']).requires((0, 2, 0)):
             upstream_audit_path = args.evidence / 'smb-upstream-audit.json'
             upstream_audit = json.loads(upstream_audit_path.read_text())
             assert upstream_audit['vulnerabilities']['count'] == 0 and not upstream_audit.get('warnings')

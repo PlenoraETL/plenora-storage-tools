@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Maturin requests metadata for all targets, including dependencies unused by
+# this host. Populate that complete lockfile before any offline wheel build.
+cargo fetch --locked
+
 test -s .fixtures/ca.crt
 test -s .fixtures/sftp-fingerprint
 cp .fixtures/ca.crt /usr/local/share/ca-certificates/plenora-storage-fixture.crt
@@ -84,7 +88,7 @@ python3 scripts/qualify_extended_faults.py
 if [ "${PLENORA_EXTENDED_TEST:-0}" = "1" ]; then
   python3 scripts/qualify_extended.py
   python3 scripts/build_python.py --debug
-  version="$(python3 scripts/release_version.py)"
+  version="$(python3 scripts/release_version.py --python)"
   target/python-sdk-test/bin/python scripts/qualify_python.py \
     --wheel target/python-wheels/plenora_storage-"${version}"-*.whl \
     --output target/release-readiness/python-qualification.json

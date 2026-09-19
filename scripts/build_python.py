@@ -5,8 +5,8 @@ import json
 from pathlib import Path
 import subprocess
 import sys
-import tomllib
 import venv
+from versioning import workspace_version
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -15,12 +15,13 @@ def build(output, release=True):
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
     command = ['maturin', 'build', '--locked', '--offline', '--manifest-path',
-               str(ROOT / 'crates/plenora-storage-py/Cargo.toml'), '--out', str(output)]
+               str(ROOT / 'crates/plenora-storage-py/Cargo.toml'), '--out', str(output),
+               '--interpreter', sys.executable]
     if release:
         command.append('--release')
     subprocess.run(command, cwd=ROOT, check=True)
-    version = tomllib.loads((ROOT / 'Cargo.toml').read_text())['workspace']['package']['version']
-    wheels = sorted(output.glob(f'plenora_storage-{version}-*.whl'))
+    version = workspace_version()
+    wheels = sorted(output.glob(f'plenora_storage-{version.python}-*.whl'))
     if len(wheels) != 1:
         raise ValueError('expected exactly one storage wheel in the output directory')
     wheel = wheels[0]

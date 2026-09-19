@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 import sys
+from versioning import parse_version
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'contracts/upstream'))
 from conformance_checks import adoption_errors
@@ -40,7 +41,7 @@ def main():
         for item in manifest['artifacts']:
             assert sums[item['name']] == item['sha256'], item['name']
             assert (folder / item['name']).stat().st_size == item['size'], item['name']
-        if tuple(map(int, manifest['version'].split('.'))) >= (0, 2, 1):
+        if parse_version(manifest['version']).requires((0, 2, 1)):
             sbom = json.loads((folder / 'storage-sbom.cdx.json').read_text())
             assert sbom['bomFormat'] == 'CycloneDX' and sbom['specVersion'] == '1.6'
             for component in sbom['components']:

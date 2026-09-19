@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Prepare complete Cargo caches before offline Python builds on clean CI runners.
+- Normalize Rust prerelease versions to Python wheel metadata and preserve qualification gates for release candidates.
+
+## 0.2.2
+
+- Refresh direct stable dependencies and the compatible lockfile, including FTP/SFTP major API migrations.
+- Complete the FTPS peer TLS shutdown before releasing upload sockets to prevent truncated Windows transfers.
+- Preserve SHA-256 output and SSH host-key pinning with the updated libraries.
+- Qualify Rust, CLI and Python on Windows/Linux against all nine storage fixtures.
+
 ## 0.2.1
 
 - Share application composition and file transfers through `plenora-storage-engine`.
