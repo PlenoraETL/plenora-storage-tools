@@ -27,7 +27,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--wheel', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--duration-seconds', type=int, default=86400)
+    parser.add_argument('--duration-seconds', type=int, default=3600,
+                        help='Alpha soak duration (default: 1 hour); use 86400 for release candidates')
     parser.add_argument('--workers', type=int, default=4)
     parser.add_argument('--interval-seconds', type=float, default=30)
     args = parser.parse_args()

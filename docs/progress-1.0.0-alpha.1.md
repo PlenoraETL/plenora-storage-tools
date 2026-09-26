@@ -73,3 +73,20 @@ congelamento API, aggregazione e qualifica
 degli asset finali e pubblicazione GitHub. Le prove AWS/Azure/GCS reali richiedono
 account e namespace dedicati con budget: le fixture non sostituiscono tali prove.
 Nessuna release stabile o release candidate è pubblicata da questo avanzamento.
+
+## Riduzione della durata per l'alfa
+
+Il 26 settembre il perimetro della prova di durata è stato ridotto a un'ora
+per l'alfa; le 24 ore restano previste per la release candidate. Le campagne
+da 24 ore vengono interrotte tra cicli completati e conservate come prove
+interrotte volontariamente, non come gate superati. Il runner originale
+registra questa interruzione come `FAIL` con `failure_type: KeyboardInterrupt`.
+
+La nuova campagna usa `--duration-seconds 3600`, un report distinto
+`.fixtures/evidence/soak-alpha-hour.json` e la wheel Linux del commit
+`ddf653853aa8f924f73947085cfb3e78ef47ae51`, con SHA-256
+`845e2fbb750a48c036653d7c09d0a873767a3da4411c85bba81c4c8b56295552b`.
+Il suo esito deve essere acquisito prima di dichiarare superata la prova breve.
+Le build di questo commit hanno superato la qualifica CLI e SDK sui nove
+provider nelle fixture su Windows e Linux, oltre alla verifica congiunta
+dei manifest e degli archivi. Queste prove non attestano i servizi cloud reali.

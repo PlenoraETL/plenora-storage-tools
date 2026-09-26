@@ -133,7 +133,7 @@ FTPS, SMB e WebDAV non diventano atomici per il solo passaggio alla 1.0.
 | Coverage | Report separati per core, adapter, CLI, Python e fork SMB; baseline e soglie per modulo, con percorsi di sicurezza/commit inventariati; il volume di test upstream SMB non maschera lacune del prodotto |
 | Fuzz | Target per configurazioni, nomi/path, risposte XML/FTP e cursor; seed, durata e risultati conservati; crash riproducibili trasformati in regressioni |
 | Prestazioni | Throughput, latenza, RSS e uso disco con payload piccoli e grandi, concorrenza 1/4/16; baseline sulla VM e soglie deliberate prima del gate finale |
-| Durata | Campagna iniziale proposta di 24 ore su fixture, con controlli di leak, handle, memoria e integrità; nessun errore inspiegato lasciato aperto |
+| Durata | Alfa: 1 ora su fixture, con controlli di leak, handle, memoria e integrità. Release candidate: campagna di 24 ore; nessun errore inspiegato lasciato aperto |
 | Dipendenze | Audit, licenze, SBOM, provenienza del fork SMB e stato della dipendenza transitiva prerelease `ssh-key` valutati sul lockfile finale |
 
 Le soglie numeriche di coverage e throughput si fissano dopo la prima misura,

@@ -21,7 +21,7 @@ on:
         type: boolean
         default: false
       soak_minutes:
-        description: Persistent Python SDK soak (24-hour campaign runs on the dedicated VM)
+        description: Persistent Python SDK soak (alpha 60 minutes; RC 24 hours on dedicated VM)
         type: choice
         options: ['0', '10', '60']
         default: '0'
