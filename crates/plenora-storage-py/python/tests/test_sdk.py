@@ -202,10 +202,12 @@ class SDKTests(unittest.TestCase):
             def __fspath__(self):
                 raise ValueError('sentinel-path-secret')
         calls = [lambda: self.engine.test(self.connection, timeout_ms=2**64),
+                 lambda: self.engine.test('sentinel-connection-secret'),
                  lambda: self.engine.test(self.connection, timeout_ms=True),
                  lambda: self.engine.test(self.connection, cancellation='sentinel-token-secret'),
                  lambda: self.engine.test(replace(self.connection, config='sentinel-config-secret')),
                  lambda: self.engine.get(self.connection, 'absent', BadPath(), overwrite=True),
+                 lambda: self.engine.get(self.connection, 'absent', b'sentinel-byte-path-secret', overwrite=True),
                  lambda: Engine('sentinel-config-secret'),
                  lambda: Engine(credential_resolver='sentinel-resolver-secret')]
         for call in calls:
@@ -219,6 +221,26 @@ class SDKTests(unittest.TestCase):
                 self.assertNotIn('sentinel-path-secret', ''.join(traceback.format_exception(error)))
             else:
                 self.fail('invalid SDK input accepted')
+        self.assertEqual(list(self.storage.iterdir()), [])
+
+    def test_unstructured_native_errors_are_redacted_and_require_recovery(self):
+        from unittest.mock import patch, Mock
+        private = 'sentinel-native-secret'
+        broken = Mock()
+        broken.invoke.side_effect = ValueError(private)
+        with patch.object(plenora_storage._native, 'Engine', side_effect=ValueError(private)):
+            with self.assertRaises(StorageError) as caught:
+                Engine()
+        errors = [caught.exception]
+        with patch.object(self.engine, '_native', broken):
+            with self.assertRaises(StorageError) as caught:
+                self.engine.test(self.connection)
+            errors.append(caught.exception)
+        for error in errors:
+            self.assertEqual(error.code, 'SDK_INTERNAL')
+            self.assertEqual(error.remote_effect, 'unknown')
+            self.assertEqual(error.retry, {'kind': 'requires_recovery'})
+            self.assertNotIn(private, ''.join(traceback.format_exception(error)))
         self.assertEqual(list(self.storage.iterdir()), [])
 
     def test_closed_context_uses_same_axes_as_operations(self):
@@ -275,6 +297,30 @@ class SDKTests(unittest.TestCase):
 
 
 class AsyncTests(unittest.IsolatedAsyncioTestCase):
+    async def test_all_async_operations_and_integrity(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            storage = root / 'storage'
+            storage.mkdir()
+            connection = Connection('local', 'plenora-storage-local-connection-v1',
+                                    {'root': str(storage)}, 'local:process')
+            source, downloaded = root / 'source', root / 'downloaded'
+            source.write_bytes(bytes(range(256)) * 256)
+            async with AsyncEngine() as engine:
+                self.assertEqual(len(engine.capabilities()['operations']), 7)
+                await engine.test(connection, cancellation=None)
+                await engine.put(connection, 'original', source, overwrite=False,
+                                 publication_policy='atomic_required')
+                await engine.copy(connection, 'original', 'copy', overwrite=False,
+                                  publication_policy='atomic_required')
+                self.assertEqual(len((await engine.list(connection))['objects']), 2)
+                await engine.stat(connection, 'copy')
+                await engine.get(connection, 'copy', downloaded, overwrite=False)
+                self.assertEqual(downloaded.read_bytes(), source.read_bytes())
+                await engine.delete(connection, 'original', ignore_missing=False)
+                await engine.delete(connection, 'copy', ignore_missing=False)
+            self.assertEqual(list(storage.iterdir()), [])
+
     async def test_file_and_serialization_errors_match_sync(self):
         class BadDict(dict):
             def items(self):
@@ -303,7 +349,7 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_cancelled_success_survives_task_and_timeout_wrappers(self):
         # Model an operation that committed just as cancellation arrived.
-        for wrapper in ['direct', 'wait_for', 'timeout']:
+        for wrapper in ['direct', 'wait_for', 'timeout', 'repeated']:
             with self.subTest(wrapper=wrapper):
                 entered, release = threading.Event(), threading.Event()
                 outcome = {'committed': True}
@@ -322,6 +368,11 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
                     else:
                         task.cancel()
                         await asyncio.sleep(0)
+                        if wrapper == 'repeated':
+                            await asyncio.sleep(0.01)
+                            task.cancel()
+                            await asyncio.sleep(0)
+                            self.assertFalse(task.done())
                         release.set()
                         with self.assertRaises(asyncio.CancelledError) as caught:
                             if wrapper == 'direct':

@@ -7,6 +7,32 @@ permissions:
   contents: read
 
 jobs:
+  python-compatibility:
+    needs: [linux, windows]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+        python: ['3.10', '3.11', '3.12', '3.13', '3.14']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ runner.os == 'Windows' && 'storage-candidate-windows' || 'storage-candidate-linux' }}
+          path: downloaded-wheel
+      - run: python -m pip install -r scripts/requirements-coverage.txt
+      - run: python scripts/check_installed_sdk.py downloaded-wheel --coverage --output target/sdk-compatibility
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-python-${{ matrix.os }}-${{ matrix.python }}
+          path: target/sdk-compatibility/
+
   parser-fuzz:
     uses: ./.github/workflows/parser-fuzz.yml
 

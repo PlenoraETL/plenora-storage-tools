@@ -21,7 +21,7 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use suppaftp::{
     FtpError, Mode, Status,
-    list::{File, ListParser},
+    list::{File, ListParser, ParseError},
     tokio::{
         AsyncRustlsConnector, AsyncRustlsFtpStream as AsyncFtpStream, AsyncRustlsStream,
         TransferStream,
@@ -884,7 +884,7 @@ async fn ensure_parent_directories(
                             // it only after MLST proves an existing directory.
                             if is_file_unavailable(&error)
                                 && let Ok(line) = ftp.mlst(Some(&current)).await
-                                && let Ok(file) = ListParser::parse_mlst(&line)
+                                && let Ok(file) = parse_listing_entry(&line)
                                 && file.is_directory()
                             {
                                 return Ok(());
@@ -939,16 +939,30 @@ async fn ftp_object_exists(
 // server that never sends a newline from growing the buffer without limit.
 const MAX_MLSD_LINE_BYTES: u64 = 32 * 1_024;
 
+// suppaftp 12.0.1 indexes UNIX.mode by byte length and then character count.
+// Reject non-octal/non-ASCII modes before either shared MLSD/MLST path reaches
+// that parser; malformed server data must become a redacted protocol error.
+fn parse_listing_entry(line: &str) -> Result<File, ParseError> {
+    for fact in line.split(';') {
+        let mut parts = fact.split('=');
+        if let (Some(name), Some(value)) = (parts.next(), parts.next())
+            && name.to_lowercase() == "unix.mode"
+            && (!(3..=4).contains(&value.len()) || !value.bytes().all(|b| matches!(b, b'0'..=b'7')))
+        {
+            return Err(ParseError::SyntaxError);
+        }
+    }
+    // Upstream MLSD and MLST delegate to the same parse_mlsx implementation.
+    ListParser::parse_mlsd(line)
+}
+
 // Compiled only by cargo-fuzz; FTP and FTPS use these same parsers.
 #[cfg(fuzzing)]
 pub async fn fuzz_listing(data: &[u8]) {
     let mut reader = data;
     while let Ok(Some(line)) = read_listing_line(&mut reader).await {
         assert!(line.len() <= MAX_MLSD_LINE_BYTES as usize);
-        if let Ok(file) = ListParser::parse_mlsd(&line) {
-            let _ = public_metadata(file.name().to_owned(), &file);
-        }
-        if let Ok(file) = ListParser::parse_mlst(&line) {
+        if let Ok(file) = parse_listing_entry(&line) {
             let _ = public_metadata(file.name().to_owned(), &file);
         }
     }
@@ -1007,7 +1021,7 @@ where
                         return Err(list_scan_limit_error());
                     }
                     *scanned += 1;
-                    let file = ListParser::parse_mlsd(&line).map_err(|_| list_parse_error())?;
+                    let file = parse_listing_entry(&line).map_err(|_| list_parse_error())?;
                     visit(file)?;
                 }
                 reader
@@ -1039,7 +1053,7 @@ async fn stat_file(
             false,
         )
         .await?;
-    let file = ListParser::parse_mlst(&line).map_err(|_| {
+    let file = parse_listing_entry(&line).map_err(|_| {
         StorageError::new(
             ErrorCategory::Protocol,
             ErrorPhase::Read,
@@ -1394,6 +1408,22 @@ mod tests {
     };
     use plenora_storage_core::{EngineConfig, ExecutionControl, OperationContext};
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+
+    #[test]
+    fn malformed_unix_modes_are_protocol_errors_not_panics() {
+        for mode in ["é7", "7é", "雪", "💥", "éé", "888", "07x5", "", "07555"] {
+            for name in ["unix.mode", "UNIX.mode", "UnIx.MoDe"] {
+                let line = format!("type=file;{name}={mode}; entry");
+                assert!(super::parse_listing_entry(&line).is_err());
+            }
+        }
+        for mode in ["755", "0755", "4755", "000"] {
+            let line = format!("type=file;size=123;UNIX.mode={mode}; entry");
+            let file = super::parse_listing_entry(&line).unwrap();
+            assert_eq!(file.name(), "entry");
+            assert_eq!(file.size(), 123);
+        }
+    }
 
     #[tokio::test]
     async fn concurrent_parent_creation_requires_proof_of_a_directory() {

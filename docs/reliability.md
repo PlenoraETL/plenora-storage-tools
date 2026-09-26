@@ -57,6 +57,22 @@ vanno fissate soglie per modulo e censiti i percorsi di sicurezza/commit non
 coperti. Una baseline ottenuta dai soli test Rust non va confusa con quella
 estesa alle superfici pubbliche.
 
+Il wrapper Python ha un gate distinto nella matrice CPython 3.10–3.14 su Linux
+e Windows. `scripts/check_installed_sdk.py --coverage` usa coverage.py 7.16.1
+sulla wheel installata, da una directory esterna al checkout, misurando righe e
+rami. Confronta i file misurati con i byte nell'archivio wheel e rifiuta moduli
+mancanti, test omessi o suite vuote. I report legano la misura al digest della
+wheel; non misurano il codice Rust o le compatibilità remote.
+
+La prima misura Windows/Python 3.11 dopo l'estensione a 25 test raggiunge
+199/199 righe e 36/36 rami del wrapper: include un ciclo asincrono completo,
+cancellazioni ripetute e redazione degli errori nativi non strutturati. Le
+soglie per modulo in `scripts/coverage-policy.json` sono 98% righe e 95% rami;
+lasciano un margine limitato rispetto alla baseline, impedendo regressioni
+ampie. Le eccezioni richiedono revisione della policy; un totale alto di un
+altro modulo non compensa quello sotto soglia. I rami riportati da coverage.py
+non rappresentano ogni possibile eccezione o interleaving dei thread.
+
 ## Mutazione degli input
 
 ```sh

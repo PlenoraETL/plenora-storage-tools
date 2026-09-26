@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Validate FTP/FTPS UNIX.mode facts before MLSD/MLST parsing to prevent a panic on malformed Unicode permissions, including parent-directory reconciliation.
+- Measure installed Python wrapper line/branch coverage against wheel bytes on CPython 3.10–3.14; enforce per-module floors and test repeated cancellation, native error redaction and all async operations.
+
 - Reject unrelated XML documents as invalid S3, Azure and WebDAV listings instead of silently returning an empty result.
 - Exercise S3/Azure/WebDAV XML and shared FTP/FTPS parsers with bounded, coverage-guided libFuzzer campaigns, AddressSanitizer, versioned seeds and preserved crash evidence; gate CI and release candidates.
 

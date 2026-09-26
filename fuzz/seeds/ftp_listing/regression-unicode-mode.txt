@@ -1,0 +1,2 @@
+type=file;unix.mode=é7; entry
+type=file;unix.mode=💥; entry
