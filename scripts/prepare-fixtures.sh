@@ -2,7 +2,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p .fixtures/minio
-trap 'status=$?; tail -n 30 .fixtures/certificate-generation.log >&2; exit "$status"' ERR
+trap 'status=$?; if [ -f .fixtures/certificate-generation.log ]; then tail -n 30 .fixtures/certificate-generation.log >&2; fi; exit "$status"' ERR
+docker compose build minio
 # Ephemeral test identity: never copy this key into a deployment.
 openssl req -x509 -newkey rsa:2048 -nodes -days 2 \
   -keyout .fixtures/ca.key -out .fixtures/ca.crt \

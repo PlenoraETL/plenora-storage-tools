@@ -2,7 +2,8 @@ name: plenora-storage-tools
 
 services:
   minio:
-    image: quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    build: docker/minio
+    image: plenora-storage-minio-fixture:2025-09-07
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: plenora-dev
@@ -14,7 +15,7 @@ services:
       - minio-data:/data
 
   minio-tls:
-    image: quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    image: plenora-storage-minio-fixture:2025-09-07
     command: server /data
     environment:
       MINIO_ROOT_USER: plenora-dev
@@ -26,20 +27,13 @@ services:
         aliases: [minio-tls-invalid]
 
   minio-init:
-    image: quay.io/minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+    image: plenora-storage-minio-fixture:2025-09-07
     depends_on:
       - minio
       - minio-tls
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - >-
-        for attempt in $$(seq 1 30); do
-          mc alias set local http://minio:9000 plenora-dev plenora-dev-secret &&
-          mc --insecure alias set secure https://minio-tls:9000 plenora-dev plenora-dev-secret &&
-          mc mb --ignore-existing local/plenora-test &&
-          mc --insecure mb --ignore-existing secure/plenora-test && exit 0;
-          sleep 1;
-        done; exit 1
+    entrypoint: ["python", "/init.py"]
+    volumes:
+      - ./.fixtures/ca.crt:/certs/ca.crt:ro
 
   sftp:
     image: atmoz/sftp@sha256:0960390462a4441dbb63698d7c185b76a41ffcee7b78ff4adf275f3e66f9c475

@@ -67,8 +67,13 @@ Non è una firma digitale né una promessa di build identiche bit per bit.
   fornisce `VCRUNTIME140.dll`, rilevati nella tabella degli import del binario.
   Questi componenti non sono inclusi nell'archivio: il controllo `--version`
   sulla macchina di destinazione è parte del gate di installazione.
-- MinIO/OpenSSH/Pure-FTPd sono le implementazioni testate, con immagini bloccate
-  per digest nel compose. Non estendere il claim ad AWS o ad altri server senza
+- MinIO/OpenSSH/Pure-FTPd sono le implementazioni testate. OpenSSH/Pure-FTPd usano
+  immagini bloccate per digest nel compose. La fixture MinIO viene costruita dal
+  sorgente ufficiale `07c3a429bfed433e49018cb0f78a52145d4bedeb`
+  (`RELEASE.2025-09-07T16-13-09Z`), con SHA-256 dell'archivio e immagini base
+  fissati in `docker/minio/Dockerfile`: le vecchie immagini Quay non sono più
+  recuperabili da un runner pulito. La sua licenza AGPL-3.0 resta nell'immagine
+  di test; MinIO non è incluso negli asset Storage Tools. Non estendere il claim ad AWS o ad altri server senza
   eseguire la matrice del documento release-readiness.
 - FTP è in chiaro e richiede autorizzazione esplicita. FTPS esplicito verifica
   il certificato TLS; SFTP usa pin SHA-256 con password oppure chiave privata
