@@ -11,7 +11,7 @@ services:
     build: docker/extended
     image: plenora-storage-extended-fixtures:0.2
     command: ["ftps"]
-    ports: ["2122:21", "30100-30109:30100-30109"]
+    ports: ["2122:21", "30100-30163:30100-30163"]
     volumes: ["./.fixtures/extended:/certs:ro"]
   webdav:
     image: plenora-storage-extended-fixtures:0.2

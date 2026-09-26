@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 from build_release import ROOT, digest, source_digest
-from qualify_extended_faults import EXPECTED_TESTS
+from qualify_extended_faults import EXPECTED_TESTS, LEGACY_TESTS
 from versioning import parse_version
 
 
@@ -87,7 +87,8 @@ def main():
             faults_extended_path = folder / 'extended-regressions.json'
             extended_faults = json.loads(faults_extended_path.read_text())
             assert extended_faults['binary_sha256'] == digest(binary)
-            assert {r['name'] for r in extended_faults['results']} == EXPECTED_TESTS
+            expected = EXPECTED_TESTS if parse_version(manifest['version']).requires((1, 0, 0)) else LEGACY_TESTS
+            assert {r['name'] for r in extended_faults['results']} == expected
             assert all(r['status'] == 'PASS' for r in extended_faults['results'])
             qualification['results'].extend(extended['results'])
             evidence.extend([extended_path, faults_extended_path])

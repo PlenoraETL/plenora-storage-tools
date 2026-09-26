@@ -1,0 +1,63 @@
+name: storage-reliability
+
+on:
+  workflow_dispatch:
+    inputs:
+      payload_bytes:
+        description: Payload per operation (1 GiB by default)
+        default: '1073741824'
+        required: true
+      workers:
+        description: Concurrent operations per provider
+        type: choice
+        options: ['1', '4', '16']
+        default: '1'
+      rounds:
+        description: Complete rounds across all nine providers
+        default: '1'
+        required: true
+      coverage:
+        description: Also measure Rust source coverage against all fixtures
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  transfers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      PAYLOAD_BYTES: ${{ inputs.payload_bytes }}
+      WORKERS: ${{ inputs.workers }}
+      ROUNDS: ${{ inputs.rounds }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - run: docker compose build storage-rust
+      - run: bash scripts/prepare-fixtures.sh
+      - run: bash scripts/prepare-extended-fixtures.sh
+      - name: Measure transfers against dedicated fixtures
+        run: |
+          docker compose -f docker-compose.yml -f compose.extended.yml run --rm --no-deps \
+            -e PAYLOAD_BYTES -e WORKERS -e ROUNDS storage-rust bash -c '
+              set -euo pipefail
+              cargo build --release --locked -p plenora-storage-cli
+              python3 scripts/fuzz_cli_inputs.py --output .fixtures/evidence/fuzz-cli.json
+              python3 scripts/qualify_transfers.py --bytes "$PAYLOAD_BYTES" --workers "$WORKERS" --rounds "$ROUNDS" \
+                --output .fixtures/evidence/large-transfers.json
+            '
+      - name: Measure Rust coverage separately from the SMB fork
+        if: ${{ inputs.coverage }}
+        run: docker compose -f docker-compose.yml -f compose.extended.yml run --rm --no-deps storage-rust bash scripts/coverage.sh
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: transfer-evidence
+          path: |
+            .fixtures/evidence/
+            .fixtures/certificate-generation.log
+            .fixtures/extended/certificate-generation.log
+          include-hidden-files: true
+      - if: always()
+        run: docker compose -f docker-compose.yml -f compose.extended.yml down

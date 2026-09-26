@@ -1139,9 +1139,17 @@ async fn ensure_parent_directories(
                 .control
                 .run(
                     async {
-                        sftp.create_dir(&current)
-                            .await
-                            .map_err(|error| map_sftp_error(error, ErrorPhase::Prepare, true))
+                        if let Err(error) = sftp.create_dir(&current).await {
+                            // mkdir can lose a race against another writer.
+                            // Only a verified directory satisfies this step.
+                            if let Ok(metadata) = sftp.metadata(&current).await
+                                && metadata.file_type().is_dir()
+                            {
+                                return Ok(());
+                            }
+                            return Err(map_sftp_error(error, ErrorPhase::Prepare, true));
+                        }
+                        Ok(())
                     },
                     ErrorPhase::Prepare,
                     true,
@@ -1557,6 +1565,94 @@ mod tests {
     }
 
     struct EndlessDirectory(Arc<AtomicUsize>);
+
+    struct ParentCreationRace {
+        mode: Option<u32>,
+        created: bool,
+    }
+
+    impl Handler for ParentCreationRace {
+        type Error = StatusCode;
+
+        fn unimplemented(&self) -> Self::Error {
+            StatusCode::OpUnsupported
+        }
+
+        async fn init(
+            &mut self,
+            _version: u32,
+            _extensions: std::collections::HashMap<String, String>,
+        ) -> Result<Version, Self::Error> {
+            Ok(Version::new())
+        }
+
+        async fn stat(
+            &mut self,
+            id: u32,
+            path: String,
+        ) -> Result<russh_sftp::protocol::Attrs, Self::Error> {
+            assert_eq!(path, "parent");
+            if !self.created {
+                return Err(StatusCode::NoSuchFile);
+            }
+            let permissions = self.mode.ok_or(StatusCode::NoSuchFile)?;
+            Ok(russh_sftp::protocol::Attrs {
+                id,
+                attrs: russh_sftp::protocol::FileAttributes {
+                    permissions: Some(permissions),
+                    ..Default::default()
+                },
+            })
+        }
+
+        async fn mkdir(
+            &mut self,
+            _id: u32,
+            path: String,
+            _attrs: russh_sftp::protocol::FileAttributes,
+        ) -> Result<Status, Self::Error> {
+            assert_eq!(path, "parent");
+            self.created = true;
+            Err(StatusCode::Failure)
+        }
+    }
+
+    #[tokio::test]
+    async fn concurrent_parent_creation_requires_proof_of_a_directory() {
+        for (mode, succeeds) in [
+            (Some(0o040_755), true),
+            (Some(0o100_644), false),
+            (None, false),
+        ] {
+            let (client, server) = tokio::io::duplex(4096);
+            let server = tokio::spawn(russh_sftp::server::run(
+                server,
+                ParentCreationRace {
+                    mode,
+                    created: false,
+                },
+            ));
+            let sftp = SftpSession::new(client).await.expect("session");
+            let policy = plenora_storage_core::EngineConfig::default();
+            let control = ExecutionControl::default()
+                .with_deadline(std::time::Instant::now() + std::time::Duration::from_secs(2));
+            let mut prepared = false;
+            let result = super::ensure_parent_directories(
+                &sftp,
+                "parent/object",
+                &plenora_storage_core::OperationContext {
+                    policy: &policy,
+                    control: &control,
+                },
+                &mut prepared,
+            )
+            .await;
+            assert_eq!(result.is_ok(), succeeds);
+            assert!(prepared);
+            sftp.close().await.expect("close");
+            server.abort();
+        }
+    }
 
     struct InterruptedCommit {
         state: Arc<AtomicUsize>,

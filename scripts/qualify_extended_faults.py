@@ -13,12 +13,13 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 BINARY = Path(os.environ.get('PLENORA_CLI_BIN', ROOT / 'target/debug' / ('plenora-storage.exe' if os.name == 'nt' else 'plenora-storage'))).resolve()
 SECRET = 'extended-fault-secret'
-EXPECTED_TESTS = {
+LEGACY_TESTS = {
     'azure_redirect_blocked', 'gcs_redirect_blocked', 'webdav_redirect_blocked',
     'azure_raw_key_rejected', 'gcs_raw_key_rejected', 'gcs_repeated_page_token_rejected',
     'webdav_absent_optional_property', 'webdav_outside_root_rejected',
     'webdav_partial_multistatus_not_success', 'webdav_commit_deadline_unknown',
 }
+EXPECTED_TESTS = LEGACY_TESTS | {'webdav_parent_race_reconciled', 'webdav_parent_not_directory_rejected'}
 ENV = dict(os.environ, PLENORA_FAULT_CREDENTIALS=json.dumps({'bearer_token': SECRET}))
 
 
@@ -28,18 +29,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def respond(self):
         self.server.calls += 1
+        self.server.methods.append(self.command)
         length = int(self.headers.get('Content-Length', 0))
         if length:
             self.rfile.read(length)
         if self.server.delay:
             time.sleep(self.server.delay)
-        self.send_response(self.server.status)
-        self.send_header('Content-Length', str(len(self.server.body)))
+        status, body = self.server.responses.get(self.command, (self.server.status, self.server.body))
+        self.send_response(status)
+        self.send_header('Content-Length', str(len(body)))
         if self.server.redirect:
             self.send_header('Location', self.server.redirect)
         self.end_headers()
         try:
-            self.wfile.write(self.server.body)
+            self.wfile.write(body)
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             pass
 
@@ -48,6 +51,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
     do_POST = respond
     do_PROPFIND = respond
     do_DELETE = respond
+    do_MKCOL = respond
 
 
 def main():
@@ -58,6 +62,7 @@ def main():
         directory = Path(temporary)
         for fixture in [server, redirect_target]:
             fixture.status, fixture.body, fixture.calls, fixture.delay, fixture.redirect = 200, b'', 0, 0, None
+            fixture.responses, fixture.methods = {}, []
             threading.Thread(target=fixture.serve_forever, daemon=True).start()
         endpoint = f'http://127.0.0.1:{server.server_port}'
         source = directory / 'payload'
@@ -121,6 +126,19 @@ def main():
         error = invoke('webdav', 'put', args, ('--deadline', deadline))['error']
         assert error['category'] == 'timeout' and error['remote_effect'] == 'unknown', error
         passed('webdav_commit_deadline_unknown')
+        server.delay = 0
+        args = ('--key', 'parent/payload', '--input', str(source), '--overwrite', 'true', '--publication-policy', 'best-effort')
+        collection = b'<d:multistatus xmlns:d="DAV:"><d:response><d:href>/parent/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>'
+        for status in [405, 409, 500]:
+            server.responses = {'MKCOL': (status, b''), 'PROPFIND': (207, collection), 'PUT': (201, b'')}
+            invoke('webdav', 'put', args, success=True)
+        passed('webdav_parent_race_reconciled')
+        for body in [collection.replace(b'<d:collection/>', b'<d:not-a-collection/>').replace(b'</d:prop>', b'<d:getcontentlength>0</d:getcontentlength></d:prop>'), b'invalid XML']:
+            server.responses = {'MKCOL': (500, b''), 'PROPFIND': (207, body), 'PUT': (201, b'')}
+            before = server.methods.count('PUT')
+            invoke('webdav', 'put', args)
+            assert server.methods.count('PUT') == before, 'upload attempted without a directory proof'
+        passed('webdav_parent_not_directory_rejected')
         server.shutdown()
         redirect_target.shutdown()
     report = {'binary_sha256': hashlib.sha256(BINARY.read_bytes()).hexdigest(), 'results': results}

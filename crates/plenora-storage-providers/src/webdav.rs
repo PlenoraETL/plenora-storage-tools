@@ -333,8 +333,22 @@ impl Backend for Dav {
                         .send()
                         .await
                         .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Prepare, true))?;
-                    if response.status() != StatusCode::METHOD_NOT_ALLOWED {
-                        checked(response, true)?;
+                    let status = response.status();
+                    if let Err(error) = checked(response, true) {
+                        // Servers can report 405, 409 or even 500 when MKCOL
+                        // loses a race. Reconcile with a read, never a retry of
+                        // the mutation, and require proof of the exact collection.
+                        if (status == StatusCode::METHOD_NOT_ALLOWED
+                            || status == StatusCode::CONFLICT
+                            || status.is_server_error())
+                            && let Ok(entries) = self.properties(&current, "0").await
+                            && entries
+                                .iter()
+                                .any(|entry| entry.key == current && entry.directory)
+                        {
+                            continue;
+                        }
+                        return Err(error);
                     }
                 }
             }

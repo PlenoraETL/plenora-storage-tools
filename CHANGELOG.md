@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reconcile concurrent parent-directory creation in FTP/FTPS, SFTP and WebDAV only after proving the parent is a directory.
+- Add bounded-memory transfer, concurrency, coverage and seeded CLI mutation gates, plus a CPython compatibility matrix.
 - Start the 1.0.0-alpha.1 development series; no stable 1.0 release is published.
 - Support pinned SFTP public-key authentication with plain or encrypted OpenSSH keys resolved by the host.
 - Align Python discovery, version identity, root errors and async lifecycle with the common SDK contract; verify the installed wheel outside the checkout.

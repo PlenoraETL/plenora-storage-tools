@@ -878,9 +878,20 @@ async fn ensure_parent_directories(
                 .control
                 .run(
                     async {
-                        ftp.mkdir(&current)
-                            .await
-                            .map_err(|error| map_ftp_error(error, ErrorPhase::Prepare, true))
+                        if let Err(error) = ftp.mkdir(&current).await {
+                            // A competing writer may create this shared parent
+                            // after our probe. A 550 alone is ambiguous: accept
+                            // it only after MLST proves an existing directory.
+                            if is_file_unavailable(&error)
+                                && let Ok(line) = ftp.mlst(Some(&current)).await
+                                && let Ok(file) = ListParser::parse_mlst(&line)
+                                && file.is_directory()
+                            {
+                                return Ok(());
+                            }
+                            return Err(map_ftp_error(error, ErrorPhase::Prepare, true));
+                        }
+                        Ok(())
                     },
                     ErrorPhase::Prepare,
                     true,
@@ -1368,6 +1379,70 @@ mod tests {
     };
     use plenora_storage_core::{EngineConfig, ExecutionControl, OperationContext};
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+
+    #[tokio::test]
+    async fn concurrent_parent_creation_requires_proof_of_a_directory() {
+        for (reply, succeeds) in [
+            (
+                "250-listing\r\n type=dir;modify=20260926000000; parent\r\n250 end\r\n",
+                true,
+            ),
+            (
+                "250-listing\r\n type=file;size=0;modify=20260926000000; parent\r\n250 end\r\n",
+                false,
+            ),
+            ("550 still unavailable\r\n", false),
+            ("250-listing\r\n malformed\r\n250 end\r\n", false),
+        ] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+                .await
+                .expect("listener");
+            let address = listener.local_addr().expect("address");
+            let server = tokio::spawn(async move {
+                let (stream, _) = listener.accept().await.expect("accept");
+                let mut stream = BufReader::new(stream);
+                stream
+                    .get_mut()
+                    .write_all(b"220 ready\r\n")
+                    .await
+                    .expect("greeting");
+                for (expected, response) in [
+                    ("MLST parent\r\n", "550 missing\r\n"),
+                    ("MKD parent\r\n", "550 unavailable\r\n"),
+                    ("MLST parent\r\n", reply),
+                ] {
+                    let mut command = String::new();
+                    stream.read_line(&mut command).await.expect("command");
+                    assert_eq!(command, expected);
+                    stream
+                        .get_mut()
+                        .write_all(response.as_bytes())
+                        .await
+                        .expect("response");
+                }
+            });
+            let mut ftp = suppaftp::tokio::AsyncRustlsFtpStream::connect(address)
+                .await
+                .expect("connect");
+            let policy = EngineConfig::default();
+            let control = ExecutionControl::default()
+                .with_deadline(std::time::Instant::now() + std::time::Duration::from_secs(2));
+            let mut prepared = false;
+            let result = ensure_parent_directories(
+                &mut ftp,
+                "parent/object",
+                &OperationContext {
+                    policy: &policy,
+                    control: &control,
+                },
+                &mut prepared,
+            )
+            .await;
+            assert_eq!(result.is_ok(), succeeds);
+            assert!(prepared);
+            server.await.expect("server");
+        }
+    }
 
     #[tokio::test]
     async fn parent_probe_obeys_deadline_and_cancellation() {

@@ -17,7 +17,7 @@ elif mode == 'ftps':
     TLS_FTPHandler.keyfile = '/certs/server.key'
     TLS_FTPHandler.tls_control_required = True
     TLS_FTPHandler.tls_data_required = True
-    TLS_FTPHandler.passive_ports = range(30100, 30110)
+    TLS_FTPHandler.passive_ports = range(30100, 30164)
     FTPServer(('0.0.0.0', 21), TLS_FTPHandler).serve_forever()
 elif mode == 'webdav':
     from cheroot.wsgi import Server

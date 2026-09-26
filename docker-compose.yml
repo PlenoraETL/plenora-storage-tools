@@ -47,6 +47,7 @@ services:
     command:
       - >-
         chown -R 1000:100 /home/plenora/upload &&
+        printf '\nMaxStartups 64:30:128\n' >> /etc/ssh/sshd_config &&
         exec /entrypoint 'plenora:plenora-sftp-secret:::upload'
     ports:
       - "2222:22"
@@ -64,11 +65,14 @@ services:
       FTP_USER_NAME: plenora
       FTP_USER_PASS: plenora-ftp-secret
       FTP_USER_HOME: /home/plenora
-      FTP_PASSIVE_PORTS: "30000:30009"
+      # Copy uses two sessions; 16 concurrent operations need at least 32.
+      FTP_MAX_CLIENTS: "64"
+      FTP_MAX_CONNECTIONS: "64"
+      FTP_PASSIVE_PORTS: "30000:30063"
       PUBLICHOST: ftp
     ports:
       - "2121:21"
-      - "30000-30009:30000-30009"
+      - "30000-30063:30000-30063"
     volumes:
       - ftp-data:/home/plenora
     healthcheck:

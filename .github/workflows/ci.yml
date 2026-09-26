@@ -24,6 +24,11 @@ jobs:
       - run: python3 scripts/render_sbom.py target/storage-sbom.cdx.json
       - run: python3 scripts/render_sbom.py target/storage-sbom.cdx.json --check
       - run: python3 scripts/build_python.py --debug
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: python-wheel-linux
+          path: target/python-wheels/*.whl
+          if-no-files-found: error
 
   docker-conformance:
     runs-on: ubuntu-latest
@@ -33,9 +38,9 @@ jobs:
       - name: Build Rust image
         run: docker compose build storage-rust
       - name: Prepare secure storage test fixtures
-        run: bash scripts/prepare-fixtures.sh
+        run: python3 scripts/run_logged.py .fixtures/prepare-fixtures.log bash scripts/prepare-fixtures.sh
       - name: Prepare extended storage fixtures
-        run: bash scripts/prepare-extended-fixtures.sh
+        run: python3 scripts/run_logged.py .fixtures/prepare-extended-fixtures.log bash scripts/prepare-extended-fixtures.sh
       - name: Verify Rust, contracts, and CLI
         run: python3 scripts/run_logged.py target/release-readiness/docker-conformance.log docker compose -f docker-compose.yml -f compose.extended.yml run --rm --no-deps storage-rust
       - name: Preserve fixture diagnostics and qualification evidence
@@ -45,6 +50,8 @@ jobs:
           name: linux-qualification
           path: |
             .fixtures/certificate-generation.log
+            .fixtures/prepare-fixtures.log
+            .fixtures/prepare-extended-fixtures.log
             .fixtures/extended/certificate-generation.log
             .fixtures/evidence/
             target/release-readiness/*.json
@@ -54,6 +61,31 @@ jobs:
       - name: Stop test services
         if: always()
         run: docker compose -f docker-compose.yml -f compose.extended.yml down
+
+  python-compatibility:
+    needs: [product-quality, native-windows]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+        python: ['3.10', '3.11', '3.12', '3.13', '3.14']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ runner.os == 'Windows' && 'windows-qualification' || 'python-wheel-linux' }}
+          path: downloaded-wheel
+      - run: python scripts/check_installed_sdk.py downloaded-wheel --output target/sdk-compatibility
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sdk-${{ matrix.os }}-${{ matrix.python }}
+          path: target/sdk-compatibility/
 
   native-windows:
     runs-on: windows-latest
@@ -79,6 +111,7 @@ jobs:
           path: |
             target/release-readiness/*.json
             target/python-wheels/python-tests.*
+            target/python-wheels/*.whl
 
   dependencies:
     runs-on: ubuntu-latest
