@@ -26,7 +26,9 @@ pub async fn get_to_file(
         .write(true)
         .open(&temporary)
         .await
-        .map_err(|_| artifact_io_error("OUTPUT_STAGING_CREATE_FAILED"))?;
+        .map_err(|error| {
+            artifact_io_error(&error, ErrorPhase::Prepare, "OUTPUT_STAGING_CREATE_FAILED")
+        })?;
     let result = engine
         .get(connection, &GetRequest { key }, &mut file, control)
         .await;
@@ -34,7 +36,9 @@ pub async fn get_to_file(
         Ok(result) => file
             .sync_all()
             .await
-            .map_err(|_| artifact_io_error("OUTPUT_STAGING_SYNC_FAILED"))
+            .map_err(|error| {
+                artifact_io_error(&error, ErrorPhase::Write, "OUTPUT_STAGING_SYNC_FAILED")
+            })
             .map(|()| result),
         Err(error) => Err(error),
     };
@@ -106,6 +110,16 @@ fn publish_error(error: &std::io::Error) -> StorageError {
             "OUTPUT_ATOMIC_PUBLISH_UNSUPPORTED",
             "the output filesystem cannot publish an artifact atomically",
         ),
+        ErrorKind::NotFound => (
+            ErrorCategory::NotFound,
+            "OUTPUT_PUBLISH_FAILED",
+            "publishing the artifact to the output destination failed",
+        ),
+        ErrorKind::StorageFull | ErrorKind::QuotaExceeded => (
+            ErrorCategory::ResourceLimit,
+            "OUTPUT_PUBLISH_FAILED",
+            "publishing the artifact to the output destination failed",
+        ),
         _ => (
             ErrorCategory::Io,
             "OUTPUT_PUBLISH_FAILED",
@@ -140,7 +154,7 @@ pub async fn put_from_file(
     control.check(ErrorPhase::Prepare, false)?;
     let metadata = fs::metadata(&options.input)
         .await
-        .map_err(|_| artifact_io_error("INPUT_METADATA_FAILED"))?;
+        .map_err(|error| artifact_io_error(&error, ErrorPhase::Read, "INPUT_METADATA_FAILED"))?;
     if !metadata.is_file() {
         return Err(StorageError::invalid_configuration(
             "INPUT_NOT_REGULAR_FILE",
@@ -149,7 +163,7 @@ pub async fn put_from_file(
     }
     let mut file = fs::File::open(&options.input)
         .await
-        .map_err(|_| artifact_io_error("INPUT_OPEN_FAILED"))?;
+        .map_err(|error| artifact_io_error(&error, ErrorPhase::Read, "INPUT_OPEN_FAILED"))?;
     engine
         .put(
             connection,
@@ -180,13 +194,67 @@ fn temporary_output_path(output: &Path) -> StorageResult<PathBuf> {
     )))
 }
 
-fn artifact_io_error(code: &'static str) -> StorageError {
+fn artifact_io_error(
+    error: &std::io::Error,
+    phase: ErrorPhase,
+    code: &'static str,
+) -> StorageError {
+    use std::io::ErrorKind;
+    let category = match error.kind() {
+        ErrorKind::NotFound => ErrorCategory::NotFound,
+        ErrorKind::PermissionDenied => ErrorCategory::Authorization,
+        ErrorKind::AlreadyExists => ErrorCategory::Conflict,
+        ErrorKind::StorageFull | ErrorKind::QuotaExceeded => ErrorCategory::ResourceLimit,
+        _ => ErrorCategory::Io,
+    };
     StorageError::new(
-        ErrorCategory::Io,
-        ErrorPhase::Write,
+        category,
+        phase,
         RemoteEffect::None,
         RetryDisposition::Never,
         code,
         "local artifact operation failed",
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn artifact_failures_keep_cause_without_exposing_os_messages() {
+        use std::io::ErrorKind;
+        for (kind, category) in [
+            (ErrorKind::NotFound, ErrorCategory::NotFound),
+            (ErrorKind::PermissionDenied, ErrorCategory::Authorization),
+            (ErrorKind::AlreadyExists, ErrorCategory::Conflict),
+            (ErrorKind::StorageFull, ErrorCategory::ResourceLimit),
+            (ErrorKind::QuotaExceeded, ErrorCategory::ResourceLimit),
+            (ErrorKind::Other, ErrorCategory::Io),
+        ] {
+            let os_error = std::io::Error::new(kind, "sentinel-private-path");
+            let error = artifact_io_error(&os_error, ErrorPhase::Read, "INPUT_OPEN_FAILED");
+            assert_eq!(error.category, category);
+            assert_eq!(error.phase, ErrorPhase::Read);
+            assert_eq!(error.remote_effect, RemoteEffect::None);
+            assert_eq!(error.retry, RetryDisposition::Never);
+            assert!(!serde_json::to_string(&error).unwrap().contains("sentinel"));
+            let publication = publish_error(&os_error);
+            assert_eq!(publication.category, category);
+            assert_eq!(publication.phase, ErrorPhase::Commit);
+            assert_eq!(publication.remote_effect, RemoteEffect::None);
+            assert_eq!(publication.retry, RetryDisposition::Never);
+            assert!(
+                !serde_json::to_string(&publication)
+                    .unwrap()
+                    .contains("sentinel")
+            );
+            let rolled_back = error.rolled_back();
+            assert_eq!(rolled_back.remote_effect, RemoteEffect::RolledBack);
+            assert_eq!(rolled_back.category, category);
+            if category != ErrorCategory::Io {
+                assert_eq!(rolled_back.retry, RetryDisposition::Never);
+            }
+        }
+    }
 }

@@ -6,7 +6,7 @@ credential references; a host callback or the environment resolves the secrets.
 from __future__ import annotations
 
 import asyncio
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass, fields
 import json
 import os
 import re
@@ -117,7 +117,7 @@ CredentialResolver = Callable[[str], Mapping[str, str]]
 def _encode(value: Any) -> str:
     try:
         return json.dumps(value, allow_nan=False)
-    except (TypeError, ValueError, OverflowError):
+    except Exception:
         raise _invalid("SDK_INPUT_INVALID", "storage input is not a JSON-compatible document") from None
 
 
@@ -161,7 +161,14 @@ class Engine:
         if credential_resolver is not None:
             resolver = lambda reference: dict(credential_resolver(reference))
         try:
-            self._native = _native.Engine(_encode(asdict(config or EngineConfig())), resolver)
+            # Config fields are scalars. Deep-copying unvalidated values would
+            # execute arbitrary __deepcopy__ callbacks before error redaction.
+            config = config if config is not None else EngineConfig()
+            try:
+                document = {field.name: getattr(config, field.name) for field in fields(EngineConfig)}
+            except Exception:
+                raise _invalid("SDK_INPUT_INVALID", "engine configuration could not be read") from None
+            self._native = _native.Engine(_encode(document), resolver)
         except ValueError as error:
             raise _translate(error) from None
 

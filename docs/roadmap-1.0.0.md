@@ -87,6 +87,9 @@ proposto: sorgente 0.2.2 -> eventuali iterazioni di sviluppo -> 1.0.0-rc.N -> 1.
 
 ### M1 — Contratti stabili
 
+La [baseline comportamentale](api-1.0.md) descrive le superfici e collega i test
+di coerenza degli errori. Non chiude l'inventario completo né il congelamento M1.
+
 Inventariare i simboli Rust pubblici, i comandi e gli exit code CLI, le firme
 Python, gli schemi JSON e le categorie di errore. Definire cosa una versione
 1.x può aggiungere e cosa richiede una major, includendo MSRV e versioni Python.

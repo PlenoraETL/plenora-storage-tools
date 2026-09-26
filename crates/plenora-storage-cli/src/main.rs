@@ -491,9 +491,13 @@ async fn connection_or_error(
 }
 
 async fn load_connection(path: &Path) -> StorageResult<ProviderConnection> {
-    let read_error = || {
+    let read_error = |error: std::io::Error| {
         StorageError::new(
-            ErrorCategory::Io,
+            match error.kind() {
+                std::io::ErrorKind::NotFound => ErrorCategory::NotFound,
+                std::io::ErrorKind::PermissionDenied => ErrorCategory::Authorization,
+                _ => ErrorCategory::Io,
+            },
             ErrorPhase::Read,
             RemoteEffect::None,
             RetryDisposition::Never,
@@ -501,22 +505,18 @@ async fn load_connection(path: &Path) -> StorageResult<ProviderConnection> {
             "connection file could not be read",
         )
     };
-    if !fs::metadata(path)
-        .await
-        .map_err(|_| read_error())?
-        .is_file()
-    {
+    if !fs::metadata(path).await.map_err(read_error)?.is_file() {
         return Err(StorageError::invalid_configuration(
             "CONNECTION_NOT_REGULAR_FILE",
             "connection input must be a regular file",
         ));
     }
-    let file = fs::File::open(path).await.map_err(|_| read_error())?;
+    let file = fs::File::open(path).await.map_err(read_error)?;
     let mut data = Vec::new();
     file.take(1_048_577)
         .read_to_end(&mut data)
         .await
-        .map_err(|_| read_error())?;
+        .map_err(read_error)?;
     if data.len() > 1_048_576 {
         return Err(StorageError::new(
             ErrorCategory::ResourceLimit,

@@ -35,3 +35,18 @@ host key resta obbligatorio salvo l'opt-in esplicito già previsto.
 Limiti di trasferimento, atomicità e compatibilità server continuano a dipendere
 dal provider e dalle evidenze pubblicate. Il cambio di versione non amplia da
 solo queste garanzie.
+
+## Errori dei file locali
+
+Gli helper condivisi Rust/CLI/Python conservano i codici `INPUT_*` e `OUTPUT_*`,
+ma distinguono file mancante, accesso negato, conflitto e risorse esaurite invece
+di ridurre ogni causa a `io`. Gli errori di apertura/metadati dell'upload sono
+in fase `read`; la creazione dello staging di download è in fase `prepare`.
+La lettura del documento di connessione CLI distingue `not_found` e
+`authorization`, mantenendo `CONNECTION_FILE_READ_FAILED` e l'exit code 5.
+Il codice di uscita per un errore riconosciuto come `resource_limit` è 4.
+
+La serializzazione Python non esegue più deep-copy dei valori di `EngineConfig`;
+gli errori di conversione di input invalidi producono `SDK_INPUT_INVALID` redatto.
+Vedere la [baseline delle API](api-1.0.md) per effetti, retry e differenze tra
+le superfici.

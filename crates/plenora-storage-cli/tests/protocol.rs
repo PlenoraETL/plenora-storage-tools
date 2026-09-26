@@ -144,4 +144,119 @@ fn mutation_policy_flags_are_explicit_values() {
     assert_eq!(output.status.code(), Some(5));
     let envelope = single_json_line(&output);
     assert_eq!(envelope["error"]["code"], "CONNECTION_FILE_READ_FAILED");
+    assert_eq!(envelope["error"]["category"], "not_found");
+    assert_eq!(envelope["error"]["phase"], "read");
+}
+
+#[cfg(feature = "local")]
+#[tokio::test]
+async fn file_errors_match_rust_and_cli_without_publication() {
+    use plenora_storage_core::{
+        EngineConfig, EnvironmentCredentialResolver, ExecutionControl, ProviderConnection,
+        PublicationPolicy,
+    };
+    use plenora_storage_engine::{PutFileOptions, build_engine, get_to_file, put_from_file};
+    use std::{path::PathBuf, sync::Arc};
+
+    struct Directory(PathBuf);
+    impl Drop for Directory {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+    let directory = Directory(std::env::temp_dir().join(format!(
+        "storage-artifact-errors-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    )));
+    std::fs::create_dir(&directory.0).unwrap();
+    let storage = directory.0.join("storage");
+    std::fs::create_dir(&storage).unwrap();
+    let connection = ProviderConnection {
+        provider: "local".to_owned(),
+        config_contract: "plenora-storage-local-connection-v1".to_owned(),
+        config: serde_json::json!({"root": storage}),
+        credential_ref: "local:process".to_owned(),
+    };
+    let config = directory.0.join("connection.json");
+    std::fs::write(&config, serde_json::to_vec(&connection).unwrap()).unwrap();
+    let engine = build_engine(
+        EngineConfig::default(),
+        Arc::new(EnvironmentCredentialResolver),
+    )
+    .unwrap();
+    let missing = directory.0.join("sentinel-private-missing");
+    let output = missing.join("download");
+    let control = ExecutionControl::default();
+    let upload_error = put_from_file(
+        &engine,
+        &connection,
+        PutFileOptions {
+            key: "new".to_owned(),
+            input: missing.clone(),
+            overwrite: true,
+            publication_policy: PublicationPolicy::AtomicRequired,
+            content_type: None,
+        },
+        &control,
+    )
+    .await
+    .unwrap_err();
+    let download_error = get_to_file(
+        &engine,
+        &connection,
+        "absent".to_owned(),
+        &output,
+        true,
+        &control,
+    )
+    .await
+    .unwrap_err();
+
+    for (arguments, error, code, phase) in [
+        (
+            vec![
+                "put",
+                "--input",
+                missing.to_str().unwrap(),
+                "--publication-policy",
+                "atomic-required",
+            ],
+            upload_error,
+            "INPUT_METADATA_FAILED",
+            "read",
+        ),
+        (
+            vec!["get", "--output", output.to_str().unwrap()],
+            download_error,
+            "OUTPUT_STAGING_CREATE_FAILED",
+            "prepare",
+        ),
+    ] {
+        let mut command = vec!["--format", "json"];
+        command.extend(arguments);
+        command.extend([
+            "--connection",
+            config.to_str().unwrap(),
+            "--key",
+            "new",
+            "--overwrite",
+            "true",
+        ]);
+        let result = run(&command);
+        assert_eq!(result.status.code(), Some(5));
+        let envelope = single_json_line(&result);
+        assert_eq!(envelope["error"], serde_json::to_value(error).unwrap());
+        assert_eq!(envelope["error"]["code"], code);
+        assert_eq!(envelope["error"]["category"], "not_found");
+        assert_eq!(envelope["error"]["phase"], phase);
+        assert_eq!(envelope["error"]["remote_effect"], "none");
+        assert_eq!(envelope["error"]["retry"]["kind"], "never");
+        assert!(!envelope.to_string().contains("sentinel-private"));
+    }
+    assert_eq!(std::fs::read_dir(storage).unwrap().count(), 0);
+    assert!(!missing.exists());
 }

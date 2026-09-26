@@ -211,8 +211,77 @@ class SDKTests(unittest.TestCase):
             errors.append(vars(caught.exception))
         self.assertEqual(errors[0], errors[1])
 
+    def test_local_artifact_errors_preserve_phase_and_no_effect(self):
+        missing = self.root / 'sentinel-private-missing'
+        for call, code, phase in [
+            (lambda: self.engine.put(self.connection, 'new', missing, overwrite=True,
+                                    publication_policy='atomic_required'), 'INPUT_METADATA_FAILED', 'read'),
+            (lambda: self.engine.get(self.connection, 'absent', missing / 'output', overwrite=True),
+             'OUTPUT_STAGING_CREATE_FAILED', 'prepare'),
+        ]:
+            with self.assertRaises(StorageError) as caught:
+                call()
+            error = caught.exception
+            self.assertEqual((error.code, error.category, error.phase), (code, 'not_found', phase))
+            self.assertEqual(error.remote_effect, 'none')
+            self.assertEqual(error.retry, {'kind': 'never'})
+            self.assertNotIn('sentinel-private', str(error))
+        self.assertEqual(list(self.storage.iterdir()), [])
+
+    def test_config_and_document_callbacks_cannot_escape_as_public_errors(self):
+        class BadValue:
+            def __deepcopy__(self, _memo):
+                raise RuntimeError('sentinel-deepcopy-secret')
+
+        class BadDict(dict):
+            def items(self):
+                raise RuntimeError('sentinel-document-secret')
+
+        class BadConfig(EngineConfig):
+            def __getattribute__(self, name):
+                if name == 'max_transfer_bytes':
+                    raise RuntimeError('sentinel-config-secret')
+                return super().__getattribute__(name)
+
+        for call in [lambda: Engine(EngineConfig(max_transfer_bytes=BadValue())),
+                     lambda: Engine(BadConfig()),
+                     lambda: self.engine.stat(self.connection, BadDict(value=1))]:
+            with self.assertRaises(StorageError) as caught:
+                call()
+            error = caught.exception
+            self.assertEqual(error.code, 'SDK_INPUT_INVALID')
+            self.assertEqual(error.remote_effect, 'none')
+            self.assertEqual(error.retry, {'kind': 'never'})
+            self.assertNotIn('sentinel-', ''.join(traceback.format_exception(error)))
+
 
 class AsyncTests(unittest.IsolatedAsyncioTestCase):
+    async def test_file_and_serialization_errors_match_sync(self):
+        class BadDict(dict):
+            def items(self):
+                raise RuntimeError('sentinel-document-secret')
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            connection = Connection('local', 'plenora-storage-local-connection-v1',
+                                    {'root': str(root)}, 'local:process')
+            calls = [
+                ('put', (connection, 'new', root / 'missing'),
+                 {'overwrite': True, 'publication_policy': 'atomic_required'}),
+                ('get', (connection, 'absent', root / 'missing' / 'download'), {'overwrite': True}),
+                ('stat', (connection, BadDict(value=1)), {}),
+            ]
+            with Engine() as sync:
+                async with AsyncEngine() as asynchronous:
+                    for method, args, kwargs in calls:
+                        with self.assertRaises(StorageError) as expected:
+                            getattr(sync, method)(*args, **kwargs)
+                        with self.assertRaises(StorageError) as actual:
+                            await getattr(asynchronous, method)(*args, **kwargs)
+                        self.assertEqual(vars(expected.exception), vars(actual.exception))
+                        self.assertNotIn('sentinel-', ''.join(traceback.format_exception(actual.exception)))
+            self.assertEqual(list(root.iterdir()), [])
+
     async def test_cancelled_success_survives_task_and_timeout_wrappers(self):
         # Model an operation that committed just as cancellation arrived.
         for wrapper in ['direct', 'wait_for', 'timeout']:

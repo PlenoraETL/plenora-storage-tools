@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Preserve local artifact error causes and read/prepare/write/commit phases across Rust, CLI and Python; keep existing codes and redacted OS errors.
+- Prevent Python input serialization callbacks from leaking raw exceptions; avoid deep-copying unvalidated engine configuration.
+- Document the public API behavior baseline and its executable compatibility tests, with remaining API freeze work explicit.
+
 - Disable implicit HTTP retries across S3, Azure, GCS and WebDAV; preserve ambiguous mutation outcomes for host reconciliation and reject invalid TLS without a retry loop.
 - Release idle SMB sockets when the final connection owner drops; qualify persistent SDK resource use across all nine fixtures.
 - Preserve access to settled async cancellation outcomes through Python 3.10 and `wait_for` wrappers with `cancellation_outcome()`.
