@@ -65,7 +65,8 @@ def build(output, target_dir):
     with tempfile.TemporaryDirectory(prefix='storage-source-build-') as temporary:
         work = Path(temporary)
         raw = work / 'source.tar'
-        subprocess.run(['git', 'archive', '--format=tar', f'--prefix={prefix}/',
+        subprocess.run(['git', '-c', 'core.autocrlf=false', '-c', 'core.eol=lf',
+                        'archive', '--format=tar', f'--prefix={prefix}/',
                         f'--output={raw}', revision], cwd=ROOT, check=True)
         with raw.open('rb') as source, archive.open('wb') as output_file:
             with gzip.GzipFile(filename='', fileobj=output_file, mode='wb', mtime=0) as compressed:
