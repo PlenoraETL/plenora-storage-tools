@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import venv
 from versioning import workspace_version
 
@@ -29,9 +30,10 @@ def build(output, release=True):
     venv.EnvBuilder(with_pip=True).create(environment)
     python = environment / ('Scripts/python.exe' if sys.platform == 'win32' else 'bin/python')
     subprocess.run([str(python), '-m', 'pip', 'install', '--no-index', '--force-reinstall', str(wheel)], check=True)
-    result = subprocess.run([str(python), '-m', 'unittest', 'discover', '-s',
-                             str(ROOT / 'crates/plenora-storage-py/python/tests'), '-v'],
-                            cwd=ROOT, capture_output=True, text=True)
+    with tempfile.TemporaryDirectory(prefix='storage-wheel-tests-') as temporary:
+        result = subprocess.run([str(python), '-I', '-m', 'unittest', 'discover', '-s',
+                                 str(ROOT / 'crates/plenora-storage-py/python/tests'), '-v'],
+                                cwd=temporary, capture_output=True, text=True)
     log = output / 'python-tests.log'
     log.write_text(result.stdout + result.stderr, encoding='utf-8')
     if result.returncode:

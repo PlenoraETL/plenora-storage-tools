@@ -27,8 +27,9 @@ directory, resume o copia tra provider. `close` impedisce nuove chiamate; quelle
 già in corso usano i propri token di cancellazione. La cancellazione asyncio
 attende l'esito della chiamata Rust e lo rende disponibile sull'eccezione.
 
-Restano qualifiche distinte: adozione formale del profilo Python upstream,
-benchmark con SLO, campagne fuzz e copertura quantitativa. Non vengono dichiarate
+Il contratto comune Python è incluso nel manifest della wheel, con test della
+distribuzione installata. Restano qualifiche distinte: benchmark con SLO,
+campagne fuzz e copertura quantitativa. Non vengono dichiarate
 completate per analogia con Database Tools. Le prove su emulatori cloud, Samba e
 WsgiDAV non certificano automaticamente account cloud reali, Windows Server,
 Nextcloud, ACL/DFS ADLS o altri server.

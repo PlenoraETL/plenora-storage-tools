@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Start the 1.0.0-alpha.1 development series; no stable 1.0 release is published.
+- Support pinned SFTP public-key authentication with plain or encrypted OpenSSH keys resolved by the host.
+- Align Python discovery, version identity, root errors and async lifecycle with the common SDK contract; verify the installed wheel outside the checkout.
+- Add a reusable target qualification command and retain candidate test logs.
 - Prepare complete Cargo caches before offline Python builds on clean CI runners.
 - Normalize Rust prerelease versions to Python wheel metadata and preserve qualification gates for release candidates.
 

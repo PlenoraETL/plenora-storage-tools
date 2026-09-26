@@ -98,7 +98,7 @@ def main():
                     raise AssertionError('deleted object remains')
                 results.append({'provider': provider, 'operations': 7, 'status': 'PASS', 'async_stat': 'PASS'})
                 print(f'PASS installed Python SDK: {provider}', flush=True)
-    report = {'version': __version__, 'wheel': args.wheel.name,
+    report = {'version': engine.capabilities()['component_version'], 'package_version': __version__, 'wheel': args.wheel.name,
               'wheel_sha256': hashlib.sha256(args.wheel.read_bytes()).hexdigest(), 'results': results}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')

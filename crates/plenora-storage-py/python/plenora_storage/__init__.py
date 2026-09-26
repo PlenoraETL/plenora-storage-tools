@@ -9,16 +9,27 @@ import asyncio
 from dataclasses import asdict, dataclass
 import json
 import os
+import re
 from typing import Any, Callable, Mapping
 
 from . import _native
-from ._native import CancellationToken, __version__
+from ._native import CancellationToken
 
-__all__ = ["Engine", "AsyncEngine", "EngineConfig", "Connection", "StorageError",
-           "CancellationToken", "__version__"]
+# Cargo uses SemVer prereleases; wheel metadata uses the equivalent PEP 440 form.
+__version__ = re.sub(r"-(alpha|beta|rc)\.(\d+)$",
+                     lambda match: {"alpha": "a", "beta": "b", "rc": "rc"}[match[1]] + match[2],
+                     _native.__version__)
+
+__all__ = ["Engine", "AsyncEngine", "EngineConfig", "Connection", "PlenoraError", "StorageError",
+           "CancellationToken", "version", "__version__"]
 
 
-class StorageError(Exception):
+def version() -> str:
+    """Installed release identity, in the same format as wheel metadata."""
+    return __version__
+
+
+class PlenoraError(Exception):
     """Redacted Rust error, including effect and retry disposition."""
 
     def __init__(self, document: Mapping[str, Any]):
@@ -31,6 +42,16 @@ class StorageError(Exception):
         self.details = dict(document.get("details", {}))
         self.message = document["message"]
         super().__init__(self.message)
+
+
+class StorageError(PlenoraError):
+    """Storage failure with the shared Plenora error axes."""
+
+
+def _invalid(code: str, message: str) -> StorageError:
+    return StorageError({"code": code, "category": "invalid_configuration",
+                         "phase": "validate", "remote_effect": "none",
+                         "retry": {"kind": "never"}, "message": message})
 
 
 @dataclass(frozen=True)
@@ -55,8 +76,11 @@ class Connection:
         return "Connection(<redacted>)"
 
     def _document(self) -> dict[str, Any]:
-        return {"provider": self.provider, "config_contract": self.config_contract,
-                "config": dict(self.config), "credential_ref": self.credential_ref}
+        try:
+            return {"provider": self.provider, "config_contract": self.config_contract,
+                    "config": dict(self.config), "credential_ref": self.credential_ref}
+        except Exception:
+            raise _invalid("SDK_CONNECTION_INVALID", "connection configuration must be a mapping") from None
 
 
 CredentialResolver = Callable[[str], Mapping[str, str]]
@@ -66,7 +90,17 @@ def _encode(value: Any) -> str:
     try:
         return json.dumps(value, allow_nan=False)
     except (TypeError, ValueError, OverflowError):
-        raise ValueError("storage input is not a JSON-compatible document") from None
+        raise _invalid("SDK_INPUT_INVALID", "storage input is not a JSON-compatible document") from None
+
+
+def _path(value: str | os.PathLike[str]) -> str:
+    try:
+        result = os.fspath(value)
+        if not isinstance(result, str):
+            raise TypeError()
+        return result
+    except Exception:
+        raise _invalid("SDK_PATH_INVALID", "file path must resolve to a string") from None
 
 
 def _translate(error: ValueError) -> StorageError:
@@ -89,7 +123,9 @@ class Engine:
     def __init__(self, config: EngineConfig | None = None, *,
                  credential_resolver: CredentialResolver | None = None):
         if credential_resolver is not None and not callable(credential_resolver):
-            raise TypeError("credential_resolver must be callable")
+            raise _invalid("SDK_RESOLVER_INVALID", "credential_resolver must be callable")
+        if config is not None and not isinstance(config, EngineConfig):
+            raise _invalid("SDK_CONFIG_INVALID", "config must be an EngineConfig")
         # The public API accepts Mapping, while PyO3's BTreeMap conversion takes
         # a concrete dict. Convert inside the callback so Rust also redacts any
         # conversion exception, without resolving secrets during construction.
@@ -110,21 +146,27 @@ class Engine:
 
     def __enter__(self) -> Engine:
         if self.is_closed:
-            raise RuntimeError("storage engine is closed")
+            raise StorageError({"code": "ENGINE_CLOSED", "category": "execution",
+                                "phase": "validate", "remote_effect": "none",
+                                "retry": {"kind": "never"}, "message": "storage engine is closed"})
         return self
 
     def __exit__(self, *_args: Any) -> None:
         self.close()
 
     def capabilities(self) -> dict[str, Any]:
-        """Native Rust capability catalog for the providers in this wheel."""
+        """Python capability catalog for the providers in this wheel."""
         return json.loads(self._native.capabilities())
 
     def _invoke(self, operation: str, connection: Connection, request: dict[str, Any], *,
                 cancellation: CancellationToken | None = None,
                 timeout_ms: int | None = None) -> dict[str, Any]:
-        if timeout_ms is not None and (type(timeout_ms) is not int or timeout_ms < 0):
-            raise ValueError("timeout_ms must be a nonnegative integer")
+        if timeout_ms is not None and (type(timeout_ms) is not int or not 0 <= timeout_ms <= 2**64 - 1):
+            raise _invalid("SDK_TIMEOUT_INVALID", "timeout_ms must be an unsigned 64-bit integer")
+        if not isinstance(connection, Connection):
+            raise _invalid("SDK_CONNECTION_INVALID", "connection must be a Connection")
+        if cancellation is not None and not isinstance(cancellation, CancellationToken):
+            raise _invalid("SDK_CANCELLATION_INVALID", "cancellation must be a CancellationToken")
         try:
             result = self._native.invoke(operation, _encode(connection._document()), _encode(request),
                                          cancellation or CancellationToken(), timeout_ms)
@@ -147,13 +189,13 @@ class Engine:
     def get(self, connection: Connection, key: str, output: str | os.PathLike[str], *,
             overwrite: bool, **controls: Any) -> dict[str, Any]:
         """Download to a staged file, then publish atomically at ``output``."""
-        return self._invoke("get", connection, {"key": key, "output": os.fspath(output),
+        return self._invoke("get", connection, {"key": key, "output": _path(output),
                                                 "overwrite": overwrite}, **controls)
 
     def put(self, connection: Connection, key: str, input: str | os.PathLike[str], *,
             overwrite: bool, publication_policy: str, content_type: str | None = None,
             **controls: Any) -> dict[str, Any]:
-        return self._invoke("put", connection, {"key": key, "input": os.fspath(input),
+        return self._invoke("put", connection, {"key": key, "input": _path(input),
                             "overwrite": overwrite, "publication_policy": publication_policy,
                             "content_type": content_type}, **controls)
 
@@ -185,14 +227,18 @@ class AsyncEngine:
         return self._engine.is_closed
 
     async def close(self) -> None:
-        self._engine.close()
+        """Compatibility alias for aclose()."""
+        await self.aclose()
+
+    async def aclose(self) -> None:
+        await asyncio.to_thread(self._engine.close)
 
     async def __aenter__(self) -> AsyncEngine:
         self._engine.__enter__()
         return self
 
     async def __aexit__(self, *_args: Any) -> None:
-        await self.close()
+        await self.aclose()
 
     def capabilities(self) -> dict[str, Any]:
         return self._engine.capabilities()
@@ -201,6 +247,8 @@ class AsyncEngine:
         token = kwargs.setdefault("cancellation", CancellationToken())
         if token is None:
             token = kwargs["cancellation"] = CancellationToken()
+        if not isinstance(token, CancellationToken):
+            raise _invalid("SDK_CANCELLATION_INVALID", "cancellation must be a CancellationToken")
         task = asyncio.create_task(asyncio.to_thread(getattr(self._engine, method), *args, **kwargs))
         try:
             return await asyncio.shield(task)

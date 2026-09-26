@@ -141,7 +141,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     filter=lambda member: None if '__pycache__' in Path(member.name).parts else member)
 
     files = [binary, archive_path, contracts] + [output / p.name for p in packages]
-    files.extend(build_python(output))
+    python_files = build_python(output)
+    files.extend(python_files)
+    wheel = next(path for path in python_files if path.suffix == '.whl')
     sbom_path = output / 'storage-sbom.cdx.json'
     sbom_path.write_text(json.dumps(render_sbom(files), indent=2) + '\n', encoding='utf-8')
     files.append(sbom_path)
@@ -150,6 +152,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         'schema_version': 4, 'component': 'plenora-storage-tools',
         'contracts_source': source, 'profile': 'plenora-storage-tools-profile-v1',
         'artifacts': [
+            {'name': wheel.name, 'surface': 'python_sdk', 'version': version,
+             'digest': 'sha256:' + digest(wheel), 'api_modes': ['sync', 'async'],
+             'verification': ['Installed wheel tests outside the checkout in isolated Python mode',
+                              'python-tests.json and python-tests.log identify the wheel digest']},
             {'name': binary_name, 'surface': 'cli', 'version': version,
              'digest': 'sha256:' + digest(binary),
              'verification': ['CLI protocol schema tests and released binary discovery', 'docs/contract-adoption.md']},
@@ -171,6 +177,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ('plenora-public-security-v1', ['provider preflight, credential reference, SSRF and artifact boundary tests']),
                 ('plenora-cli-v2', ['CLI protocol tests, version and capabilities on the packaged binary']),
                 ('plenora-runtime-binding-v1', ['runtime_binding integration suite executed from extracted core archive']),
+                ('plenora-python-sdk-v1', ['Installed SDK identity, typing, lifecycle, parity, discovery and redaction tests',
+                                         'crates/plenora-storage-py/python/tests/test_sdk.py']),
             ]
         ],
         'deviations': [],

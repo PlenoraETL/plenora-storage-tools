@@ -11,6 +11,8 @@ cp .fixtures/ca.crt /usr/local/share/ca-certificates/plenora-storage-fixture.crt
 update-ca-certificates > /tmp/plenora-storage-certificates.log
 export PLENORA_SFTP_HOST_KEY_SHA256
 PLENORA_SFTP_HOST_KEY_SHA256="$(cat .fixtures/sftp-fingerprint)"
+export PLENORA_SFTP_PRIVATE_KEY_FILE="$PWD/.fixtures/sftp-client"
+export PLENORA_SFTP_ENCRYPTED_KEY_FILE="$PWD/.fixtures/sftp-client-encrypted"
 
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings

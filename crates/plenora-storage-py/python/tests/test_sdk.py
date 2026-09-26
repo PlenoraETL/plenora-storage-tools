@@ -1,16 +1,36 @@
 import asyncio
+import importlib.metadata
+import inspect
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
 import tempfile
 import threading
+import traceback
 import unittest
 from types import MappingProxyType
 
-from plenora_storage import AsyncEngine, CancellationToken, Connection, Engine, EngineConfig, StorageError
+import plenora_storage
+from plenora_storage import AsyncEngine, CancellationToken, Connection, Engine, EngineConfig, PlenoraError, StorageError, version
 
 
 class SDKTests(unittest.TestCase):
+    def test_installed_identity_typing_and_public_surface(self):
+        distribution = importlib.metadata.distribution('plenora-storage')
+        self.assertEqual(version(), distribution.version)
+        self.assertEqual(plenora_storage.__version__, version())
+        installed = Path(distribution.locate_file('plenora_storage')).resolve()
+        self.assertEqual(Path(plenora_storage.__file__).resolve().parent, installed)
+        self.assertEqual(Path(plenora_storage._native.__file__).resolve().parent, installed)
+        self.assertTrue((installed / 'py.typed').is_file())
+        self.assertTrue((installed / '_native.pyi').is_file())
+        self.assertTrue(issubclass(StorageError, PlenoraError))
+        self.assertEqual(set(plenora_storage.__all__), {'Engine', 'AsyncEngine', 'EngineConfig', 'Connection',
+                         'PlenoraError', 'StorageError', 'CancellationToken', 'version', '__version__'})
+        for operation in ['test', 'list', 'stat', 'get', 'put', 'copy', 'delete']:
+            self.assertEqual(inspect.signature(getattr(Engine, operation)),
+                             inspect.signature(getattr(AsyncEngine, operation)))
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -150,9 +170,46 @@ class SDKTests(unittest.TestCase):
 
     def test_full_catalog(self):
         catalog = self.engine.capabilities()
+        self.assertEqual(catalog['component_version'], plenora_storage._native.__version__)
+        self.assertEqual(catalog['interfaces'], [{'kind': 'python_sdk', 'contract': 'plenora-python-sdk-v1',
+                                                'version': 1, 'artifact': 'plenora-storage'}])
+        self.assertTrue(all(operation['surfaces'] == ['python_sdk'] for operation in catalog['operations']))
         self.assertEqual(len(catalog['operations']), 7)
         self.assertEqual({provider['provider'] for provider in catalog['operations'][0]['attributes']['providers']},
                          {'local', 's3', 'sftp', 'ftp', 'ftps', 'azure', 'gcs', 'smb', 'webdav'})
+
+    def test_boundary_errors_are_typed_redacted_and_have_no_effect(self):
+        class BadPath:
+            def __fspath__(self):
+                raise ValueError('sentinel-path-secret')
+        calls = [lambda: self.engine.test(self.connection, timeout_ms=2**64),
+                 lambda: self.engine.test(self.connection, timeout_ms=True),
+                 lambda: self.engine.test(self.connection, cancellation='sentinel-token-secret'),
+                 lambda: self.engine.test(replace(self.connection, config='sentinel-config-secret')),
+                 lambda: self.engine.get(self.connection, 'absent', BadPath(), overwrite=True),
+                 lambda: Engine('sentinel-config-secret'),
+                 lambda: Engine(credential_resolver='sentinel-resolver-secret')]
+        for call in calls:
+            try:
+                call()
+            except PlenoraError as error:
+                self.assertEqual(error.remote_effect, 'none')
+                self.assertEqual(error.retry, {'kind': 'never'})
+                self.assertNotIn('sentinel-', str(error))
+                self.assertNotIn('sentinel-', repr(error))
+                self.assertNotIn('sentinel-path-secret', ''.join(traceback.format_exception(error)))
+            else:
+                self.fail('invalid SDK input accepted')
+        self.assertEqual(list(self.storage.iterdir()), [])
+
+    def test_closed_context_uses_same_axes_as_operations(self):
+        self.engine.close()
+        errors = []
+        for call in [self.engine.__enter__, lambda: self.engine.test(self.connection)]:
+            with self.assertRaises(PlenoraError) as caught:
+                call()
+            errors.append(vars(caught.exception))
+        self.assertEqual(errors[0], errors[1])
 
 
 class AsyncTests(unittest.IsolatedAsyncioTestCase):
@@ -163,6 +220,23 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
                 await engine.test(connection)
                 self.assertEqual((await engine.list(connection))['objects'], [])
             self.assertTrue(engine.is_closed)
+            await engine.aclose()
+            await engine.close()
+            with self.assertRaises(PlenoraError):
+                await engine.__aenter__()
+            with self.assertRaises(PlenoraError) as caught:
+                await engine.test(connection)
+            self.assertEqual(caught.exception.code, 'ENGINE_CLOSED')
+
+    async def test_async_invalid_controls_match_sync(self):
+        connection = Connection('local', 'plenora-storage-local-connection-v1', {'root': '.'}, 'local:process')
+        for controls in [{'timeout_ms': -1}, {'timeout_ms': 2**64}, {'cancellation': object()}]:
+            with Engine() as sync, self.assertRaises(PlenoraError) as synchronous:
+                sync.test(connection, **controls)
+            async with AsyncEngine() as asynchronous:
+                with self.assertRaises(PlenoraError) as caught:
+                    await asynchronous.test(connection, **controls)
+            self.assertEqual(vars(synchronous.exception), vars(caught.exception))
 
     async def test_cancellation_drains_blocked_resolver_without_blocking_event_loop(self):
         entered = threading.Event()
@@ -177,6 +251,8 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
                                credential_resolver=resolver) as engine:
             task = asyncio.create_task(engine.test(connection))
             self.assertTrue(await asyncio.to_thread(entered.wait, 5))
+            await asyncio.wait_for(engine.aclose(), 1)
+            self.assertTrue(engine.is_closed)
             task.cancel()
             await asyncio.sleep(0.02)
             self.assertFalse(task.done())

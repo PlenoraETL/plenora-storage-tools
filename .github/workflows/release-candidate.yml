@@ -27,7 +27,7 @@ jobs:
       - run: docker compose build storage-rust
       - run: bash scripts/prepare-fixtures.sh
       - run: bash scripts/prepare-extended-fixtures.sh
-      - run: docker compose -f docker-compose.yml -f compose.extended.yml run --rm --no-deps storage-rust
+      - run: python3 scripts/run_logged.py target/release-evidence/x86_64-unknown-linux-gnu-tests.log docker compose -f docker-compose.yml -f compose.extended.yml run --rm --no-deps storage-rust
       - name: Build and qualify release in Debian Bookworm
         run: |
           docker compose -f docker-compose.yml -f compose.extended.yml run --rm --no-deps storage-rust bash -c '
@@ -37,22 +37,14 @@ jobs:
             python3 scripts/build_release.py
             cp .fixtures/ca.crt /usr/local/share/ca-certificates/plenora-storage-fixture.crt
             update-ca-certificates
-            export PLENORA_SFTP_HOST_KEY_SHA256="$(cat .fixtures/sftp-fingerprint)"
-            export PLENORA_CLI_BIN="$PWD/dist/$version/x86_64-unknown-linux-gnu/plenora-storage"
-            python3 scripts/qualify_extended.py
-            python3 scripts/qualify_extended_faults.py
-            cp target/release-readiness/extended-*.json dist/$version/x86_64-unknown-linux-gnu/
-            python3 scripts/audit_release_readiness.py
-            python3 scripts/qualify_cli.py > dist/$version/x86_64-unknown-linux-gnu/qualification.json
-            python3 scripts/qualify_commit_faults.py > dist/$version/x86_64-unknown-linux-gnu/commit-faults.json
-            cp target/release-readiness/results.json dist/$version/x86_64-unknown-linux-gnu/cli-regressions.json
-            target/python-sdk-test/bin/python scripts/qualify_python.py --wheel dist/$version/x86_64-unknown-linux-gnu/*.whl --output dist/$version/x86_64-unknown-linux-gnu/python-qualification.json
-            python3 scripts/verify_release.py dist/$version
+            python3 scripts/qualify_target.py "dist/$version/x86_64-unknown-linux-gnu"
           '
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: storage-candidate-linux
-          path: dist/
+          path: |
+            dist/
+            target/release-evidence/
           if-no-files-found: error
       - if: always()
         run: docker compose -f docker-compose.yml -f compose.extended.yml down
@@ -68,7 +60,7 @@ jobs:
           python-version: '3.11'
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
-      - run: cargo test --workspace --all-targets --locked
+      - run: python scripts/run_logged.py target/release-evidence/x86_64-pc-windows-msvc-tests.log cargo test --workspace --all-targets --locked
       - run: cargo fetch --locked
       - run: python -m pip install maturin==1.15.0
       - run: python scripts/build_release.py
@@ -85,5 +77,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: storage-candidate-windows
-          path: dist/
+          path: |
+            dist/
+            target/release-evidence/
           if-no-files-found: error

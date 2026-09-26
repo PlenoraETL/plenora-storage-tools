@@ -71,8 +71,12 @@ Non è una firma digitale né una promessa di build identiche bit per bit.
   per digest nel compose. Non estendere il claim ad AWS o ad altri server senza
   eseguire la matrice del documento release-readiness.
 - FTP è in chiaro e richiede autorizzazione esplicita. FTPS esplicito verifica
-  il certificato TLS; SFTP usa password e pin SHA-256. L'autenticazione SSH
-  tramite chiave privata non è implementata.
+  il certificato TLS; SFTP usa pin SHA-256 con password oppure chiave privata
+  OpenSSH, anche cifrata. Il resolver fornisce `username` e una sola modalità:
+  `password` oppure `private_key` con `passphrase` opzionale. La chiave contiene
+  il testo del file, non il suo percorso; il limite è 64 KiB. Password e chiave
+  mescolate vengono rifiutate prima della connessione. Le fixture esercitano
+  chiavi Ed25519; altre famiglie richiedono prove dedicate.
 - Il root remoto è un namespace applicativo, non una sandbox contro symlink o
   hardlink ostili. Il server deve applicare isolamento/chroot e permessi corretti.
 - Le deadline sono cooperative. `unknown` richiede verifica dello stato remoto,

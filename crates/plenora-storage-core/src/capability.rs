@@ -34,6 +34,7 @@ pub struct CapabilityInterface {
 pub enum Surface {
     Rust,
     Cli,
+    PythonSdk,
     Runtime,
 }
 
@@ -136,6 +137,7 @@ fn interface(surface: Surface) -> CapabilityInterface {
     let (contract, version, artifact) = match surface {
         Surface::Rust => (RUST_INTERFACE_CONTRACT, 1, "plenora-storage-core"),
         Surface::Cli => (CLI_INTERFACE_CONTRACT, 2, "plenora-storage"),
+        Surface::PythonSdk => ("plenora-python-sdk-v1", 1, "plenora-storage"),
         Surface::Runtime => (RUNTIME_INTERFACE_CONTRACT, 1, CAPABILITY_NAME),
     };
     CapabilityInterface {
@@ -187,8 +189,8 @@ fn transfer_attributes(action: &str, surface: Surface) -> Value {
     let mode = match (action, surface) {
         ("get", Surface::Rust) => "streaming_sink",
         ("put", Surface::Rust) => "streaming_source",
-        ("get", Surface::Cli) => "local_file_sink",
-        ("put", Surface::Cli) => "local_file_source",
+        ("get", Surface::Cli | Surface::PythonSdk) => "local_file_sink",
+        ("put", Surface::Cli | Surface::PythonSdk) => "local_file_source",
         ("get", Surface::Runtime) => "runtime_artifact_sink",
         ("put", Surface::Runtime) => "runtime_artifact_source",
         _ => "none",

@@ -21,3 +21,5 @@ docker compose run --rm minio-init
 docker compose exec -T sftp ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub \
   | awk '{print $2}' > .fixtures/sftp-fingerprint
 test -s .fixtures/sftp-fingerprint
+
+bash scripts/prepare-sftp-keys.sh

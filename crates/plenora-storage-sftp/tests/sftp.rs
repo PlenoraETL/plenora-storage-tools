@@ -10,6 +10,102 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 struct TestCredentials;
 
+struct KeyCredentials {
+    encoded: String,
+    passphrase: Option<String>,
+}
+
+impl CredentialResolver for KeyCredentials {
+    fn resolve(&self, _reference: &str) -> StorageResult<CredentialMaterial> {
+        let mut fields = BTreeMap::from([
+            ("username".to_owned(), "plenora".to_owned()),
+            ("private_key".to_owned(), self.encoded.clone()),
+        ]);
+        if let Some(passphrase) = &self.passphrase {
+            fields.insert("passphrase".to_owned(), passphrase.clone());
+        }
+        Ok(CredentialMaterial::new(fields))
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires the Docker storage fixtures and ephemeral client keys"]
+async fn pinned_private_key_authentication_accepts_plain_and_encrypted_keys() -> StorageResult<()> {
+    for (variable, passphrase) in [
+        ("PLENORA_SFTP_PRIVATE_KEY_FILE", None),
+        (
+            "PLENORA_SFTP_ENCRYPTED_KEY_FILE",
+            Some("plenora-key-fixture-secret".to_owned()),
+        ),
+    ] {
+        let encoded = std::fs::read_to_string(std::env::var(variable).expect("fixture key path"))
+            .expect("fixture key");
+        let mut engine = Engine::new(EngineConfig {
+            allow_private_network: true,
+            ..EngineConfig::default()
+        });
+        engine.register_provider(Arc::new(SftpProvider::new(Arc::new(KeyCredentials {
+            encoded,
+            passphrase,
+        }))))?;
+        let mut config = connection();
+        config.config["host_key_sha256"] = serde_json::json!(
+            std::env::var("PLENORA_SFTP_HOST_KEY_SHA256").expect("fixture host pin")
+        );
+        assert!(
+            engine
+                .test(&config, &ExecutionControl::default())
+                .await?
+                .reachable
+        );
+        config.config["host_key_sha256"] =
+            serde_json::json!("SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+        assert!(
+            engine
+                .test(&config, &ExecutionControl::default())
+                .await
+                .is_err()
+        );
+    }
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore = "requires the Docker storage fixtures and ephemeral client keys"]
+async fn encrypted_private_key_rejects_wrong_passphrase_without_exposing_material()
+-> StorageResult<()> {
+    let encoded = std::fs::read_to_string(
+        std::env::var("PLENORA_SFTP_ENCRYPTED_KEY_FILE").expect("fixture key path"),
+    )
+    .expect("fixture key");
+    let mut engine = Engine::new(EngineConfig {
+        allow_private_network: true,
+        ..EngineConfig::default()
+    });
+    engine.register_provider(Arc::new(SftpProvider::new(Arc::new(KeyCredentials {
+        encoded,
+        passphrase: Some("wrong-secret".to_owned()),
+    }))))?;
+    let mut config = connection();
+    config.config["host_key_sha256"] =
+        serde_json::json!(std::env::var("PLENORA_SFTP_HOST_KEY_SHA256").expect("fixture host pin"));
+    let error = engine
+        .test(&config, &ExecutionControl::default())
+        .await
+        .expect_err("wrong passphrase");
+    assert_eq!(error.code, "SFTP_PRIVATE_KEY_INVALID");
+    assert_eq!(
+        error.remote_effect,
+        plenora_storage_core::RemoteEffect::None
+    );
+    assert!(
+        !serde_json::to_string(&error)
+            .expect("error")
+            .contains("wrong-secret")
+    );
+    Ok(())
+}
+
 impl CredentialResolver for TestCredentials {
     fn resolve(&self, _reference: &str) -> StorageResult<CredentialMaterial> {
         Ok(CredentialMaterial::new(BTreeMap::from([

@@ -13,16 +13,17 @@ use std::{
 
 use async_trait::async_trait;
 use plenora_storage_core::{
-    ArtifactMetadata, CopyRequest, CredentialResolver, DeleteRequest, DeleteResult, ErrorCategory,
-    ErrorPhase, GetRequest, IntegrityMetadata, ObjectMetadata, OperationContext,
-    ProviderCapabilities, ProviderConnection, ProviderListRequest, ProviderListResult,
-    PublicationPolicy, PutRequest, RemoteEffect, RetryDisposition, StatRequest, StorageError,
-    StorageProvider, StorageResult, TestResult, TransferResult, directory_may_contain,
-    key_matches_prefix, resolve_network_target, validate_object_key, validate_object_prefix,
+    ArtifactMetadata, CopyRequest, CredentialMaterial, CredentialResolver, DeleteRequest,
+    DeleteResult, ErrorCategory, ErrorPhase, GetRequest, IntegrityMetadata, ObjectMetadata,
+    OperationContext, ProviderCapabilities, ProviderConnection, ProviderListRequest,
+    ProviderListResult, PublicationPolicy, PutRequest, RemoteEffect, RetryDisposition, StatRequest,
+    StorageError, StorageProvider, StorageResult, TestResult, TransferResult,
+    directory_may_contain, key_matches_prefix, resolve_network_target, validate_object_key,
+    validate_object_prefix,
 };
 use russh::{
     client,
-    keys::{HashAlg, PublicKeyOrCertificate},
+    keys::{HashAlg, PrivateKey, PrivateKeyWithHashAlg, PublicKeyOrCertificate, decode_secret_key},
 };
 use russh_sftp::{
     client::{RawSftpSession, SftpSession, error::Error as SftpError, fs::Metadata},
@@ -96,7 +97,7 @@ impl SftpProvider {
             .resolve(&connection.credential_ref)
             .map_err(|error| error.with_provider(PROVIDER_ID))?;
         let username = credential.required("username")?.to_owned();
-        let password = credential.required("password")?.to_owned();
+        let authentication = SftpAuthentication::from_material(&credential)?;
         let handler = SshClient {
             expected_fingerprint: config.host_key_sha256.clone(),
             allow_unverified: context.policy.allow_unverified_ssh,
@@ -108,10 +109,21 @@ impl SftpProvider {
         )
         .await
         .map_err(map_ssh_connect_error)?;
-        let authenticated = ssh
-            .authenticate_password(username, password)
-            .await
-            .map_err(map_ssh_connect_error)?;
+        let authenticated = match authentication {
+            SftpAuthentication::Password(password) => {
+                ssh.authenticate_password(username, password).await
+            }
+            SftpAuthentication::PrivateKey(key) => {
+                let hash = ssh
+                    .best_supported_rsa_hash()
+                    .await
+                    .map_err(map_ssh_connect_error)?
+                    .flatten();
+                ssh.authenticate_publickey(username, PrivateKeyWithHashAlg::new(key, hash))
+                    .await
+            }
+        }
+        .map_err(map_ssh_connect_error)?;
         if !authenticated.success() {
             return Err(StorageError::new(
                 ErrorCategory::Authentication,
@@ -150,6 +162,44 @@ impl SftpProvider {
 struct SshClient {
     expected_fingerprint: Option<String>,
     allow_unverified: bool,
+}
+
+enum SftpAuthentication {
+    Password(String),
+    PrivateKey(Arc<PrivateKey>),
+}
+
+impl SftpAuthentication {
+    fn from_material(material: &CredentialMaterial) -> StorageResult<Self> {
+        match (
+            material.optional("password"),
+            material.optional("private_key"),
+        ) {
+            (Some(password), None) if material.optional("passphrase").is_none() => {
+                Ok(Self::Password(password.to_owned()))
+            }
+            (None, Some(encoded)) if encoded.len() <= 65_536 => {
+                let key =
+                    decode_secret_key(encoded, material.optional("passphrase")).map_err(|_| {
+                        StorageError::new(
+                            ErrorCategory::Authentication,
+                            ErrorPhase::Validate,
+                            RemoteEffect::None,
+                            RetryDisposition::Never,
+                            "SFTP_PRIVATE_KEY_INVALID",
+                            "SFTP private key could not be decoded or decrypted",
+                        )
+                        .with_provider(PROVIDER_ID)
+                    })?;
+                Ok(Self::PrivateKey(Arc::new(key)))
+            }
+            _ => Err(StorageError::invalid_configuration(
+                "SFTP_CREDENTIAL_FIELDS_INVALID",
+                "SFTP credentials require either password or private_key with optional passphrase",
+            )
+            .with_provider(PROVIDER_ID)),
+        }
+    }
 }
 
 impl client::Handler for SshClient {
@@ -280,7 +330,10 @@ impl StorageProvider for SftpProvider {
                 .collect(),
             attributes: BTreeMap::from([
                 ("api".to_owned(), "sftp-v3".to_owned()),
-                ("authentication".to_owned(), "password".to_owned()),
+                (
+                    "authentication".to_owned(),
+                    "password,public_key".to_owned(),
+                ),
                 ("host_key_verification".to_owned(), "sha256-pin".to_owned()),
                 ("streaming_get".to_owned(), "true".to_owned()),
                 ("streaming_put".to_owned(), "true".to_owned()),
@@ -1425,6 +1478,42 @@ mod tests {
         Arc,
         atomic::{AtomicUsize, Ordering},
     };
+
+    #[test]
+    fn private_key_errors_and_ambiguous_credentials_are_redacted() {
+        use super::{CredentialMaterial, SftpAuthentication};
+        for fields in [
+            vec![
+                ("private_key", "private-material-never-echo"),
+                ("passphrase", "secret-phrase"),
+            ],
+            vec![
+                ("private_key", "private-material-never-echo"),
+                ("password", "secret-password"),
+            ],
+            vec![
+                ("password", "secret-password"),
+                ("passphrase", "secret-phrase"),
+            ],
+            vec![],
+        ] {
+            let material = CredentialMaterial::new(
+                fields
+                    .into_iter()
+                    .map(|(k, v)| (k.to_owned(), v.to_owned()))
+                    .collect(),
+            );
+            let Err(error) = SftpAuthentication::from_material(&material) else {
+                panic!("invalid credentials accepted");
+            };
+            assert_eq!(error.remote_effect, RemoteEffect::None);
+            assert_eq!(error.phase, ErrorPhase::Validate);
+            let public = serde_json::to_string(&error).expect("public error");
+            assert!(!public.contains("private-material-never-echo"));
+            assert!(!public.contains("secret-phrase"));
+            assert!(!public.contains("secret-password"));
+        }
+    }
 
     #[tokio::test]
     async fn host_key_pin_is_required_unless_explicitly_disabled() {

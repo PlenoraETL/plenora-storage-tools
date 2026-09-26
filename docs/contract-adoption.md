@@ -19,10 +19,13 @@ segreti e artifact, trasporto e lifecycle.
 | Public Security v1 | Identità remota, opt-in separati, riferimenti ai segreti, policy di rete, artifact opachi e preflight | Test provider HTTPS/pin corretto e errato, test network/credential/connection, suite runtime e regressioni CLI |
 | CLI v2 | JSON unico, stderr vuoto, exit code, version/capabilities, input fail-closed, deadline/cancellazione | `cli/tests/protocol.rs`, `audit_release_readiness.py`, `qualify_cli.py`, `qualify_commit_faults.py` |
 | Runtime Binding v1 | RT-001–RT-015: route, versioni, content type, UUID canonici, controlli, artifact, risultati ed errori completi | `core/tests/runtime_binding.rs`, eseguito anche dall'archivio Cargo estratto |
+| Python SDK v1 | Identità wheel, typing, sync/async, lifecycle, errori e discovery Python | `python/tests/test_sdk.py`, eseguito dalla wheel installata in modalità isolata fuori dal checkout |
 
-Non sono dichiarate deviazioni dai sei contratti nel perimetro descritto.
-La certificazione del profilo Python, trasporto runtime del consumer, autenticazione SSH a chiave,
-compatibilità AWS e SLO prestazionali non sono superfici o garanzie adottate.
+Il contratto comune Python si applica alla wheel distribuita; è aggiunto al
+manifest v4 senza modificare il profilo storage upstream. Il testo normativo è
+copiato dalla medesima revisione in `contracts/upstream/PYTHON-SDK-1.0.md`.
+Trasporto runtime del consumer, compatibilità AWS e SLO prestazionali non sono
+garanzie adottate. La qualifica operativa resta distinta dai test contrattuali.
 FTP non offre pubblicazione atomica o create-if-absent: discovery e rifiuto
 anticipato esplicitano queste limitazioni, come previsto dal profilo.
 
@@ -55,6 +58,7 @@ deadline sia con SIGTERM, e commit SFTP interrotto prima/dopo pubblicazione.
 Non costituiscono una dimostrazione contro ogni guasto del server o filesystem;
 gli esiti non dimostrabili restano `unknown` e richiedono recovery.
 
-Lo SDK Python è distribuito e testato separatamente nella wheel; non viene
-aggiunto al manifest di adozione storage v1 come superficie certificata senza
-le prove del relativo profilo. Vedere [allineamento](database-alignment.md).
+Lo SDK Python è distribuito nella wheel; il manifest ne identifica il digest e
+le modalità `sync` e `async`. Le ricevute delle release precedenti non cambiano:
+queste nuove evidenze riguardano soltanto gli artefatti che le includono.
+Vedere [allineamento](database-alignment.md).

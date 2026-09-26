@@ -4,7 +4,7 @@
 use plenora_storage_core::{
     CancellationToken, CredentialMaterial, CredentialResolver, Engine, EngineConfig,
     EnvironmentCredentialResolver, ExecutionControl, ProviderConnection, StorageError,
-    StorageResult,
+    StorageResult, Surface,
 };
 use plenora_storage_engine::{PutFileOptions, build_engine, get_to_file, put_from_file};
 use pyo3::{exceptions::PyValueError, prelude::*};
@@ -12,7 +12,7 @@ use serde::{Deserialize, de::DeserializeOwned};
 use std::{
     collections::BTreeMap,
     path::PathBuf,
-    sync::Arc,
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
@@ -53,7 +53,7 @@ impl Token {
 #[pyclass(name = "Engine", module = "plenora_storage._native", frozen)]
 struct NativeEngine {
     engine: Engine,
-    runtime: tokio::runtime::Runtime,
+    runtime: Mutex<Option<Arc<tokio::runtime::Runtime>>>,
 }
 
 #[pymethods]
@@ -68,11 +68,25 @@ impl NativeEngine {
             .build()
             .map_err(|_| PyValueError::new_err("storage runtime creation failed"))?;
         let engine = build_engine(config, Arc::new(Credentials(resolver))).map_err(python_error)?;
-        Ok(Self { engine, runtime })
+        Ok(Self {
+            engine,
+            runtime: Mutex::new(Some(Arc::new(runtime))),
+        })
     }
 
-    fn close(&self) {
+    fn close(&self, py: Python<'_>) {
         self.engine.close();
+        // Release idle worker threads deterministically. In-flight invocations
+        // retain their own Arc until they settle, including Python callbacks.
+        // Never wait for runtime shutdown while holding the GIL or this mutex.
+        py.detach(|| {
+            let runtime = self
+                .runtime
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .take();
+            drop(runtime);
+        });
     }
     #[getter]
     fn is_closed(&self) -> bool {
@@ -80,7 +94,7 @@ impl NativeEngine {
     }
 
     fn capabilities(&self) -> PyResult<String> {
-        encode(&self.engine.capabilities()).map_err(python_error)
+        encode(&self.engine.capabilities_for(Surface::PythonSdk)).map_err(python_error)
     }
 
     #[pyo3(signature = (operation, connection, request, token, timeout_ms=None))]
@@ -104,9 +118,17 @@ impl NativeEngine {
                     })?,
             );
         }
-        py.detach(|| {
-            self.runtime
-                .block_on(self.execute(operation, &connection, request, &control))
+        let runtime = self
+            .runtime
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .as_ref()
+            .cloned()
+            .ok_or_else(|| python_error(StorageError::engine_closed()))?;
+        py.detach(move || {
+            let result = runtime.block_on(self.execute(operation, &connection, request, &control));
+            drop(runtime);
+            result
         })
         .map_err(python_error)
     }

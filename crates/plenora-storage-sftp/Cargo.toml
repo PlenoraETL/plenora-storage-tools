@@ -13,7 +13,7 @@ readme = "../../README.md"
 [dependencies]
 hex.workspace = true
 async-trait.workspace = true
-plenora-storage-core = { path = "../plenora-storage-core", version = "0.2.2" }
+plenora-storage-core = { path = "../plenora-storage-core", version = "1.0.0-alpha.1" }
 russh.workspace = true
 russh-sftp.workspace = true
 serde.workspace = true

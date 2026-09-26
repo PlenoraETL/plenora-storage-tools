@@ -33,13 +33,16 @@ and the repository's vendored contracts.
 `AsyncEngine` offers the same methods with `await` and `async with`. Cancelling
 an asyncio task signals Rust and waits for the operation to settle; inspect
 `CancelledError.storage_error` or `.storage_result` before retrying a mutation.
-`StorageError` exposes `code`, `category`, `phase`, `remote_effect`, `retry`, and
+`StorageError`, a subclass of `PlenoraError`, exposes `code`, `category`, `phase`, `remote_effect`, `retry`, and
 `provider`. Closing rejects new operations; it does not cancel existing calls.
 Keep engines alive until pending calls finish. No connection pooling is promised.
 
-`capabilities()` returns the compiled **Rust** catalog, not a claim of Python
-profile certification. The Python convenience API is typed and follows the same
-error and lifecycle semantics; Python profile adoption requires its own evidence.
+`capabilities()` returns the `python_sdk` catalog for this wheel. `version()`
+matches installed distribution metadata; prereleases use PEP 440 notation
+(`1.0.0a1` corresponds to native `1.0.0-alpha.1`). `AsyncEngine.aclose()` is the
+deterministic async lifecycle method; `await close()` remains an alias.
+The common Python SDK contract and installed-wheel tests are included in the
+adoption manifest. Operational qualification of each final wheel is separate.
 
 Build locally with `maturin build --locked --manifest-path
 crates/plenora-storage-py/Cargo.toml`. Select providers with `--no-default-features
