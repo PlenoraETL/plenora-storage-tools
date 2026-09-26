@@ -7,7 +7,7 @@ use bytes::Bytes;
 use futures_util::{Stream, StreamExt};
 use object_store::{
     Attribute, AttributeValue, Attributes, ObjectStore, ObjectStoreExt, PutMode, PutOptions,
-    azure::MicrosoftAzureBuilder, path::Path,
+    RetryConfig, azure::MicrosoftAzureBuilder, path::Path,
 };
 use plenora_storage_core::{
     CredentialResolver, EngineConfig, ErrorCategory, ErrorPhase, ObjectMetadata, OperationContext,
@@ -64,6 +64,10 @@ impl ProviderFactory for Azure {
             .with_container_name(cfg.container)
             .with_endpoint(cfg.endpoint)
             .with_allow_http(context.policy.allow_insecure_http)
+            .with_retry(RetryConfig {
+                max_retries: 0,
+                ..RetryConfig::default()
+            })
             .with_http_connector(connector);
         let builder = if let Some(token) = material.optional("bearer_token") {
             builder.with_bearer_token_authorization(token)

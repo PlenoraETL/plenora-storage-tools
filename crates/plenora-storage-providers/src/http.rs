@@ -49,6 +49,7 @@ impl Connector {
         reqwest::Client::builder()
             .https_only(!self.allow_http)
             .no_proxy()
+            .retry(reqwest::retry::never())
             .redirect(reqwest::redirect::Policy::none())
             .resolve_to_addrs(&self.host, &self.addresses)
             .connect_timeout(Duration::from_secs(10))

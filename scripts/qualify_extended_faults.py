@@ -19,8 +19,10 @@ LEGACY_TESTS = {
     'webdav_absent_optional_property', 'webdav_outside_root_rejected',
     'webdav_partial_multistatus_not_success', 'webdav_commit_deadline_unknown',
 }
-EXPECTED_TESTS = LEGACY_TESTS | {'webdav_parent_race_reconciled', 'webdav_parent_not_directory_rejected'}
-ENV = dict(os.environ, PLENORA_FAULT_CREDENTIALS=json.dumps({'bearer_token': SECRET}))
+EXPECTED_TESTS = LEGACY_TESTS | {'webdav_parent_race_reconciled', 'webdav_parent_not_directory_rejected'} | {
+    provider + '_mutation_not_retried' for provider in ['s3', 'azure', 'gcs', 'webdav']}
+ENV = dict(os.environ, PLENORA_FAULT_CREDENTIALS=json.dumps({
+    'bearer_token': SECRET, 'access_key_id': 'fixture', 'secret_access_key': SECRET}))
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -72,6 +74,8 @@ def main():
             config = {'endpoint': endpoint}
             if provider == 'azure':
                 config.update(account='fixture', container='objects')
+            elif provider == 's3':
+                config.update(bucket='objects', region='us-east-1', virtual_hosted_style=False)
             elif provider == 'gcs':
                 config.update(bucket='objects')
             else:
@@ -90,6 +94,18 @@ def main():
 
         def passed(name):
             results.append({'name': name, 'status': 'PASS'})
+
+        for provider in ['s3', 'azure', 'gcs', 'webdav']:
+            for status in [500, 503, 429]:
+                server.status = status
+                before = server.calls
+                policy = 'best-effort' if provider == 'webdav' else 'atomic-required'
+                result = invoke(provider, 'put', ('--key', 'payload', '--input', str(source),
+                                '--overwrite', 'false', '--publication-policy', policy))
+                assert server.calls == before + 1, 'mutation was automatically retried'
+                assert result['error']['remote_effect'] == 'unknown', result
+                assert result['error']['retry']['kind'] == 'requires_recovery', result
+            passed(provider + '_mutation_not_retried')
 
         server.status = 307
         server.redirect = f'http://127.0.0.1:{redirect_target.server_port}/stolen'

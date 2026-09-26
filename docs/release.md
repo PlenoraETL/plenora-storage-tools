@@ -101,6 +101,10 @@ Non è una firma digitale né una promessa di build identiche bit per bit.
 - Le deadline sono cooperative. `unknown` richiede verifica dello stato remoto,
   non retry automatico. In particolare, perdita della risposta al commit e
   terminazione forzata del processo non consentono di provare il rollback.
+- I client HTTP S3, Azure, GCS e WebDAV non ripetono automaticamente le richieste.
+  Anche una risposta 500/503/429 a una mutazione lascia la riconciliazione al
+  consumer; i test contano le richieste ricevute dal server. Questa policy vale
+  anche per le letture: il consumer decide i retry ammessi dall'errore pubblico.
 - Su S3 configurare una policy server per eliminare multipart incompleti:
   cancellazione durante `finish` o arresto del processo possono lasciare parti.
   Non cancellare un oggetto finale basandosi soltanto su un timeout del client.

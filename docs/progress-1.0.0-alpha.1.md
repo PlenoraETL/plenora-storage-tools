@@ -45,6 +45,17 @@ un checkpoint `RUNNING` non soddisfa il gate.
 
 ## Distribuzione e prove ancora aperte
 
+Il packaging successivo, verificato al commit
+`1cdead24e42626263cc19ed084cf8874137b329e`, include un bundle Rust completo.
+Il consumer esterno compila ed esegue su Windows e Linux senza patch del registry;
+gli archivi sorgente dei due host hanno SHA-256 identico
+`dc54557da3c9a44766383eddd6c7e9c2cc8194e449ceace2365d917f07b35222`.
+Una CI successiva ha però rivelato retry HTTP impliciti in S3/Azure: gli asset
+di quel commit non sono candidati alla promozione. La nuova regressione fallisce
+sul vecchio binario e verifica una sola mutazione per risposta 500/503/429 su
+S3, Azure, GCS e WebDAV. Servono nuove build con la correzione. La campagna di
+durata sopra identifica ancora la propria wheel precedente, non questa modifica.
+
 Il packaging CLI produce ZIP per Windows e tar.gz per Linux e confronta i byte
 dell'eseguibile archiviato con quelli del binario qualificato. Test negativi
 rifiutano eseguibili differenti e pacchetti senza licenze. L'avvio di una CLI
@@ -58,7 +69,7 @@ di soglie per modulo né una misura delle righe del wrapper Python.
 
 Restano da chiudere nel [piano](roadmap-1.0.0.md): esito delle 24 ore, soglie e
 lacune di coverage, fuzz dei parser XML/FTP, benchmark con soglie deliberate,
-congelamento API, bundle sorgente Rust installabile, aggregazione e qualifica
+congelamento API, aggregazione e qualifica
 degli asset finali e pubblicazione GitHub. Le prove AWS/Azure/GCS reali richiedono
 account e namespace dedicati con budget: le fixture non sostituiscono tali prove.
 Nessuna release stabile o release candidate è pubblicata da questo avanzamento.

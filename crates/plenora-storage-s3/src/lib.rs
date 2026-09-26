@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use futures_util::StreamExt;
 use object_store::{
     Attribute, AttributeValue, Attributes, ClientConfigKey, ClientOptions, CopyMode, CopyOptions,
-    ObjectMeta, ObjectStore, ObjectStoreExt, PutMode, PutMultipartOptions, PutOptions,
+    ObjectMeta, ObjectStore, ObjectStoreExt, PutMode, PutMultipartOptions, PutOptions, RetryConfig,
     WriteMultipart,
     aws::{AmazonS3, AmazonS3Builder},
     client::{HttpClient, HttpConnector},
@@ -91,6 +91,12 @@ impl S3Provider {
             .with_region(config.region)
             .with_virtual_hosted_style_request(config.virtual_hosted_style)
             .with_allow_http(context.policy.allow_insecure_http)
+            // The host owns retries and reconciliation. In particular, an
+            // HTTP 5xx response does not prove that a mutation was not applied.
+            .with_retry(RetryConfig {
+                max_retries: 0,
+                ..RetryConfig::default()
+            })
             .with_access_key_id(access_key)
             .with_secret_access_key(secret_key);
         if let Some(token) = credential.optional("session_token") {
@@ -178,6 +184,7 @@ impl HttpConnector for PinnedDnsConnector {
             // prevent, so both are refused.
             .redirect(reqwest::redirect::Policy::none())
             .no_proxy()
+            .retry(reqwest::retry::never())
             .user_agent(CLIENT_USER_AGENT)
             .timeout(CLIENT_TIMEOUT)
             .connect_timeout(CLIENT_CONNECT_TIMEOUT)
