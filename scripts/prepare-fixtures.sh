@@ -2,6 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p .fixtures/minio
+trap 'status=$?; tail -n 30 .fixtures/certificate-generation.log >&2; exit "$status"' ERR
 # Ephemeral test identity: never copy this key into a deployment.
 openssl req -x509 -newkey rsa:2048 -nodes -days 2 \
   -keyout .fixtures/ca.key -out .fixtures/ca.crt \

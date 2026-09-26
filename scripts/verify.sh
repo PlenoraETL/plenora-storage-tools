@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+trap 'status=$?; python3 scripts/export_evidence.py || status=$?; exit "$status"' EXIT
 
 # Maturin requests metadata for all targets, including dependencies unused by
 # this host. Populate that complete lockfile before any offline wheel build.

@@ -2,10 +2,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p .fixtures/extended
+trap 'status=$?; tail -n 30 .fixtures/extended/certificate-generation.log >&2; exit "$status"' ERR
 openssl req -x509 -newkey rsa:2048 -nodes -days 2 \
   -keyout .fixtures/extended/server.key -out .fixtures/extended/server.crt \
   -subj '/CN=ftps' -addext 'subjectAltName=DNS:ftps,IP:192.168.2.134' \
-  -addext 'basicConstraints=critical,CA:FALSE' >/dev/null 2>&1
+  -addext 'basicConstraints=critical,CA:FALSE' >.fixtures/extended/certificate-generation.log 2>&1
 docker compose -f docker-compose.yml -f compose.extended.yml build ftps
 docker compose -f docker-compose.yml -f compose.extended.yml up -d azure gcs ftps webdav smb
 for attempt in $(seq 1 30); do

@@ -37,7 +37,20 @@ jobs:
       - name: Prepare extended storage fixtures
         run: bash scripts/prepare-extended-fixtures.sh
       - name: Verify Rust, contracts, and CLI
-        run: docker compose -f docker-compose.yml -f compose.extended.yml run --rm --no-deps storage-rust
+        run: python3 scripts/run_logged.py target/release-readiness/docker-conformance.log docker compose -f docker-compose.yml -f compose.extended.yml run --rm --no-deps storage-rust
+      - name: Preserve fixture diagnostics and qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: linux-qualification
+          path: |
+            .fixtures/certificate-generation.log
+            .fixtures/extended/certificate-generation.log
+            .fixtures/evidence/
+            target/release-readiness/*.json
+            target/release-readiness/*.log
+            target/python-wheels/python-tests.*
+          include-hidden-files: true
       - name: Stop test services
         if: always()
         run: docker compose -f docker-compose.yml -f compose.extended.yml down
