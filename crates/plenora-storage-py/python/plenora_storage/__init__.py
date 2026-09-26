@@ -21,7 +21,7 @@ __version__ = re.sub(r"-(alpha|beta|rc)\.(\d+)$",
                      _native.__version__)
 
 __all__ = ["Engine", "AsyncEngine", "EngineConfig", "Connection", "PlenoraError", "StorageError",
-           "CancellationToken", "version", "__version__"]
+           "CancellationToken", "cancellation_outcome", "version", "__version__"]
 
 
 def version() -> str:
@@ -46,6 +46,34 @@ class PlenoraError(Exception):
 
 class StorageError(PlenoraError):
     """Storage failure with the shared Plenora error axes."""
+
+
+def cancellation_outcome(error: BaseException) -> dict[str, Any] | PlenoraError | None:
+    """Find the settled storage outcome through asyncio cancellation wrappers.
+
+    Python 3.10 creates new CancelledError instances linked via __context__;
+    wait_for timeouts also wrap cancellation in __cause__. None means no known
+    storage outcome, never proof that a remote mutation had no effect.
+    """
+    pending = [error]
+    visited: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if id(current) in visited:
+            continue
+        visited.add(id(current))
+        if isinstance(current, asyncio.CancelledError):
+            result = getattr(current, "storage_result", None)
+            if isinstance(result, dict):
+                return result
+            failure = getattr(current, "storage_error", None)
+            if isinstance(failure, PlenoraError):
+                return failure
+        if current.__context__ is not None:
+            pending.append(current.__context__)
+        if current.__cause__ is not None:
+            pending.append(current.__cause__)
+    return None
 
 
 def _invalid(code: str, message: str) -> StorageError:
@@ -213,9 +241,9 @@ class Engine:
 class AsyncEngine:
     """Asyncio facade with cooperative Rust cancellation and operation draining.
 
-    When a task is cancelled, the raised ``CancelledError`` carries either
-    ``storage_result`` or ``storage_error`` after the Rust operation settles.
-    Inspect that outcome before retrying a mutation.
+    When a task is cancelled, use ``cancellation_outcome(error)`` to retrieve
+    the settled result or storage error, including through Python 3.10 and
+    wait_for exception wrappers. Inspect that outcome before retrying a mutation.
     """
 
     def __init__(self, config: EngineConfig | None = None, *,

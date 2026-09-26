@@ -31,8 +31,13 @@ Provider configuration and limits are described in `docs/provider-expansion.md`
 and the repository's vendored contracts.
 
 `AsyncEngine` offers the same methods with `await` and `async with`. Cancelling
-an asyncio task signals Rust and waits for the operation to settle; inspect
-`CancelledError.storage_error` or `.storage_result` before retrying a mutation.
+an asyncio task signals Rust and waits for the operation to settle. Pass the
+caught exception to `cancellation_outcome(error)` before retrying a mutation:
+it returns the settled result dictionary, a `PlenoraError`, or `None` when no
+outcome is known. `None` never proves that a mutation had no effect. The helper
+also follows `wait_for` timeout causes and Python 3.10 cancellation contexts;
+direct access to `.storage_error`/`.storage_result` is not portable across
+these wrappers. Do not suppress the cancellation after inspecting its outcome.
 `StorageError`, a subclass of `PlenoraError`, exposes `code`, `category`, `phase`, `remote_effect`, `retry`, and
 `provider`. Closing rejects new operations; it does not cancel existing calls.
 Keep engines alive until pending calls finish. No connection pooling is promised.

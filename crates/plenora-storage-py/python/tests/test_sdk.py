@@ -11,7 +11,7 @@ import unittest
 from types import MappingProxyType
 
 import plenora_storage
-from plenora_storage import AsyncEngine, CancellationToken, Connection, Engine, EngineConfig, PlenoraError, StorageError, version
+from plenora_storage import AsyncEngine, CancellationToken, Connection, Engine, EngineConfig, PlenoraError, StorageError, cancellation_outcome, version
 
 
 class SDKTests(unittest.TestCase):
@@ -26,7 +26,7 @@ class SDKTests(unittest.TestCase):
         self.assertTrue((installed / '_native.pyi').is_file())
         self.assertTrue(issubclass(StorageError, PlenoraError))
         self.assertEqual(set(plenora_storage.__all__), {'Engine', 'AsyncEngine', 'EngineConfig', 'Connection',
-                         'PlenoraError', 'StorageError', 'CancellationToken', 'version', '__version__'})
+                         'PlenoraError', 'StorageError', 'CancellationToken', 'cancellation_outcome', 'version', '__version__'})
         for operation in ['test', 'list', 'stat', 'get', 'put', 'copy', 'delete']:
             self.assertEqual(inspect.signature(getattr(Engine, operation)),
                              inspect.signature(getattr(AsyncEngine, operation)))
@@ -213,6 +213,42 @@ class SDKTests(unittest.TestCase):
 
 
 class AsyncTests(unittest.IsolatedAsyncioTestCase):
+    async def test_cancelled_success_survives_task_and_timeout_wrappers(self):
+        # Model an operation that committed just as cancellation arrived.
+        for wrapper in ['direct', 'wait_for', 'timeout']:
+            with self.subTest(wrapper=wrapper):
+                entered, release = threading.Event(), threading.Event()
+                outcome = {'committed': True}
+                def committed(*_args, **_kwargs):
+                    entered.set()
+                    release.wait(5)
+                    return outcome
+                async with AsyncEngine() as engine:
+                    engine._engine.test = committed
+                    task = asyncio.create_task(engine.test(None))
+                    self.assertTrue(await asyncio.to_thread(entered.wait, 5))
+                    if wrapper == 'timeout':
+                        asyncio.get_running_loop().call_later(0.05, release.set)
+                        with self.assertRaises(asyncio.TimeoutError) as caught:
+                            await asyncio.wait_for(task, 0.01)
+                    else:
+                        task.cancel()
+                        await asyncio.sleep(0)
+                        release.set()
+                        with self.assertRaises(asyncio.CancelledError) as caught:
+                            if wrapper == 'direct':
+                                await task
+                            else:
+                                await asyncio.wait_for(task, 5)
+                    self.assertEqual(cancellation_outcome(caught.exception), outcome)
+                    self.assertTrue(task.done())
+
+    async def test_unknown_cancellation_outcome_is_not_no_effect(self):
+        error = asyncio.CancelledError()
+        error.__context__ = error
+        self.assertIsNone(cancellation_outcome(error))
+        self.assertIsNone(cancellation_outcome(asyncio.TimeoutError()))
+
     async def test_async_lifecycle(self):
         with tempfile.TemporaryDirectory() as root:
             connection = Connection('local', 'plenora-storage-local-connection-v1', {'root': root}, 'local:process')
@@ -259,7 +295,7 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
             release.set()
             with self.assertRaises(asyncio.CancelledError) as caught:
                 await asyncio.wait_for(task, 5)
-            self.assertEqual(caught.exception.storage_error.category, 'cancelled')
+            self.assertEqual(cancellation_outcome(caught.exception).category, 'cancelled')
 
 
 if __name__ == '__main__':
