@@ -1,0 +1,2501 @@
+{
+  "command": {
+    "arguments": [
+      {
+        "action": "Set",
+        "aliases": null,
+        "defaults": [],
+        "global": true,
+        "id": "format",
+        "index": null,
+        "long": "format",
+        "max_values": 1,
+        "min_values": 1,
+        "parser": "ValueParser::other(plenora_storage::OutputFormat)",
+        "required": false,
+        "short": null,
+        "values": [
+          "json"
+        ]
+      },
+      {
+        "action": "SetTrue",
+        "aliases": null,
+        "defaults": [
+          "false"
+        ],
+        "global": true,
+        "id": "version",
+        "index": null,
+        "long": "version",
+        "max_values": 0,
+        "min_values": 0,
+        "parser": "ValueParser::bool",
+        "required": false,
+        "short": null,
+        "values": [
+          "true",
+          "false"
+        ]
+      },
+      {
+        "action": "Set",
+        "aliases": null,
+        "defaults": [],
+        "global": true,
+        "id": "deadline",
+        "index": null,
+        "long": "deadline",
+        "max_values": 1,
+        "min_values": 1,
+        "parser": "ValueParser::string",
+        "required": false,
+        "short": null,
+        "values": null
+      },
+      {
+        "action": "SetTrue",
+        "aliases": null,
+        "defaults": [
+          "false"
+        ],
+        "global": true,
+        "id": "allow_experimental_contracts",
+        "index": null,
+        "long": "allow-experimental-contracts",
+        "max_values": 0,
+        "min_values": 0,
+        "parser": "ValueParser::bool",
+        "required": false,
+        "short": null,
+        "values": [
+          "true",
+          "false"
+        ]
+      },
+      {
+        "action": "SetTrue",
+        "aliases": null,
+        "defaults": [
+          "false"
+        ],
+        "global": true,
+        "id": "allow_insecure_http",
+        "index": null,
+        "long": "allow-insecure-http",
+        "max_values": 0,
+        "min_values": 0,
+        "parser": "ValueParser::bool",
+        "required": false,
+        "short": null,
+        "values": [
+          "true",
+          "false"
+        ]
+      },
+      {
+        "action": "SetTrue",
+        "aliases": null,
+        "defaults": [
+          "false"
+        ],
+        "global": true,
+        "id": "allow_insecure_ftp",
+        "index": null,
+        "long": "allow-insecure-ftp",
+        "max_values": 0,
+        "min_values": 0,
+        "parser": "ValueParser::bool",
+        "required": false,
+        "short": null,
+        "values": [
+          "true",
+          "false"
+        ]
+      },
+      {
+        "action": "SetTrue",
+        "aliases": null,
+        "defaults": [
+          "false"
+        ],
+        "global": true,
+        "id": "allow_private_network",
+        "index": null,
+        "long": "allow-private-network",
+        "max_values": 0,
+        "min_values": 0,
+        "parser": "ValueParser::bool",
+        "required": false,
+        "short": null,
+        "values": [
+          "true",
+          "false"
+        ]
+      },
+      {
+        "action": "SetTrue",
+        "aliases": null,
+        "defaults": [
+          "false"
+        ],
+        "global": true,
+        "id": "allow_unverified_ssh",
+        "index": null,
+        "long": "allow-unverified-ssh",
+        "max_values": 0,
+        "min_values": 0,
+        "parser": "ValueParser::bool",
+        "required": false,
+        "short": null,
+        "values": [
+          "true",
+          "false"
+        ]
+      },
+      {
+        "action": "Set",
+        "aliases": null,
+        "defaults": [
+          "1073741824"
+        ],
+        "global": true,
+        "id": "max_transfer_bytes",
+        "index": null,
+        "long": "max-transfer-bytes",
+        "max_values": 1,
+        "min_values": 1,
+        "parser": "ValueParser::other(u64)",
+        "required": false,
+        "short": null,
+        "values": null
+      },
+      {
+        "action": "Set",
+        "aliases": null,
+        "defaults": [
+          "10000"
+        ],
+        "global": true,
+        "id": "max_list_items",
+        "index": null,
+        "long": "max-list-items",
+        "max_values": 1,
+        "min_values": 1,
+        "parser": "ValueParser::other(usize)",
+        "required": false,
+        "short": null,
+        "values": null
+      },
+      {
+        "action": "Set",
+        "aliases": null,
+        "defaults": [
+          "67108864"
+        ],
+        "global": true,
+        "id": "max_buffered_put_bytes",
+        "index": null,
+        "long": "max-buffered-put-bytes",
+        "max_values": 1,
+        "min_values": 1,
+        "parser": "ValueParser::other(u64)",
+        "required": false,
+        "short": null,
+        "values": null
+      },
+      {
+        "action": "Help",
+        "aliases": null,
+        "defaults": [],
+        "global": false,
+        "id": "help",
+        "index": null,
+        "long": "help",
+        "max_values": 0,
+        "min_values": 0,
+        "parser": "ValueParser::string",
+        "required": false,
+        "short": "h",
+        "values": null
+      }
+    ],
+    "name": "plenora-storage",
+    "subcommands": [
+      {
+        "arguments": [
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": true,
+            "id": "format",
+            "index": null,
+            "long": "format",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(plenora_storage::OutputFormat)",
+            "required": false,
+            "short": null,
+            "values": [
+              "json"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "version",
+            "index": null,
+            "long": "version",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": true,
+            "id": "deadline",
+            "index": null,
+            "long": "deadline",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::string",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_experimental_contracts",
+            "index": null,
+            "long": "allow-experimental-contracts",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_insecure_http",
+            "index": null,
+            "long": "allow-insecure-http",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_insecure_ftp",
+            "index": null,
+            "long": "allow-insecure-ftp",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_private_network",
+            "index": null,
+            "long": "allow-private-network",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_unverified_ssh",
+            "index": null,
+            "long": "allow-unverified-ssh",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [
+              "1073741824"
+            ],
+            "global": true,
+            "id": "max_transfer_bytes",
+            "index": null,
+            "long": "max-transfer-bytes",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(u64)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [
+              "10000"
+            ],
+            "global": true,
+            "id": "max_list_items",
+            "index": null,
+            "long": "max-list-items",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(usize)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [
+              "67108864"
+            ],
+            "global": true,
+            "id": "max_buffered_put_bytes",
+            "index": null,
+            "long": "max-buffered-put-bytes",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(u64)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Help",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "help",
+            "index": null,
+            "long": "help",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::string",
+            "required": false,
+            "short": "h",
+            "values": null
+          }
+        ],
+        "name": "capabilities",
+        "subcommands": []
+      },
+      {
+        "arguments": [
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "connection",
+            "index": null,
+            "long": "connection",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::path_buf",
+            "required": true,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": true,
+            "id": "format",
+            "index": null,
+            "long": "format",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(plenora_storage::OutputFormat)",
+            "required": false,
+            "short": null,
+            "values": [
+              "json"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "version",
+            "index": null,
+            "long": "version",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": true,
+            "id": "deadline",
+            "index": null,
+            "long": "deadline",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::string",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_experimental_contracts",
+            "index": null,
+            "long": "allow-experimental-contracts",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_insecure_http",
+            "index": null,
+            "long": "allow-insecure-http",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_insecure_ftp",
+            "index": null,
+            "long": "allow-insecure-ftp",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_private_network",
+            "index": null,
+            "long": "allow-private-network",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_unverified_ssh",
+            "index": null,
+            "long": "allow-unverified-ssh",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [
+              "1073741824"
+            ],
+            "global": true,
+            "id": "max_transfer_bytes",
+            "index": null,
+            "long": "max-transfer-bytes",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(u64)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [
+              "10000"
+            ],
+            "global": true,
+            "id": "max_list_items",
+            "index": null,
+            "long": "max-list-items",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(usize)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [
+              "67108864"
+            ],
+            "global": true,
+            "id": "max_buffered_put_bytes",
+            "index": null,
+            "long": "max-buffered-put-bytes",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(u64)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Help",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "help",
+            "index": null,
+            "long": "help",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::string",
+            "required": false,
+            "short": "h",
+            "values": null
+          }
+        ],
+        "name": "test",
+        "subcommands": []
+      },
+      {
+        "arguments": [
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "connection",
+            "index": null,
+            "long": "connection",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::path_buf",
+            "required": true,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "prefix",
+            "index": null,
+            "long": "prefix",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::string",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "cursor",
+            "index": null,
+            "long": "cursor",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::string",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "max_items",
+            "index": null,
+            "long": "max-items",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(usize)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": false,
+            "id": "all",
+            "index": null,
+            "long": "all",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": true,
+            "id": "format",
+            "index": null,
+            "long": "format",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(plenora_storage::OutputFormat)",
+            "required": false,
+            "short": null,
+            "values": [
+              "json"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "version",
+            "index": null,
+            "long": "version",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": true,
+            "id": "deadline",
+            "index": null,
+            "long": "deadline",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::string",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_experimental_contracts",
+            "index": null,
+            "long": "allow-experimental-contracts",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_insecure_http",
+            "index": null,
+            "long": "allow-insecure-http",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_insecure_ftp",
+            "index": null,
+            "long": "allow-insecure-ftp",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_private_network",
+            "index": null,
+            "long": "allow-private-network",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_unverified_ssh",
+            "index": null,
+            "long": "allow-unverified-ssh",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [
+              "1073741824"
+            ],
+            "global": true,
+            "id": "max_transfer_bytes",
+            "index": null,
+            "long": "max-transfer-bytes",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(u64)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [
+              "10000"
+            ],
+            "global": true,
+            "id": "max_list_items",
+            "index": null,
+            "long": "max-list-items",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(usize)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [
+              "67108864"
+            ],
+            "global": true,
+            "id": "max_buffered_put_bytes",
+            "index": null,
+            "long": "max-buffered-put-bytes",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(u64)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Help",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "help",
+            "index": null,
+            "long": "help",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::string",
+            "required": false,
+            "short": "h",
+            "values": null
+          }
+        ],
+        "name": "list",
+        "subcommands": []
+      },
+      {
+        "arguments": [
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "connection",
+            "index": null,
+            "long": "connection",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::path_buf",
+            "required": true,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "key",
+            "index": null,
+            "long": "key",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::string",
+            "required": true,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": true,
+            "id": "format",
+            "index": null,
+            "long": "format",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(plenora_storage::OutputFormat)",
+            "required": false,
+            "short": null,
+            "values": [
+              "json"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "version",
+            "index": null,
+            "long": "version",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": true,
+            "id": "deadline",
+            "index": null,
+            "long": "deadline",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::string",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_experimental_contracts",
+            "index": null,
+            "long": "allow-experimental-contracts",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_insecure_http",
+            "index": null,
+            "long": "allow-insecure-http",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_insecure_ftp",
+            "index": null,
+            "long": "allow-insecure-ftp",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_private_network",
+            "index": null,
+            "long": "allow-private-network",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_unverified_ssh",
+            "index": null,
+            "long": "allow-unverified-ssh",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [
+              "1073741824"
+            ],
+            "global": true,
+            "id": "max_transfer_bytes",
+            "index": null,
+            "long": "max-transfer-bytes",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(u64)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [
+              "10000"
+            ],
+            "global": true,
+            "id": "max_list_items",
+            "index": null,
+            "long": "max-list-items",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(usize)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [
+              "67108864"
+            ],
+            "global": true,
+            "id": "max_buffered_put_bytes",
+            "index": null,
+            "long": "max-buffered-put-bytes",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(u64)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Help",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "help",
+            "index": null,
+            "long": "help",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::string",
+            "required": false,
+            "short": "h",
+            "values": null
+          }
+        ],
+        "name": "stat",
+        "subcommands": []
+      },
+      {
+        "arguments": [
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "connection",
+            "index": null,
+            "long": "connection",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::path_buf",
+            "required": true,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "key",
+            "index": null,
+            "long": "key",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::string",
+            "required": true,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "output",
+            "index": null,
+            "long": "output",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::path_buf",
+            "required": true,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "overwrite",
+            "index": null,
+            "long": "overwrite",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::bool",
+            "required": true,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": true,
+            "id": "format",
+            "index": null,
+            "long": "format",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(plenora_storage::OutputFormat)",
+            "required": false,
+            "short": null,
+            "values": [
+              "json"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "version",
+            "index": null,
+            "long": "version",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": true,
+            "id": "deadline",
+            "index": null,
+            "long": "deadline",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::string",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_experimental_contracts",
+            "index": null,
+            "long": "allow-experimental-contracts",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_insecure_http",
+            "index": null,
+            "long": "allow-insecure-http",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_insecure_ftp",
+            "index": null,
+            "long": "allow-insecure-ftp",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_private_network",
+            "index": null,
+            "long": "allow-private-network",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_unverified_ssh",
+            "index": null,
+            "long": "allow-unverified-ssh",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [
+              "1073741824"
+            ],
+            "global": true,
+            "id": "max_transfer_bytes",
+            "index": null,
+            "long": "max-transfer-bytes",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(u64)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [
+              "10000"
+            ],
+            "global": true,
+            "id": "max_list_items",
+            "index": null,
+            "long": "max-list-items",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(usize)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [
+              "67108864"
+            ],
+            "global": true,
+            "id": "max_buffered_put_bytes",
+            "index": null,
+            "long": "max-buffered-put-bytes",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(u64)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Help",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "help",
+            "index": null,
+            "long": "help",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::string",
+            "required": false,
+            "short": "h",
+            "values": null
+          }
+        ],
+        "name": "get",
+        "subcommands": []
+      },
+      {
+        "arguments": [
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "connection",
+            "index": null,
+            "long": "connection",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::path_buf",
+            "required": true,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "key",
+            "index": null,
+            "long": "key",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::string",
+            "required": true,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "input",
+            "index": null,
+            "long": "input",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::path_buf",
+            "required": true,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "overwrite",
+            "index": null,
+            "long": "overwrite",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::bool",
+            "required": true,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "publication_policy",
+            "index": null,
+            "long": "publication-policy",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(plenora_storage::CliPublicationPolicy)",
+            "required": true,
+            "short": null,
+            "values": [
+              "best-effort",
+              "atomic-required"
+            ]
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "content_type",
+            "index": null,
+            "long": "content-type",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::string",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": true,
+            "id": "format",
+            "index": null,
+            "long": "format",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(plenora_storage::OutputFormat)",
+            "required": false,
+            "short": null,
+            "values": [
+              "json"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "version",
+            "index": null,
+            "long": "version",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": true,
+            "id": "deadline",
+            "index": null,
+            "long": "deadline",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::string",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_experimental_contracts",
+            "index": null,
+            "long": "allow-experimental-contracts",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_insecure_http",
+            "index": null,
+            "long": "allow-insecure-http",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_insecure_ftp",
+            "index": null,
+            "long": "allow-insecure-ftp",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_private_network",
+            "index": null,
+            "long": "allow-private-network",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_unverified_ssh",
+            "index": null,
+            "long": "allow-unverified-ssh",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [
+              "1073741824"
+            ],
+            "global": true,
+            "id": "max_transfer_bytes",
+            "index": null,
+            "long": "max-transfer-bytes",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(u64)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [
+              "10000"
+            ],
+            "global": true,
+            "id": "max_list_items",
+            "index": null,
+            "long": "max-list-items",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(usize)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [
+              "67108864"
+            ],
+            "global": true,
+            "id": "max_buffered_put_bytes",
+            "index": null,
+            "long": "max-buffered-put-bytes",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(u64)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Help",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "help",
+            "index": null,
+            "long": "help",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::string",
+            "required": false,
+            "short": "h",
+            "values": null
+          }
+        ],
+        "name": "put",
+        "subcommands": []
+      },
+      {
+        "arguments": [
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "connection",
+            "index": null,
+            "long": "connection",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::path_buf",
+            "required": true,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "source_key",
+            "index": null,
+            "long": "source-key",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::string",
+            "required": true,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "destination_key",
+            "index": null,
+            "long": "destination-key",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::string",
+            "required": true,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "overwrite",
+            "index": null,
+            "long": "overwrite",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::bool",
+            "required": true,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "publication_policy",
+            "index": null,
+            "long": "publication-policy",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(plenora_storage::CliPublicationPolicy)",
+            "required": true,
+            "short": null,
+            "values": [
+              "best-effort",
+              "atomic-required"
+            ]
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": true,
+            "id": "format",
+            "index": null,
+            "long": "format",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(plenora_storage::OutputFormat)",
+            "required": false,
+            "short": null,
+            "values": [
+              "json"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "version",
+            "index": null,
+            "long": "version",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": true,
+            "id": "deadline",
+            "index": null,
+            "long": "deadline",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::string",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_experimental_contracts",
+            "index": null,
+            "long": "allow-experimental-contracts",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_insecure_http",
+            "index": null,
+            "long": "allow-insecure-http",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_insecure_ftp",
+            "index": null,
+            "long": "allow-insecure-ftp",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_private_network",
+            "index": null,
+            "long": "allow-private-network",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_unverified_ssh",
+            "index": null,
+            "long": "allow-unverified-ssh",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [
+              "1073741824"
+            ],
+            "global": true,
+            "id": "max_transfer_bytes",
+            "index": null,
+            "long": "max-transfer-bytes",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(u64)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [
+              "10000"
+            ],
+            "global": true,
+            "id": "max_list_items",
+            "index": null,
+            "long": "max-list-items",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(usize)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [
+              "67108864"
+            ],
+            "global": true,
+            "id": "max_buffered_put_bytes",
+            "index": null,
+            "long": "max-buffered-put-bytes",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(u64)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Help",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "help",
+            "index": null,
+            "long": "help",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::string",
+            "required": false,
+            "short": "h",
+            "values": null
+          }
+        ],
+        "name": "copy",
+        "subcommands": []
+      },
+      {
+        "arguments": [
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "connection",
+            "index": null,
+            "long": "connection",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::path_buf",
+            "required": true,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "key",
+            "index": null,
+            "long": "key",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::string",
+            "required": true,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "ignore_missing",
+            "index": null,
+            "long": "ignore-missing",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::bool",
+            "required": true,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": true,
+            "id": "format",
+            "index": null,
+            "long": "format",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(plenora_storage::OutputFormat)",
+            "required": false,
+            "short": null,
+            "values": [
+              "json"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "version",
+            "index": null,
+            "long": "version",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [],
+            "global": true,
+            "id": "deadline",
+            "index": null,
+            "long": "deadline",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::string",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_experimental_contracts",
+            "index": null,
+            "long": "allow-experimental-contracts",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_insecure_http",
+            "index": null,
+            "long": "allow-insecure-http",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_insecure_ftp",
+            "index": null,
+            "long": "allow-insecure-ftp",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_private_network",
+            "index": null,
+            "long": "allow-private-network",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "allow_unverified_ssh",
+            "index": null,
+            "long": "allow-unverified-ssh",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [
+              "1073741824"
+            ],
+            "global": true,
+            "id": "max_transfer_bytes",
+            "index": null,
+            "long": "max-transfer-bytes",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(u64)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [
+              "10000"
+            ],
+            "global": true,
+            "id": "max_list_items",
+            "index": null,
+            "long": "max-list-items",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(usize)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Set",
+            "aliases": null,
+            "defaults": [
+              "67108864"
+            ],
+            "global": true,
+            "id": "max_buffered_put_bytes",
+            "index": null,
+            "long": "max-buffered-put-bytes",
+            "max_values": 1,
+            "min_values": 1,
+            "parser": "ValueParser::other(u64)",
+            "required": false,
+            "short": null,
+            "values": null
+          },
+          {
+            "action": "Help",
+            "aliases": null,
+            "defaults": [],
+            "global": false,
+            "id": "help",
+            "index": null,
+            "long": "help",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::string",
+            "required": false,
+            "short": "h",
+            "values": null
+          }
+        ],
+        "name": "delete",
+        "subcommands": []
+      },
+      {
+        "arguments": [],
+        "name": "help",
+        "subcommands": [
+          {
+            "arguments": [],
+            "name": "capabilities",
+            "subcommands": []
+          },
+          {
+            "arguments": [],
+            "name": "test",
+            "subcommands": []
+          },
+          {
+            "arguments": [],
+            "name": "list",
+            "subcommands": []
+          },
+          {
+            "arguments": [],
+            "name": "stat",
+            "subcommands": []
+          },
+          {
+            "arguments": [],
+            "name": "get",
+            "subcommands": []
+          },
+          {
+            "arguments": [],
+            "name": "put",
+            "subcommands": []
+          },
+          {
+            "arguments": [],
+            "name": "copy",
+            "subcommands": []
+          },
+          {
+            "arguments": [],
+            "name": "delete",
+            "subcommands": []
+          },
+          {
+            "arguments": [],
+            "name": "help",
+            "subcommands": []
+          }
+        ]
+      }
+    ]
+  },
+  "error_exit_codes": {
+    "authentication": 5,
+    "authorization": 5,
+    "cancelled": 130,
+    "conflict": 5,
+    "execution": 6,
+    "internal": 70,
+    "invalid_configuration": 2,
+    "io": 5,
+    "not_found": 5,
+    "protocol": 5,
+    "resource_limit": 4,
+    "timeout": 5,
+    "transient": 5,
+    "unsupported": 3
+  },
+  "protocol_version": 2,
+  "schema_version": 1
+}

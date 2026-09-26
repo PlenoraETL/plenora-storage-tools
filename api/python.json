@@ -1,0 +1,1154 @@
+{
+  "error_attributes": [
+    "category",
+    "code",
+    "details",
+    "message",
+    "phase",
+    "provider",
+    "remote_effect",
+    "retry"
+  ],
+  "exports": {
+    "AsyncEngine": {
+      "bases": [
+        "object"
+      ],
+      "kind": "class",
+      "members": {
+        "__aenter__": {
+          "kind": "async",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            }
+          ],
+          "returns": "AsyncEngine"
+        },
+        "__aexit__": {
+          "kind": "async",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            },
+            {
+              "annotation": "Any",
+              "default": null,
+              "kind": "VAR_POSITIONAL",
+              "name": "_args",
+              "required": true
+            }
+          ],
+          "returns": "None"
+        },
+        "__init__": {
+          "kind": "method",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            },
+            {
+              "annotation": "EngineConfig | None",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "config",
+              "required": false
+            },
+            {
+              "annotation": "CredentialResolver | None",
+              "default": null,
+              "kind": "KEYWORD_ONLY",
+              "name": "credential_resolver",
+              "required": false
+            }
+          ],
+          "returns": null
+        },
+        "aclose": {
+          "kind": "async",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            }
+          ],
+          "returns": "None"
+        },
+        "capabilities": {
+          "kind": "method",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            }
+          ],
+          "returns": "dict[str, Any]"
+        },
+        "close": {
+          "kind": "async",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            }
+          ],
+          "returns": "None"
+        },
+        "copy": {
+          "kind": "async",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            },
+            {
+              "annotation": "Connection",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "connection",
+              "required": true
+            },
+            {
+              "annotation": "str",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "source_key",
+              "required": true
+            },
+            {
+              "annotation": "str",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "destination_key",
+              "required": true
+            },
+            {
+              "annotation": "bool",
+              "default": null,
+              "kind": "KEYWORD_ONLY",
+              "name": "overwrite",
+              "required": true
+            },
+            {
+              "annotation": "str",
+              "default": null,
+              "kind": "KEYWORD_ONLY",
+              "name": "publication_policy",
+              "required": true
+            },
+            {
+              "annotation": "Any",
+              "default": null,
+              "kind": "VAR_KEYWORD",
+              "name": "controls",
+              "required": true
+            }
+          ],
+          "returns": "dict[str, Any]"
+        },
+        "delete": {
+          "kind": "async",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            },
+            {
+              "annotation": "Connection",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "connection",
+              "required": true
+            },
+            {
+              "annotation": "str",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "key",
+              "required": true
+            },
+            {
+              "annotation": "bool",
+              "default": null,
+              "kind": "KEYWORD_ONLY",
+              "name": "ignore_missing",
+              "required": true
+            },
+            {
+              "annotation": "Any",
+              "default": null,
+              "kind": "VAR_KEYWORD",
+              "name": "controls",
+              "required": true
+            }
+          ],
+          "returns": "dict[str, Any]"
+        },
+        "get": {
+          "kind": "async",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            },
+            {
+              "annotation": "Connection",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "connection",
+              "required": true
+            },
+            {
+              "annotation": "str",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "key",
+              "required": true
+            },
+            {
+              "annotation": "str | os.PathLike[str]",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "output",
+              "required": true
+            },
+            {
+              "annotation": "bool",
+              "default": null,
+              "kind": "KEYWORD_ONLY",
+              "name": "overwrite",
+              "required": true
+            },
+            {
+              "annotation": "Any",
+              "default": null,
+              "kind": "VAR_KEYWORD",
+              "name": "controls",
+              "required": true
+            }
+          ],
+          "returns": "dict[str, Any]"
+        },
+        "is_closed": {
+          "kind": "property",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            }
+          ],
+          "returns": "bool",
+          "writable": false
+        },
+        "list": {
+          "kind": "async",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            },
+            {
+              "annotation": "Connection",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "connection",
+              "required": true
+            },
+            {
+              "annotation": "str | None",
+              "default": null,
+              "kind": "KEYWORD_ONLY",
+              "name": "prefix",
+              "required": false
+            },
+            {
+              "annotation": "str | None",
+              "default": null,
+              "kind": "KEYWORD_ONLY",
+              "name": "cursor",
+              "required": false
+            },
+            {
+              "annotation": "int | None",
+              "default": null,
+              "kind": "KEYWORD_ONLY",
+              "name": "max_items",
+              "required": false
+            },
+            {
+              "annotation": "Any",
+              "default": null,
+              "kind": "VAR_KEYWORD",
+              "name": "controls",
+              "required": true
+            }
+          ],
+          "returns": "dict[str, Any]"
+        },
+        "put": {
+          "kind": "async",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            },
+            {
+              "annotation": "Connection",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "connection",
+              "required": true
+            },
+            {
+              "annotation": "str",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "key",
+              "required": true
+            },
+            {
+              "annotation": "str | os.PathLike[str]",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "input",
+              "required": true
+            },
+            {
+              "annotation": "bool",
+              "default": null,
+              "kind": "KEYWORD_ONLY",
+              "name": "overwrite",
+              "required": true
+            },
+            {
+              "annotation": "str",
+              "default": null,
+              "kind": "KEYWORD_ONLY",
+              "name": "publication_policy",
+              "required": true
+            },
+            {
+              "annotation": "str | None",
+              "default": null,
+              "kind": "KEYWORD_ONLY",
+              "name": "content_type",
+              "required": false
+            },
+            {
+              "annotation": "Any",
+              "default": null,
+              "kind": "VAR_KEYWORD",
+              "name": "controls",
+              "required": true
+            }
+          ],
+          "returns": "dict[str, Any]"
+        },
+        "stat": {
+          "kind": "async",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            },
+            {
+              "annotation": "Connection",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "connection",
+              "required": true
+            },
+            {
+              "annotation": "str",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "key",
+              "required": true
+            },
+            {
+              "annotation": "Any",
+              "default": null,
+              "kind": "VAR_KEYWORD",
+              "name": "controls",
+              "required": true
+            }
+          ],
+          "returns": "dict[str, Any]"
+        },
+        "test": {
+          "kind": "async",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            },
+            {
+              "annotation": "Connection",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "connection",
+              "required": true
+            },
+            {
+              "annotation": "Any",
+              "default": null,
+              "kind": "VAR_KEYWORD",
+              "name": "controls",
+              "required": true
+            }
+          ],
+          "returns": "dict[str, Any]"
+        }
+      }
+    },
+    "CancellationToken": {
+      "bases": [
+        "object"
+      ],
+      "constructor": {
+        "parameters": [],
+        "returns": null
+      },
+      "kind": "class",
+      "members": {
+        "cancel": {
+          "kind": "method",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_ONLY",
+              "name": "self",
+              "required": true
+            }
+          ],
+          "returns": null
+        },
+        "is_cancelled": {
+          "kind": "property"
+        }
+      },
+      "stub": "ClassDef(name='CancellationToken', bases=[], keywords=[], body=[FunctionDef(name='__init__', args=arguments(posonlyargs=[], args=[arg(arg='self')], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Expr(value=Constant(value=Ellipsis))], decorator_list=[], returns=Constant(value=None)), FunctionDef(name='cancel', args=arguments(posonlyargs=[], args=[arg(arg='self')], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Expr(value=Constant(value=Ellipsis))], decorator_list=[], returns=Constant(value=None)), FunctionDef(name='is_cancelled', args=arguments(posonlyargs=[], args=[arg(arg='self')], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Expr(value=Constant(value=Ellipsis))], decorator_list=[Name(id='property', ctx=Load())], returns=Name(id='bool', ctx=Load()))], decorator_list=[])"
+    },
+    "Connection": {
+      "bases": [
+        "object"
+      ],
+      "fields": [
+        {
+          "default": null,
+          "name": "provider",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "default": null,
+          "name": "config_contract",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "default": null,
+          "name": "config",
+          "required": true,
+          "type": "Mapping[str, Any]"
+        },
+        {
+          "default": null,
+          "name": "credential_ref",
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "frozen": true,
+      "kind": "class",
+      "members": {
+        "__init__": {
+          "kind": "method",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            },
+            {
+              "annotation": "str",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "provider",
+              "required": true
+            },
+            {
+              "annotation": "str",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "config_contract",
+              "required": true
+            },
+            {
+              "annotation": "Mapping[str, Any]",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "config",
+              "required": true
+            },
+            {
+              "annotation": "str",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "credential_ref",
+              "required": true
+            }
+          ],
+          "returns": "None"
+        }
+      }
+    },
+    "Engine": {
+      "bases": [
+        "object"
+      ],
+      "kind": "class",
+      "members": {
+        "__enter__": {
+          "kind": "method",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            }
+          ],
+          "returns": "Engine"
+        },
+        "__exit__": {
+          "kind": "method",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            },
+            {
+              "annotation": "Any",
+              "default": null,
+              "kind": "VAR_POSITIONAL",
+              "name": "_args",
+              "required": true
+            }
+          ],
+          "returns": "None"
+        },
+        "__init__": {
+          "kind": "method",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            },
+            {
+              "annotation": "EngineConfig | None",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "config",
+              "required": false
+            },
+            {
+              "annotation": "CredentialResolver | None",
+              "default": null,
+              "kind": "KEYWORD_ONLY",
+              "name": "credential_resolver",
+              "required": false
+            }
+          ],
+          "returns": null
+        },
+        "capabilities": {
+          "kind": "method",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            }
+          ],
+          "returns": "dict[str, Any]"
+        },
+        "close": {
+          "kind": "method",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            }
+          ],
+          "returns": "None"
+        },
+        "copy": {
+          "kind": "method",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            },
+            {
+              "annotation": "Connection",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "connection",
+              "required": true
+            },
+            {
+              "annotation": "str",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "source_key",
+              "required": true
+            },
+            {
+              "annotation": "str",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "destination_key",
+              "required": true
+            },
+            {
+              "annotation": "bool",
+              "default": null,
+              "kind": "KEYWORD_ONLY",
+              "name": "overwrite",
+              "required": true
+            },
+            {
+              "annotation": "str",
+              "default": null,
+              "kind": "KEYWORD_ONLY",
+              "name": "publication_policy",
+              "required": true
+            },
+            {
+              "annotation": "Any",
+              "default": null,
+              "kind": "VAR_KEYWORD",
+              "name": "controls",
+              "required": true
+            }
+          ],
+          "returns": "dict[str, Any]"
+        },
+        "delete": {
+          "kind": "method",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            },
+            {
+              "annotation": "Connection",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "connection",
+              "required": true
+            },
+            {
+              "annotation": "str",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "key",
+              "required": true
+            },
+            {
+              "annotation": "bool",
+              "default": null,
+              "kind": "KEYWORD_ONLY",
+              "name": "ignore_missing",
+              "required": true
+            },
+            {
+              "annotation": "Any",
+              "default": null,
+              "kind": "VAR_KEYWORD",
+              "name": "controls",
+              "required": true
+            }
+          ],
+          "returns": "dict[str, Any]"
+        },
+        "get": {
+          "kind": "method",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            },
+            {
+              "annotation": "Connection",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "connection",
+              "required": true
+            },
+            {
+              "annotation": "str",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "key",
+              "required": true
+            },
+            {
+              "annotation": "str | os.PathLike[str]",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "output",
+              "required": true
+            },
+            {
+              "annotation": "bool",
+              "default": null,
+              "kind": "KEYWORD_ONLY",
+              "name": "overwrite",
+              "required": true
+            },
+            {
+              "annotation": "Any",
+              "default": null,
+              "kind": "VAR_KEYWORD",
+              "name": "controls",
+              "required": true
+            }
+          ],
+          "returns": "dict[str, Any]"
+        },
+        "is_closed": {
+          "kind": "property",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            }
+          ],
+          "returns": "bool",
+          "writable": false
+        },
+        "list": {
+          "kind": "method",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            },
+            {
+              "annotation": "Connection",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "connection",
+              "required": true
+            },
+            {
+              "annotation": "str | None",
+              "default": null,
+              "kind": "KEYWORD_ONLY",
+              "name": "prefix",
+              "required": false
+            },
+            {
+              "annotation": "str | None",
+              "default": null,
+              "kind": "KEYWORD_ONLY",
+              "name": "cursor",
+              "required": false
+            },
+            {
+              "annotation": "int | None",
+              "default": null,
+              "kind": "KEYWORD_ONLY",
+              "name": "max_items",
+              "required": false
+            },
+            {
+              "annotation": "Any",
+              "default": null,
+              "kind": "VAR_KEYWORD",
+              "name": "controls",
+              "required": true
+            }
+          ],
+          "returns": "dict[str, Any]"
+        },
+        "put": {
+          "kind": "method",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            },
+            {
+              "annotation": "Connection",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "connection",
+              "required": true
+            },
+            {
+              "annotation": "str",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "key",
+              "required": true
+            },
+            {
+              "annotation": "str | os.PathLike[str]",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "input",
+              "required": true
+            },
+            {
+              "annotation": "bool",
+              "default": null,
+              "kind": "KEYWORD_ONLY",
+              "name": "overwrite",
+              "required": true
+            },
+            {
+              "annotation": "str",
+              "default": null,
+              "kind": "KEYWORD_ONLY",
+              "name": "publication_policy",
+              "required": true
+            },
+            {
+              "annotation": "str | None",
+              "default": null,
+              "kind": "KEYWORD_ONLY",
+              "name": "content_type",
+              "required": false
+            },
+            {
+              "annotation": "Any",
+              "default": null,
+              "kind": "VAR_KEYWORD",
+              "name": "controls",
+              "required": true
+            }
+          ],
+          "returns": "dict[str, Any]"
+        },
+        "stat": {
+          "kind": "method",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            },
+            {
+              "annotation": "Connection",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "connection",
+              "required": true
+            },
+            {
+              "annotation": "str",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "key",
+              "required": true
+            },
+            {
+              "annotation": "Any",
+              "default": null,
+              "kind": "VAR_KEYWORD",
+              "name": "controls",
+              "required": true
+            }
+          ],
+          "returns": "dict[str, Any]"
+        },
+        "test": {
+          "kind": "method",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            },
+            {
+              "annotation": "Connection",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "connection",
+              "required": true
+            },
+            {
+              "annotation": "Any",
+              "default": null,
+              "kind": "VAR_KEYWORD",
+              "name": "controls",
+              "required": true
+            }
+          ],
+          "returns": "dict[str, Any]"
+        }
+      }
+    },
+    "EngineConfig": {
+      "bases": [
+        "object"
+      ],
+      "fields": [
+        {
+          "default": false,
+          "name": "allow_insecure_http",
+          "required": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "name": "allow_insecure_ftp",
+          "required": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "name": "allow_private_network",
+          "required": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "name": "allow_unverified_ssh",
+          "required": false,
+          "type": "bool"
+        },
+        {
+          "default": 1073741824,
+          "name": "max_transfer_bytes",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "default": 10000,
+          "name": "max_list_items",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "default": 67108864,
+          "name": "max_buffered_put_bytes",
+          "required": false,
+          "type": "int"
+        }
+      ],
+      "frozen": true,
+      "kind": "class",
+      "members": {
+        "__init__": {
+          "kind": "method",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            },
+            {
+              "annotation": "bool",
+              "default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "allow_insecure_http",
+              "required": false
+            },
+            {
+              "annotation": "bool",
+              "default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "allow_insecure_ftp",
+              "required": false
+            },
+            {
+              "annotation": "bool",
+              "default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "allow_private_network",
+              "required": false
+            },
+            {
+              "annotation": "bool",
+              "default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "allow_unverified_ssh",
+              "required": false
+            },
+            {
+              "annotation": "int",
+              "default": 1073741824,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "max_transfer_bytes",
+              "required": false
+            },
+            {
+              "annotation": "int",
+              "default": 10000,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "max_list_items",
+              "required": false
+            },
+            {
+              "annotation": "int",
+              "default": 67108864,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "max_buffered_put_bytes",
+              "required": false
+            }
+          ],
+          "returns": "None"
+        }
+      }
+    },
+    "PlenoraError": {
+      "bases": [
+        "Exception"
+      ],
+      "kind": "class",
+      "members": {
+        "__init__": {
+          "kind": "method",
+          "parameters": [
+            {
+              "annotation": null,
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "self",
+              "required": true
+            },
+            {
+              "annotation": "Mapping[str, Any]",
+              "default": null,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "document",
+              "required": true
+            }
+          ],
+          "returns": null
+        }
+      }
+    },
+    "StorageError": {
+      "bases": [
+        "PlenoraError"
+      ],
+      "kind": "class",
+      "members": {}
+    },
+    "__version__": {
+      "kind": "str"
+    },
+    "cancellation_outcome": {
+      "kind": "function",
+      "parameters": [
+        {
+          "annotation": "BaseException",
+          "default": null,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "error",
+          "required": true
+        }
+      ],
+      "returns": "dict[str, Any] | PlenoraError | None"
+    },
+    "version": {
+      "kind": "function",
+      "parameters": [],
+      "returns": "str"
+    }
+  },
+  "root_error": true,
+  "schema_version": 1,
+  "type_aliases": {
+    "CredentialResolver": "Subscript(value=Name(id='Callable', ctx=Load()), slice=Tuple(elts=[List(elts=[Name(id='str', ctx=Load())], ctx=Load()), Subscript(value=Name(id='Mapping', ctx=Load()), slice=Tuple(elts=[Name(id='str', ctx=Load()), Name(id='str', ctx=Load())], ctx=Load()), ctx=Load())], ctx=Load()), ctx=Load())"
+  }
+}

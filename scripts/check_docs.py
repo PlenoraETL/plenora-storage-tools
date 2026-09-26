@@ -5,11 +5,13 @@ import tomllib
 from urllib.parse import unquote
 from render_state import ROOT, render
 from versioning import workspace_version
+from render_api_inventory import render as render_api_inventory
 
 
 def main():
     expected = render()
     assert (ROOT / 'docs/STATO.md').read_text(encoding='utf-8') == expected, 'run scripts/render_state.py'
+    assert (ROOT / 'docs/API-INVENTORY.md').read_text(encoding='utf-8') == render_api_inventory(), 'run scripts/render_api_inventory.py'
     version = workspace_version()
     pyproject = tomllib.loads((ROOT / 'crates/plenora-storage-py/pyproject.toml').read_text())
     assert pyproject['project']['version'] == version.python, 'Python and native versions differ'

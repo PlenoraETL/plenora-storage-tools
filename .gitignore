@@ -1,4 +1,5 @@
 /target/
+/tools/api-inventory/target/
 /.env
 /dist/
 /.fixtures/

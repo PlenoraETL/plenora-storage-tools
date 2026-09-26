@@ -1,0 +1,288 @@
+{
+  "contracts": {
+    "contracts/schemas/plenora-storage-azure-connection-v1.schema.json": "5acf3fe3b3cc674ec7dfcad5ea7ebea77c1460ec54195349b78e3e338b9a4651",
+    "contracts/schemas/plenora-storage-capability-attributes-v1.schema.json": "4b6215c4210898c3657d80da6b496a910928cb7479d326b8b55ffebe7e078ebc",
+    "contracts/schemas/plenora-storage-common-v1.schema.json": "d99c4a7e9a0e0f994fc33f7546b9c57aede0677bc718f904090833ae93390316",
+    "contracts/schemas/plenora-storage-connection-v1.schema.json": "ce4ec2728ec9bc5ec3a1207c92aab710db1032846a7561d631c37bd8ce8e1ba5",
+    "contracts/schemas/plenora-storage-copy-input-v1.schema.json": "0a8568f5d1ff43f9d6e05fed18c713190c8230043408380f49c5e9594f539904",
+    "contracts/schemas/plenora-storage-copy-output-v1.schema.json": "a8178b88bde03d36085c301b88231379b5548fe582f3ccc812443ccccb1cd1f7",
+    "contracts/schemas/plenora-storage-delete-input-v1.schema.json": "0b6b4128f6b3ded12a22529adcd852440553d9504b6f802bca1ff734fcff7d9e",
+    "contracts/schemas/plenora-storage-delete-output-v1.schema.json": "ca32801534e16a0e012200426753d987890e48bc08a7248f961595240295dd44",
+    "contracts/schemas/plenora-storage-ftp-connection-v1.schema.json": "d2a69fff213171f7f08bdf7cacb837827874b17768e5bf41b87c6e9ad6f91481",
+    "contracts/schemas/plenora-storage-ftps-connection-v1.schema.json": "3c3a29092ba965181dd621234adf816182d65d89187f6514b24f473897ca4e10",
+    "contracts/schemas/plenora-storage-gcs-connection-v1.schema.json": "b120f6c7a37113ba0594364eb53facccff586dba502ef12b6480645d1adbf9fd",
+    "contracts/schemas/plenora-storage-get-input-v1.schema.json": "a8305d99a261f06660e835d0cc7433d4ca3a8b8ffb7b9072b8b2fa23a1754ec4",
+    "contracts/schemas/plenora-storage-get-output-v1.schema.json": "3baf9b63a8122d8e52a6c4cd503910b2ae72aee4a2f1b1b34bc89f183d3c00f4",
+    "contracts/schemas/plenora-storage-list-input-v1.schema.json": "a4d643b518ef1bb3c447e8a1fde6ca94fa0bf9fa1e72e6b9d1a3fde2d67662cf",
+    "contracts/schemas/plenora-storage-list-output-v1.schema.json": "d6cbee9d270e2393ac6e53f1a5fe177a1122f511ff2d345176908d4d88330265",
+    "contracts/schemas/plenora-storage-local-connection-v1.schema.json": "54d376d762a56cde9e6ef7e36b2f880a6a9423d32daf463b5983319725608a09",
+    "contracts/schemas/plenora-storage-put-input-v1.schema.json": "39043103f791885e21be0cb6a3f5b7955e15c7bab98a3bbe38fb56bfce346f4e",
+    "contracts/schemas/plenora-storage-put-output-v1.schema.json": "cb7d2e1440aed774939003e65355e8f0ff3ae6dbbfdf370da5e8b6b42c15ce13",
+    "contracts/schemas/plenora-storage-s3-connection-v1.schema.json": "5f779d992ea1c353f7398445e04312ff8cabd5b3d1ab46158bac51cd1fd9c1dc",
+    "contracts/schemas/plenora-storage-sftp-connection-v1.schema.json": "325136b8af025e516180a52b1dd74122910f748e9951576a512b239083f6f37d",
+    "contracts/schemas/plenora-storage-smb-connection-v1.schema.json": "7cf6a13bb1e8dbe2577756d0dc7d254248b989e6ac592adca846ad33149cba5d",
+    "contracts/schemas/plenora-storage-stat-input-v1.schema.json": "4a25934d9dcdc9e36336707ea200b32af29945e54c85291924601d969051f3fb",
+    "contracts/schemas/plenora-storage-stat-output-v1.schema.json": "b8854b8980cb8a9c116012e06a7a64ea02201c44823decdd1b2fc3df47c7684f",
+    "contracts/schemas/plenora-storage-test-input-v1.schema.json": "9f0b8d327810a49dc206056bca61ac82278b4741ce2f8e16466746742522115d",
+    "contracts/schemas/plenora-storage-test-output-v1.schema.json": "f19f0c550b45a6a7c104b4d6db28812404896f42b27fb5c34ec54b2f7f8628f3",
+    "contracts/schemas/plenora-storage-webdav-connection-v1.schema.json": "535848f0c9ff02b06ac6b3a1eebe557e0cd503a4e987209c4f8fdfb42b25ee78",
+    "contracts/upstream/adoption-manifest-v4.schema.json": "deee97c3cb682268d648ec9975cbb73a225de62d5b43b19573ddd19647e203a0",
+    "contracts/upstream/capabilities-v2.schema.json": "c3982782dcf9afe1e1a21e87292e73cf17feac742d1cf0bcb9cbc38d9480c450",
+    "contracts/upstream/cli-envelope-v2.schema.json": "e2210f179e24190ea85d1c82b5cacc2429ea7ba3505bbc47395e638236db19ea",
+    "contracts/upstream/error-v1.schema.json": "164a0c580080d93ee1a020e7e33b651fe46950a4133e9bd8c044daa64cb9b914"
+  },
+  "edition": "2024",
+  "packages": {
+    "plenora-smb2": {
+      "features": {
+        "fuzzing": [],
+        "serde": [
+          "dep:serde"
+        ],
+        "testing": []
+      },
+      "lib": {
+        "name": "smb2",
+        "path": "src/lib.rs"
+      },
+      "rust_version": "1.92"
+    },
+    "plenora-storage-cli": {
+      "features": {
+        "azure": [
+          "plenora-storage-engine/azure"
+        ],
+        "default": [
+          "full"
+        ],
+        "ftp": [
+          "plenora-storage-engine/ftp"
+        ],
+        "ftps": [
+          "plenora-storage-engine/ftps"
+        ],
+        "full": [
+          "local",
+          "s3",
+          "sftp",
+          "ftp",
+          "ftps",
+          "azure",
+          "gcs",
+          "smb",
+          "webdav"
+        ],
+        "gcs": [
+          "plenora-storage-engine/gcs"
+        ],
+        "local": [
+          "plenora-storage-engine/local"
+        ],
+        "s3": [
+          "plenora-storage-engine/s3"
+        ],
+        "sftp": [
+          "plenora-storage-engine/sftp"
+        ],
+        "smb": [
+          "plenora-storage-engine/smb"
+        ],
+        "webdav": [
+          "plenora-storage-engine/webdav"
+        ]
+      },
+      "lib": {},
+      "rust_version": {
+        "workspace": true
+      }
+    },
+    "plenora-storage-core": {
+      "features": {},
+      "lib": {},
+      "rust_version": {
+        "workspace": true
+      }
+    },
+    "plenora-storage-engine": {
+      "features": {
+        "azure": [
+          "dep:plenora-storage-providers",
+          "plenora-storage-providers/azure"
+        ],
+        "default": [
+          "full"
+        ],
+        "ftp": [
+          "dep:plenora-storage-ftp"
+        ],
+        "ftps": [
+          "dep:plenora-storage-ftp"
+        ],
+        "full": [
+          "local",
+          "s3",
+          "sftp",
+          "ftp",
+          "ftps",
+          "azure",
+          "gcs",
+          "smb",
+          "webdav"
+        ],
+        "gcs": [
+          "dep:plenora-storage-providers",
+          "plenora-storage-providers/gcs"
+        ],
+        "local": [
+          "dep:plenora-storage-providers",
+          "plenora-storage-providers/local"
+        ],
+        "s3": [
+          "dep:plenora-storage-s3"
+        ],
+        "sftp": [
+          "dep:plenora-storage-sftp"
+        ],
+        "smb": [
+          "dep:plenora-storage-providers",
+          "plenora-storage-providers/smb"
+        ],
+        "webdav": [
+          "dep:plenora-storage-providers",
+          "plenora-storage-providers/webdav"
+        ]
+      },
+      "lib": {},
+      "rust_version": {
+        "workspace": true
+      }
+    },
+    "plenora-storage-ftp": {
+      "features": {},
+      "lib": {},
+      "rust_version": {
+        "workspace": true
+      }
+    },
+    "plenora-storage-providers": {
+      "features": {
+        "azure": [
+          "dep:object_store",
+          "dep:reqwest",
+          "dep:rustls",
+          "dep:quick-xml",
+          "dep:url"
+        ],
+        "default": [
+          "full"
+        ],
+        "full": [
+          "local",
+          "azure",
+          "gcs",
+          "smb",
+          "webdav"
+        ],
+        "gcs": [
+          "dep:reqwest",
+          "dep:rustls",
+          "dep:url"
+        ],
+        "local": [
+          "dep:cap-std"
+        ],
+        "smb": [
+          "dep:smb2"
+        ],
+        "webdav": [
+          "dep:reqwest",
+          "dep:rustls",
+          "dep:quick-xml",
+          "dep:url",
+          "dep:percent-encoding"
+        ]
+      },
+      "lib": {},
+      "rust_version": {
+        "workspace": true
+      }
+    },
+    "plenora-storage-py": {
+      "features": {
+        "azure": [
+          "plenora-storage-engine/azure"
+        ],
+        "default": [
+          "full"
+        ],
+        "ftp": [
+          "plenora-storage-engine/ftp"
+        ],
+        "ftps": [
+          "plenora-storage-engine/ftps"
+        ],
+        "full": [
+          "local",
+          "s3",
+          "sftp",
+          "ftp",
+          "ftps",
+          "azure",
+          "gcs",
+          "smb",
+          "webdav"
+        ],
+        "gcs": [
+          "plenora-storage-engine/gcs"
+        ],
+        "local": [
+          "plenora-storage-engine/local"
+        ],
+        "s3": [
+          "plenora-storage-engine/s3"
+        ],
+        "sftp": [
+          "plenora-storage-engine/sftp"
+        ],
+        "smb": [
+          "plenora-storage-engine/smb"
+        ],
+        "webdav": [
+          "plenora-storage-engine/webdav"
+        ]
+      },
+      "lib": {
+        "crate-type": [
+          "cdylib"
+        ],
+        "doctest": false,
+        "name": "plenora_storage_native",
+        "test": false
+      },
+      "rust_version": {
+        "workspace": true
+      }
+    },
+    "plenora-storage-s3": {
+      "features": {},
+      "lib": {},
+      "rust_version": {
+        "workspace": true
+      }
+    },
+    "plenora-storage-sftp": {
+      "features": {},
+      "lib": {},
+      "rust_version": {
+        "workspace": true
+      }
+    }
+  },
+  "python_requires": ">=3.10",
+  "rust_version": "1.92",
+  "schema_version": 1,
+  "upstream_contracts": {
+    "repository": "https://github.com/PlenoraETL/plenora-contracts.git",
+    "revision": "f811f21f072b34896efdb6e110bee34d756153df"
+  }
+}

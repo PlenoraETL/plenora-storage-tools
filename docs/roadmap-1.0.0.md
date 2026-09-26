@@ -88,7 +88,10 @@ proposto: sorgente 0.2.2 -> eventuali iterazioni di sviluppo -> 1.0.0-rc.N -> 1.
 ### M1 — Contratti stabili
 
 La [baseline comportamentale](api-1.0.md) descrive le superfici e collega i test
-di coerenza degli errori. Non chiude l'inventario completo né il congelamento M1.
+di coerenza degli errori. L'[inventario generato](API-INVENTORY.md) e i gate
+Rust/CLI/Python proteggono ora la baseline alfa. Restano per il congelamento
+stabile la qualifica delle garanzie per provider e il riferimento alla release
+definitiva: non si attribuisce alla baseline alfa una qualifica di produzione.
 
 Inventariare i simboli Rust pubblici, i comandi e gli exit code CLI, le firme
 Python, gli schemi JSON e le categorie di errore. Definire cosa una versione

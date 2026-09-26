@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Guard compiler-resolved Rust APIs on Windows/Linux, the compiled CLI model, installed Python signatures and versioned JSON contracts against a reviewed alpha baseline; add negative compatibility tests and release workflow gates.
+
 - Preserve local artifact error causes and read/prepare/write/commit phases across Rust, CLI and Python; keep existing codes and redacted OS errors.
 - Prevent Python input serialization callbacks from leaking raw exceptions; avoid deep-copying unvalidated engine configuration.
 - Document the public API behavior baseline and its executable compatibility tests, with remaining API freeze work explicit.

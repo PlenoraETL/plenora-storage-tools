@@ -131,6 +131,14 @@ La [CI](../.github/workflows/ci.yml) esegue già i gate di questa baseline:
 - `scripts/check_features.py`: discovery coerente con i provider compilati.
 - `scripts/check_docs.py`: inventario generato, versioni e link della documentazione.
 
-Restano da chiudere prima del congelamento M1 l'inventario completo delle firme
-pubbliche Rust e una verifica automatica di compatibilità rispetto al baseline
-stabile scelto. Questi test comportamentali non sostituiscono tale controllo.
+L'[inventario generato](API-INVENTORY.md) collega le firme complete dei sette
+crate Rust, gli snapshot CLI/Python e i requisiti dei contratti. La
+[baseline](../api/README.md) della serie alfa è ora protetta dalla CI sui due
+target e dal workflow di release. Il controllo è conservativo: blocca anche
+aggiunte da valutare esplicitamente, senza dichiararle automaticamente breaking.
+Le prove negative verificano che il gate rilevi le modifiche incompatibili.
+
+Questo chiude l'inventario e il controllo delle firme per la distribuzione
+completa. Non equivale alla qualifica di produzione: al rilascio stabile andrà
+conservato il riferimento al commit qualificato, insieme alle garanzie per
+provider e alle prove di comportamento previste dal piano.

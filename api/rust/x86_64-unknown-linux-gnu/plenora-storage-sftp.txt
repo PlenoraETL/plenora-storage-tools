@@ -1,0 +1,91 @@
+pub mod plenora_storage_sftp
+pub struct plenora_storage_sftp::SftpConnectionConfig
+pub plenora_storage_sftp::SftpConnectionConfig::atomic_rename: bool
+pub plenora_storage_sftp::SftpConnectionConfig::host: alloc::string::String
+pub plenora_storage_sftp::SftpConnectionConfig::host_key_sha256: core::option::Option<alloc::string::String>
+pub plenora_storage_sftp::SftpConnectionConfig::port: u16
+pub plenora_storage_sftp::SftpConnectionConfig::root: alloc::string::String
+impl core::clone::Clone for plenora_storage_sftp::SftpConnectionConfig
+pub fn plenora_storage_sftp::SftpConnectionConfig::clone(&self) -> plenora_storage_sftp::SftpConnectionConfig
+impl core::cmp::Eq for plenora_storage_sftp::SftpConnectionConfig
+impl core::cmp::PartialEq for plenora_storage_sftp::SftpConnectionConfig
+pub fn plenora_storage_sftp::SftpConnectionConfig::eq(&self, other: &plenora_storage_sftp::SftpConnectionConfig) -> bool
+impl core::fmt::Debug for plenora_storage_sftp::SftpConnectionConfig
+pub fn plenora_storage_sftp::SftpConnectionConfig::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for plenora_storage_sftp::SftpConnectionConfig
+impl<'de> serde_core::de::Deserialize<'de> for plenora_storage_sftp::SftpConnectionConfig
+pub fn plenora_storage_sftp::SftpConnectionConfig::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for plenora_storage_sftp::SftpConnectionConfig
+impl core::marker::Send for plenora_storage_sftp::SftpConnectionConfig
+impl core::marker::Sync for plenora_storage_sftp::SftpConnectionConfig
+impl core::marker::Unpin for plenora_storage_sftp::SftpConnectionConfig
+impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_sftp::SftpConnectionConfig
+impl core::panic::unwind_safe::UnwindSafe for plenora_storage_sftp::SftpConnectionConfig
+impl<Q, K> hashbrown::Equivalent<K> for plenora_storage_sftp::SftpConnectionConfig where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn plenora_storage_sftp::SftpConnectionConfig::equivalent(&self, key: &K) -> bool
+impl<T, U> core::convert::Into<U> for plenora_storage_sftp::SftpConnectionConfig where U: core::convert::From<T>
+pub fn plenora_storage_sftp::SftpConnectionConfig::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for plenora_storage_sftp::SftpConnectionConfig where U: core::convert::Into<T>
+pub type plenora_storage_sftp::SftpConnectionConfig::Error = core::convert::Infallible
+pub fn plenora_storage_sftp::SftpConnectionConfig::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for plenora_storage_sftp::SftpConnectionConfig where U: core::convert::TryFrom<T>
+pub type plenora_storage_sftp::SftpConnectionConfig::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn plenora_storage_sftp::SftpConnectionConfig::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for plenora_storage_sftp::SftpConnectionConfig where T: core::clone::Clone
+pub type plenora_storage_sftp::SftpConnectionConfig::Owned = T
+pub fn plenora_storage_sftp::SftpConnectionConfig::clone_into(&self, target: &mut T)
+pub fn plenora_storage_sftp::SftpConnectionConfig::to_owned(&self) -> T
+impl<T> core::any::Any for plenora_storage_sftp::SftpConnectionConfig where T: 'static + ?core::marker::Sized
+pub fn plenora_storage_sftp::SftpConnectionConfig::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for plenora_storage_sftp::SftpConnectionConfig where T: ?core::marker::Sized
+pub fn plenora_storage_sftp::SftpConnectionConfig::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for plenora_storage_sftp::SftpConnectionConfig where T: ?core::marker::Sized
+pub fn plenora_storage_sftp::SftpConnectionConfig::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for plenora_storage_sftp::SftpConnectionConfig where T: core::clone::Clone
+pub unsafe fn plenora_storage_sftp::SftpConnectionConfig::clone_to_uninit(&self, dest: *mut u8)
+impl<T> core::convert::From<T> for plenora_storage_sftp::SftpConnectionConfig
+pub fn plenora_storage_sftp::SftpConnectionConfig::from(t: T) -> T
+impl<T> serde_core::de::DeserializeOwned for plenora_storage_sftp::SftpConnectionConfig where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> typenum::type_operators::Same for plenora_storage_sftp::SftpConnectionConfig
+pub type plenora_storage_sftp::SftpConnectionConfig::Output = T
+pub struct plenora_storage_sftp::SftpProvider
+impl plenora_storage_sftp::SftpProvider
+pub fn plenora_storage_sftp::SftpProvider::new(credentials: alloc::sync::Arc<dyn plenora_storage_core::credentials::CredentialResolver>) -> Self
+impl plenora_storage_core::provider::StorageProvider for plenora_storage_sftp::SftpProvider
+pub fn plenora_storage_sftp::SftpProvider::capabilities(&self) -> plenora_storage_core::capability::ProviderCapabilities
+pub fn plenora_storage_sftp::SftpProvider::config_contract(&self) -> &'static str
+pub fn plenora_storage_sftp::SftpProvider::copy<'life0, 'life1, 'life2, 'life3, 'life4, 'async_trait>(&'life0 self, connection: &'life1 plenora_storage_core::model::ProviderConnection, request: &'life2 plenora_storage_core::model::CopyRequest, context: &'life3 plenora_storage_core::provider::OperationContext<'life4>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<plenora_storage_core::model::ObjectMetadata>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait, 'life4: 'async_trait
+pub fn plenora_storage_sftp::SftpProvider::delete<'life0, 'life1, 'life2, 'life3, 'life4, 'async_trait>(&'life0 self, connection: &'life1 plenora_storage_core::model::ProviderConnection, request: &'life2 plenora_storage_core::model::DeleteRequest, context: &'life3 plenora_storage_core::provider::OperationContext<'life4>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<plenora_storage_core::model::DeleteResult>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait, 'life4: 'async_trait
+pub fn plenora_storage_sftp::SftpProvider::get<'life0, 'life1, 'life2, 'life3, 'life4, 'life5, 'async_trait>(&'life0 self, connection: &'life1 plenora_storage_core::model::ProviderConnection, request: &'life2 plenora_storage_core::model::GetRequest, sink: &'life3 mut (dyn tokio::io::async_write::AsyncWrite + core::marker::Send + core::marker::Unpin), context: &'life4 plenora_storage_core::provider::OperationContext<'life5>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<plenora_storage_core::model::TransferResult>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait, 'life4: 'async_trait, 'life5: 'async_trait
+pub fn plenora_storage_sftp::SftpProvider::id(&self) -> &'static str
+pub fn plenora_storage_sftp::SftpProvider::list<'life0, 'life1, 'life2, 'life3, 'life4, 'async_trait>(&'life0 self, connection: &'life1 plenora_storage_core::model::ProviderConnection, request: &'life2 plenora_storage_core::model::ProviderListRequest, context: &'life3 plenora_storage_core::provider::OperationContext<'life4>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<plenora_storage_core::model::ProviderListResult>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait, 'life4: 'async_trait
+pub fn plenora_storage_sftp::SftpProvider::put<'life0, 'life1, 'life2, 'life3, 'life4, 'life5, 'async_trait>(&'life0 self, connection: &'life1 plenora_storage_core::model::ProviderConnection, request: &'life2 plenora_storage_core::model::PutRequest, source: &'life3 mut (dyn tokio::io::async_read::AsyncRead + core::marker::Send + core::marker::Unpin), context: &'life4 plenora_storage_core::provider::OperationContext<'life5>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<plenora_storage_core::model::TransferResult>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait, 'life4: 'async_trait, 'life5: 'async_trait
+pub fn plenora_storage_sftp::SftpProvider::stat<'life0, 'life1, 'life2, 'life3, 'life4, 'async_trait>(&'life0 self, connection: &'life1 plenora_storage_core::model::ProviderConnection, request: &'life2 plenora_storage_core::model::StatRequest, context: &'life3 plenora_storage_core::provider::OperationContext<'life4>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<plenora_storage_core::model::ObjectMetadata>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait, 'life4: 'async_trait
+pub fn plenora_storage_sftp::SftpProvider::test<'life0, 'life1, 'life2, 'life3, 'async_trait>(&'life0 self, connection: &'life1 plenora_storage_core::model::ProviderConnection, context: &'life2 plenora_storage_core::provider::OperationContext<'life3>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<plenora_storage_core::model::TestResult>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
+pub fn plenora_storage_sftp::SftpProvider::validate_connection(&self, connection: &plenora_storage_core::model::ProviderConnection, policy: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
+impl core::marker::Freeze for plenora_storage_sftp::SftpProvider
+impl core::marker::Send for plenora_storage_sftp::SftpProvider
+impl core::marker::Sync for plenora_storage_sftp::SftpProvider
+impl core::marker::Unpin for plenora_storage_sftp::SftpProvider
+impl !core::panic::unwind_safe::RefUnwindSafe for plenora_storage_sftp::SftpProvider
+impl !core::panic::unwind_safe::UnwindSafe for plenora_storage_sftp::SftpProvider
+impl<T, U> core::convert::Into<U> for plenora_storage_sftp::SftpProvider where U: core::convert::From<T>
+pub fn plenora_storage_sftp::SftpProvider::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for plenora_storage_sftp::SftpProvider where U: core::convert::Into<T>
+pub type plenora_storage_sftp::SftpProvider::Error = core::convert::Infallible
+pub fn plenora_storage_sftp::SftpProvider::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for plenora_storage_sftp::SftpProvider where U: core::convert::TryFrom<T>
+pub type plenora_storage_sftp::SftpProvider::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn plenora_storage_sftp::SftpProvider::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for plenora_storage_sftp::SftpProvider where T: 'static + ?core::marker::Sized
+pub fn plenora_storage_sftp::SftpProvider::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for plenora_storage_sftp::SftpProvider where T: ?core::marker::Sized
+pub fn plenora_storage_sftp::SftpProvider::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for plenora_storage_sftp::SftpProvider where T: ?core::marker::Sized
+pub fn plenora_storage_sftp::SftpProvider::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for plenora_storage_sftp::SftpProvider
+pub fn plenora_storage_sftp::SftpProvider::from(t: T) -> T
+impl<T> typenum::type_operators::Same for plenora_storage_sftp::SftpProvider
+pub type plenora_storage_sftp::SftpProvider::Output = T
+pub const plenora_storage_sftp::CONFIG_CONTRACT: &str
+pub const plenora_storage_sftp::PROVIDER_ID: &str

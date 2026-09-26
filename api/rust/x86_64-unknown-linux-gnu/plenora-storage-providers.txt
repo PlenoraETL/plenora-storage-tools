@@ -1,0 +1,492 @@
+pub mod plenora_storage_providers
+pub struct plenora_storage_providers::Azure
+impl plenora_storage_providers::ProviderFactory for plenora_storage_providers::Azure
+pub const plenora_storage_providers::Azure::ATOMIC: bool
+pub const plenora_storage_providers::Azure::CONTRACT: &'static str
+pub const plenora_storage_providers::Azure::ID: &'static str
+pub const plenora_storage_providers::Azure::METADATA: bool
+pub fn plenora_storage_providers::Azure::validate(connection: &plenora_storage_core::model::ProviderConnection, policy: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
+impl core::marker::Freeze for plenora_storage_providers::Azure
+impl core::marker::Send for plenora_storage_providers::Azure
+impl core::marker::Sync for plenora_storage_providers::Azure
+impl core::marker::Unpin for plenora_storage_providers::Azure
+impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::Azure
+impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::Azure
+impl<T, U> core::convert::Into<U> for plenora_storage_providers::Azure where U: core::convert::From<T>
+pub fn plenora_storage_providers::Azure::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for plenora_storage_providers::Azure where U: core::convert::Into<T>
+pub type plenora_storage_providers::Azure::Error = core::convert::Infallible
+pub fn plenora_storage_providers::Azure::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for plenora_storage_providers::Azure where U: core::convert::TryFrom<T>
+pub type plenora_storage_providers::Azure::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn plenora_storage_providers::Azure::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for plenora_storage_providers::Azure where T: 'static + ?core::marker::Sized
+pub fn plenora_storage_providers::Azure::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for plenora_storage_providers::Azure where T: ?core::marker::Sized
+pub fn plenora_storage_providers::Azure::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for plenora_storage_providers::Azure where T: ?core::marker::Sized
+pub fn plenora_storage_providers::Azure::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for plenora_storage_providers::Azure
+pub fn plenora_storage_providers::Azure::from(t: T) -> T
+impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::Azure where T: ?core::marker::Sized
+pub fn plenora_storage_providers::Azure::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::Azure::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+impl<T> tracing::instrument::Instrument for plenora_storage_providers::Azure
+impl<T> tracing::instrument::WithSubscriber for plenora_storage_providers::Azure
+impl<T> typenum::type_operators::Same for plenora_storage_providers::Azure
+pub type plenora_storage_providers::Azure::Output = T
+pub struct plenora_storage_providers::AzureConnectionConfig
+pub plenora_storage_providers::AzureConnectionConfig::account: alloc::string::String
+pub plenora_storage_providers::AzureConnectionConfig::container: alloc::string::String
+pub plenora_storage_providers::AzureConnectionConfig::endpoint: alloc::string::String
+impl core::clone::Clone for plenora_storage_providers::AzureConnectionConfig
+pub fn plenora_storage_providers::AzureConnectionConfig::clone(&self) -> plenora_storage_providers::AzureConnectionConfig
+impl core::fmt::Debug for plenora_storage_providers::AzureConnectionConfig
+pub fn plenora_storage_providers::AzureConnectionConfig::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'de> serde_core::de::Deserialize<'de> for plenora_storage_providers::AzureConnectionConfig
+pub fn plenora_storage_providers::AzureConnectionConfig::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for plenora_storage_providers::AzureConnectionConfig
+impl core::marker::Send for plenora_storage_providers::AzureConnectionConfig
+impl core::marker::Sync for plenora_storage_providers::AzureConnectionConfig
+impl core::marker::Unpin for plenora_storage_providers::AzureConnectionConfig
+impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::AzureConnectionConfig
+impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::AzureConnectionConfig
+impl<T, U> core::convert::Into<U> for plenora_storage_providers::AzureConnectionConfig where U: core::convert::From<T>
+pub fn plenora_storage_providers::AzureConnectionConfig::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for plenora_storage_providers::AzureConnectionConfig where U: core::convert::Into<T>
+pub type plenora_storage_providers::AzureConnectionConfig::Error = core::convert::Infallible
+pub fn plenora_storage_providers::AzureConnectionConfig::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for plenora_storage_providers::AzureConnectionConfig where U: core::convert::TryFrom<T>
+pub type plenora_storage_providers::AzureConnectionConfig::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn plenora_storage_providers::AzureConnectionConfig::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for plenora_storage_providers::AzureConnectionConfig where T: core::clone::Clone
+pub type plenora_storage_providers::AzureConnectionConfig::Owned = T
+pub fn plenora_storage_providers::AzureConnectionConfig::clone_into(&self, target: &mut T)
+pub fn plenora_storage_providers::AzureConnectionConfig::to_owned(&self) -> T
+impl<T> core::any::Any for plenora_storage_providers::AzureConnectionConfig where T: 'static + ?core::marker::Sized
+pub fn plenora_storage_providers::AzureConnectionConfig::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for plenora_storage_providers::AzureConnectionConfig where T: ?core::marker::Sized
+pub fn plenora_storage_providers::AzureConnectionConfig::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for plenora_storage_providers::AzureConnectionConfig where T: ?core::marker::Sized
+pub fn plenora_storage_providers::AzureConnectionConfig::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for plenora_storage_providers::AzureConnectionConfig where T: core::clone::Clone
+pub unsafe fn plenora_storage_providers::AzureConnectionConfig::clone_to_uninit(&self, dest: *mut u8)
+impl<T> core::convert::From<T> for plenora_storage_providers::AzureConnectionConfig
+pub fn plenora_storage_providers::AzureConnectionConfig::from(t: T) -> T
+impl<T> serde_core::de::DeserializeOwned for plenora_storage_providers::AzureConnectionConfig where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::AzureConnectionConfig where T: ?core::marker::Sized
+pub fn plenora_storage_providers::AzureConnectionConfig::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::AzureConnectionConfig::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+impl<T> tracing::instrument::Instrument for plenora_storage_providers::AzureConnectionConfig
+impl<T> tracing::instrument::WithSubscriber for plenora_storage_providers::AzureConnectionConfig
+impl<T> typenum::type_operators::Same for plenora_storage_providers::AzureConnectionConfig
+pub type plenora_storage_providers::AzureConnectionConfig::Output = T
+pub struct plenora_storage_providers::Gcs
+impl plenora_storage_providers::ProviderFactory for plenora_storage_providers::Gcs
+pub const plenora_storage_providers::Gcs::ATOMIC: bool
+pub const plenora_storage_providers::Gcs::CONTRACT: &'static str
+pub const plenora_storage_providers::Gcs::ID: &'static str
+pub const plenora_storage_providers::Gcs::METADATA: bool
+pub fn plenora_storage_providers::Gcs::validate(connection: &plenora_storage_core::model::ProviderConnection, policy: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
+impl core::marker::Freeze for plenora_storage_providers::Gcs
+impl core::marker::Send for plenora_storage_providers::Gcs
+impl core::marker::Sync for plenora_storage_providers::Gcs
+impl core::marker::Unpin for plenora_storage_providers::Gcs
+impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::Gcs
+impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::Gcs
+impl<T, U> core::convert::Into<U> for plenora_storage_providers::Gcs where U: core::convert::From<T>
+pub fn plenora_storage_providers::Gcs::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for plenora_storage_providers::Gcs where U: core::convert::Into<T>
+pub type plenora_storage_providers::Gcs::Error = core::convert::Infallible
+pub fn plenora_storage_providers::Gcs::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for plenora_storage_providers::Gcs where U: core::convert::TryFrom<T>
+pub type plenora_storage_providers::Gcs::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn plenora_storage_providers::Gcs::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for plenora_storage_providers::Gcs where T: 'static + ?core::marker::Sized
+pub fn plenora_storage_providers::Gcs::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for plenora_storage_providers::Gcs where T: ?core::marker::Sized
+pub fn plenora_storage_providers::Gcs::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for plenora_storage_providers::Gcs where T: ?core::marker::Sized
+pub fn plenora_storage_providers::Gcs::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for plenora_storage_providers::Gcs
+pub fn plenora_storage_providers::Gcs::from(t: T) -> T
+impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::Gcs where T: ?core::marker::Sized
+pub fn plenora_storage_providers::Gcs::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::Gcs::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+impl<T> tracing::instrument::Instrument for plenora_storage_providers::Gcs
+impl<T> tracing::instrument::WithSubscriber for plenora_storage_providers::Gcs
+impl<T> typenum::type_operators::Same for plenora_storage_providers::Gcs
+pub type plenora_storage_providers::Gcs::Output = T
+pub struct plenora_storage_providers::GcsConnectionConfig
+pub plenora_storage_providers::GcsConnectionConfig::bucket: alloc::string::String
+pub plenora_storage_providers::GcsConnectionConfig::endpoint: alloc::string::String
+impl core::clone::Clone for plenora_storage_providers::GcsConnectionConfig
+pub fn plenora_storage_providers::GcsConnectionConfig::clone(&self) -> plenora_storage_providers::GcsConnectionConfig
+impl core::fmt::Debug for plenora_storage_providers::GcsConnectionConfig
+pub fn plenora_storage_providers::GcsConnectionConfig::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'de> serde_core::de::Deserialize<'de> for plenora_storage_providers::GcsConnectionConfig
+pub fn plenora_storage_providers::GcsConnectionConfig::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for plenora_storage_providers::GcsConnectionConfig
+impl core::marker::Send for plenora_storage_providers::GcsConnectionConfig
+impl core::marker::Sync for plenora_storage_providers::GcsConnectionConfig
+impl core::marker::Unpin for plenora_storage_providers::GcsConnectionConfig
+impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::GcsConnectionConfig
+impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::GcsConnectionConfig
+impl<T, U> core::convert::Into<U> for plenora_storage_providers::GcsConnectionConfig where U: core::convert::From<T>
+pub fn plenora_storage_providers::GcsConnectionConfig::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for plenora_storage_providers::GcsConnectionConfig where U: core::convert::Into<T>
+pub type plenora_storage_providers::GcsConnectionConfig::Error = core::convert::Infallible
+pub fn plenora_storage_providers::GcsConnectionConfig::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for plenora_storage_providers::GcsConnectionConfig where U: core::convert::TryFrom<T>
+pub type plenora_storage_providers::GcsConnectionConfig::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn plenora_storage_providers::GcsConnectionConfig::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for plenora_storage_providers::GcsConnectionConfig where T: core::clone::Clone
+pub type plenora_storage_providers::GcsConnectionConfig::Owned = T
+pub fn plenora_storage_providers::GcsConnectionConfig::clone_into(&self, target: &mut T)
+pub fn plenora_storage_providers::GcsConnectionConfig::to_owned(&self) -> T
+impl<T> core::any::Any for plenora_storage_providers::GcsConnectionConfig where T: 'static + ?core::marker::Sized
+pub fn plenora_storage_providers::GcsConnectionConfig::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for plenora_storage_providers::GcsConnectionConfig where T: ?core::marker::Sized
+pub fn plenora_storage_providers::GcsConnectionConfig::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for plenora_storage_providers::GcsConnectionConfig where T: ?core::marker::Sized
+pub fn plenora_storage_providers::GcsConnectionConfig::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for plenora_storage_providers::GcsConnectionConfig where T: core::clone::Clone
+pub unsafe fn plenora_storage_providers::GcsConnectionConfig::clone_to_uninit(&self, dest: *mut u8)
+impl<T> core::convert::From<T> for plenora_storage_providers::GcsConnectionConfig
+pub fn plenora_storage_providers::GcsConnectionConfig::from(t: T) -> T
+impl<T> serde_core::de::DeserializeOwned for plenora_storage_providers::GcsConnectionConfig where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::GcsConnectionConfig where T: ?core::marker::Sized
+pub fn plenora_storage_providers::GcsConnectionConfig::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::GcsConnectionConfig::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+impl<T> tracing::instrument::Instrument for plenora_storage_providers::GcsConnectionConfig
+impl<T> tracing::instrument::WithSubscriber for plenora_storage_providers::GcsConnectionConfig
+impl<T> typenum::type_operators::Same for plenora_storage_providers::GcsConnectionConfig
+pub type plenora_storage_providers::GcsConnectionConfig::Output = T
+pub struct plenora_storage_providers::Local
+impl plenora_storage_providers::ProviderFactory for plenora_storage_providers::Local
+pub const plenora_storage_providers::Local::ATOMIC: bool
+pub const plenora_storage_providers::Local::CONTRACT: &'static str
+pub const plenora_storage_providers::Local::ID: &'static str
+pub const plenora_storage_providers::Local::METADATA: bool
+pub fn plenora_storage_providers::Local::validate(connection: &plenora_storage_core::model::ProviderConnection, _: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
+impl core::marker::Freeze for plenora_storage_providers::Local
+impl core::marker::Send for plenora_storage_providers::Local
+impl core::marker::Sync for plenora_storage_providers::Local
+impl core::marker::Unpin for plenora_storage_providers::Local
+impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::Local
+impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::Local
+impl<T, U> core::convert::Into<U> for plenora_storage_providers::Local where U: core::convert::From<T>
+pub fn plenora_storage_providers::Local::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for plenora_storage_providers::Local where U: core::convert::Into<T>
+pub type plenora_storage_providers::Local::Error = core::convert::Infallible
+pub fn plenora_storage_providers::Local::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for plenora_storage_providers::Local where U: core::convert::TryFrom<T>
+pub type plenora_storage_providers::Local::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn plenora_storage_providers::Local::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for plenora_storage_providers::Local where T: 'static + ?core::marker::Sized
+pub fn plenora_storage_providers::Local::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for plenora_storage_providers::Local where T: ?core::marker::Sized
+pub fn plenora_storage_providers::Local::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for plenora_storage_providers::Local where T: ?core::marker::Sized
+pub fn plenora_storage_providers::Local::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for plenora_storage_providers::Local
+pub fn plenora_storage_providers::Local::from(t: T) -> T
+impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::Local where T: ?core::marker::Sized
+pub fn plenora_storage_providers::Local::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::Local::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+impl<T> tracing::instrument::Instrument for plenora_storage_providers::Local
+impl<T> tracing::instrument::WithSubscriber for plenora_storage_providers::Local
+impl<T> typenum::type_operators::Same for plenora_storage_providers::Local
+pub type plenora_storage_providers::Local::Output = T
+pub struct plenora_storage_providers::LocalConnectionConfig
+pub plenora_storage_providers::LocalConnectionConfig::root: alloc::string::String
+impl core::clone::Clone for plenora_storage_providers::LocalConnectionConfig
+pub fn plenora_storage_providers::LocalConnectionConfig::clone(&self) -> plenora_storage_providers::LocalConnectionConfig
+impl core::fmt::Debug for plenora_storage_providers::LocalConnectionConfig
+pub fn plenora_storage_providers::LocalConnectionConfig::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'de> serde_core::de::Deserialize<'de> for plenora_storage_providers::LocalConnectionConfig
+pub fn plenora_storage_providers::LocalConnectionConfig::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for plenora_storage_providers::LocalConnectionConfig
+impl core::marker::Send for plenora_storage_providers::LocalConnectionConfig
+impl core::marker::Sync for plenora_storage_providers::LocalConnectionConfig
+impl core::marker::Unpin for plenora_storage_providers::LocalConnectionConfig
+impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::LocalConnectionConfig
+impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::LocalConnectionConfig
+impl<T, U> core::convert::Into<U> for plenora_storage_providers::LocalConnectionConfig where U: core::convert::From<T>
+pub fn plenora_storage_providers::LocalConnectionConfig::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for plenora_storage_providers::LocalConnectionConfig where U: core::convert::Into<T>
+pub type plenora_storage_providers::LocalConnectionConfig::Error = core::convert::Infallible
+pub fn plenora_storage_providers::LocalConnectionConfig::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for plenora_storage_providers::LocalConnectionConfig where U: core::convert::TryFrom<T>
+pub type plenora_storage_providers::LocalConnectionConfig::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn plenora_storage_providers::LocalConnectionConfig::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for plenora_storage_providers::LocalConnectionConfig where T: core::clone::Clone
+pub type plenora_storage_providers::LocalConnectionConfig::Owned = T
+pub fn plenora_storage_providers::LocalConnectionConfig::clone_into(&self, target: &mut T)
+pub fn plenora_storage_providers::LocalConnectionConfig::to_owned(&self) -> T
+impl<T> core::any::Any for plenora_storage_providers::LocalConnectionConfig where T: 'static + ?core::marker::Sized
+pub fn plenora_storage_providers::LocalConnectionConfig::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for plenora_storage_providers::LocalConnectionConfig where T: ?core::marker::Sized
+pub fn plenora_storage_providers::LocalConnectionConfig::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for plenora_storage_providers::LocalConnectionConfig where T: ?core::marker::Sized
+pub fn plenora_storage_providers::LocalConnectionConfig::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for plenora_storage_providers::LocalConnectionConfig where T: core::clone::Clone
+pub unsafe fn plenora_storage_providers::LocalConnectionConfig::clone_to_uninit(&self, dest: *mut u8)
+impl<T> core::convert::From<T> for plenora_storage_providers::LocalConnectionConfig
+pub fn plenora_storage_providers::LocalConnectionConfig::from(t: T) -> T
+impl<T> serde_core::de::DeserializeOwned for plenora_storage_providers::LocalConnectionConfig where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::LocalConnectionConfig where T: ?core::marker::Sized
+pub fn plenora_storage_providers::LocalConnectionConfig::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::LocalConnectionConfig::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+impl<T> tracing::instrument::Instrument for plenora_storage_providers::LocalConnectionConfig
+impl<T> tracing::instrument::WithSubscriber for plenora_storage_providers::LocalConnectionConfig
+impl<T> typenum::type_operators::Same for plenora_storage_providers::LocalConnectionConfig
+pub type plenora_storage_providers::LocalConnectionConfig::Output = T
+pub struct plenora_storage_providers::Provider<F: plenora_storage_providers::ProviderFactory>
+impl<F: plenora_storage_providers::ProviderFactory> plenora_storage_providers::Provider<F>
+pub fn plenora_storage_providers::Provider<F>::new(credentials: alloc::sync::Arc<dyn plenora_storage_core::credentials::CredentialResolver>) -> Self
+impl<F: plenora_storage_providers::ProviderFactory> plenora_storage_core::provider::StorageProvider for plenora_storage_providers::Provider<F>
+pub fn plenora_storage_providers::Provider<F>::capabilities(&self) -> plenora_storage_core::capability::ProviderCapabilities
+pub fn plenora_storage_providers::Provider<F>::config_contract(&self) -> &'static str
+pub fn plenora_storage_providers::Provider<F>::copy<'life0, 'life1, 'life2, 'life3, 'life4, 'async_trait>(&'life0 self, connection: &'life1 plenora_storage_core::model::ProviderConnection, request: &'life2 plenora_storage_core::model::CopyRequest, context: &'life3 plenora_storage_core::provider::OperationContext<'life4>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<plenora_storage_core::model::ObjectMetadata>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait, 'life4: 'async_trait
+pub fn plenora_storage_providers::Provider<F>::delete<'life0, 'life1, 'life2, 'life3, 'life4, 'async_trait>(&'life0 self, connection: &'life1 plenora_storage_core::model::ProviderConnection, request: &'life2 plenora_storage_core::model::DeleteRequest, context: &'life3 plenora_storage_core::provider::OperationContext<'life4>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<plenora_storage_core::model::DeleteResult>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait, 'life4: 'async_trait
+pub fn plenora_storage_providers::Provider<F>::get<'life0, 'life1, 'life2, 'life3, 'life4, 'life5, 'async_trait>(&'life0 self, connection: &'life1 plenora_storage_core::model::ProviderConnection, request: &'life2 plenora_storage_core::model::GetRequest, sink: &'life3 mut (dyn tokio::io::async_write::AsyncWrite + core::marker::Send + core::marker::Unpin), context: &'life4 plenora_storage_core::provider::OperationContext<'life5>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<plenora_storage_core::model::TransferResult>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait, 'life4: 'async_trait, 'life5: 'async_trait
+pub fn plenora_storage_providers::Provider<F>::id(&self) -> &'static str
+pub fn plenora_storage_providers::Provider<F>::list<'life0, 'life1, 'life2, 'life3, 'life4, 'async_trait>(&'life0 self, connection: &'life1 plenora_storage_core::model::ProviderConnection, request: &'life2 plenora_storage_core::model::ProviderListRequest, context: &'life3 plenora_storage_core::provider::OperationContext<'life4>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<plenora_storage_core::model::ProviderListResult>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait, 'life4: 'async_trait
+pub fn plenora_storage_providers::Provider<F>::put<'life0, 'life1, 'life2, 'life3, 'life4, 'life5, 'async_trait>(&'life0 self, connection: &'life1 plenora_storage_core::model::ProviderConnection, request: &'life2 plenora_storage_core::model::PutRequest, source: &'life3 mut (dyn tokio::io::async_read::AsyncRead + core::marker::Send + core::marker::Unpin), context: &'life4 plenora_storage_core::provider::OperationContext<'life5>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<plenora_storage_core::model::TransferResult>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait, 'life4: 'async_trait, 'life5: 'async_trait
+pub fn plenora_storage_providers::Provider<F>::stat<'life0, 'life1, 'life2, 'life3, 'life4, 'async_trait>(&'life0 self, connection: &'life1 plenora_storage_core::model::ProviderConnection, request: &'life2 plenora_storage_core::model::StatRequest, context: &'life3 plenora_storage_core::provider::OperationContext<'life4>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<plenora_storage_core::model::ObjectMetadata>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait, 'life4: 'async_trait
+pub fn plenora_storage_providers::Provider<F>::test<'life0, 'life1, 'life2, 'life3, 'async_trait>(&'life0 self, connection: &'life1 plenora_storage_core::model::ProviderConnection, context: &'life2 plenora_storage_core::provider::OperationContext<'life3>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<plenora_storage_core::model::TestResult>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
+pub fn plenora_storage_providers::Provider<F>::validate_connection(&self, connection: &plenora_storage_core::model::ProviderConnection, policy: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
+impl<F> core::marker::Freeze for plenora_storage_providers::Provider<F>
+impl<F> core::marker::Send for plenora_storage_providers::Provider<F>
+impl<F> core::marker::Sync for plenora_storage_providers::Provider<F>
+impl<F> core::marker::Unpin for plenora_storage_providers::Provider<F> where F: core::marker::Unpin
+impl<F> !core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::Provider<F>
+impl<F> !core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::Provider<F>
+impl<T, U> core::convert::Into<U> for plenora_storage_providers::Provider<F> where U: core::convert::From<T>
+pub fn plenora_storage_providers::Provider<F>::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for plenora_storage_providers::Provider<F> where U: core::convert::Into<T>
+pub type plenora_storage_providers::Provider<F>::Error = core::convert::Infallible
+pub fn plenora_storage_providers::Provider<F>::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for plenora_storage_providers::Provider<F> where U: core::convert::TryFrom<T>
+pub type plenora_storage_providers::Provider<F>::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn plenora_storage_providers::Provider<F>::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for plenora_storage_providers::Provider<F> where T: 'static + ?core::marker::Sized
+pub fn plenora_storage_providers::Provider<F>::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for plenora_storage_providers::Provider<F> where T: ?core::marker::Sized
+pub fn plenora_storage_providers::Provider<F>::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for plenora_storage_providers::Provider<F> where T: ?core::marker::Sized
+pub fn plenora_storage_providers::Provider<F>::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for plenora_storage_providers::Provider<F>
+pub fn plenora_storage_providers::Provider<F>::from(t: T) -> T
+impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::Provider<F> where T: ?core::marker::Sized
+pub fn plenora_storage_providers::Provider<F>::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::Provider<F>::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+impl<T> tracing::instrument::Instrument for plenora_storage_providers::Provider<F>
+impl<T> tracing::instrument::WithSubscriber for plenora_storage_providers::Provider<F>
+impl<T> typenum::type_operators::Same for plenora_storage_providers::Provider<F>
+pub type plenora_storage_providers::Provider<F>::Output = T
+pub struct plenora_storage_providers::Smb
+impl plenora_storage_providers::ProviderFactory for plenora_storage_providers::Smb
+pub const plenora_storage_providers::Smb::ATOMIC: bool
+pub const plenora_storage_providers::Smb::CONTRACT: &'static str
+pub const plenora_storage_providers::Smb::ID: &'static str
+pub const plenora_storage_providers::Smb::METADATA: bool
+pub fn plenora_storage_providers::Smb::validate(connection: &plenora_storage_core::model::ProviderConnection, _: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
+impl core::marker::Freeze for plenora_storage_providers::Smb
+impl core::marker::Send for plenora_storage_providers::Smb
+impl core::marker::Sync for plenora_storage_providers::Smb
+impl core::marker::Unpin for plenora_storage_providers::Smb
+impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::Smb
+impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::Smb
+impl<T, U> core::convert::Into<U> for plenora_storage_providers::Smb where U: core::convert::From<T>
+pub fn plenora_storage_providers::Smb::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for plenora_storage_providers::Smb where U: core::convert::Into<T>
+pub type plenora_storage_providers::Smb::Error = core::convert::Infallible
+pub fn plenora_storage_providers::Smb::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for plenora_storage_providers::Smb where U: core::convert::TryFrom<T>
+pub type plenora_storage_providers::Smb::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn plenora_storage_providers::Smb::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for plenora_storage_providers::Smb where T: 'static + ?core::marker::Sized
+pub fn plenora_storage_providers::Smb::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for plenora_storage_providers::Smb where T: ?core::marker::Sized
+pub fn plenora_storage_providers::Smb::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for plenora_storage_providers::Smb where T: ?core::marker::Sized
+pub fn plenora_storage_providers::Smb::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for plenora_storage_providers::Smb
+pub fn plenora_storage_providers::Smb::from(t: T) -> T
+impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::Smb where T: ?core::marker::Sized
+pub fn plenora_storage_providers::Smb::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::Smb::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+impl<T> tracing::instrument::Instrument for plenora_storage_providers::Smb
+impl<T> tracing::instrument::WithSubscriber for plenora_storage_providers::Smb
+impl<T> typenum::type_operators::Same for plenora_storage_providers::Smb
+pub type plenora_storage_providers::Smb::Output = T
+pub struct plenora_storage_providers::SmbConnectionConfig
+pub plenora_storage_providers::SmbConnectionConfig::host: alloc::string::String
+pub plenora_storage_providers::SmbConnectionConfig::port: u16
+pub plenora_storage_providers::SmbConnectionConfig::root: alloc::string::String
+pub plenora_storage_providers::SmbConnectionConfig::share: alloc::string::String
+impl core::clone::Clone for plenora_storage_providers::SmbConnectionConfig
+pub fn plenora_storage_providers::SmbConnectionConfig::clone(&self) -> plenora_storage_providers::SmbConnectionConfig
+impl core::fmt::Debug for plenora_storage_providers::SmbConnectionConfig
+pub fn plenora_storage_providers::SmbConnectionConfig::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'de> serde_core::de::Deserialize<'de> for plenora_storage_providers::SmbConnectionConfig
+pub fn plenora_storage_providers::SmbConnectionConfig::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for plenora_storage_providers::SmbConnectionConfig
+impl core::marker::Send for plenora_storage_providers::SmbConnectionConfig
+impl core::marker::Sync for plenora_storage_providers::SmbConnectionConfig
+impl core::marker::Unpin for plenora_storage_providers::SmbConnectionConfig
+impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::SmbConnectionConfig
+impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::SmbConnectionConfig
+impl<T, U> core::convert::Into<U> for plenora_storage_providers::SmbConnectionConfig where U: core::convert::From<T>
+pub fn plenora_storage_providers::SmbConnectionConfig::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for plenora_storage_providers::SmbConnectionConfig where U: core::convert::Into<T>
+pub type plenora_storage_providers::SmbConnectionConfig::Error = core::convert::Infallible
+pub fn plenora_storage_providers::SmbConnectionConfig::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for plenora_storage_providers::SmbConnectionConfig where U: core::convert::TryFrom<T>
+pub type plenora_storage_providers::SmbConnectionConfig::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn plenora_storage_providers::SmbConnectionConfig::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for plenora_storage_providers::SmbConnectionConfig where T: core::clone::Clone
+pub type plenora_storage_providers::SmbConnectionConfig::Owned = T
+pub fn plenora_storage_providers::SmbConnectionConfig::clone_into(&self, target: &mut T)
+pub fn plenora_storage_providers::SmbConnectionConfig::to_owned(&self) -> T
+impl<T> core::any::Any for plenora_storage_providers::SmbConnectionConfig where T: 'static + ?core::marker::Sized
+pub fn plenora_storage_providers::SmbConnectionConfig::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for plenora_storage_providers::SmbConnectionConfig where T: ?core::marker::Sized
+pub fn plenora_storage_providers::SmbConnectionConfig::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for plenora_storage_providers::SmbConnectionConfig where T: ?core::marker::Sized
+pub fn plenora_storage_providers::SmbConnectionConfig::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for plenora_storage_providers::SmbConnectionConfig where T: core::clone::Clone
+pub unsafe fn plenora_storage_providers::SmbConnectionConfig::clone_to_uninit(&self, dest: *mut u8)
+impl<T> core::convert::From<T> for plenora_storage_providers::SmbConnectionConfig
+pub fn plenora_storage_providers::SmbConnectionConfig::from(t: T) -> T
+impl<T> serde_core::de::DeserializeOwned for plenora_storage_providers::SmbConnectionConfig where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::SmbConnectionConfig where T: ?core::marker::Sized
+pub fn plenora_storage_providers::SmbConnectionConfig::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::SmbConnectionConfig::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+impl<T> tracing::instrument::Instrument for plenora_storage_providers::SmbConnectionConfig
+impl<T> tracing::instrument::WithSubscriber for plenora_storage_providers::SmbConnectionConfig
+impl<T> typenum::type_operators::Same for plenora_storage_providers::SmbConnectionConfig
+pub type plenora_storage_providers::SmbConnectionConfig::Output = T
+pub struct plenora_storage_providers::WebDav
+impl plenora_storage_providers::ProviderFactory for plenora_storage_providers::WebDav
+pub const plenora_storage_providers::WebDav::ATOMIC: bool
+pub const plenora_storage_providers::WebDav::CONTRACT: &'static str
+pub const plenora_storage_providers::WebDav::ID: &'static str
+pub const plenora_storage_providers::WebDav::METADATA: bool
+pub fn plenora_storage_providers::WebDav::validate(c: &plenora_storage_core::model::ProviderConnection, p: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
+impl core::marker::Freeze for plenora_storage_providers::WebDav
+impl core::marker::Send for plenora_storage_providers::WebDav
+impl core::marker::Sync for plenora_storage_providers::WebDav
+impl core::marker::Unpin for plenora_storage_providers::WebDav
+impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::WebDav
+impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::WebDav
+impl<T, U> core::convert::Into<U> for plenora_storage_providers::WebDav where U: core::convert::From<T>
+pub fn plenora_storage_providers::WebDav::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for plenora_storage_providers::WebDav where U: core::convert::Into<T>
+pub type plenora_storage_providers::WebDav::Error = core::convert::Infallible
+pub fn plenora_storage_providers::WebDav::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for plenora_storage_providers::WebDav where U: core::convert::TryFrom<T>
+pub type plenora_storage_providers::WebDav::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn plenora_storage_providers::WebDav::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for plenora_storage_providers::WebDav where T: 'static + ?core::marker::Sized
+pub fn plenora_storage_providers::WebDav::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for plenora_storage_providers::WebDav where T: ?core::marker::Sized
+pub fn plenora_storage_providers::WebDav::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for plenora_storage_providers::WebDav where T: ?core::marker::Sized
+pub fn plenora_storage_providers::WebDav::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for plenora_storage_providers::WebDav
+pub fn plenora_storage_providers::WebDav::from(t: T) -> T
+impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::WebDav where T: ?core::marker::Sized
+pub fn plenora_storage_providers::WebDav::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::WebDav::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+impl<T> tracing::instrument::Instrument for plenora_storage_providers::WebDav
+impl<T> tracing::instrument::WithSubscriber for plenora_storage_providers::WebDav
+impl<T> typenum::type_operators::Same for plenora_storage_providers::WebDav
+pub type plenora_storage_providers::WebDav::Output = T
+pub struct plenora_storage_providers::WebDavConnectionConfig
+pub plenora_storage_providers::WebDavConnectionConfig::endpoint: alloc::string::String
+impl core::clone::Clone for plenora_storage_providers::WebDavConnectionConfig
+pub fn plenora_storage_providers::WebDavConnectionConfig::clone(&self) -> plenora_storage_providers::WebDavConnectionConfig
+impl core::fmt::Debug for plenora_storage_providers::WebDavConnectionConfig
+pub fn plenora_storage_providers::WebDavConnectionConfig::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'de> serde_core::de::Deserialize<'de> for plenora_storage_providers::WebDavConnectionConfig
+pub fn plenora_storage_providers::WebDavConnectionConfig::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for plenora_storage_providers::WebDavConnectionConfig
+impl core::marker::Send for plenora_storage_providers::WebDavConnectionConfig
+impl core::marker::Sync for plenora_storage_providers::WebDavConnectionConfig
+impl core::marker::Unpin for plenora_storage_providers::WebDavConnectionConfig
+impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::WebDavConnectionConfig
+impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::WebDavConnectionConfig
+impl<T, U> core::convert::Into<U> for plenora_storage_providers::WebDavConnectionConfig where U: core::convert::From<T>
+pub fn plenora_storage_providers::WebDavConnectionConfig::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for plenora_storage_providers::WebDavConnectionConfig where U: core::convert::Into<T>
+pub type plenora_storage_providers::WebDavConnectionConfig::Error = core::convert::Infallible
+pub fn plenora_storage_providers::WebDavConnectionConfig::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for plenora_storage_providers::WebDavConnectionConfig where U: core::convert::TryFrom<T>
+pub type plenora_storage_providers::WebDavConnectionConfig::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn plenora_storage_providers::WebDavConnectionConfig::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for plenora_storage_providers::WebDavConnectionConfig where T: core::clone::Clone
+pub type plenora_storage_providers::WebDavConnectionConfig::Owned = T
+pub fn plenora_storage_providers::WebDavConnectionConfig::clone_into(&self, target: &mut T)
+pub fn plenora_storage_providers::WebDavConnectionConfig::to_owned(&self) -> T
+impl<T> core::any::Any for plenora_storage_providers::WebDavConnectionConfig where T: 'static + ?core::marker::Sized
+pub fn plenora_storage_providers::WebDavConnectionConfig::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for plenora_storage_providers::WebDavConnectionConfig where T: ?core::marker::Sized
+pub fn plenora_storage_providers::WebDavConnectionConfig::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for plenora_storage_providers::WebDavConnectionConfig where T: ?core::marker::Sized
+pub fn plenora_storage_providers::WebDavConnectionConfig::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for plenora_storage_providers::WebDavConnectionConfig where T: core::clone::Clone
+pub unsafe fn plenora_storage_providers::WebDavConnectionConfig::clone_to_uninit(&self, dest: *mut u8)
+impl<T> core::convert::From<T> for plenora_storage_providers::WebDavConnectionConfig
+pub fn plenora_storage_providers::WebDavConnectionConfig::from(t: T) -> T
+impl<T> serde_core::de::DeserializeOwned for plenora_storage_providers::WebDavConnectionConfig where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::WebDavConnectionConfig where T: ?core::marker::Sized
+pub fn plenora_storage_providers::WebDavConnectionConfig::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::WebDavConnectionConfig::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+impl<T> tracing::instrument::Instrument for plenora_storage_providers::WebDavConnectionConfig
+impl<T> tracing::instrument::WithSubscriber for plenora_storage_providers::WebDavConnectionConfig
+impl<T> typenum::type_operators::Same for plenora_storage_providers::WebDavConnectionConfig
+pub type plenora_storage_providers::WebDavConnectionConfig::Output = T
+pub trait plenora_storage_providers::ProviderFactory: core::marker::Send + core::marker::Sync + 'static
+pub const plenora_storage_providers::ProviderFactory::ATOMIC: bool
+pub const plenora_storage_providers::ProviderFactory::CONTRACT: &'static str
+pub const plenora_storage_providers::ProviderFactory::ID: &'static str
+pub const plenora_storage_providers::ProviderFactory::METADATA: bool
+pub fn plenora_storage_providers::ProviderFactory::validate(connection: &plenora_storage_core::model::ProviderConnection, policy: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
+impl plenora_storage_providers::ProviderFactory for plenora_storage_providers::Azure
+pub const plenora_storage_providers::Azure::ATOMIC: bool
+pub const plenora_storage_providers::Azure::CONTRACT: &'static str
+pub const plenora_storage_providers::Azure::ID: &'static str
+pub const plenora_storage_providers::Azure::METADATA: bool
+pub fn plenora_storage_providers::Azure::validate(connection: &plenora_storage_core::model::ProviderConnection, policy: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
+impl plenora_storage_providers::ProviderFactory for plenora_storage_providers::Gcs
+pub const plenora_storage_providers::Gcs::ATOMIC: bool
+pub const plenora_storage_providers::Gcs::CONTRACT: &'static str
+pub const plenora_storage_providers::Gcs::ID: &'static str
+pub const plenora_storage_providers::Gcs::METADATA: bool
+pub fn plenora_storage_providers::Gcs::validate(connection: &plenora_storage_core::model::ProviderConnection, policy: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
+impl plenora_storage_providers::ProviderFactory for plenora_storage_providers::Local
+pub const plenora_storage_providers::Local::ATOMIC: bool
+pub const plenora_storage_providers::Local::CONTRACT: &'static str
+pub const plenora_storage_providers::Local::ID: &'static str
+pub const plenora_storage_providers::Local::METADATA: bool
+pub fn plenora_storage_providers::Local::validate(connection: &plenora_storage_core::model::ProviderConnection, _: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
+impl plenora_storage_providers::ProviderFactory for plenora_storage_providers::Smb
+pub const plenora_storage_providers::Smb::ATOMIC: bool
+pub const plenora_storage_providers::Smb::CONTRACT: &'static str
+pub const plenora_storage_providers::Smb::ID: &'static str
+pub const plenora_storage_providers::Smb::METADATA: bool
+pub fn plenora_storage_providers::Smb::validate(connection: &plenora_storage_core::model::ProviderConnection, _: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
+impl plenora_storage_providers::ProviderFactory for plenora_storage_providers::WebDav
+pub const plenora_storage_providers::WebDav::ATOMIC: bool
+pub const plenora_storage_providers::WebDav::CONTRACT: &'static str
+pub const plenora_storage_providers::WebDav::ID: &'static str
+pub const plenora_storage_providers::WebDav::METADATA: bool
+pub fn plenora_storage_providers::WebDav::validate(c: &plenora_storage_core::model::ProviderConnection, p: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
+pub type plenora_storage_providers::AzureProvider = plenora_storage_providers::Provider<plenora_storage_providers::Azure>
+pub type plenora_storage_providers::GcsProvider = plenora_storage_providers::Provider<plenora_storage_providers::Gcs>
+pub type plenora_storage_providers::LocalProvider = plenora_storage_providers::Provider<plenora_storage_providers::Local>
+pub type plenora_storage_providers::SmbProvider = plenora_storage_providers::Provider<plenora_storage_providers::Smb>
+pub type plenora_storage_providers::WebDavProvider = plenora_storage_providers::Provider<plenora_storage_providers::WebDav>

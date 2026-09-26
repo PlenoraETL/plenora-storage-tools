@@ -1,6 +1,7 @@
 import asyncio
 import importlib.metadata
 import inspect
+import importlib.util
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
@@ -15,6 +16,24 @@ from plenora_storage import AsyncEngine, CancellationToken, Connection, Engine, 
 
 
 class SDKTests(unittest.TestCase):
+    def test_installed_api_matches_baseline_and_detects_signature_changes(self):
+        root = Path(__file__).resolve().parents[4]
+        spec = importlib.util.spec_from_file_location('storage_api_snapshot', root / 'scripts/check_python_api.py')
+        checker = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(checker)
+        import json
+        from unittest.mock import patch
+        expected = json.loads((root / 'api/python.json').read_text())
+        self.assertEqual(checker.snapshot(plenora_storage), expected)
+
+        def changed(self, connection, key, *, required_new_argument):
+            pass
+
+        with patch.object(Engine, 'stat', changed):
+            self.assertNotEqual(checker.snapshot(plenora_storage), expected)
+        with patch.object(plenora_storage, '__all__', [name for name in plenora_storage.__all__ if name != 'version']):
+            self.assertNotEqual(checker.snapshot(plenora_storage), expected)
+
     def test_installed_identity_typing_and_public_surface(self):
         distribution = importlib.metadata.distribution('plenora-storage')
         self.assertEqual(version(), distribution.version)

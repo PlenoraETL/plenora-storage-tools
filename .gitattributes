@@ -13,4 +13,5 @@ LICENSE-* text eol=lf
 *.conf text eol=lf
 *.json text eol=lf
 *.md text eol=lf
+api/**/*.txt text eol=lf
 Dockerfile text eol=lf
