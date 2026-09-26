@@ -473,7 +473,106 @@
           "kind": "property"
         }
       },
-      "stub": "ClassDef(name='CancellationToken', bases=[], keywords=[], body=[FunctionDef(name='__init__', args=arguments(posonlyargs=[], args=[arg(arg='self')], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Expr(value=Constant(value=Ellipsis))], decorator_list=[], returns=Constant(value=None)), FunctionDef(name='cancel', args=arguments(posonlyargs=[], args=[arg(arg='self')], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Expr(value=Constant(value=Ellipsis))], decorator_list=[], returns=Constant(value=None)), FunctionDef(name='is_cancelled', args=arguments(posonlyargs=[], args=[arg(arg='self')], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Expr(value=Constant(value=Ellipsis))], decorator_list=[Name(id='property', ctx=Load())], returns=Name(id='bool', ctx=Load()))], decorator_list=[])"
+      "stub": {
+        "body": [
+          {
+            "args": {
+              "args": [
+                {
+                  "arg": "self",
+                  "node": "arg"
+                }
+              ],
+              "node": "arguments"
+            },
+            "body": [
+              {
+                "node": "Expr",
+                "value": {
+                  "node": "Constant",
+                  "value": {
+                    "literal": "ellipsis"
+                  }
+                }
+              }
+            ],
+            "name": "__init__",
+            "node": "FunctionDef",
+            "returns": {
+              "node": "Constant"
+            }
+          },
+          {
+            "args": {
+              "args": [
+                {
+                  "arg": "self",
+                  "node": "arg"
+                }
+              ],
+              "node": "arguments"
+            },
+            "body": [
+              {
+                "node": "Expr",
+                "value": {
+                  "node": "Constant",
+                  "value": {
+                    "literal": "ellipsis"
+                  }
+                }
+              }
+            ],
+            "name": "cancel",
+            "node": "FunctionDef",
+            "returns": {
+              "node": "Constant"
+            }
+          },
+          {
+            "args": {
+              "args": [
+                {
+                  "arg": "self",
+                  "node": "arg"
+                }
+              ],
+              "node": "arguments"
+            },
+            "body": [
+              {
+                "node": "Expr",
+                "value": {
+                  "node": "Constant",
+                  "value": {
+                    "literal": "ellipsis"
+                  }
+                }
+              }
+            ],
+            "decorator_list": [
+              {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "property",
+                "node": "Name"
+              }
+            ],
+            "name": "is_cancelled",
+            "node": "FunctionDef",
+            "returns": {
+              "ctx": {
+                "node": "Load"
+              },
+              "id": "bool",
+              "node": "Name"
+            }
+          }
+        ],
+        "name": "CancellationToken",
+        "node": "ClassDef"
+      }
     },
     "Connection": {
       "bases": [
@@ -1149,6 +1248,76 @@
   "root_error": true,
   "schema_version": 1,
   "type_aliases": {
-    "CredentialResolver": "Subscript(value=Name(id='Callable', ctx=Load()), slice=Tuple(elts=[List(elts=[Name(id='str', ctx=Load())], ctx=Load()), Subscript(value=Name(id='Mapping', ctx=Load()), slice=Tuple(elts=[Name(id='str', ctx=Load()), Name(id='str', ctx=Load())], ctx=Load()), ctx=Load())], ctx=Load()), ctx=Load())"
+    "CredentialResolver": {
+      "ctx": {
+        "node": "Load"
+      },
+      "node": "Subscript",
+      "slice": {
+        "ctx": {
+          "node": "Load"
+        },
+        "elts": [
+          {
+            "ctx": {
+              "node": "Load"
+            },
+            "elts": [
+              {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "str",
+                "node": "Name"
+              }
+            ],
+            "node": "List"
+          },
+          {
+            "ctx": {
+              "node": "Load"
+            },
+            "node": "Subscript",
+            "slice": {
+              "ctx": {
+                "node": "Load"
+              },
+              "elts": [
+                {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "str",
+                  "node": "Name"
+                },
+                {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "str",
+                  "node": "Name"
+                }
+              ],
+              "node": "Tuple"
+            },
+            "value": {
+              "ctx": {
+                "node": "Load"
+              },
+              "id": "Mapping",
+              "node": "Name"
+            }
+          }
+        ],
+        "node": "Tuple"
+      },
+      "value": {
+        "ctx": {
+          "node": "Load"
+        },
+        "id": "Callable",
+        "node": "Name"
+      }
+    }
   }
 }

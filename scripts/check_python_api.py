@@ -9,6 +9,20 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def syntax(node):
+    # Python 3.12 added empty type_params fields; ast.dump also changes which
+    # empty fields it displays across releases. Normalize these representation
+    # differences while retaining every nonempty part of a type declaration.
+    if node is Ellipsis:
+        return {'literal': 'ellipsis'}
+    if isinstance(node, ast.AST):
+        return {'node': type(node).__name__, **{name: syntax(value) for name, value in ast.iter_fields(node)
+                                              if value is not None and value != []}}
+    if isinstance(node, list):
+        return [syntax(value) for value in node]
+    return node
+
+
 def annotation(value):
     if value is inspect.Signature.empty:
         return None
@@ -44,7 +58,7 @@ def snapshot(module):
                 # typed stub plus the actual runtime names, kinds and signatures.
                 stub = ast.parse((Path(module.__file__).parent / '_native.pyi').read_text())
                 declaration = next(node for node in stub.body if isinstance(node, ast.ClassDef) and node.name == name)
-                item['stub'] = ast.dump(declaration, include_attributes=False)
+                item['stub'] = syntax(declaration)
                 item['constructor'] = signature(value)
                 item['members'] = {member: {'kind': 'property'} if inspect.isgetsetdescriptor(obj)
                                    else {'kind': 'method', **signature(obj)}
@@ -75,7 +89,7 @@ def snapshot(module):
     error = module.StorageError({'code': 'FIXTURE', 'category': 'io', 'phase': 'read',
                                  'remote_effect': 'none', 'retry': {'kind': 'never'}, 'message': 'fixture'})
     source = ast.parse(Path(module.__file__).read_text(encoding='utf-8'))
-    aliases = {target.id: ast.dump(node.value, include_attributes=False)
+    aliases = {target.id: syntax(node.value)
                for node in source.body if isinstance(node, ast.Assign) and isinstance(node.value, ast.Subscript)
                for target in node.targets if isinstance(target, ast.Name) and not target.id.startswith('_')}
     return {'schema_version': 1, 'exports': exports, 'type_aliases': aliases,
