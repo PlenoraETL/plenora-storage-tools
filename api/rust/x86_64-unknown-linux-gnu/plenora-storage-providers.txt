@@ -5,6 +5,7 @@ pub const plenora_storage_providers::Azure::ATOMIC: bool
 pub const plenora_storage_providers::Azure::CONTRACT: &'static str
 pub const plenora_storage_providers::Azure::ID: &'static str
 pub const plenora_storage_providers::Azure::METADATA: bool
+pub fn plenora_storage_providers::Azure::connect<'life0, 'life1, 'life2, 'life3, 'async_trait>(connection: &'life0 plenora_storage_core::model::ProviderConnection, credentials: &'life1 dyn plenora_storage_core::credentials::CredentialResolver, context: &'life2 plenora_storage_core::provider::OperationContext<'life3>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<alloc::boxed::Box<dyn plenora_storage_providers::common::Backend>>> + core::marker::Send + 'async_trait)>> where 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 pub fn plenora_storage_providers::Azure::validate(connection: &plenora_storage_core::model::ProviderConnection, policy: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
 impl core::marker::Freeze for plenora_storage_providers::Azure
 impl core::marker::Send for plenora_storage_providers::Azure
@@ -12,6 +13,60 @@ impl core::marker::Sync for plenora_storage_providers::Azure
 impl core::marker::Unpin for plenora_storage_providers::Azure
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::Azure
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::Azure
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Azure
+pub type plenora_storage_providers::Azure::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Azure::is_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Greater> for plenora_storage_providers::Azure
+pub type plenora_storage_providers::Azure::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Azure::is_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Less> for plenora_storage_providers::Azure
+pub type plenora_storage_providers::Azure::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Azure::is_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Azure
+pub type plenora_storage_providers::Azure::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Azure::is_greater_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater> for plenora_storage_providers::Azure
+pub type plenora_storage_providers::Azure::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Azure::is_greater_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less> for plenora_storage_providers::Azure
+pub type plenora_storage_providers::Azure::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Azure::is_greater_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Equal> for plenora_storage_providers::Azure
+pub type plenora_storage_providers::Azure::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Azure::is_greater_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Greater> for plenora_storage_providers::Azure
+pub type plenora_storage_providers::Azure::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Azure::is_greater_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Less> for plenora_storage_providers::Azure
+pub type plenora_storage_providers::Azure::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Azure::is_greater_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Azure
+pub type plenora_storage_providers::Azure::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Azure::is_less_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Greater> for plenora_storage_providers::Azure
+pub type plenora_storage_providers::Azure::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Azure::is_less_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Less> for plenora_storage_providers::Azure
+pub type plenora_storage_providers::Azure::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Azure::is_less_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Equal> for plenora_storage_providers::Azure
+pub type plenora_storage_providers::Azure::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Azure::is_less_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Greater> for plenora_storage_providers::Azure
+pub type plenora_storage_providers::Azure::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Azure::is_less_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Less> for plenora_storage_providers::Azure
+pub type plenora_storage_providers::Azure::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Azure::is_less_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Azure
+pub type plenora_storage_providers::Azure::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Azure::is_not_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Greater> for plenora_storage_providers::Azure
+pub type plenora_storage_providers::Azure::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Azure::is_not_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Less> for plenora_storage_providers::Azure
+pub type plenora_storage_providers::Azure::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Azure::is_not_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Less>>::Output
 impl<T, U> core::convert::Into<U> for plenora_storage_providers::Azure where U: core::convert::From<T>
 pub fn plenora_storage_providers::Azure::into(self) -> U
 impl<T, U> core::convert::TryFrom<U> for plenora_storage_providers::Azure where U: core::convert::Into<T>
@@ -28,6 +83,7 @@ impl<T> core::borrow::BorrowMut<T> for plenora_storage_providers::Azure where T:
 pub fn plenora_storage_providers::Azure::borrow_mut(&mut self) -> &mut T
 impl<T> core::convert::From<T> for plenora_storage_providers::Azure
 pub fn plenora_storage_providers::Azure::from(t: T) -> T
+impl<T> core::mem::SizedTypeProperties for plenora_storage_providers::Azure
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::Azure where T: ?core::marker::Sized
 pub fn plenora_storage_providers::Azure::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
 pub fn plenora_storage_providers::Azure::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
@@ -51,6 +107,60 @@ impl core::marker::Sync for plenora_storage_providers::AzureConnectionConfig
 impl core::marker::Unpin for plenora_storage_providers::AzureConnectionConfig
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::AzureConnectionConfig
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::AzureConnectionConfig
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_providers::AzureConnectionConfig
+pub type plenora_storage_providers::AzureConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::AzureConnectionConfig::is_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Greater> for plenora_storage_providers::AzureConnectionConfig
+pub type plenora_storage_providers::AzureConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::AzureConnectionConfig::is_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Less> for plenora_storage_providers::AzureConnectionConfig
+pub type plenora_storage_providers::AzureConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::AzureConnectionConfig::is_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal> for plenora_storage_providers::AzureConnectionConfig
+pub type plenora_storage_providers::AzureConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::AzureConnectionConfig::is_greater_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater> for plenora_storage_providers::AzureConnectionConfig
+pub type plenora_storage_providers::AzureConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::AzureConnectionConfig::is_greater_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less> for plenora_storage_providers::AzureConnectionConfig
+pub type plenora_storage_providers::AzureConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::AzureConnectionConfig::is_greater_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Equal> for plenora_storage_providers::AzureConnectionConfig
+pub type plenora_storage_providers::AzureConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::AzureConnectionConfig::is_greater_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Greater> for plenora_storage_providers::AzureConnectionConfig
+pub type plenora_storage_providers::AzureConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::AzureConnectionConfig::is_greater_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Less> for plenora_storage_providers::AzureConnectionConfig
+pub type plenora_storage_providers::AzureConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::AzureConnectionConfig::is_greater_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Equal> for plenora_storage_providers::AzureConnectionConfig
+pub type plenora_storage_providers::AzureConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::AzureConnectionConfig::is_less_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Greater> for plenora_storage_providers::AzureConnectionConfig
+pub type plenora_storage_providers::AzureConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::AzureConnectionConfig::is_less_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Less> for plenora_storage_providers::AzureConnectionConfig
+pub type plenora_storage_providers::AzureConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::AzureConnectionConfig::is_less_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Equal> for plenora_storage_providers::AzureConnectionConfig
+pub type plenora_storage_providers::AzureConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::AzureConnectionConfig::is_less_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Greater> for plenora_storage_providers::AzureConnectionConfig
+pub type plenora_storage_providers::AzureConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::AzureConnectionConfig::is_less_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Less> for plenora_storage_providers::AzureConnectionConfig
+pub type plenora_storage_providers::AzureConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::AzureConnectionConfig::is_less_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Equal> for plenora_storage_providers::AzureConnectionConfig
+pub type plenora_storage_providers::AzureConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::AzureConnectionConfig::is_not_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Greater> for plenora_storage_providers::AzureConnectionConfig
+pub type plenora_storage_providers::AzureConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::AzureConnectionConfig::is_not_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Less> for plenora_storage_providers::AzureConnectionConfig
+pub type plenora_storage_providers::AzureConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::AzureConnectionConfig::is_not_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Less>>::Output
 impl<T, U> core::convert::Into<U> for plenora_storage_providers::AzureConnectionConfig where U: core::convert::From<T>
 pub fn plenora_storage_providers::AzureConnectionConfig::into(self) -> U
 impl<T, U> core::convert::TryFrom<U> for plenora_storage_providers::AzureConnectionConfig where U: core::convert::Into<T>
@@ -73,6 +183,7 @@ impl<T> core::clone::CloneToUninit for plenora_storage_providers::AzureConnectio
 pub unsafe fn plenora_storage_providers::AzureConnectionConfig::clone_to_uninit(&self, dest: *mut u8)
 impl<T> core::convert::From<T> for plenora_storage_providers::AzureConnectionConfig
 pub fn plenora_storage_providers::AzureConnectionConfig::from(t: T) -> T
+impl<T> core::mem::SizedTypeProperties for plenora_storage_providers::AzureConnectionConfig
 impl<T> serde_core::de::DeserializeOwned for plenora_storage_providers::AzureConnectionConfig where T: for<'de> serde_core::de::Deserialize<'de>
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::AzureConnectionConfig where T: ?core::marker::Sized
 pub fn plenora_storage_providers::AzureConnectionConfig::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
@@ -87,6 +198,7 @@ pub const plenora_storage_providers::Gcs::ATOMIC: bool
 pub const plenora_storage_providers::Gcs::CONTRACT: &'static str
 pub const plenora_storage_providers::Gcs::ID: &'static str
 pub const plenora_storage_providers::Gcs::METADATA: bool
+pub fn plenora_storage_providers::Gcs::connect<'life0, 'life1, 'life2, 'life3, 'async_trait>(connection: &'life0 plenora_storage_core::model::ProviderConnection, credentials: &'life1 dyn plenora_storage_core::credentials::CredentialResolver, context: &'life2 plenora_storage_core::provider::OperationContext<'life3>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<alloc::boxed::Box<dyn plenora_storage_providers::common::Backend>>> + core::marker::Send + 'async_trait)>> where 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 pub fn plenora_storage_providers::Gcs::validate(connection: &plenora_storage_core::model::ProviderConnection, policy: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
 impl core::marker::Freeze for plenora_storage_providers::Gcs
 impl core::marker::Send for plenora_storage_providers::Gcs
@@ -94,6 +206,60 @@ impl core::marker::Sync for plenora_storage_providers::Gcs
 impl core::marker::Unpin for plenora_storage_providers::Gcs
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::Gcs
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::Gcs
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Gcs
+pub type plenora_storage_providers::Gcs::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Gcs::is_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Greater> for plenora_storage_providers::Gcs
+pub type plenora_storage_providers::Gcs::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Gcs::is_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Less> for plenora_storage_providers::Gcs
+pub type plenora_storage_providers::Gcs::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Gcs::is_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Gcs
+pub type plenora_storage_providers::Gcs::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Gcs::is_greater_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater> for plenora_storage_providers::Gcs
+pub type plenora_storage_providers::Gcs::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Gcs::is_greater_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less> for plenora_storage_providers::Gcs
+pub type plenora_storage_providers::Gcs::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Gcs::is_greater_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Equal> for plenora_storage_providers::Gcs
+pub type plenora_storage_providers::Gcs::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Gcs::is_greater_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Greater> for plenora_storage_providers::Gcs
+pub type plenora_storage_providers::Gcs::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Gcs::is_greater_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Less> for plenora_storage_providers::Gcs
+pub type plenora_storage_providers::Gcs::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Gcs::is_greater_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Gcs
+pub type plenora_storage_providers::Gcs::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Gcs::is_less_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Greater> for plenora_storage_providers::Gcs
+pub type plenora_storage_providers::Gcs::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Gcs::is_less_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Less> for plenora_storage_providers::Gcs
+pub type plenora_storage_providers::Gcs::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Gcs::is_less_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Equal> for plenora_storage_providers::Gcs
+pub type plenora_storage_providers::Gcs::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Gcs::is_less_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Greater> for plenora_storage_providers::Gcs
+pub type plenora_storage_providers::Gcs::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Gcs::is_less_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Less> for plenora_storage_providers::Gcs
+pub type plenora_storage_providers::Gcs::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Gcs::is_less_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Gcs
+pub type plenora_storage_providers::Gcs::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Gcs::is_not_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Greater> for plenora_storage_providers::Gcs
+pub type plenora_storage_providers::Gcs::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Gcs::is_not_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Less> for plenora_storage_providers::Gcs
+pub type plenora_storage_providers::Gcs::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Gcs::is_not_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Less>>::Output
 impl<T, U> core::convert::Into<U> for plenora_storage_providers::Gcs where U: core::convert::From<T>
 pub fn plenora_storage_providers::Gcs::into(self) -> U
 impl<T, U> core::convert::TryFrom<U> for plenora_storage_providers::Gcs where U: core::convert::Into<T>
@@ -110,6 +276,7 @@ impl<T> core::borrow::BorrowMut<T> for plenora_storage_providers::Gcs where T: ?
 pub fn plenora_storage_providers::Gcs::borrow_mut(&mut self) -> &mut T
 impl<T> core::convert::From<T> for plenora_storage_providers::Gcs
 pub fn plenora_storage_providers::Gcs::from(t: T) -> T
+impl<T> core::mem::SizedTypeProperties for plenora_storage_providers::Gcs
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::Gcs where T: ?core::marker::Sized
 pub fn plenora_storage_providers::Gcs::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
 pub fn plenora_storage_providers::Gcs::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
@@ -132,6 +299,60 @@ impl core::marker::Sync for plenora_storage_providers::GcsConnectionConfig
 impl core::marker::Unpin for plenora_storage_providers::GcsConnectionConfig
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::GcsConnectionConfig
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::GcsConnectionConfig
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_providers::GcsConnectionConfig
+pub type plenora_storage_providers::GcsConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::GcsConnectionConfig::is_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Greater> for plenora_storage_providers::GcsConnectionConfig
+pub type plenora_storage_providers::GcsConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::GcsConnectionConfig::is_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Less> for plenora_storage_providers::GcsConnectionConfig
+pub type plenora_storage_providers::GcsConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::GcsConnectionConfig::is_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal> for plenora_storage_providers::GcsConnectionConfig
+pub type plenora_storage_providers::GcsConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::GcsConnectionConfig::is_greater_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater> for plenora_storage_providers::GcsConnectionConfig
+pub type plenora_storage_providers::GcsConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::GcsConnectionConfig::is_greater_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less> for plenora_storage_providers::GcsConnectionConfig
+pub type plenora_storage_providers::GcsConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::GcsConnectionConfig::is_greater_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Equal> for plenora_storage_providers::GcsConnectionConfig
+pub type plenora_storage_providers::GcsConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::GcsConnectionConfig::is_greater_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Greater> for plenora_storage_providers::GcsConnectionConfig
+pub type plenora_storage_providers::GcsConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::GcsConnectionConfig::is_greater_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Less> for plenora_storage_providers::GcsConnectionConfig
+pub type plenora_storage_providers::GcsConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::GcsConnectionConfig::is_greater_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Equal> for plenora_storage_providers::GcsConnectionConfig
+pub type plenora_storage_providers::GcsConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::GcsConnectionConfig::is_less_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Greater> for plenora_storage_providers::GcsConnectionConfig
+pub type plenora_storage_providers::GcsConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::GcsConnectionConfig::is_less_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Less> for plenora_storage_providers::GcsConnectionConfig
+pub type plenora_storage_providers::GcsConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::GcsConnectionConfig::is_less_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Equal> for plenora_storage_providers::GcsConnectionConfig
+pub type plenora_storage_providers::GcsConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::GcsConnectionConfig::is_less_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Greater> for plenora_storage_providers::GcsConnectionConfig
+pub type plenora_storage_providers::GcsConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::GcsConnectionConfig::is_less_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Less> for plenora_storage_providers::GcsConnectionConfig
+pub type plenora_storage_providers::GcsConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::GcsConnectionConfig::is_less_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Equal> for plenora_storage_providers::GcsConnectionConfig
+pub type plenora_storage_providers::GcsConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::GcsConnectionConfig::is_not_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Greater> for plenora_storage_providers::GcsConnectionConfig
+pub type plenora_storage_providers::GcsConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::GcsConnectionConfig::is_not_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Less> for plenora_storage_providers::GcsConnectionConfig
+pub type plenora_storage_providers::GcsConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::GcsConnectionConfig::is_not_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Less>>::Output
 impl<T, U> core::convert::Into<U> for plenora_storage_providers::GcsConnectionConfig where U: core::convert::From<T>
 pub fn plenora_storage_providers::GcsConnectionConfig::into(self) -> U
 impl<T, U> core::convert::TryFrom<U> for plenora_storage_providers::GcsConnectionConfig where U: core::convert::Into<T>
@@ -154,6 +375,7 @@ impl<T> core::clone::CloneToUninit for plenora_storage_providers::GcsConnectionC
 pub unsafe fn plenora_storage_providers::GcsConnectionConfig::clone_to_uninit(&self, dest: *mut u8)
 impl<T> core::convert::From<T> for plenora_storage_providers::GcsConnectionConfig
 pub fn plenora_storage_providers::GcsConnectionConfig::from(t: T) -> T
+impl<T> core::mem::SizedTypeProperties for plenora_storage_providers::GcsConnectionConfig
 impl<T> serde_core::de::DeserializeOwned for plenora_storage_providers::GcsConnectionConfig where T: for<'de> serde_core::de::Deserialize<'de>
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::GcsConnectionConfig where T: ?core::marker::Sized
 pub fn plenora_storage_providers::GcsConnectionConfig::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
@@ -168,6 +390,7 @@ pub const plenora_storage_providers::Local::ATOMIC: bool
 pub const plenora_storage_providers::Local::CONTRACT: &'static str
 pub const plenora_storage_providers::Local::ID: &'static str
 pub const plenora_storage_providers::Local::METADATA: bool
+pub fn plenora_storage_providers::Local::connect<'life0, 'life1, 'life2, 'life3, 'async_trait>(connection: &'life0 plenora_storage_core::model::ProviderConnection, _: &'life1 dyn plenora_storage_core::credentials::CredentialResolver, _: &'life2 plenora_storage_core::provider::OperationContext<'life3>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<alloc::boxed::Box<dyn plenora_storage_providers::common::Backend>>> + core::marker::Send + 'async_trait)>> where 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 pub fn plenora_storage_providers::Local::validate(connection: &plenora_storage_core::model::ProviderConnection, _: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
 impl core::marker::Freeze for plenora_storage_providers::Local
 impl core::marker::Send for plenora_storage_providers::Local
@@ -175,6 +398,60 @@ impl core::marker::Sync for plenora_storage_providers::Local
 impl core::marker::Unpin for plenora_storage_providers::Local
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::Local
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::Local
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Local
+pub type plenora_storage_providers::Local::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Local::is_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Greater> for plenora_storage_providers::Local
+pub type plenora_storage_providers::Local::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Local::is_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Less> for plenora_storage_providers::Local
+pub type plenora_storage_providers::Local::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Local::is_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Local
+pub type plenora_storage_providers::Local::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Local::is_greater_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater> for plenora_storage_providers::Local
+pub type plenora_storage_providers::Local::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Local::is_greater_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less> for plenora_storage_providers::Local
+pub type plenora_storage_providers::Local::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Local::is_greater_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Equal> for plenora_storage_providers::Local
+pub type plenora_storage_providers::Local::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Local::is_greater_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Greater> for plenora_storage_providers::Local
+pub type plenora_storage_providers::Local::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Local::is_greater_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Less> for plenora_storage_providers::Local
+pub type plenora_storage_providers::Local::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Local::is_greater_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Local
+pub type plenora_storage_providers::Local::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Local::is_less_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Greater> for plenora_storage_providers::Local
+pub type plenora_storage_providers::Local::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Local::is_less_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Less> for plenora_storage_providers::Local
+pub type plenora_storage_providers::Local::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Local::is_less_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Equal> for plenora_storage_providers::Local
+pub type plenora_storage_providers::Local::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Local::is_less_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Greater> for plenora_storage_providers::Local
+pub type plenora_storage_providers::Local::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Local::is_less_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Less> for plenora_storage_providers::Local
+pub type plenora_storage_providers::Local::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Local::is_less_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Local
+pub type plenora_storage_providers::Local::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Local::is_not_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Greater> for plenora_storage_providers::Local
+pub type plenora_storage_providers::Local::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Local::is_not_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Less> for plenora_storage_providers::Local
+pub type plenora_storage_providers::Local::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Local::is_not_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Less>>::Output
 impl<T, U> core::convert::Into<U> for plenora_storage_providers::Local where U: core::convert::From<T>
 pub fn plenora_storage_providers::Local::into(self) -> U
 impl<T, U> core::convert::TryFrom<U> for plenora_storage_providers::Local where U: core::convert::Into<T>
@@ -191,6 +468,7 @@ impl<T> core::borrow::BorrowMut<T> for plenora_storage_providers::Local where T:
 pub fn plenora_storage_providers::Local::borrow_mut(&mut self) -> &mut T
 impl<T> core::convert::From<T> for plenora_storage_providers::Local
 pub fn plenora_storage_providers::Local::from(t: T) -> T
+impl<T> core::mem::SizedTypeProperties for plenora_storage_providers::Local
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::Local where T: ?core::marker::Sized
 pub fn plenora_storage_providers::Local::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
 pub fn plenora_storage_providers::Local::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
@@ -212,6 +490,60 @@ impl core::marker::Sync for plenora_storage_providers::LocalConnectionConfig
 impl core::marker::Unpin for plenora_storage_providers::LocalConnectionConfig
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::LocalConnectionConfig
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::LocalConnectionConfig
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_providers::LocalConnectionConfig
+pub type plenora_storage_providers::LocalConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::LocalConnectionConfig::is_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Greater> for plenora_storage_providers::LocalConnectionConfig
+pub type plenora_storage_providers::LocalConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::LocalConnectionConfig::is_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Less> for plenora_storage_providers::LocalConnectionConfig
+pub type plenora_storage_providers::LocalConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::LocalConnectionConfig::is_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal> for plenora_storage_providers::LocalConnectionConfig
+pub type plenora_storage_providers::LocalConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::LocalConnectionConfig::is_greater_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater> for plenora_storage_providers::LocalConnectionConfig
+pub type plenora_storage_providers::LocalConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::LocalConnectionConfig::is_greater_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less> for plenora_storage_providers::LocalConnectionConfig
+pub type plenora_storage_providers::LocalConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::LocalConnectionConfig::is_greater_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Equal> for plenora_storage_providers::LocalConnectionConfig
+pub type plenora_storage_providers::LocalConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::LocalConnectionConfig::is_greater_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Greater> for plenora_storage_providers::LocalConnectionConfig
+pub type plenora_storage_providers::LocalConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::LocalConnectionConfig::is_greater_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Less> for plenora_storage_providers::LocalConnectionConfig
+pub type plenora_storage_providers::LocalConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::LocalConnectionConfig::is_greater_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Equal> for plenora_storage_providers::LocalConnectionConfig
+pub type plenora_storage_providers::LocalConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::LocalConnectionConfig::is_less_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Greater> for plenora_storage_providers::LocalConnectionConfig
+pub type plenora_storage_providers::LocalConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::LocalConnectionConfig::is_less_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Less> for plenora_storage_providers::LocalConnectionConfig
+pub type plenora_storage_providers::LocalConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::LocalConnectionConfig::is_less_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Equal> for plenora_storage_providers::LocalConnectionConfig
+pub type plenora_storage_providers::LocalConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::LocalConnectionConfig::is_less_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Greater> for plenora_storage_providers::LocalConnectionConfig
+pub type plenora_storage_providers::LocalConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::LocalConnectionConfig::is_less_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Less> for plenora_storage_providers::LocalConnectionConfig
+pub type plenora_storage_providers::LocalConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::LocalConnectionConfig::is_less_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Equal> for plenora_storage_providers::LocalConnectionConfig
+pub type plenora_storage_providers::LocalConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::LocalConnectionConfig::is_not_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Greater> for plenora_storage_providers::LocalConnectionConfig
+pub type plenora_storage_providers::LocalConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::LocalConnectionConfig::is_not_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Less> for plenora_storage_providers::LocalConnectionConfig
+pub type plenora_storage_providers::LocalConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::LocalConnectionConfig::is_not_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Less>>::Output
 impl<T, U> core::convert::Into<U> for plenora_storage_providers::LocalConnectionConfig where U: core::convert::From<T>
 pub fn plenora_storage_providers::LocalConnectionConfig::into(self) -> U
 impl<T, U> core::convert::TryFrom<U> for plenora_storage_providers::LocalConnectionConfig where U: core::convert::Into<T>
@@ -234,6 +566,7 @@ impl<T> core::clone::CloneToUninit for plenora_storage_providers::LocalConnectio
 pub unsafe fn plenora_storage_providers::LocalConnectionConfig::clone_to_uninit(&self, dest: *mut u8)
 impl<T> core::convert::From<T> for plenora_storage_providers::LocalConnectionConfig
 pub fn plenora_storage_providers::LocalConnectionConfig::from(t: T) -> T
+impl<T> core::mem::SizedTypeProperties for plenora_storage_providers::LocalConnectionConfig
 impl<T> serde_core::de::DeserializeOwned for plenora_storage_providers::LocalConnectionConfig where T: for<'de> serde_core::de::Deserialize<'de>
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::LocalConnectionConfig where T: ?core::marker::Sized
 pub fn plenora_storage_providers::LocalConnectionConfig::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
@@ -263,6 +596,60 @@ impl<F> core::marker::Sync for plenora_storage_providers::Provider<F>
 impl<F> core::marker::Unpin for plenora_storage_providers::Provider<F> where F: core::marker::Unpin
 impl<F> !core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::Provider<F>
 impl<F> !core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::Provider<F>
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Provider<F>
+pub type plenora_storage_providers::Provider<F>::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Provider<F>::is_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Greater> for plenora_storage_providers::Provider<F>
+pub type plenora_storage_providers::Provider<F>::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Provider<F>::is_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Less> for plenora_storage_providers::Provider<F>
+pub type plenora_storage_providers::Provider<F>::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Provider<F>::is_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Provider<F>
+pub type plenora_storage_providers::Provider<F>::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Provider<F>::is_greater_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater> for plenora_storage_providers::Provider<F>
+pub type plenora_storage_providers::Provider<F>::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Provider<F>::is_greater_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less> for plenora_storage_providers::Provider<F>
+pub type plenora_storage_providers::Provider<F>::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Provider<F>::is_greater_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Equal> for plenora_storage_providers::Provider<F>
+pub type plenora_storage_providers::Provider<F>::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Provider<F>::is_greater_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Greater> for plenora_storage_providers::Provider<F>
+pub type plenora_storage_providers::Provider<F>::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Provider<F>::is_greater_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Less> for plenora_storage_providers::Provider<F>
+pub type plenora_storage_providers::Provider<F>::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Provider<F>::is_greater_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Provider<F>
+pub type plenora_storage_providers::Provider<F>::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Provider<F>::is_less_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Greater> for plenora_storage_providers::Provider<F>
+pub type plenora_storage_providers::Provider<F>::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Provider<F>::is_less_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Less> for plenora_storage_providers::Provider<F>
+pub type plenora_storage_providers::Provider<F>::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Provider<F>::is_less_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Equal> for plenora_storage_providers::Provider<F>
+pub type plenora_storage_providers::Provider<F>::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Provider<F>::is_less_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Greater> for plenora_storage_providers::Provider<F>
+pub type plenora_storage_providers::Provider<F>::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Provider<F>::is_less_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Less> for plenora_storage_providers::Provider<F>
+pub type plenora_storage_providers::Provider<F>::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Provider<F>::is_less_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Provider<F>
+pub type plenora_storage_providers::Provider<F>::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Provider<F>::is_not_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Greater> for plenora_storage_providers::Provider<F>
+pub type plenora_storage_providers::Provider<F>::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Provider<F>::is_not_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Less> for plenora_storage_providers::Provider<F>
+pub type plenora_storage_providers::Provider<F>::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Provider<F>::is_not_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Less>>::Output
 impl<T, U> core::convert::Into<U> for plenora_storage_providers::Provider<F> where U: core::convert::From<T>
 pub fn plenora_storage_providers::Provider<F>::into(self) -> U
 impl<T, U> core::convert::TryFrom<U> for plenora_storage_providers::Provider<F> where U: core::convert::Into<T>
@@ -279,6 +666,7 @@ impl<T> core::borrow::BorrowMut<T> for plenora_storage_providers::Provider<F> wh
 pub fn plenora_storage_providers::Provider<F>::borrow_mut(&mut self) -> &mut T
 impl<T> core::convert::From<T> for plenora_storage_providers::Provider<F>
 pub fn plenora_storage_providers::Provider<F>::from(t: T) -> T
+impl<T> core::mem::SizedTypeProperties for plenora_storage_providers::Provider<F>
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::Provider<F> where T: ?core::marker::Sized
 pub fn plenora_storage_providers::Provider<F>::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
 pub fn plenora_storage_providers::Provider<F>::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
@@ -292,6 +680,7 @@ pub const plenora_storage_providers::Smb::ATOMIC: bool
 pub const plenora_storage_providers::Smb::CONTRACT: &'static str
 pub const plenora_storage_providers::Smb::ID: &'static str
 pub const plenora_storage_providers::Smb::METADATA: bool
+pub fn plenora_storage_providers::Smb::connect<'life0, 'life1, 'life2, 'life3, 'async_trait>(connection: &'life0 plenora_storage_core::model::ProviderConnection, credentials: &'life1 dyn plenora_storage_core::credentials::CredentialResolver, context: &'life2 plenora_storage_core::provider::OperationContext<'life3>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<alloc::boxed::Box<dyn plenora_storage_providers::common::Backend>>> + core::marker::Send + 'async_trait)>> where 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 pub fn plenora_storage_providers::Smb::validate(connection: &plenora_storage_core::model::ProviderConnection, _: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
 impl core::marker::Freeze for plenora_storage_providers::Smb
 impl core::marker::Send for plenora_storage_providers::Smb
@@ -299,6 +688,60 @@ impl core::marker::Sync for plenora_storage_providers::Smb
 impl core::marker::Unpin for plenora_storage_providers::Smb
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::Smb
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::Smb
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Smb
+pub type plenora_storage_providers::Smb::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Smb::is_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Greater> for plenora_storage_providers::Smb
+pub type plenora_storage_providers::Smb::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Smb::is_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Less> for plenora_storage_providers::Smb
+pub type plenora_storage_providers::Smb::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Smb::is_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Smb
+pub type plenora_storage_providers::Smb::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Smb::is_greater_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater> for plenora_storage_providers::Smb
+pub type plenora_storage_providers::Smb::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Smb::is_greater_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less> for plenora_storage_providers::Smb
+pub type plenora_storage_providers::Smb::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Smb::is_greater_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Equal> for plenora_storage_providers::Smb
+pub type plenora_storage_providers::Smb::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Smb::is_greater_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Greater> for plenora_storage_providers::Smb
+pub type plenora_storage_providers::Smb::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Smb::is_greater_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Less> for plenora_storage_providers::Smb
+pub type plenora_storage_providers::Smb::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Smb::is_greater_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Smb
+pub type plenora_storage_providers::Smb::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Smb::is_less_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Greater> for plenora_storage_providers::Smb
+pub type plenora_storage_providers::Smb::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Smb::is_less_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Less> for plenora_storage_providers::Smb
+pub type plenora_storage_providers::Smb::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Smb::is_less_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Equal> for plenora_storage_providers::Smb
+pub type plenora_storage_providers::Smb::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Smb::is_less_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Greater> for plenora_storage_providers::Smb
+pub type plenora_storage_providers::Smb::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Smb::is_less_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Less> for plenora_storage_providers::Smb
+pub type plenora_storage_providers::Smb::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Smb::is_less_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Smb
+pub type plenora_storage_providers::Smb::Output = typenum::bit::B0
+pub fn plenora_storage_providers::Smb::is_not_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Greater> for plenora_storage_providers::Smb
+pub type plenora_storage_providers::Smb::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Smb::is_not_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Less> for plenora_storage_providers::Smb
+pub type plenora_storage_providers::Smb::Output = typenum::bit::B1
+pub fn plenora_storage_providers::Smb::is_not_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Less>>::Output
 impl<T, U> core::convert::Into<U> for plenora_storage_providers::Smb where U: core::convert::From<T>
 pub fn plenora_storage_providers::Smb::into(self) -> U
 impl<T, U> core::convert::TryFrom<U> for plenora_storage_providers::Smb where U: core::convert::Into<T>
@@ -315,6 +758,7 @@ impl<T> core::borrow::BorrowMut<T> for plenora_storage_providers::Smb where T: ?
 pub fn plenora_storage_providers::Smb::borrow_mut(&mut self) -> &mut T
 impl<T> core::convert::From<T> for plenora_storage_providers::Smb
 pub fn plenora_storage_providers::Smb::from(t: T) -> T
+impl<T> core::mem::SizedTypeProperties for plenora_storage_providers::Smb
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::Smb where T: ?core::marker::Sized
 pub fn plenora_storage_providers::Smb::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
 pub fn plenora_storage_providers::Smb::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
@@ -339,6 +783,60 @@ impl core::marker::Sync for plenora_storage_providers::SmbConnectionConfig
 impl core::marker::Unpin for plenora_storage_providers::SmbConnectionConfig
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::SmbConnectionConfig
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::SmbConnectionConfig
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_providers::SmbConnectionConfig
+pub type plenora_storage_providers::SmbConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::SmbConnectionConfig::is_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Greater> for plenora_storage_providers::SmbConnectionConfig
+pub type plenora_storage_providers::SmbConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::SmbConnectionConfig::is_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Less> for plenora_storage_providers::SmbConnectionConfig
+pub type plenora_storage_providers::SmbConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::SmbConnectionConfig::is_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal> for plenora_storage_providers::SmbConnectionConfig
+pub type plenora_storage_providers::SmbConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::SmbConnectionConfig::is_greater_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater> for plenora_storage_providers::SmbConnectionConfig
+pub type plenora_storage_providers::SmbConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::SmbConnectionConfig::is_greater_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less> for plenora_storage_providers::SmbConnectionConfig
+pub type plenora_storage_providers::SmbConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::SmbConnectionConfig::is_greater_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Equal> for plenora_storage_providers::SmbConnectionConfig
+pub type plenora_storage_providers::SmbConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::SmbConnectionConfig::is_greater_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Greater> for plenora_storage_providers::SmbConnectionConfig
+pub type plenora_storage_providers::SmbConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::SmbConnectionConfig::is_greater_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Less> for plenora_storage_providers::SmbConnectionConfig
+pub type plenora_storage_providers::SmbConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::SmbConnectionConfig::is_greater_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Equal> for plenora_storage_providers::SmbConnectionConfig
+pub type plenora_storage_providers::SmbConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::SmbConnectionConfig::is_less_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Greater> for plenora_storage_providers::SmbConnectionConfig
+pub type plenora_storage_providers::SmbConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::SmbConnectionConfig::is_less_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Less> for plenora_storage_providers::SmbConnectionConfig
+pub type plenora_storage_providers::SmbConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::SmbConnectionConfig::is_less_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Equal> for plenora_storage_providers::SmbConnectionConfig
+pub type plenora_storage_providers::SmbConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::SmbConnectionConfig::is_less_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Greater> for plenora_storage_providers::SmbConnectionConfig
+pub type plenora_storage_providers::SmbConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::SmbConnectionConfig::is_less_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Less> for plenora_storage_providers::SmbConnectionConfig
+pub type plenora_storage_providers::SmbConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::SmbConnectionConfig::is_less_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Equal> for plenora_storage_providers::SmbConnectionConfig
+pub type plenora_storage_providers::SmbConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::SmbConnectionConfig::is_not_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Greater> for plenora_storage_providers::SmbConnectionConfig
+pub type plenora_storage_providers::SmbConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::SmbConnectionConfig::is_not_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Less> for plenora_storage_providers::SmbConnectionConfig
+pub type plenora_storage_providers::SmbConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::SmbConnectionConfig::is_not_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Less>>::Output
 impl<T, U> core::convert::Into<U> for plenora_storage_providers::SmbConnectionConfig where U: core::convert::From<T>
 pub fn plenora_storage_providers::SmbConnectionConfig::into(self) -> U
 impl<T, U> core::convert::TryFrom<U> for plenora_storage_providers::SmbConnectionConfig where U: core::convert::Into<T>
@@ -361,6 +859,7 @@ impl<T> core::clone::CloneToUninit for plenora_storage_providers::SmbConnectionC
 pub unsafe fn plenora_storage_providers::SmbConnectionConfig::clone_to_uninit(&self, dest: *mut u8)
 impl<T> core::convert::From<T> for plenora_storage_providers::SmbConnectionConfig
 pub fn plenora_storage_providers::SmbConnectionConfig::from(t: T) -> T
+impl<T> core::mem::SizedTypeProperties for plenora_storage_providers::SmbConnectionConfig
 impl<T> serde_core::de::DeserializeOwned for plenora_storage_providers::SmbConnectionConfig where T: for<'de> serde_core::de::Deserialize<'de>
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::SmbConnectionConfig where T: ?core::marker::Sized
 pub fn plenora_storage_providers::SmbConnectionConfig::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
@@ -375,6 +874,7 @@ pub const plenora_storage_providers::WebDav::ATOMIC: bool
 pub const plenora_storage_providers::WebDav::CONTRACT: &'static str
 pub const plenora_storage_providers::WebDav::ID: &'static str
 pub const plenora_storage_providers::WebDav::METADATA: bool
+pub fn plenora_storage_providers::WebDav::connect<'life0, 'life1, 'life2, 'life3, 'async_trait>(c: &'life0 plenora_storage_core::model::ProviderConnection, credentials: &'life1 dyn plenora_storage_core::credentials::CredentialResolver, x: &'life2 plenora_storage_core::provider::OperationContext<'life3>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<alloc::boxed::Box<dyn plenora_storage_providers::common::Backend>>> + core::marker::Send + 'async_trait)>> where 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 pub fn plenora_storage_providers::WebDav::validate(c: &plenora_storage_core::model::ProviderConnection, p: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
 impl core::marker::Freeze for plenora_storage_providers::WebDav
 impl core::marker::Send for plenora_storage_providers::WebDav
@@ -382,6 +882,60 @@ impl core::marker::Sync for plenora_storage_providers::WebDav
 impl core::marker::Unpin for plenora_storage_providers::WebDav
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::WebDav
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::WebDav
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_providers::WebDav
+pub type plenora_storage_providers::WebDav::Output = typenum::bit::B1
+pub fn plenora_storage_providers::WebDav::is_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Greater> for plenora_storage_providers::WebDav
+pub type plenora_storage_providers::WebDav::Output = typenum::bit::B0
+pub fn plenora_storage_providers::WebDav::is_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Less> for plenora_storage_providers::WebDav
+pub type plenora_storage_providers::WebDav::Output = typenum::bit::B0
+pub fn plenora_storage_providers::WebDav::is_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal> for plenora_storage_providers::WebDav
+pub type plenora_storage_providers::WebDav::Output = typenum::bit::B1
+pub fn plenora_storage_providers::WebDav::is_greater_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater> for plenora_storage_providers::WebDav
+pub type plenora_storage_providers::WebDav::Output = typenum::bit::B1
+pub fn plenora_storage_providers::WebDav::is_greater_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less> for plenora_storage_providers::WebDav
+pub type plenora_storage_providers::WebDav::Output = typenum::bit::B0
+pub fn plenora_storage_providers::WebDav::is_greater_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Equal> for plenora_storage_providers::WebDav
+pub type plenora_storage_providers::WebDav::Output = typenum::bit::B0
+pub fn plenora_storage_providers::WebDav::is_greater_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Greater> for plenora_storage_providers::WebDav
+pub type plenora_storage_providers::WebDav::Output = typenum::bit::B1
+pub fn plenora_storage_providers::WebDav::is_greater_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Less> for plenora_storage_providers::WebDav
+pub type plenora_storage_providers::WebDav::Output = typenum::bit::B0
+pub fn plenora_storage_providers::WebDav::is_greater_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Equal> for plenora_storage_providers::WebDav
+pub type plenora_storage_providers::WebDav::Output = typenum::bit::B1
+pub fn plenora_storage_providers::WebDav::is_less_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Greater> for plenora_storage_providers::WebDav
+pub type plenora_storage_providers::WebDav::Output = typenum::bit::B0
+pub fn plenora_storage_providers::WebDav::is_less_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Less> for plenora_storage_providers::WebDav
+pub type plenora_storage_providers::WebDav::Output = typenum::bit::B1
+pub fn plenora_storage_providers::WebDav::is_less_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Equal> for plenora_storage_providers::WebDav
+pub type plenora_storage_providers::WebDav::Output = typenum::bit::B0
+pub fn plenora_storage_providers::WebDav::is_less_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Greater> for plenora_storage_providers::WebDav
+pub type plenora_storage_providers::WebDav::Output = typenum::bit::B0
+pub fn plenora_storage_providers::WebDav::is_less_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Less> for plenora_storage_providers::WebDav
+pub type plenora_storage_providers::WebDav::Output = typenum::bit::B1
+pub fn plenora_storage_providers::WebDav::is_less_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Equal> for plenora_storage_providers::WebDav
+pub type plenora_storage_providers::WebDav::Output = typenum::bit::B0
+pub fn plenora_storage_providers::WebDav::is_not_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Greater> for plenora_storage_providers::WebDav
+pub type plenora_storage_providers::WebDav::Output = typenum::bit::B1
+pub fn plenora_storage_providers::WebDav::is_not_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Less> for plenora_storage_providers::WebDav
+pub type plenora_storage_providers::WebDav::Output = typenum::bit::B1
+pub fn plenora_storage_providers::WebDav::is_not_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Less>>::Output
 impl<T, U> core::convert::Into<U> for plenora_storage_providers::WebDav where U: core::convert::From<T>
 pub fn plenora_storage_providers::WebDav::into(self) -> U
 impl<T, U> core::convert::TryFrom<U> for plenora_storage_providers::WebDav where U: core::convert::Into<T>
@@ -398,6 +952,7 @@ impl<T> core::borrow::BorrowMut<T> for plenora_storage_providers::WebDav where T
 pub fn plenora_storage_providers::WebDav::borrow_mut(&mut self) -> &mut T
 impl<T> core::convert::From<T> for plenora_storage_providers::WebDav
 pub fn plenora_storage_providers::WebDav::from(t: T) -> T
+impl<T> core::mem::SizedTypeProperties for plenora_storage_providers::WebDav
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::WebDav where T: ?core::marker::Sized
 pub fn plenora_storage_providers::WebDav::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
 pub fn plenora_storage_providers::WebDav::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
@@ -419,6 +974,60 @@ impl core::marker::Sync for plenora_storage_providers::WebDavConnectionConfig
 impl core::marker::Unpin for plenora_storage_providers::WebDavConnectionConfig
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::WebDavConnectionConfig
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::WebDavConnectionConfig
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_providers::WebDavConnectionConfig
+pub type plenora_storage_providers::WebDavConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::WebDavConnectionConfig::is_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Greater> for plenora_storage_providers::WebDavConnectionConfig
+pub type plenora_storage_providers::WebDavConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::WebDavConnectionConfig::is_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Less> for plenora_storage_providers::WebDavConnectionConfig
+pub type plenora_storage_providers::WebDavConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::WebDavConnectionConfig::is_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal> for plenora_storage_providers::WebDavConnectionConfig
+pub type plenora_storage_providers::WebDavConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::WebDavConnectionConfig::is_greater_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater> for plenora_storage_providers::WebDavConnectionConfig
+pub type plenora_storage_providers::WebDavConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::WebDavConnectionConfig::is_greater_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less> for plenora_storage_providers::WebDavConnectionConfig
+pub type plenora_storage_providers::WebDavConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::WebDavConnectionConfig::is_greater_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Equal> for plenora_storage_providers::WebDavConnectionConfig
+pub type plenora_storage_providers::WebDavConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::WebDavConnectionConfig::is_greater_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Greater> for plenora_storage_providers::WebDavConnectionConfig
+pub type plenora_storage_providers::WebDavConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::WebDavConnectionConfig::is_greater_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Less> for plenora_storage_providers::WebDavConnectionConfig
+pub type plenora_storage_providers::WebDavConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::WebDavConnectionConfig::is_greater_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Equal> for plenora_storage_providers::WebDavConnectionConfig
+pub type plenora_storage_providers::WebDavConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::WebDavConnectionConfig::is_less_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Greater> for plenora_storage_providers::WebDavConnectionConfig
+pub type plenora_storage_providers::WebDavConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::WebDavConnectionConfig::is_less_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Less> for plenora_storage_providers::WebDavConnectionConfig
+pub type plenora_storage_providers::WebDavConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::WebDavConnectionConfig::is_less_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Equal> for plenora_storage_providers::WebDavConnectionConfig
+pub type plenora_storage_providers::WebDavConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::WebDavConnectionConfig::is_less_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Greater> for plenora_storage_providers::WebDavConnectionConfig
+pub type plenora_storage_providers::WebDavConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::WebDavConnectionConfig::is_less_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Less> for plenora_storage_providers::WebDavConnectionConfig
+pub type plenora_storage_providers::WebDavConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::WebDavConnectionConfig::is_less_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Equal> for plenora_storage_providers::WebDavConnectionConfig
+pub type plenora_storage_providers::WebDavConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_providers::WebDavConnectionConfig::is_not_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Greater> for plenora_storage_providers::WebDavConnectionConfig
+pub type plenora_storage_providers::WebDavConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::WebDavConnectionConfig::is_not_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Less> for plenora_storage_providers::WebDavConnectionConfig
+pub type plenora_storage_providers::WebDavConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_providers::WebDavConnectionConfig::is_not_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Less>>::Output
 impl<T, U> core::convert::Into<U> for plenora_storage_providers::WebDavConnectionConfig where U: core::convert::From<T>
 pub fn plenora_storage_providers::WebDavConnectionConfig::into(self) -> U
 impl<T, U> core::convert::TryFrom<U> for plenora_storage_providers::WebDavConnectionConfig where U: core::convert::Into<T>
@@ -441,6 +1050,7 @@ impl<T> core::clone::CloneToUninit for plenora_storage_providers::WebDavConnecti
 pub unsafe fn plenora_storage_providers::WebDavConnectionConfig::clone_to_uninit(&self, dest: *mut u8)
 impl<T> core::convert::From<T> for plenora_storage_providers::WebDavConnectionConfig
 pub fn plenora_storage_providers::WebDavConnectionConfig::from(t: T) -> T
+impl<T> core::mem::SizedTypeProperties for plenora_storage_providers::WebDavConnectionConfig
 impl<T> serde_core::de::DeserializeOwned for plenora_storage_providers::WebDavConnectionConfig where T: for<'de> serde_core::de::Deserialize<'de>
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::WebDavConnectionConfig where T: ?core::marker::Sized
 pub fn plenora_storage_providers::WebDavConnectionConfig::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
@@ -454,36 +1064,42 @@ pub const plenora_storage_providers::ProviderFactory::ATOMIC: bool
 pub const plenora_storage_providers::ProviderFactory::CONTRACT: &'static str
 pub const plenora_storage_providers::ProviderFactory::ID: &'static str
 pub const plenora_storage_providers::ProviderFactory::METADATA: bool
+pub fn plenora_storage_providers::ProviderFactory::connect<'life0, 'life1, 'life2, 'life3, 'async_trait>(connection: &'life0 plenora_storage_core::model::ProviderConnection, credentials: &'life1 dyn plenora_storage_core::credentials::CredentialResolver, context: &'life2 plenora_storage_core::provider::OperationContext<'life3>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<alloc::boxed::Box<dyn plenora_storage_providers::common::Backend>>> + core::marker::Send + 'async_trait)>> where 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 pub fn plenora_storage_providers::ProviderFactory::validate(connection: &plenora_storage_core::model::ProviderConnection, policy: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
 impl plenora_storage_providers::ProviderFactory for plenora_storage_providers::Azure
 pub const plenora_storage_providers::Azure::ATOMIC: bool
 pub const plenora_storage_providers::Azure::CONTRACT: &'static str
 pub const plenora_storage_providers::Azure::ID: &'static str
 pub const plenora_storage_providers::Azure::METADATA: bool
+pub fn plenora_storage_providers::Azure::connect<'life0, 'life1, 'life2, 'life3, 'async_trait>(connection: &'life0 plenora_storage_core::model::ProviderConnection, credentials: &'life1 dyn plenora_storage_core::credentials::CredentialResolver, context: &'life2 plenora_storage_core::provider::OperationContext<'life3>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<alloc::boxed::Box<dyn plenora_storage_providers::common::Backend>>> + core::marker::Send + 'async_trait)>> where 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 pub fn plenora_storage_providers::Azure::validate(connection: &plenora_storage_core::model::ProviderConnection, policy: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
 impl plenora_storage_providers::ProviderFactory for plenora_storage_providers::Gcs
 pub const plenora_storage_providers::Gcs::ATOMIC: bool
 pub const plenora_storage_providers::Gcs::CONTRACT: &'static str
 pub const plenora_storage_providers::Gcs::ID: &'static str
 pub const plenora_storage_providers::Gcs::METADATA: bool
+pub fn plenora_storage_providers::Gcs::connect<'life0, 'life1, 'life2, 'life3, 'async_trait>(connection: &'life0 plenora_storage_core::model::ProviderConnection, credentials: &'life1 dyn plenora_storage_core::credentials::CredentialResolver, context: &'life2 plenora_storage_core::provider::OperationContext<'life3>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<alloc::boxed::Box<dyn plenora_storage_providers::common::Backend>>> + core::marker::Send + 'async_trait)>> where 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 pub fn plenora_storage_providers::Gcs::validate(connection: &plenora_storage_core::model::ProviderConnection, policy: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
 impl plenora_storage_providers::ProviderFactory for plenora_storage_providers::Local
 pub const plenora_storage_providers::Local::ATOMIC: bool
 pub const plenora_storage_providers::Local::CONTRACT: &'static str
 pub const plenora_storage_providers::Local::ID: &'static str
 pub const plenora_storage_providers::Local::METADATA: bool
+pub fn plenora_storage_providers::Local::connect<'life0, 'life1, 'life2, 'life3, 'async_trait>(connection: &'life0 plenora_storage_core::model::ProviderConnection, _: &'life1 dyn plenora_storage_core::credentials::CredentialResolver, _: &'life2 plenora_storage_core::provider::OperationContext<'life3>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<alloc::boxed::Box<dyn plenora_storage_providers::common::Backend>>> + core::marker::Send + 'async_trait)>> where 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 pub fn plenora_storage_providers::Local::validate(connection: &plenora_storage_core::model::ProviderConnection, _: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
 impl plenora_storage_providers::ProviderFactory for plenora_storage_providers::Smb
 pub const plenora_storage_providers::Smb::ATOMIC: bool
 pub const plenora_storage_providers::Smb::CONTRACT: &'static str
 pub const plenora_storage_providers::Smb::ID: &'static str
 pub const plenora_storage_providers::Smb::METADATA: bool
+pub fn plenora_storage_providers::Smb::connect<'life0, 'life1, 'life2, 'life3, 'async_trait>(connection: &'life0 plenora_storage_core::model::ProviderConnection, credentials: &'life1 dyn plenora_storage_core::credentials::CredentialResolver, context: &'life2 plenora_storage_core::provider::OperationContext<'life3>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<alloc::boxed::Box<dyn plenora_storage_providers::common::Backend>>> + core::marker::Send + 'async_trait)>> where 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 pub fn plenora_storage_providers::Smb::validate(connection: &plenora_storage_core::model::ProviderConnection, _: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
 impl plenora_storage_providers::ProviderFactory for plenora_storage_providers::WebDav
 pub const plenora_storage_providers::WebDav::ATOMIC: bool
 pub const plenora_storage_providers::WebDav::CONTRACT: &'static str
 pub const plenora_storage_providers::WebDav::ID: &'static str
 pub const plenora_storage_providers::WebDav::METADATA: bool
+pub fn plenora_storage_providers::WebDav::connect<'life0, 'life1, 'life2, 'life3, 'async_trait>(c: &'life0 plenora_storage_core::model::ProviderConnection, credentials: &'life1 dyn plenora_storage_core::credentials::CredentialResolver, x: &'life2 plenora_storage_core::provider::OperationContext<'life3>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<alloc::boxed::Box<dyn plenora_storage_providers::common::Backend>>> + core::marker::Send + 'async_trait)>> where 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 pub fn plenora_storage_providers::WebDav::validate(c: &plenora_storage_core::model::ProviderConnection, p: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
 pub type plenora_storage_providers::AzureProvider = plenora_storage_providers::Provider<plenora_storage_providers::Azure>
 pub type plenora_storage_providers::GcsProvider = plenora_storage_providers::Provider<plenora_storage_providers::Gcs>

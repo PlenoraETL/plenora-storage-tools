@@ -8,6 +8,7 @@ pub plenora_storage_sftp::SftpConnectionConfig::root: alloc::string::String
 impl core::clone::Clone for plenora_storage_sftp::SftpConnectionConfig
 pub fn plenora_storage_sftp::SftpConnectionConfig::clone(&self) -> plenora_storage_sftp::SftpConnectionConfig
 impl core::cmp::Eq for plenora_storage_sftp::SftpConnectionConfig
+pub fn plenora_storage_sftp::SftpConnectionConfig::assert_receiver_is_total_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_sftp::SftpConnectionConfig
 pub fn plenora_storage_sftp::SftpConnectionConfig::eq(&self, other: &plenora_storage_sftp::SftpConnectionConfig) -> bool
 impl core::fmt::Debug for plenora_storage_sftp::SftpConnectionConfig
@@ -21,6 +22,60 @@ impl core::marker::Sync for plenora_storage_sftp::SftpConnectionConfig
 impl core::marker::Unpin for plenora_storage_sftp::SftpConnectionConfig
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_sftp::SftpConnectionConfig
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_sftp::SftpConnectionConfig
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_sftp::SftpConnectionConfig
+pub type plenora_storage_sftp::SftpConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_sftp::SftpConnectionConfig::is_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Greater> for plenora_storage_sftp::SftpConnectionConfig
+pub type plenora_storage_sftp::SftpConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_sftp::SftpConnectionConfig::is_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Less> for plenora_storage_sftp::SftpConnectionConfig
+pub type plenora_storage_sftp::SftpConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_sftp::SftpConnectionConfig::is_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal> for plenora_storage_sftp::SftpConnectionConfig
+pub type plenora_storage_sftp::SftpConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_sftp::SftpConnectionConfig::is_greater_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater> for plenora_storage_sftp::SftpConnectionConfig
+pub type plenora_storage_sftp::SftpConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_sftp::SftpConnectionConfig::is_greater_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less> for plenora_storage_sftp::SftpConnectionConfig
+pub type plenora_storage_sftp::SftpConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_sftp::SftpConnectionConfig::is_greater_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Equal> for plenora_storage_sftp::SftpConnectionConfig
+pub type plenora_storage_sftp::SftpConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_sftp::SftpConnectionConfig::is_greater_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Greater> for plenora_storage_sftp::SftpConnectionConfig
+pub type plenora_storage_sftp::SftpConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_sftp::SftpConnectionConfig::is_greater_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Less> for plenora_storage_sftp::SftpConnectionConfig
+pub type plenora_storage_sftp::SftpConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_sftp::SftpConnectionConfig::is_greater_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Equal> for plenora_storage_sftp::SftpConnectionConfig
+pub type plenora_storage_sftp::SftpConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_sftp::SftpConnectionConfig::is_less_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Greater> for plenora_storage_sftp::SftpConnectionConfig
+pub type plenora_storage_sftp::SftpConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_sftp::SftpConnectionConfig::is_less_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Less> for plenora_storage_sftp::SftpConnectionConfig
+pub type plenora_storage_sftp::SftpConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_sftp::SftpConnectionConfig::is_less_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Equal> for plenora_storage_sftp::SftpConnectionConfig
+pub type plenora_storage_sftp::SftpConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_sftp::SftpConnectionConfig::is_less_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Greater> for plenora_storage_sftp::SftpConnectionConfig
+pub type plenora_storage_sftp::SftpConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_sftp::SftpConnectionConfig::is_less_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Less> for plenora_storage_sftp::SftpConnectionConfig
+pub type plenora_storage_sftp::SftpConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_sftp::SftpConnectionConfig::is_less_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Equal> for plenora_storage_sftp::SftpConnectionConfig
+pub type plenora_storage_sftp::SftpConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_sftp::SftpConnectionConfig::is_not_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Greater> for plenora_storage_sftp::SftpConnectionConfig
+pub type plenora_storage_sftp::SftpConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_sftp::SftpConnectionConfig::is_not_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Less> for plenora_storage_sftp::SftpConnectionConfig
+pub type plenora_storage_sftp::SftpConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_sftp::SftpConnectionConfig::is_not_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Less>>::Output
 impl<Q, K> hashbrown::Equivalent<K> for plenora_storage_sftp::SftpConnectionConfig where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
 pub fn plenora_storage_sftp::SftpConnectionConfig::equivalent(&self, key: &K) -> bool
 impl<T, U> core::convert::Into<U> for plenora_storage_sftp::SftpConnectionConfig where U: core::convert::From<T>
@@ -45,6 +100,7 @@ impl<T> core::clone::CloneToUninit for plenora_storage_sftp::SftpConnectionConfi
 pub unsafe fn plenora_storage_sftp::SftpConnectionConfig::clone_to_uninit(&self, dest: *mut u8)
 impl<T> core::convert::From<T> for plenora_storage_sftp::SftpConnectionConfig
 pub fn plenora_storage_sftp::SftpConnectionConfig::from(t: T) -> T
+impl<T> core::mem::SizedTypeProperties for plenora_storage_sftp::SftpConnectionConfig
 impl<T> serde_core::de::DeserializeOwned for plenora_storage_sftp::SftpConnectionConfig where T: for<'de> serde_core::de::Deserialize<'de>
 impl<T> typenum::type_operators::Same for plenora_storage_sftp::SftpConnectionConfig
 pub type plenora_storage_sftp::SftpConnectionConfig::Output = T
@@ -69,6 +125,60 @@ impl core::marker::Sync for plenora_storage_sftp::SftpProvider
 impl core::marker::Unpin for plenora_storage_sftp::SftpProvider
 impl !core::panic::unwind_safe::RefUnwindSafe for plenora_storage_sftp::SftpProvider
 impl !core::panic::unwind_safe::UnwindSafe for plenora_storage_sftp::SftpProvider
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_sftp::SftpProvider
+pub type plenora_storage_sftp::SftpProvider::Output = typenum::bit::B1
+pub fn plenora_storage_sftp::SftpProvider::is_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Greater> for plenora_storage_sftp::SftpProvider
+pub type plenora_storage_sftp::SftpProvider::Output = typenum::bit::B0
+pub fn plenora_storage_sftp::SftpProvider::is_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Less> for plenora_storage_sftp::SftpProvider
+pub type plenora_storage_sftp::SftpProvider::Output = typenum::bit::B0
+pub fn plenora_storage_sftp::SftpProvider::is_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal> for plenora_storage_sftp::SftpProvider
+pub type plenora_storage_sftp::SftpProvider::Output = typenum::bit::B1
+pub fn plenora_storage_sftp::SftpProvider::is_greater_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater> for plenora_storage_sftp::SftpProvider
+pub type plenora_storage_sftp::SftpProvider::Output = typenum::bit::B1
+pub fn plenora_storage_sftp::SftpProvider::is_greater_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less> for plenora_storage_sftp::SftpProvider
+pub type plenora_storage_sftp::SftpProvider::Output = typenum::bit::B0
+pub fn plenora_storage_sftp::SftpProvider::is_greater_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Equal> for plenora_storage_sftp::SftpProvider
+pub type plenora_storage_sftp::SftpProvider::Output = typenum::bit::B0
+pub fn plenora_storage_sftp::SftpProvider::is_greater_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Greater> for plenora_storage_sftp::SftpProvider
+pub type plenora_storage_sftp::SftpProvider::Output = typenum::bit::B1
+pub fn plenora_storage_sftp::SftpProvider::is_greater_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Less> for plenora_storage_sftp::SftpProvider
+pub type plenora_storage_sftp::SftpProvider::Output = typenum::bit::B0
+pub fn plenora_storage_sftp::SftpProvider::is_greater_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Equal> for plenora_storage_sftp::SftpProvider
+pub type plenora_storage_sftp::SftpProvider::Output = typenum::bit::B1
+pub fn plenora_storage_sftp::SftpProvider::is_less_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Greater> for plenora_storage_sftp::SftpProvider
+pub type plenora_storage_sftp::SftpProvider::Output = typenum::bit::B0
+pub fn plenora_storage_sftp::SftpProvider::is_less_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Less> for plenora_storage_sftp::SftpProvider
+pub type plenora_storage_sftp::SftpProvider::Output = typenum::bit::B1
+pub fn plenora_storage_sftp::SftpProvider::is_less_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Equal> for plenora_storage_sftp::SftpProvider
+pub type plenora_storage_sftp::SftpProvider::Output = typenum::bit::B0
+pub fn plenora_storage_sftp::SftpProvider::is_less_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Greater> for plenora_storage_sftp::SftpProvider
+pub type plenora_storage_sftp::SftpProvider::Output = typenum::bit::B0
+pub fn plenora_storage_sftp::SftpProvider::is_less_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Less> for plenora_storage_sftp::SftpProvider
+pub type plenora_storage_sftp::SftpProvider::Output = typenum::bit::B1
+pub fn plenora_storage_sftp::SftpProvider::is_less_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Equal> for plenora_storage_sftp::SftpProvider
+pub type plenora_storage_sftp::SftpProvider::Output = typenum::bit::B0
+pub fn plenora_storage_sftp::SftpProvider::is_not_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Greater> for plenora_storage_sftp::SftpProvider
+pub type plenora_storage_sftp::SftpProvider::Output = typenum::bit::B1
+pub fn plenora_storage_sftp::SftpProvider::is_not_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Less> for plenora_storage_sftp::SftpProvider
+pub type plenora_storage_sftp::SftpProvider::Output = typenum::bit::B1
+pub fn plenora_storage_sftp::SftpProvider::is_not_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Less>>::Output
 impl<T, U> core::convert::Into<U> for plenora_storage_sftp::SftpProvider where U: core::convert::From<T>
 pub fn plenora_storage_sftp::SftpProvider::into(self) -> U
 impl<T, U> core::convert::TryFrom<U> for plenora_storage_sftp::SftpProvider where U: core::convert::Into<T>
@@ -85,6 +195,7 @@ impl<T> core::borrow::BorrowMut<T> for plenora_storage_sftp::SftpProvider where 
 pub fn plenora_storage_sftp::SftpProvider::borrow_mut(&mut self) -> &mut T
 impl<T> core::convert::From<T> for plenora_storage_sftp::SftpProvider
 pub fn plenora_storage_sftp::SftpProvider::from(t: T) -> T
+impl<T> core::mem::SizedTypeProperties for plenora_storage_sftp::SftpProvider
 impl<T> typenum::type_operators::Same for plenora_storage_sftp::SftpProvider
 pub type plenora_storage_sftp::SftpProvider::Output = T
 pub const plenora_storage_sftp::CONFIG_CONTRACT: &str

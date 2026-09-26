@@ -62,7 +62,7 @@ def main():
     names = set()
     for package, library in packages():
         run(['cargo', 'rustdoc', '--locked', '--offline', '-p', package, '--lib', '--all-features',
-             '--', '-Z', 'unstable-options', '--output-format', 'json'], env=environment)
+             '--', '-Z', 'unstable-options', '--output-format', 'json', '--document-hidden-items'], env=environment)
         document = cargo_target / 'doc' / (library + '.json')
         actual = run([str(executable), str(document)], capture_output=True).stdout
         name = package + '.txt'
@@ -73,6 +73,8 @@ def main():
         if delta:
             failures.append(name)
             (destination / (name + '.diff')).write_text(delta, encoding='utf-8')
+        else:
+            (destination / (name + '.diff')).unlink(missing_ok=True)
         results.append({'package': package, 'lines': len(actual.splitlines()),
                         'sha256': hashlib.sha256(actual.encode()).hexdigest(),
                         'matches': not bool(delta)})
@@ -80,6 +82,7 @@ def main():
         failures.append('package inventory differs')
     report = {'schema_version': 1, 'status': 'CANDIDATE' if args.candidate else 'FAIL' if failures else 'PASS',
               'rustc': metadata['release'], 'target': target, 'features': 'all',
+              'document_hidden_items': True, 'public_api_version': '0.51.0',
               'source_revision': run(['git', 'rev-parse', 'HEAD'], capture_output=True).stdout.strip(),
               'source_dirty': bool(run(['git', 'status', '--porcelain'], capture_output=True).stdout.strip()),
               'packages': results, 'differences': failures}

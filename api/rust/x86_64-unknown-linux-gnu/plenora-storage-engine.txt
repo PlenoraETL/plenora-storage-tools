@@ -11,6 +11,60 @@ impl core::marker::Sync for plenora_storage_engine::PutFileOptions
 impl core::marker::Unpin for plenora_storage_engine::PutFileOptions
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_engine::PutFileOptions
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_engine::PutFileOptions
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_engine::PutFileOptions
+pub type plenora_storage_engine::PutFileOptions::Output = typenum::bit::B1
+pub fn plenora_storage_engine::PutFileOptions::is_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Greater> for plenora_storage_engine::PutFileOptions
+pub type plenora_storage_engine::PutFileOptions::Output = typenum::bit::B0
+pub fn plenora_storage_engine::PutFileOptions::is_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Less> for plenora_storage_engine::PutFileOptions
+pub type plenora_storage_engine::PutFileOptions::Output = typenum::bit::B0
+pub fn plenora_storage_engine::PutFileOptions::is_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal> for plenora_storage_engine::PutFileOptions
+pub type plenora_storage_engine::PutFileOptions::Output = typenum::bit::B1
+pub fn plenora_storage_engine::PutFileOptions::is_greater_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater> for plenora_storage_engine::PutFileOptions
+pub type plenora_storage_engine::PutFileOptions::Output = typenum::bit::B1
+pub fn plenora_storage_engine::PutFileOptions::is_greater_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less> for plenora_storage_engine::PutFileOptions
+pub type plenora_storage_engine::PutFileOptions::Output = typenum::bit::B0
+pub fn plenora_storage_engine::PutFileOptions::is_greater_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Equal> for plenora_storage_engine::PutFileOptions
+pub type plenora_storage_engine::PutFileOptions::Output = typenum::bit::B0
+pub fn plenora_storage_engine::PutFileOptions::is_greater_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Greater> for plenora_storage_engine::PutFileOptions
+pub type plenora_storage_engine::PutFileOptions::Output = typenum::bit::B1
+pub fn plenora_storage_engine::PutFileOptions::is_greater_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Less> for plenora_storage_engine::PutFileOptions
+pub type plenora_storage_engine::PutFileOptions::Output = typenum::bit::B0
+pub fn plenora_storage_engine::PutFileOptions::is_greater_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Equal> for plenora_storage_engine::PutFileOptions
+pub type plenora_storage_engine::PutFileOptions::Output = typenum::bit::B1
+pub fn plenora_storage_engine::PutFileOptions::is_less_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Greater> for plenora_storage_engine::PutFileOptions
+pub type plenora_storage_engine::PutFileOptions::Output = typenum::bit::B0
+pub fn plenora_storage_engine::PutFileOptions::is_less_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Less> for plenora_storage_engine::PutFileOptions
+pub type plenora_storage_engine::PutFileOptions::Output = typenum::bit::B1
+pub fn plenora_storage_engine::PutFileOptions::is_less_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Equal> for plenora_storage_engine::PutFileOptions
+pub type plenora_storage_engine::PutFileOptions::Output = typenum::bit::B0
+pub fn plenora_storage_engine::PutFileOptions::is_less_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Greater> for plenora_storage_engine::PutFileOptions
+pub type plenora_storage_engine::PutFileOptions::Output = typenum::bit::B0
+pub fn plenora_storage_engine::PutFileOptions::is_less_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Less> for plenora_storage_engine::PutFileOptions
+pub type plenora_storage_engine::PutFileOptions::Output = typenum::bit::B1
+pub fn plenora_storage_engine::PutFileOptions::is_less_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Equal> for plenora_storage_engine::PutFileOptions
+pub type plenora_storage_engine::PutFileOptions::Output = typenum::bit::B0
+pub fn plenora_storage_engine::PutFileOptions::is_not_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Greater> for plenora_storage_engine::PutFileOptions
+pub type plenora_storage_engine::PutFileOptions::Output = typenum::bit::B1
+pub fn plenora_storage_engine::PutFileOptions::is_not_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Less> for plenora_storage_engine::PutFileOptions
+pub type plenora_storage_engine::PutFileOptions::Output = typenum::bit::B1
+pub fn plenora_storage_engine::PutFileOptions::is_not_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Less>>::Output
 impl<T, U> core::convert::Into<U> for plenora_storage_engine::PutFileOptions where U: core::convert::From<T>
 pub fn plenora_storage_engine::PutFileOptions::into(self) -> U
 impl<T, U> core::convert::TryFrom<U> for plenora_storage_engine::PutFileOptions where U: core::convert::Into<T>
@@ -27,6 +81,7 @@ impl<T> core::borrow::BorrowMut<T> for plenora_storage_engine::PutFileOptions wh
 pub fn plenora_storage_engine::PutFileOptions::borrow_mut(&mut self) -> &mut T
 impl<T> core::convert::From<T> for plenora_storage_engine::PutFileOptions
 pub fn plenora_storage_engine::PutFileOptions::from(t: T) -> T
+impl<T> core::mem::SizedTypeProperties for plenora_storage_engine::PutFileOptions
 impl<T> either::into_either::IntoEither for plenora_storage_engine::PutFileOptions
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_engine::PutFileOptions where T: ?core::marker::Sized
 pub fn plenora_storage_engine::PutFileOptions::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>

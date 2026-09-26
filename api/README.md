@@ -7,7 +7,8 @@ di produzione e non implica che esista già una release stabile.
 
 - `rust/<target>/*.txt`: superficie risolta da rustdoc di tutti i sette crate
   pubblici con tutte le feature, inclusi metodi, re-export, trait e auto-trait.
-  Il fork SMB ha un file distinto; non viene nascosto nel totale del prodotto.
+  Sono inclusi anche gli item pubblici con `#[doc(hidden)]`. Il fork SMB ha un
+  file distinto; non viene nascosto nel totale del prodotto.
 - `cli.json`: modello Clap compilato, valori ammessi, obbligatorietà, default,
   protocollo ed exit code. Non include il testo descrittivo dell'help.
 - `python.json`: esportazioni, firme, annotazioni, type alias, dataclass,

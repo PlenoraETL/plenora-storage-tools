@@ -12,6 +12,7 @@ pub struct Client;
 impl Client { pub fn close(&self) {} }
 pub enum Outcome { Ready }
 pub fn consume(value: u32) -> u32 { value }
+#[doc(hidden)] pub fn hidden_but_public() {}
 '''
 
 
@@ -23,6 +24,7 @@ def main():
         'changed_parameter_type': BASE.replace('value: u32', 'value: u16').replace('{ value }', '{ value.into() }'),
         'added_exhaustive_enum_variant': BASE.replace('Ready }', 'Ready, Failed }'),
         'lost_send_sync': BASE.replace('pub struct Client;', 'pub struct Client(std::rc::Rc<()>);'),
+        'removed_hidden_public_function': BASE.replace('#[doc(hidden)] pub fn hidden_but_public() {}', ''),
     }
     with tempfile.TemporaryDirectory(prefix='storage-api-gate-') as temporary:
         folder = Path(temporary)
@@ -31,7 +33,7 @@ def main():
             path = folder / 'lib.rs'
             path.write_text(source)
             subprocess.run(['rustdoc', '--edition', '2024', '--crate-name', 'api_gate_fixture',
-                            '-Z', 'unstable-options', '--output-format', 'json', '-o', str(folder), str(path)],
+                            '-Z', 'unstable-options', '--output-format', 'json', '--document-hidden-items', '-o', str(folder), str(path)],
                            env=dict(os.environ, RUSTC_BOOTSTRAP='1'), check=True, capture_output=True)
             return subprocess.run([str(tool), str(folder / 'api_gate_fixture.json')], check=True,
                                   capture_output=True, text=True).stdout

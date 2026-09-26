@@ -7,6 +7,7 @@ pub plenora_storage_s3::S3ConnectionConfig::virtual_hosted_style: bool
 impl core::clone::Clone for plenora_storage_s3::S3ConnectionConfig
 pub fn plenora_storage_s3::S3ConnectionConfig::clone(&self) -> plenora_storage_s3::S3ConnectionConfig
 impl core::cmp::Eq for plenora_storage_s3::S3ConnectionConfig
+pub fn plenora_storage_s3::S3ConnectionConfig::assert_receiver_is_total_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_s3::S3ConnectionConfig
 pub fn plenora_storage_s3::S3ConnectionConfig::eq(&self, other: &plenora_storage_s3::S3ConnectionConfig) -> bool
 impl core::fmt::Debug for plenora_storage_s3::S3ConnectionConfig
@@ -20,6 +21,60 @@ impl core::marker::Sync for plenora_storage_s3::S3ConnectionConfig
 impl core::marker::Unpin for plenora_storage_s3::S3ConnectionConfig
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_s3::S3ConnectionConfig
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_s3::S3ConnectionConfig
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_s3::S3ConnectionConfig
+pub type plenora_storage_s3::S3ConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_s3::S3ConnectionConfig::is_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Greater> for plenora_storage_s3::S3ConnectionConfig
+pub type plenora_storage_s3::S3ConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_s3::S3ConnectionConfig::is_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Less> for plenora_storage_s3::S3ConnectionConfig
+pub type plenora_storage_s3::S3ConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_s3::S3ConnectionConfig::is_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal> for plenora_storage_s3::S3ConnectionConfig
+pub type plenora_storage_s3::S3ConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_s3::S3ConnectionConfig::is_greater_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater> for plenora_storage_s3::S3ConnectionConfig
+pub type plenora_storage_s3::S3ConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_s3::S3ConnectionConfig::is_greater_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less> for plenora_storage_s3::S3ConnectionConfig
+pub type plenora_storage_s3::S3ConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_s3::S3ConnectionConfig::is_greater_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Equal> for plenora_storage_s3::S3ConnectionConfig
+pub type plenora_storage_s3::S3ConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_s3::S3ConnectionConfig::is_greater_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Greater> for plenora_storage_s3::S3ConnectionConfig
+pub type plenora_storage_s3::S3ConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_s3::S3ConnectionConfig::is_greater_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Less> for plenora_storage_s3::S3ConnectionConfig
+pub type plenora_storage_s3::S3ConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_s3::S3ConnectionConfig::is_greater_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Equal> for plenora_storage_s3::S3ConnectionConfig
+pub type plenora_storage_s3::S3ConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_s3::S3ConnectionConfig::is_less_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Greater> for plenora_storage_s3::S3ConnectionConfig
+pub type plenora_storage_s3::S3ConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_s3::S3ConnectionConfig::is_less_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Less> for plenora_storage_s3::S3ConnectionConfig
+pub type plenora_storage_s3::S3ConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_s3::S3ConnectionConfig::is_less_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Equal> for plenora_storage_s3::S3ConnectionConfig
+pub type plenora_storage_s3::S3ConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_s3::S3ConnectionConfig::is_less_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Greater> for plenora_storage_s3::S3ConnectionConfig
+pub type plenora_storage_s3::S3ConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_s3::S3ConnectionConfig::is_less_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Less> for plenora_storage_s3::S3ConnectionConfig
+pub type plenora_storage_s3::S3ConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_s3::S3ConnectionConfig::is_less_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Equal> for plenora_storage_s3::S3ConnectionConfig
+pub type plenora_storage_s3::S3ConnectionConfig::Output = typenum::bit::B0
+pub fn plenora_storage_s3::S3ConnectionConfig::is_not_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Greater> for plenora_storage_s3::S3ConnectionConfig
+pub type plenora_storage_s3::S3ConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_s3::S3ConnectionConfig::is_not_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Less> for plenora_storage_s3::S3ConnectionConfig
+pub type plenora_storage_s3::S3ConnectionConfig::Output = typenum::bit::B1
+pub fn plenora_storage_s3::S3ConnectionConfig::is_not_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Less>>::Output
 impl<Q, K> equivalent::Equivalent<K> for plenora_storage_s3::S3ConnectionConfig where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
 pub fn plenora_storage_s3::S3ConnectionConfig::equivalent(&self, key: &K) -> bool
 impl<Q, K> hashbrown::Equivalent<K> for plenora_storage_s3::S3ConnectionConfig where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
@@ -46,6 +101,7 @@ impl<T> core::clone::CloneToUninit for plenora_storage_s3::S3ConnectionConfig wh
 pub unsafe fn plenora_storage_s3::S3ConnectionConfig::clone_to_uninit(&self, dest: *mut u8)
 impl<T> core::convert::From<T> for plenora_storage_s3::S3ConnectionConfig
 pub fn plenora_storage_s3::S3ConnectionConfig::from(t: T) -> T
+impl<T> core::mem::SizedTypeProperties for plenora_storage_s3::S3ConnectionConfig
 impl<T> either::into_either::IntoEither for plenora_storage_s3::S3ConnectionConfig
 impl<T> serde_core::de::DeserializeOwned for plenora_storage_s3::S3ConnectionConfig where T: for<'de> serde_core::de::Deserialize<'de>
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_s3::S3ConnectionConfig where T: ?core::marker::Sized
@@ -76,6 +132,60 @@ impl core::marker::Sync for plenora_storage_s3::S3Provider
 impl core::marker::Unpin for plenora_storage_s3::S3Provider
 impl !core::panic::unwind_safe::RefUnwindSafe for plenora_storage_s3::S3Provider
 impl !core::panic::unwind_safe::UnwindSafe for plenora_storage_s3::S3Provider
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_s3::S3Provider
+pub type plenora_storage_s3::S3Provider::Output = typenum::bit::B1
+pub fn plenora_storage_s3::S3Provider::is_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Greater> for plenora_storage_s3::S3Provider
+pub type plenora_storage_s3::S3Provider::Output = typenum::bit::B0
+pub fn plenora_storage_s3::S3Provider::is_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Less> for plenora_storage_s3::S3Provider
+pub type plenora_storage_s3::S3Provider::Output = typenum::bit::B0
+pub fn plenora_storage_s3::S3Provider::is_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal> for plenora_storage_s3::S3Provider
+pub type plenora_storage_s3::S3Provider::Output = typenum::bit::B1
+pub fn plenora_storage_s3::S3Provider::is_greater_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater> for plenora_storage_s3::S3Provider
+pub type plenora_storage_s3::S3Provider::Output = typenum::bit::B1
+pub fn plenora_storage_s3::S3Provider::is_greater_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less> for plenora_storage_s3::S3Provider
+pub type plenora_storage_s3::S3Provider::Output = typenum::bit::B0
+pub fn plenora_storage_s3::S3Provider::is_greater_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Equal> for plenora_storage_s3::S3Provider
+pub type plenora_storage_s3::S3Provider::Output = typenum::bit::B0
+pub fn plenora_storage_s3::S3Provider::is_greater_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Greater> for plenora_storage_s3::S3Provider
+pub type plenora_storage_s3::S3Provider::Output = typenum::bit::B1
+pub fn plenora_storage_s3::S3Provider::is_greater_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Less> for plenora_storage_s3::S3Provider
+pub type plenora_storage_s3::S3Provider::Output = typenum::bit::B0
+pub fn plenora_storage_s3::S3Provider::is_greater_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Equal> for plenora_storage_s3::S3Provider
+pub type plenora_storage_s3::S3Provider::Output = typenum::bit::B1
+pub fn plenora_storage_s3::S3Provider::is_less_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Greater> for plenora_storage_s3::S3Provider
+pub type plenora_storage_s3::S3Provider::Output = typenum::bit::B0
+pub fn plenora_storage_s3::S3Provider::is_less_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Less> for plenora_storage_s3::S3Provider
+pub type plenora_storage_s3::S3Provider::Output = typenum::bit::B1
+pub fn plenora_storage_s3::S3Provider::is_less_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Equal> for plenora_storage_s3::S3Provider
+pub type plenora_storage_s3::S3Provider::Output = typenum::bit::B0
+pub fn plenora_storage_s3::S3Provider::is_less_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Greater> for plenora_storage_s3::S3Provider
+pub type plenora_storage_s3::S3Provider::Output = typenum::bit::B0
+pub fn plenora_storage_s3::S3Provider::is_less_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Less> for plenora_storage_s3::S3Provider
+pub type plenora_storage_s3::S3Provider::Output = typenum::bit::B1
+pub fn plenora_storage_s3::S3Provider::is_less_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Equal> for plenora_storage_s3::S3Provider
+pub type plenora_storage_s3::S3Provider::Output = typenum::bit::B0
+pub fn plenora_storage_s3::S3Provider::is_not_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Greater> for plenora_storage_s3::S3Provider
+pub type plenora_storage_s3::S3Provider::Output = typenum::bit::B1
+pub fn plenora_storage_s3::S3Provider::is_not_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Less> for plenora_storage_s3::S3Provider
+pub type plenora_storage_s3::S3Provider::Output = typenum::bit::B1
+pub fn plenora_storage_s3::S3Provider::is_not_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Less>>::Output
 impl<T, U> core::convert::Into<U> for plenora_storage_s3::S3Provider where U: core::convert::From<T>
 pub fn plenora_storage_s3::S3Provider::into(self) -> U
 impl<T, U> core::convert::TryFrom<U> for plenora_storage_s3::S3Provider where U: core::convert::Into<T>
@@ -92,6 +202,7 @@ impl<T> core::borrow::BorrowMut<T> for plenora_storage_s3::S3Provider where T: ?
 pub fn plenora_storage_s3::S3Provider::borrow_mut(&mut self) -> &mut T
 impl<T> core::convert::From<T> for plenora_storage_s3::S3Provider
 pub fn plenora_storage_s3::S3Provider::from(t: T) -> T
+impl<T> core::mem::SizedTypeProperties for plenora_storage_s3::S3Provider
 impl<T> either::into_either::IntoEither for plenora_storage_s3::S3Provider
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_s3::S3Provider where T: ?core::marker::Sized
 pub fn plenora_storage_s3::S3Provider::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
