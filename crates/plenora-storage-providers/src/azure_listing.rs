@@ -39,6 +39,11 @@ impl HttpService for ValidatingClient {
 }
 
 #[derive(Deserialize)]
+enum ListingDocument {
+    EnumerationResults(Listing),
+}
+
+#[derive(Deserialize)]
 struct Listing {
     #[serde(rename = "Blobs", default)]
     blobs: Blobs,
@@ -61,7 +66,7 @@ struct Name {
     encoded: Option<String>,
 }
 fn validate(bytes: &[u8]) -> StorageResult<()> {
-    let listing: Listing = quick_xml::de::from_reader(bytes)
+    let ListingDocument::EnumerationResults(listing) = quick_xml::de::from_reader(bytes)
         .map_err(|_| crate::common::invalid("AZURE_LIST_RESPONSE_INVALID"))?;
     for blob in listing.blobs.objects {
         if blob.name.encoded.is_some() {
@@ -73,9 +78,29 @@ fn validate(bytes: &[u8]) -> StorageResult<()> {
     Ok(())
 }
 
+#[cfg(fuzzing)]
+pub(crate) fn fuzz_listing(bytes: &[u8]) {
+    if let Err(error) = validate(bytes) {
+        assert!(matches!(
+            error.code.as_str(),
+            "AZURE_LIST_RESPONSE_INVALID" | "OBJECT_KEY_UNREPRESENTABLE"
+        ));
+        assert!(error.details.is_empty());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::validate;
+    #[test]
+    fn unrelated_xml_is_not_an_empty_listing() {
+        for data in [
+            b"<html/>".as_slice(),
+            b"<Error><Message>private</Message></Error>",
+        ] {
+            assert!(validate(data).is_err());
+        }
+    }
     #[test]
     fn rejects_names_that_path_normalization_would_alias() {
         for key in ["folder/", "/folder", "a//b", "a/../b", ""] {

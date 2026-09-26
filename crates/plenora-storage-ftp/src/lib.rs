@@ -939,6 +939,21 @@ async fn ftp_object_exists(
 // server that never sends a newline from growing the buffer without limit.
 const MAX_MLSD_LINE_BYTES: u64 = 32 * 1_024;
 
+// Compiled only by cargo-fuzz; FTP and FTPS use these same parsers.
+#[cfg(fuzzing)]
+pub async fn fuzz_listing(data: &[u8]) {
+    let mut reader = data;
+    while let Ok(Some(line)) = read_listing_line(&mut reader).await {
+        assert!(line.len() <= MAX_MLSD_LINE_BYTES as usize);
+        if let Ok(file) = ListParser::parse_mlsd(&line) {
+            let _ = public_metadata(file.name().to_owned(), &file);
+        }
+        if let Ok(file) = ListParser::parse_mlst(&line) {
+            let _ = public_metadata(file.name().to_owned(), &file);
+        }
+    }
+}
+
 async fn read_listing_line<R: AsyncBufRead + Unpin>(
     reader: &mut R,
 ) -> StorageResult<Option<String>> {

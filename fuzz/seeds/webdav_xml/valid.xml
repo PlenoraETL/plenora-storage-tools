@@ -1,0 +1,1 @@
+<d:multistatus xmlns:d="DAV:"><d:response><d:href>/storage/a%20b</d:href><d:propstat><d:prop><d:getcontentlength>123</d:getcontentlength><d:getetag>"abc"</d:getetag></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>

@@ -1,6 +1,19 @@
 //! Additional storage providers sharing the v1 operations and bounded transfers.
 #![forbid(unsafe_code)]
 
+// Entry points exist only in instrumented fuzz builds, never in product builds.
+#[cfg(fuzzing)]
+pub mod parser_fuzz {
+    #[cfg(feature = "azure")]
+    pub fn azure(data: &[u8]) {
+        crate::azure_listing::fuzz_listing(data);
+    }
+    #[cfg(feature = "webdav")]
+    pub fn webdav(data: &[u8]) {
+        crate::webdav::fuzz_properties(data);
+    }
+}
+
 #[cfg(feature = "azure")]
 mod azure_listing;
 #[cfg(feature = "azure")]

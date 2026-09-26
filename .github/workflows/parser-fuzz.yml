@@ -1,0 +1,33 @@
+name: parser-fuzz
+
+on:
+  workflow_call:
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: Fuzzing seconds per parser (compilation excluded)
+        default: '300'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  parsers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      FUZZ_SECONDS: ${{ inputs.seconds || '60' }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - run: docker build -t storage-parser-fuzz -f fuzz/Dockerfile .
+      - name: Fetch the committed fuzz dependency graph
+        run: docker run --rm -v "$PWD:/workspace" -v storage-fuzz-registry:/usr/local/cargo/registry storage-parser-fuzz cargo +nightly-2026-09-20 fetch --manifest-path fuzz/Cargo.toml --locked
+      - name: Exercise parsers without network access
+        run: docker run --rm --network none -e FUZZ_SECONDS -v "$PWD:/workspace" -v storage-fuzz-registry:/usr/local/cargo/registry storage-parser-fuzz python3 scripts/fuzz_parsers.py --seconds "$FUZZ_SECONDS"
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: parser-fuzz-evidence
+          path: target/parser-fuzz/
+          if-no-files-found: error

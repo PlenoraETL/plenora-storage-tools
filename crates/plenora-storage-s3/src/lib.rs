@@ -4,6 +4,11 @@
 
 mod list_validation;
 
+#[cfg(fuzzing)]
+pub fn fuzz_listing(data: &[u8]) {
+    list_validation::fuzz_listing(data);
+}
+
 use std::{borrow::Cow, collections::BTreeMap, net::SocketAddr, sync::Arc, time::Duration};
 
 use async_trait::async_trait;

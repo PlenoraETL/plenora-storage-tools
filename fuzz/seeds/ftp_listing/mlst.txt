@@ -1,0 +1,1 @@
+ type=file;size=0;modify=20250926120000; /storage/file.txt

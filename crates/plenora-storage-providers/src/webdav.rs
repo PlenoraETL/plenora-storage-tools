@@ -124,68 +124,135 @@ impl Dav {
             }
             data.extend_from_slice(&chunk);
         }
-        let parsed: MultiStatus = quick_xml::de::from_reader(data.as_slice())
-            .map_err(|_| failure(ErrorCategory::Protocol, ErrorPhase::Read, false))?;
-        let root_path = decoded(self.root.path())?;
-        let mut entries = Vec::new();
-        for item in parsed.responses {
-            let url = self
-                .root
-                .join(&item.href)
-                .map_err(|_| invalid("WEBDAV_HREF_INVALID"))?;
-            if url.origin() != self.root.origin()
-                || url.query().is_some()
-                || url.fragment().is_some()
-                || !url.username().is_empty()
-                || url.password().is_some()
-            {
-                return Err(invalid("WEBDAV_HREF_OUTSIDE_ROOT"));
-            }
-            let path = decoded(url.path())?;
-            let key = path
-                .strip_prefix(&root_path)
-                .ok_or_else(|| invalid("WEBDAV_HREF_OUTSIDE_ROOT"))?
-                .trim_end_matches('/')
-                .to_owned();
-            if !key.is_empty() {
-                validate_object_key(&key)?;
-            }
-            let mut directory = false;
-            let mut size = None;
-            let mut etag = None;
-            let mut valid = false;
-            for prop in item.propstats {
-                if prop.status.split_whitespace().nth(1) == Some("200") {
-                    valid = true;
-                    if prop.prop.etag.is_some() {
-                        etag = prop.prop.etag.and_then(|value| strong_etag(&value));
-                    }
-                    directory |= prop
-                        .prop
-                        .resource_type
-                        .is_some_and(|r| r.collection.is_some());
-                    if let Some(length) = prop.prop.length {
-                        size = Some(
-                            length
-                                .parse::<u64>()
-                                .map_err(|_| invalid("WEBDAV_LENGTH_INVALID"))?,
-                        );
-                    }
-                }
-            }
-            if !valid || (!directory && size.is_none()) {
-                return Err(failure(ErrorCategory::Protocol, ErrorPhase::Read, false));
-            }
-            entries.push(DavEntry {
-                key,
-                directory,
-                size: size.unwrap_or(0),
-                etag,
-            });
-        }
-        Ok(entries)
+        parse_properties(&self.root, &data)
     }
 }
+
+fn parse_properties(root: &Url, data: &[u8]) -> StorageResult<Vec<DavEntry>> {
+    let MultiStatusDocument::MultiStatus(parsed) = quick_xml::de::from_reader(data)
+        .map_err(|_| failure(ErrorCategory::Protocol, ErrorPhase::Read, false))?;
+    let root_path = decoded(root.path())?;
+    let mut entries = Vec::new();
+    for item in parsed.responses {
+        let url = root
+            .join(&item.href)
+            .map_err(|_| invalid("WEBDAV_HREF_INVALID"))?;
+        if url.origin() != root.origin()
+            || url.query().is_some()
+            || url.fragment().is_some()
+            || !url.username().is_empty()
+            || url.password().is_some()
+        {
+            return Err(invalid("WEBDAV_HREF_OUTSIDE_ROOT"));
+        }
+        let path = decoded(url.path())?;
+        let key = path
+            .strip_prefix(&root_path)
+            .ok_or_else(|| invalid("WEBDAV_HREF_OUTSIDE_ROOT"))?
+            .trim_end_matches('/')
+            .to_owned();
+        if !key.is_empty() {
+            validate_object_key(&key)?;
+        }
+        let mut directory = false;
+        let mut size = None;
+        let mut etag = None;
+        let mut valid = false;
+        for prop in item.propstats {
+            if prop.status.split_whitespace().nth(1) == Some("200") {
+                valid = true;
+                if prop.prop.etag.is_some() {
+                    etag = prop.prop.etag.and_then(|value| strong_etag(&value));
+                }
+                directory |= prop
+                    .prop
+                    .resource_type
+                    .is_some_and(|r| r.collection.is_some());
+                if let Some(length) = prop.prop.length {
+                    size = Some(
+                        length
+                            .parse::<u64>()
+                            .map_err(|_| invalid("WEBDAV_LENGTH_INVALID"))?,
+                    );
+                }
+            }
+        }
+        if !valid || (!directory && size.is_none()) {
+            return Err(failure(ErrorCategory::Protocol, ErrorPhase::Read, false));
+        }
+        entries.push(DavEntry {
+            key,
+            directory,
+            size: size.unwrap_or(0),
+            etag,
+        });
+    }
+    Ok(entries)
+}
+
+#[cfg(test)]
+mod parser_tests {
+    use super::*;
+
+    #[test]
+    fn unrelated_xml_is_not_an_empty_listing() {
+        let root = Url::parse("https://fixture.invalid/storage/").unwrap();
+        for data in [
+            b"<html/>".as_slice(),
+            b"<Error><Message>private</Message></Error>",
+        ] {
+            assert!(parse_properties(&root, data).is_err());
+        }
+    }
+
+    #[test]
+    fn namespaced_properties_preserve_metadata_and_reject_escaping_hrefs() {
+        let root = Url::parse("https://fixture.invalid/storage/").unwrap();
+        let document = |href: &str| {
+            format!(
+                "<d:multistatus xmlns:d=\"DAV:\"><d:response><d:href>{href}</d:href><d:propstat><d:prop><d:getcontentlength>123</d:getcontentlength><d:getetag>\"abc\"</d:getetag></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>"
+            )
+        };
+        let entries = parse_properties(&root, document("/storage/a%20b").as_bytes()).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].key, "a b");
+        assert_eq!(entries[0].size, 123);
+        assert_eq!(entries[0].etag.as_deref(), Some("\"abc\""));
+        for href in [
+            "https://other.invalid/storage/private",
+            "/storage/../private",
+            "/storage/%2E%2E/private",
+            "/storage/a?private",
+            "/storage/a#private",
+        ] {
+            let error = parse_properties(&root, document(href).as_bytes())
+                .err()
+                .unwrap();
+            assert!(!error.message.contains("private"));
+            assert!(error.details.is_empty());
+        }
+    }
+}
+
+#[cfg(fuzzing)]
+pub(crate) fn fuzz_properties(data: &[u8]) {
+    let root = Url::parse("https://fixture.invalid/storage/").unwrap();
+    if let Ok(entries) = parse_properties(&root, data) {
+        for entry in entries {
+            assert!(entry.key.is_empty() || validate_object_key(&entry.key).is_ok());
+            if let Some(etag) = entry.etag {
+                assert!(etag.starts_with('"') && etag.ends_with('"'));
+                assert!(!etag.contains(['\r', '\n']));
+            }
+        }
+    }
+}
+#[derive(Deserialize)]
+enum MultiStatusDocument {
+    #[serde(rename = "multistatus")]
+    MultiStatus(MultiStatus),
+}
+
 #[derive(Deserialize)]
 struct MultiStatus {
     #[serde(rename = "response", default)]

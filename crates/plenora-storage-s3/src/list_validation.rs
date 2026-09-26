@@ -60,6 +60,11 @@ fn validation_error(error: StorageError) -> HttpError {
 }
 
 #[derive(Deserialize)]
+enum ListDocument {
+    ListBucketResult(RawList),
+}
+
+#[derive(Deserialize)]
 struct RawList {
     #[serde(rename = "Contents", default)]
     contents: Vec<RawObject>,
@@ -74,17 +79,18 @@ struct RawObject {
 }
 
 fn validate_list_response(bytes: &[u8]) -> StorageResult<()> {
-    let listing: RawList = quick_xml::de::from_reader(bytes).map_err(|_| {
-        StorageError::new(
-            ErrorCategory::Protocol,
-            ErrorPhase::Read,
-            RemoteEffect::None,
-            RetryDisposition::Never,
-            "S3_LIST_RESPONSE_INVALID",
-            "S3 list response is invalid",
-        )
-        .with_provider(PROVIDER_ID)
-    })?;
+    let ListDocument::ListBucketResult(listing) =
+        quick_xml::de::from_reader(bytes).map_err(|_| {
+            StorageError::new(
+                ErrorCategory::Protocol,
+                ErrorPhase::Read,
+                RemoteEffect::None,
+                RetryDisposition::Never,
+                "S3_LIST_RESPONSE_INVALID",
+                "S3 list response is invalid",
+            )
+            .with_provider(PROVIDER_ID)
+        })?;
     // The client did not request URL-encoded keys and its path layer does not
     // decode them. Never publish an unexpectedly encoded name as a literal key.
     if listing.encoding_type.is_some() {
@@ -96,9 +102,30 @@ fn validate_list_response(bytes: &[u8]) -> StorageResult<()> {
     Ok(())
 }
 
+#[cfg(fuzzing)]
+pub(crate) fn fuzz_listing(bytes: &[u8]) {
+    if let Err(error) = validate_list_response(bytes) {
+        assert!(matches!(
+            error.code.as_str(),
+            "S3_LIST_RESPONSE_INVALID" | "OBJECT_KEY_UNREPRESENTABLE"
+        ));
+        assert!(error.details.is_empty());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::validate_list_response;
+
+    #[test]
+    fn unrelated_xml_is_not_an_empty_listing() {
+        for data in [
+            b"<html/>".as_slice(),
+            b"<Error><Message>private</Message></Error>",
+        ] {
+            assert!(validate_list_response(data).is_err());
+        }
+    }
 
     #[test]
     fn isolated_invalid_keys_are_rejected_before_normalization() {

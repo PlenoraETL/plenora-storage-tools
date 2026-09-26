@@ -1,5 +1,8 @@
 /target/
 /tools/api-inventory/target/
+/fuzz/target/
+/fuzz/artifacts/
+/fuzz/corpus/
 /.env
 /dist/
 /.fixtures/

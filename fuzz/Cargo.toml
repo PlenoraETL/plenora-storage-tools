@@ -1,0 +1,48 @@
+[package]
+name = "plenora-storage-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+
+[dependencies]
+libfuzzer-sys = "=0.4.13"
+plenora-storage-providers = { path = "../crates/plenora-storage-providers", default-features = false, features = ["azure", "webdav"] }
+plenora-storage-ftp = { path = "../crates/plenora-storage-ftp" }
+plenora-storage-s3 = { path = "../crates/plenora-storage-s3" }
+tokio = { version = "1.53.1", features = ["rt"] }
+
+[[bin]]
+name = "s3_xml"
+path = "fuzz_targets/s3_xml.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "azure_xml"
+path = "fuzz_targets/azure_xml.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "webdav_xml"
+path = "fuzz_targets/webdav_xml.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ftp_listing"
+path = "fuzz_targets/ftp_listing.rs"
+test = false
+doc = false
+bench = false
+
+[profile.release]
+overflow-checks = true

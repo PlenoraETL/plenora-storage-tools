@@ -1,0 +1,4 @@
+type=file;size=123;modify=20250926120000; sample.txt
+type=dir;modify=20250926120000; directory
+type=cdir; .
+type=pdir; ..

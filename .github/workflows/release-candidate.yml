@@ -7,11 +7,14 @@ permissions:
   contents: read
 
 jobs:
+  parser-fuzz:
+    uses: ./.github/workflows/parser-fuzz.yml
+
   api-compatibility:
     uses: ./.github/workflows/api-compatibility.yml
 
   dependencies:
-    needs: api-compatibility
+    needs: [api-compatibility, parser-fuzz]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -20,6 +23,7 @@ jobs:
       - run: cargo install cargo-deny --version 0.20.2 --locked
       - run: cargo audit --deny warnings
       - run: cargo audit --file tools/api-inventory/Cargo.lock --deny warnings
+      - run: cargo audit --file fuzz/Cargo.lock --deny warnings
       - run: python3 scripts/audit_smb_upstream.py
       - run: cargo deny --locked check
 
