@@ -43,6 +43,11 @@ permettono di isolare una qualifica sulla VM. Python 3.11 o successivo è richie
 dagli script. I test contrattuali che leggono fixture del workspace sono esclusi
 dal pacchetto core; i contratti sono distribuiti in un archivio separato.
 
+Nella serie 1.0 il pacchetto CLI Windows è ZIP; Linux usa tar.gz. Entrambi
+includono licenze e documentazione. `verify_release.py` controlla anche che
+l'eseguibile estratto abbia gli stessi byte del binario qualificato: il solo
+checksum dell'archivio non dimostra questa corrispondenza.
+
 La fase di packaging usa `--no-verify` perché Cargo 1.92 su Windows può
 fallire nel registro temporaneo dei crate interni non pubblicati con
 `no hash listed`. La verifica successiva estrae gli archivi Cargo in una

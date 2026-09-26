@@ -12,6 +12,7 @@ import sys
 
 from build_python import build as build_python
 from render_sbom import render as render_sbom
+from package_cli import build as package_cli
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'contracts/upstream'))
 from conformance_checks import adoption_errors
@@ -126,15 +127,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         run('cargo', 'test', '--offline', '--manifest-path',
             str(consumer / f'plenora-storage-core-{version}' / 'Cargo.toml'), '--test', 'runtime_binding', env=env)
 
-    archive_path = output / f'plenora-storage-{version}-{target}.tar.gz'
-    with tarfile.open(archive_path, 'w:gz') as archive:
-        archive.add(binary, arcname=binary_name)
-        for name in ['README.md', 'LICENSE-MIT', 'LICENSE-APACHE', 'docs/release.md',
-                     'docs/contract-adoption.md', 'docs/release-readiness.md', 'docs/provider-expansion.md',
-                     'docs/STATO.md', 'docs/database-alignment.md', 'docs/architecture.md',
-                     'crates/plenora-storage-py/README.md',
-                     'crates/plenora-smb2/PROVENANCE.md', 'crates/plenora-smb2/LICENSE-MIT', 'crates/plenora-smb2/LICENSE-APACHE']:
-            archive.add(ROOT / name, arcname=name)
+    archive_path = package_cli(output, binary, version, target)
     contracts = output / f'plenora-storage-contracts-{version}.tar.gz'
     with tarfile.open(contracts, 'w:gz') as archive:
         archive.add(ROOT / 'contracts', arcname='contracts',

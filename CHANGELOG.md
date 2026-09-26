@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Release idle SMB sockets when the final connection owner drops; qualify persistent SDK resource use across all nine fixtures.
+- Preserve access to settled async cancellation outcomes through Python 3.10 and `wait_for` wrappers with `cancellation_outcome()`.
+- Build the pinned MinIO test server from verified official source when its former container images are unavailable.
 - Reconcile concurrent parent-directory creation in FTP/FTPS, SFTP and WebDAV only after proving the parent is a directory.
 - Add bounded-memory transfer, concurrency, coverage and seeded CLI mutation gates, plus a CPython compatibility matrix.
 - Start the 1.0.0-alpha.1 development series; no stable 1.0 release is published.

@@ -18,6 +18,11 @@ nel [piano](roadmap-1.0.0.md).
 - Usare `await engine.aclose()` oppure `async with`; `await engine.close()`
   rimane disponibile come alias. La chiusura impedisce nuove operazioni e non
   cancella quelle in corso: attendere il loro esito prima di scartare l'engine.
+- Dopo una cancellazione asyncio, usare `cancellation_outcome(error)` per leggere
+  il risultato definitivo o l'errore storage. Il helper segue anche le eccezioni
+  create da Python 3.10 e da `wait_for`; leggere direttamente gli attributi
+  dell'eccezione esterna non è portabile. Un risultato `None` indica assenza di
+  evidenza, non assenza di effetti remoti.
 
 ## Rust e SFTP
 

@@ -199,6 +199,7 @@ la sua maturità non viene attribuita automaticamente a Storage.
 
 ## Riferimenti
 
+- [Avanzamento verificato del 26 settembre](progress-1.0.0-alpha.1.md).
 - [Procedura di qualifica](release.md) e [adozione contratti](contract-adoption.md).
 - [GitHub Releases del progetto](https://github.com/PlenoraETL/plenora-storage-tools/releases).
 - [CI sul commit iniziale](https://github.com/PlenoraETL/plenora-storage-tools/actions/runs/35407535528).
