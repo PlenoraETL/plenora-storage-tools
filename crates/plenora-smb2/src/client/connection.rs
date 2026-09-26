@@ -850,7 +850,9 @@ fn spawn_plumbing(
         old.abort();
     }
 
-    let inner_for_task = Arc::clone(inner);
+    // A strong reference here prevents Inner::drop from ever aborting an
+    // idle receiver: the task keeps its own connection and socket alive.
+    let inner_for_task = Arc::downgrade(inner);
     let handle = tokio::spawn(async move {
         receiver_loop(receiver, inner_for_task).await;
     });
@@ -4732,9 +4734,15 @@ impl Connection {
 
 /// Receiver task loop: owns the transport receive half, routes each frame
 /// to its waiter.
-async fn receiver_loop(transport_recv: Box<dyn TransportReceive>, inner: Arc<Inner>) {
+async fn receiver_loop(transport_recv: Box<dyn TransportReceive>, weak: Weak<Inner>) {
     loop {
-        let raw = match transport_recv.receive().await {
+        // Never retain Inner while waiting for an unsolicited frame. The last
+        // caller can then drop it and abort all plumbing, releasing both halves.
+        let received = transport_recv.receive().await;
+        let Some(inner) = weak.upgrade() else {
+            return;
+        };
+        let raw = match received {
             Ok(bytes) => bytes,
             Err(e) => {
                 debug!("receiver_loop: transport error: {}, shutting down", e);
@@ -5386,6 +5394,37 @@ mod tests {
     /// by wiring up `NextCommand` offsets and 8-byte-padding each sub
     /// except the last. Used by compound execute tests below.
     use crate::client::test_helpers::build_compound_response_frame;
+
+    #[tokio::test]
+    async fn last_connection_clone_releases_idle_tcp_transport() {
+        use tokio::io::AsyncReadExt;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let connection = Connection::connect(
+            &listener.local_addr().unwrap().to_string(),
+            Duration::from_secs(1),
+        )
+        .await
+        .unwrap();
+        let (mut peer, _) = listener.accept().await.unwrap();
+        let remaining = connection.clone();
+        drop(connection);
+        let mut byte = [0];
+        assert!(
+            tokio::time::timeout(Duration::from_millis(20), peer.read(&mut byte))
+                .await
+                .is_err(),
+            "dropping one clone must not close an active connection"
+        );
+        drop(remaining);
+        let bytes = tokio::time::timeout(Duration::from_secs(1), peer.read(&mut byte))
+            .await
+            .expect("idle receiver retained the socket after the final clone dropped")
+            .unwrap();
+        assert_eq!(
+            bytes, 0,
+            "peer must observe EOF without closing its side first"
+        );
+    }
 
     /// Build a canned negotiate response with the given dialect.
     fn build_negotiate_response(dialect: Dialect) -> Vec<u8> {

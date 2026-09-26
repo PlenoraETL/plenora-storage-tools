@@ -8,7 +8,7 @@ This package preserves upstream source and licenses. Plenora changes: package na
 
 Keep this narrowly scoped fork until an upstream release incorporates the fix. Review upstream security advisories when updating dependencies; the renamed package is not matched automatically by RustSec under the upstream name.
 
-Mechanical adjustments: rustfmt formatting and three scoped lint annotations for upstream test/platform code; no additional behavior changes.
+Mechanical adjustments: rustfmt formatting and three scoped lint annotations for upstream test/platform code.
 
 In Plenora 0.2.2, dependency requirements were refreshed to current stable releases,
 including CCM 0.6.1 (replacing the release candidate) and lz4_flex 0.14.0.
@@ -17,3 +17,11 @@ The declared Rust minimum follows the workspace at 1.92, with equivalent
 hash above identifies the original source, not this modified package.
 
 Tests: removed an upstream manual test hardcoded to an unrelated private NAS; added a wire-capability regression to the existing negotiation test. Plenora tests SMB against its dedicated Samba fixture.
+
+In Plenora 1.0.0-alpha.1, the receiver task retains a weak connection reference
+while waiting for network input. The upstream strong reference prevented the
+last connection owner from releasing the idle socket. A persistent SDK campaign
+exposed one retained socket per SMB operation. The regression checks that TCP
+stays open while another clone exists and that the peer observes EOF after the
+final clone drops, without requiring the server to initiate teardown. The
+shared transport fix applies to every SMB operation and to Rust, CLI and Python.

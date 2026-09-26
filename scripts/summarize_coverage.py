@@ -35,7 +35,7 @@ def summarize(document):
     return {'schema_version': 1, 'crates': dict(sorted(crates.items())),
             'product_excluding_smb_fork': {'lines': lines, 'covered': covered,
                                          'percent': round(100 * covered / lines, 2) if lines else None},
-            'scope': 'Rust source; Python wrapper and server interoperability are separate gates',
+            'scope': 'Rust source including inline test modules; Python wrapper and server interoperability are separate gates',
             'threshold_status': 'baseline_measurement_only'}
 
 

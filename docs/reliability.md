@@ -49,6 +49,8 @@ Rust e le prove pubbliche CLI/Python sul codice strumentato. Il report completo
 `.fixtures/evidence/`. Il fork SMB è escluso dal totale del prodotto e riportato
 separatamente. I test della wheel non misurano automaticamente le righe Python:
 il report LLVM riguarda il codice Rust, incluso il bridge nativo.
+Le righe dei moduli di test inline nei file Rust rientrano nella misura LLVM:
+la percentuale non va presentata come coverage del solo codice di produzione.
 
 Le percentuali iniziali sono misure, non soglie già soddisfatte. Prima della RC
 vanno fissate soglie per modulo e censiti i percorsi di sicurezza/commit non
@@ -66,6 +68,23 @@ Usa operazioni di sola lettura su una fixture locale e controlla envelope,
 assenza di credenziali nei messaggi ed effetti. Il report conserva seed e indice
 del caso fallito. Non sostituisce il fuzzing guidato dalla coverage dei parser
 XML/FTP, che resta aperto, né la campagna di durata di 24 ore prevista dal piano.
+
+## Durata dello SDK
+
+```sh
+python3 scripts/build_python.py --output .fixtures/soak-wheel
+target/python-sdk-test/bin/python scripts/stress_python.py \
+  --wheel .fixtures/soak-wheel/*.whl --duration-seconds 86400 \
+  --output .fixtures/evidence/soak-python.json
+```
+
+La prova mantiene lo stesso engine Python sincrono, con quattro worker e tutti
+i nove provider. Ogni ciclo verifica put/copy/get, checksum e cleanup; dopo il
+primo ciclo impone crescita massima di 128 MiB RSS, 16 descrittori e 16 thread.
+Il report identifica la wheel effettivamente installata e registra risorse per
+provider, picchi e avanzamento. `RUNNING` non equivale a una prova superata.
+La durata di 24 ore si esegue sulla VM dedicata; il workflow offre anche prove
+di 10 o 60 minuti. Questa campagna non misura un engine asyncio persistente.
 
 ## Compatibilità Python
 
