@@ -48,6 +48,11 @@ def main():
             archive = f"plenora-storage-{manifest['version']}-{manifest['target']}{extension}"
             assert archive in sums, 'missing platform CLI archive'
             verify_archive(folder / archive, folder / binary)
+            source_report = json.loads((folder / 'source-consumer.json').read_text())
+            assert source_report['status'] == 'PASS'
+            assert source_report['source_revision'] == manifest['source_revision']
+            assert sums[source_report['archive']] == source_report['archive_sha256']
+            assert sums['source-consumer.log'] == source_report['log_sha256']
         if parse_version(manifest['version']).requires((0, 2, 1)):
             sbom = json.loads((folder / 'storage-sbom.cdx.json').read_text())
             assert sbom['bomFormat'] == 'CycloneDX' and sbom['specVersion'] == '1.6'

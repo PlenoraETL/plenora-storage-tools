@@ -48,6 +48,15 @@ includono licenze e documentazione. `verify_release.py` controlla anche che
 l'eseguibile estratto abbia gli stessi byte del binario qualificato: il solo
 checksum dell'archivio non dimostra questa corrispondenza.
 
+Il bundle `plenora-storage-<version>-source.tar.gz` contiene l'intero workspace
+committato, Cargo.lock, contratti e licenze. `scripts/package_source.py` lo
+estrae fuori dal checkout e compila/esegue un consumer con dipendenze path da
+core ed engine, senza patch del registry. Il report `source-consumer.json`
+lega esito, commit, archivio e log tramite digest; la CI esegue la prova su
+Linux e Windows. La build completa include questi file negli asset e nel gate
+finale. `--allow-dirty` produce solo un candidato locale incompleto: non può
+attestare un bundle sorgente committato né superare la qualifica 1.0.
+
 La fase di packaging usa `--no-verify` perché Cargo 1.92 su Windows può
 fallire nel registro temporaneo dei crate interni non pubblicati con
 `no hash listed`. La verifica successiva estrae gli archivi Cargo in una
