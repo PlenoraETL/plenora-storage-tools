@@ -82,6 +82,11 @@ la bozza. Checksum e identità vengono ricontrollati dopo il download; asset
 estranei impediscono la pubblicazione. L'archivio di input viene rimosso mentre
 la release è ancora una bozza, lasciando il bundle di qualifica verificato.
 
+Il job di download dispone di `contents: write` per vedere gli asset ancora in
+bozza: GitHub limita la visibilità delle bozze a chi ha accesso push, come
+descritto nella [documentazione delle release](https://docs.github.com/en/rest/releases/releases#list-releases).
+La pubblicazione rimane affidata al job finale dopo i controlli sui due target.
+
 L'[attestazione personalizzata](https://github.com/actions/attest#attestation-modes)
 descrive la qualifica dei digest distribuiti. Non dichiara che i runner di
 pubblicazione abbiano compilato gli artefatti prodotti sulla VM.
