@@ -2,6 +2,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 python3 scripts/check_test_layout.py
+# Maturin's offline metadata resolves all target dependencies, including crates
+# that a native Linux build alone does not download into a fresh runner cache.
+cargo fetch --locked
 rustup component add llvm-tools-preview
 cargo install cargo-llvm-cov --version 0.9.1 --locked --root target/coverage-tools
 mkdir -p .fixtures/evidence
