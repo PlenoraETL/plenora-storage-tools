@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.0.0-rc.1 — in qualification
+
+- Prepare the first release candidate for qualification on Windows and Linux; publication and stable promotion require the remaining release gates.
+
 - Scope the first 1.0 release to the nine declared fixture systems; defer real AWS, Azure and GCS qualification and record those services as not qualified in release manifests and receipts.
 
 - Validate FTP/FTPS UNIX.mode facts before MLSD/MLST parsing to prevent a panic on malformed Unicode permissions, including parent-directory reconciliation.

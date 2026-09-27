@@ -32,6 +32,9 @@ def main():
         f'version = "{previous.python}"', f'version = "{version.python}"'), encoding='utf-8', newline='\n')
     subprocess.run(['cargo', 'metadata', '--offline', '--format-version', '1'],
                    cwd=ROOT, stdout=subprocess.DEVNULL, check=True)
+    subprocess.run(['cargo', 'metadata', '--manifest-path', 'fuzz/Cargo.toml', '--offline',
+                    '--format-version', '1'],
+                   cwd=ROOT, stdout=subprocess.DEVNULL, check=True)
     subprocess.run([sys.executable, str(ROOT / 'scripts/render_state.py')], cwd=ROOT, check=True)
 
 

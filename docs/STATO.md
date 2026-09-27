@@ -2,7 +2,7 @@
 
 <!-- Generato da scripts/render_state.py. Non modificare a mano. -->
 
-Versione sorgente: `1.0.0-alpha.1`. Rust minimo: `1.92`.
+Versione sorgente: `1.0.0-rc.1`. Rust minimo: `1.92`.
 
 Questo inventario descrive il codice compilato. Non certifica una release:
 la qualifica richiede le evidenze vincolate al commit e ai digest degli artefatti.
@@ -11,15 +11,15 @@ la qualifica richiede le evidenze vincolate al commit e ai digest degli artefatt
 
 | Crate | Versione |
 | --- | --- |
-| `plenora-storage-core` | `1.0.0-alpha.1` |
-| `plenora-storage-s3` | `1.0.0-alpha.1` |
-| `plenora-storage-sftp` | `1.0.0-alpha.1` |
-| `plenora-storage-ftp` | `1.0.0-alpha.1` |
-| `plenora-storage-providers` | `1.0.0-alpha.1` |
-| `plenora-smb2` | `1.0.0-alpha.1` |
-| `plenora-storage-cli` | `1.0.0-alpha.1` |
-| `plenora-storage-engine` | `1.0.0-alpha.1` |
-| `plenora-storage-py` | `1.0.0-alpha.1` |
+| `plenora-storage-core` | `1.0.0-rc.1` |
+| `plenora-storage-s3` | `1.0.0-rc.1` |
+| `plenora-storage-sftp` | `1.0.0-rc.1` |
+| `plenora-storage-ftp` | `1.0.0-rc.1` |
+| `plenora-storage-providers` | `1.0.0-rc.1` |
+| `plenora-smb2` | `1.0.0-rc.1` |
+| `plenora-storage-cli` | `1.0.0-rc.1` |
+| `plenora-storage-engine` | `1.0.0-rc.1` |
+| `plenora-storage-py` | `1.0.0-rc.1` |
 
 ## Provider compilati nella distribuzione completa
 
