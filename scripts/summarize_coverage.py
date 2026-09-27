@@ -1,7 +1,26 @@
 """Report Rust coverage by product crate, keeping the vendored SMB fork separate."""
 import argparse
+import hashlib
 import json
 from pathlib import Path
+import subprocess
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def apply_thresholds(report, policy):
+    if set(report['crates']) != set(policy):
+        raise ValueError('coverage must include every crate in the policy, with no unreviewed crates')
+    results = {}
+    for crate, threshold in policy.items():
+        count = report['crates'][crate]
+        if not 0 <= threshold <= 100 or count['lines'] <= 0:
+            raise ValueError('invalid coverage threshold or empty crate')
+        passed = 100 * count['covered'] >= threshold * count['lines']
+        results[crate] = {'minimum_percent': threshold, 'status': 'PASS' if passed else 'FAIL'}
+    report['thresholds'] = results
+    report['threshold_status'] = 'PASS' if all(item['status'] == 'PASS' for item in results.values()) else 'FAIL'
+    return report
 
 
 def summarize(document):
@@ -43,5 +62,23 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('input', type=Path)
     parser.add_argument('output', type=Path)
+    parser.add_argument('--policy', type=Path, help='Enforce per-crate floors from a reviewed policy')
     args = parser.parse_args()
-    args.output.write_text(json.dumps(summarize(json.loads(args.input.read_text())), indent=2) + '\n')
+    report = {'schema_version': 1, 'threshold_status': 'RUNNING'}
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(json.dumps(report) + '\n')
+    try:
+        raw = args.input.read_bytes()
+        report = summarize(json.loads(raw))
+        report['raw_report_sha256'] = hashlib.sha256(raw).hexdigest()
+        report['source_revision'] = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+        report['dirty'] = bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip())
+        if args.policy:
+            apply_thresholds(report, json.loads(args.policy.read_text())['rust_lines'])
+    except BaseException as error:
+        report.update(threshold_status='FAIL', failure_type=type(error).__name__)
+        raise
+    finally:
+        args.output.write_text(json.dumps(report, indent=2) + '\n')
+    if report['threshold_status'] == 'FAIL':
+        raise SystemExit('Rust coverage is below the per-crate release floor')

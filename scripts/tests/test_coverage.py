@@ -3,7 +3,7 @@ from pathlib import Path
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from summarize_coverage import summarize
+from summarize_coverage import apply_thresholds, summarize
 
 
 def source(crate, covered, count):
@@ -12,6 +12,17 @@ def source(crate, covered, count):
 
 
 class CoverageTests(unittest.TestCase):
+    def test_per_crate_gate_rejects_missing_and_undercovered_crates(self):
+        report = summarize({'data': [{'files': [source('plenora-smb2', 999, 1000),
+                                               source('plenora-storage-core', 8599, 10000)]}]})
+        with self.assertRaises(ValueError):
+            apply_thresholds(report, {'plenora-storage-core': 86})
+        result = apply_thresholds(report, {'plenora-storage-core': 86, 'plenora-smb2': 86})
+        self.assertEqual(result['threshold_status'], 'FAIL')
+        self.assertEqual(result['thresholds']['plenora-smb2']['status'], 'PASS')
+        # Compare exact counts, not rounded display percentages.
+        report['crates']['plenora-storage-core']['covered'] = 8600
+        self.assertEqual(apply_thresholds(report, {'plenora-storage-core': 86, 'plenora-smb2': 86})['threshold_status'], 'PASS')
     def test_fork_cannot_hide_uncovered_product_code(self):
         report = summarize({'data': [{'files': [source('plenora-smb2', 900, 1000),
                                                source('plenora-storage-core', 1, 10)]}]})

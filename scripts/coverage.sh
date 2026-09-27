@@ -32,4 +32,4 @@ python3 scripts/run_logged.py .fixtures/evidence/coverage-python-live.log \
     --output .fixtures/evidence/coverage-python-qualification.json
 cargo llvm-cov report --json --output-path .fixtures/evidence/rust-coverage.json
 python3 scripts/summarize_coverage.py .fixtures/evidence/rust-coverage.json \
-  .fixtures/evidence/coverage-summary.json
+  .fixtures/evidence/coverage-summary.json --policy scripts/coverage-policy.json

@@ -52,10 +52,30 @@ il report LLVM riguarda il codice Rust, incluso il bridge nativo.
 Le righe dei moduli di test inline nei file Rust rientrano nella misura LLVM:
 la percentuale non va presentata come coverage del solo codice di produzione.
 
-Le percentuali iniziali sono misure, non soglie già soddisfatte. Prima della RC
-vanno fissate soglie per modulo e censiti i percorsi di sicurezza/commit non
-coperti. Una baseline ottenuta dai soli test Rust non va confusa con quella
-estesa alle superfici pubbliche.
+La campagna sul commit `ddf4a3f05cbfc6bb90fe8972124a07b2666123d0`, con test
+Rust e prove CLI/Python su tutte le fixture, misura 6.504/7.583 righe (85,77%)
+escludendo il fork SMB. Da questa misura derivano le soglie per crate in
+`scripts/coverage-policy.json`: circa 2–3 punti percentuali di margine, per
+bloccare regressioni senza trattare la percentuale come prova di correttezza.
+
+| Crate | Baseline (%) | Minimo (%) |
+| --- | ---: | ---: |
+| core | 88,33 | 86 |
+| engine | 91,67 | 89 |
+| CLI | 83,43 | 81 |
+| FTP/FTPS | 85,58 | 83 |
+| SFTP | 84,69 | 82 |
+| S3 | 75,41 | 73 |
+| providers | 88,15 | 86 |
+| bridge Python Rust | 90,43 | 88 |
+| fork SMB, separato | 88,46 | 86 |
+
+`coverage.sh`, eseguito dal workflow di affidabilità con `coverage=true`, impone
+queste soglie e rifiuta crate mancanti o non ancora censiti nella policy. Il
+report conserva commit, stato del checkout e digest del report LLVM originale.
+Il confronto usa i conteggi esatti; arrotondare la percentuale non permette di
+superare una soglia. Restano da censire e chiudere i percorsi di sicurezza/commit
+non coperti: la misura include test inline e non sostituisce quella revisione.
 
 Il wrapper Python ha un gate distinto nella matrice CPython 3.10–3.14 su Linux
 e Windows. `scripts/check_installed_sdk.py --coverage` usa coverage.py 7.16.1

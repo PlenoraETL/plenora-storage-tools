@@ -1,5 +1,16 @@
 {
   "schema_version": 1,
+  "rust_lines": {
+    "plenora-storage-cli": 81,
+    "plenora-storage-core": 86,
+    "plenora-storage-engine": 89,
+    "plenora-storage-ftp": 83,
+    "plenora-storage-providers": 86,
+    "plenora-storage-py": 88,
+    "plenora-storage-s3": 73,
+    "plenora-storage-sftp": 82,
+    "plenora-smb2": 86
+  },
   "python": {
     "line_percent": 98,
     "branch_percent": 95
