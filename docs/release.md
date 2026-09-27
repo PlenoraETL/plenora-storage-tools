@@ -15,6 +15,15 @@ API, parser fuzz, coverage, matrice Python con typing, trasferimenti, soak e
 confronto delle prestazioni. Lo stesso documento descrive la pubblicazione da
 bozza GitHub con prove degli asset scaricati su Linux e Windows.
 
+Gli inventari delle dipendenze devono essere verificabili nello stesso checkout
+per entrambi i target. `.gitattributes` impone LF anche ai file
+`scripts/requirements-*.txt`, dei quali la SBOM di qualifica registra i digest
+dei byte. Il test `test_sboms_match_across_git_checkout_line_endings`, eseguito
+dal job CI `product-quality`, confronta gli inventari dopo due checkout Git
+con conversione dei fine riga disattivata e attivata. Correggere gli attributi
+non corregge gli inventari già prodotti: gli artefatti precedenti conservano
+le proprie evidenze e devono superare separatamente il gate finale.
+
 La release corrente comprende Rust, CLI e SDK Python; la [matrice](provider-expansion.md) descrive i sei aggiunti. Gli
 artefatti preparati diventano distribuibili quando `release-qualification.json`
 registra `qualified_for_publication` per i loro digest. Non pubblicare un
