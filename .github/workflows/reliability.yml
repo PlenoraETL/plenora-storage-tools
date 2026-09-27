@@ -20,6 +20,10 @@ on:
         description: Also measure Rust source coverage against all fixtures
         type: boolean
         default: false
+      performance:
+        description: Compare two independent five-round campaigns on this runner
+        type: boolean
+        default: false
       soak_minutes:
         description: Persistent Python SDK soak (alpha 60 minutes; RC 24 hours on dedicated VM)
         type: choice
@@ -56,6 +60,18 @@ jobs:
       - name: Measure Rust coverage separately from the SMB fork
         if: ${{ inputs.coverage }}
         run: docker compose -f docker-compose.yml -f compose.extended.yml run --rm --no-deps storage-rust bash scripts/coverage.sh
+      - name: Establish and check the performance baseline
+        if: ${{ inputs.performance }}
+        run: |
+          docker compose -f docker-compose.yml -f compose.extended.yml run --rm --no-deps storage-rust bash -c '
+            set -euo pipefail
+            python3 scripts/qualify_transfers.py --bytes 1048576 --workers 4 --rounds 5 \
+              --output .fixtures/evidence/performance/baseline.json
+            python3 scripts/qualify_transfers.py --bytes 1048576 --workers 4 --rounds 5 \
+              --output .fixtures/evidence/performance/candidate.json
+            python3 scripts/check_performance.py .fixtures/evidence/performance/baseline.json \
+              .fixtures/evidence/performance/candidate.json --output .fixtures/evidence/performance/report.json
+          '
       - name: Exercise a persistent installed Python engine
         if: ${{ inputs.soak_minutes != '0' }}
         run: |

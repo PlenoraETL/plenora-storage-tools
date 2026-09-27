@@ -10,8 +10,11 @@ DOCUMENTS = [
     'README.md', 'LICENSE-MIT', 'LICENSE-APACHE', 'docs/release.md',
     'docs/contract-adoption.md', 'docs/release-readiness.md', 'docs/provider-expansion.md',
     'docs/STATO.md', 'docs/database-alignment.md', 'docs/architecture.md',
+    'docs/README.md', 'docs/database-reference-review.md', 'docs/release-evidence-bundle.md',
+    'docs/quality-alignment-progress.md',
     'docs/migration-1.0.md', 'docs/reliability.md', 'docs/compatibility-1.0.md',
     'crates/plenora-storage-py/README.md',
+    'crates/plenora-storage-py/examples/local_roundtrip.py',
     'crates/plenora-smb2/PROVENANCE.md', 'crates/plenora-smb2/LICENSE-MIT',
     'crates/plenora-smb2/LICENSE-APACHE',
 ]

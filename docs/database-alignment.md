@@ -25,9 +25,10 @@ non afferma che ciascuna sia collegata a ogni binario. Non include pacchetti del
 sistema operativo o strumenti di build. Lo schema di riferimento è quello
 [ufficiale CycloneDX 1.6](https://github.com/CycloneDX/specification/blob/1.6/schema/bom-1.6.schema.json).
 
-Lo SDK Python espone le sette operazioni tramite file, configurazioni tipizzate
-e risultati ancora espressi come `dict[str, Any]`. Il marker PEP 561 e lo stub
-nativo non sostituiscono un contratto statico preciso dei risultati pubblici.
+Lo SDK Python espone le sette operazioni tramite file e conserva risultati
+dizionario a runtime. Gli stub pubblici descrivono risultati `TypedDict`, policy
+ammesse e controlli delle operazioni. La matrice della wheel installata esegue
+un consumer mypy strict con casi validi e invalidi, oltre a un esempio sync/async.
 Non introduce pooling, transazioni storage, sincronizzazione di
 directory, resume o copia tra provider. `close` impedisce nuove chiamate; quelle
 già in corso usano i propri token di cancellazione. La cancellazione asyncio
@@ -36,9 +37,10 @@ attende l'esito della chiamata Rust e lo rende disponibile sull'eccezione.
 Il contratto comune Python è incluso nel manifest della wheel, con test della
 distribuzione installata. Esistono gate distinti per parser fuzz, coverage Rust
 per crate e coverage Python sulla wheel installata, descritti nelle
-[prove di affidabilità](reliability.md). Restano da completare il confronto
-delle prestazioni con una baseline, la misura Rust del solo codice di prodotto
-e l'aggregazione delle evidenze richieste nella ricevuta finale. L'esistenza
+[prove di affidabilità](reliability.md). Il [gate finale](release-evidence-bundle.md)
+richiede ora anche il confronto delle prestazioni e l'aggregazione dei report.
+Restano da raccogliere le nuove evidenze complete e da misurare la coverage Rust
+del solo codice di prodotto. L'esistenza
 di un gate non certifica ogni candidato. Le prove su emulatori cloud, Samba e
 WsgiDAV non certificano automaticamente account cloud reali, Windows Server,
 Nextcloud, ACL/DFS ADLS o altri server.

@@ -15,7 +15,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_count(log, returncode):
     counts = re.findall(r'^Ran (\d+) tests? in ', log, re.MULTILINE)
-    if returncode or len(counts) != 1 or int(counts[0]) == 0 or 'skipped=' in log:
+    if (returncode or len(counts) != 1 or int(counts[0]) == 0 or 'skipped=' in log
+            or not re.search(r'^OK\s*$', log, re.MULTILINE)
+            or re.search(r'^(FAILED|ERROR:|FAIL:)', log, re.MULTILINE)):
         raise ValueError('installed SDK tests failed, were skipped or did not run')
     return int(counts[0])
 
@@ -51,7 +53,7 @@ def enforce_coverage(files, policy):
             raise ValueError('Python coverage is below the per-module release floor')
 
 
-def qualify(wheel, output, measure):
+def qualify(wheel, output, measure, typing=False):
     subprocess.run([sys.executable, '-I', '-m', 'pip', 'install', '--no-index', '--force-reinstall', str(wheel)], check=True)
     with tempfile.TemporaryDirectory(prefix='storage-sdk-compatibility-') as temporary:
         prefix = [sys.executable, '-I', '-m']
@@ -64,6 +66,8 @@ def qualify(wheel, output, measure):
         log = output / 'sdk-tests.log'
         log.write_text(result.stdout + result.stderr, encoding='utf-8')
         count = test_count(log.read_text(encoding='utf-8'), result.returncode)
+        subprocess.run([sys.executable, '-I', str(ROOT / 'crates/plenora-storage-py/examples/local_roundtrip.py')],
+                       cwd=temporary, check=True)
         if measure:
             subprocess.run([sys.executable, '-I', '-m', 'coverage', 'json',
                             '--data-file', str(output / '.coverage'),
@@ -79,6 +83,9 @@ def qualify(wheel, output, measure):
         report['coverage'] = {'tool_version': document['meta']['version'], 'branch': True,
                               'files': files, 'policy': policy, 'report_sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
         enforce_coverage(files, policy)
+    if typing:
+        from check_sdk_typing import check
+        report['typing'] = check(wheel, output)
     return report
 
 
@@ -87,6 +94,7 @@ def main():
     parser.add_argument('artifacts', type=Path)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--coverage', action='store_true', help='Measure installed Python lines and branches')
+    parser.add_argument('--typing', action='store_true', help='Check the installed public typing contract')
     args = parser.parse_args()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -97,7 +105,7 @@ def main():
         wheels = [args.artifacts] if args.artifacts.is_file() else list(args.artifacts.rglob('plenora_storage-*.whl'))
         if len(wheels) != 1:
             raise ValueError('expected one downloaded wheel for this platform')
-        report = qualify(wheels[0].resolve(), output, args.coverage)
+        report = qualify(wheels[0].resolve(), output, args.coverage, args.typing)
     except BaseException as error:
         report.update(status='FAIL', failure_type=type(error).__name__)
         raise

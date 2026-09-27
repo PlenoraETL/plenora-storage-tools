@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import random
+import platform
 import signal
 import subprocess
 import sys
@@ -18,6 +19,19 @@ import tempfile
 import uuid
 
 from fixture_connections import ATOMIC, BUFFERED, PROVIDERS, ROOT, fixture
+
+
+def measurement_environment():
+    """Identify the test platform without recording host names or endpoints."""
+    sources = [ROOT / 'docker-compose.yml', ROOT / 'compose.extended.yml',
+               *sorted((ROOT / 'docker').rglob('Dockerfile'))]
+    fixture_hash = hashlib.sha256()
+    for path in sources:
+        fixture_hash.update(path.relative_to(ROOT).as_posix().encode() + b'\0' + path.read_bytes())
+    model = next((line.split(':', 1)[1].strip() for line in Path('/proc/cpuinfo').read_text().splitlines()
+                  if line.startswith('model name')), platform.machine())
+    return {'machine': platform.machine(), 'kernel': platform.release(), 'cpu_count': os.cpu_count(),
+            'cpu_model': model, 'fixture_sha256': fixture_hash.hexdigest()}
 
 
 def digest(path):
@@ -153,6 +167,10 @@ def main():
         parser.error('requires Linux, known fixture providers and positive resource limits')
     binary = Path(os.environ.get('PLENORA_CLI_BIN', ROOT / 'target/release/plenora-storage')).resolve()
     report = {'schema_version': 1, 'binary_sha256': digest(binary), 'platform': sys.platform,
+              'campaign_id': str(uuid.uuid4()), 'started_utc': datetime.now(timezone.utc).isoformat(),
+              'environment': measurement_environment(),
+              'source_revision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
+              'dirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()),
               'memory_measurement': 'Linux RUSAGE_CHILDREN per fresh wrapper; includes process startup',
               'payload_bytes': args.bytes, 'workers': args.workers, 'rounds': args.rounds,
               'rss_limit_bytes': args.rss_limit_mib * 1024**2, 'status': 'RUNNING', 'results': []}

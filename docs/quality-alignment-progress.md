@@ -1,0 +1,24 @@
+# Consolidamento rispetto a Database Tools
+
+Interventi successivi al [confronto del 27 settembre](database-reference-review.md).
+Il confronto conserva le osservazioni dei commit esaminati; questo documento
+descrive gli interventi, senza attribuire loro qualifiche dei candidati precedenti.
+
+| Area | Implementato | Verifica ancora necessaria per la release |
+| --- | --- | --- |
+| Ricevuta finale | Controllo API, fuzz, coverage, dieci combinazioni Python, typing, trasferimenti, soak e performance; verifica dei file originali; invalidazione della ricevuta precedente su un tentativo fallito | Raccogliere il bundle completo del nuovo candidato, con gli stessi digest che saranno pubblicati |
+| Distribuzione | Workflow da bozza GitHub, qualifica ripetuta, smoke dopo download su entrambi i target, attestazione della qualifica, checksum e pubblicazione solo dopo successo | Eseguire il workflow su una bozza qualificata; non è ancora una release pubblicata |
+| SDK Python | Tipi pubblici dei risultati, policy Literal, controlli nominati negli stub, baseline dei tipi, consumer mypy strict ed esempio sync/async | Confermare la matrice completa CPython 3.10–3.14 sui due target per la wheel finale |
+| Documenti | Controllo README dello SDK, link locali, ancore, script citati ed esempi Python; procedure correnti indicizzate | Eseguire e verificare le istruzioni con gli asset finali |
+| Performance | Identità delle campagne, ambiente misurato, confronto mediana/p95/RSS e workflow eseguibile | Misurare sul laboratorio dedicato e valutare la stabilità delle soglie iniziali; nessun SLO già attestato |
+
+La verifica locale Windows del primo sviluppo ha eseguito 26 test sulla wheel
+installata con Python 3.11.15, consumer mypy 2.3.1 e coverage Python del 100%
+(232 righe e 36 rami). È una prova di sviluppo locale, non la qualifica delle
+dieci combinazioni né degli artefatti RC costruiti in precedenza.
+
+Restano interventi distinti: separazione dei test Rust dai file di prodotto,
+coverage del solo prodotto, suddivisione dei moduli per responsabilità,
+documentazione degli errori Rust, controlli sui commenti e ampliamento della
+SBOM agli ambiti di build/qualifica. Non si dichiarano completati per la sola
+presenza dei nuovi gate di distribuzione.

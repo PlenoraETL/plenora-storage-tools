@@ -93,6 +93,8 @@ def snapshot(module):
                for node in source.body if isinstance(node, ast.Assign) and isinstance(node.value, ast.Subscript)
                for target in node.targets if isinstance(target, ast.Name) and not target.id.startswith('_')}
     return {'schema_version': 1, 'exports': exports, 'type_aliases': aliases,
+            'public_typing': {name: syntax(ast.parse((Path(module.__file__).parent / name).read_text(encoding='utf-8')))
+                              for name in ('__init__.pyi', 'types.py')},
             'error_attributes': sorted(vars(error)), 'root_error': isinstance(error, module.PlenoraError)}
 
 

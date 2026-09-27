@@ -1,0 +1,108 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag with a draft release and qualification-input.tar.gz
+        required: true
+        type: string
+
+concurrency:
+  group: storage-release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  RELEASE_TAG: ${{ inputs.tag }}
+  GH_TOKEN: ${{ github.token }}
+  GH_REPO: ${{ github.repository }}
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -r scripts/requirements-quality.txt
+      - name: Validate the draft and download its qualification input
+        run: |
+          python scripts/release_publication.py draft --tag "$RELEASE_TAG"
+          gh release download "$RELEASE_TAG" --pattern qualification-input.tar.gz --dir target/release-input
+      - name: Recheck all release evidence before uploading distribution files
+        run: |
+          python scripts/release_publication.py prepare --tag "$RELEASE_TAG" \
+            --archive target/release-input/qualification-input.tar.gz --directory target/publication
+          python scripts/release_publication.py upload --tag "$RELEASE_TAG" --directory target/publication
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: verified-publication
+          path: target/publication/
+          if-no-files-found: error
+
+  download-smoke:
+    needs: qualify
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -r scripts/requirements-coverage.txt -r scripts/requirements-sdk-typing.txt
+      - run: gh release download "$RELEASE_TAG" --dir target/downloaded-release
+      - run: python scripts/release_publication.py smoke --directory target/downloaded-release
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-download-${{ runner.os }}
+          path: target/release-download-smoke/
+
+  publish:
+    needs: [qualify, download-smoke]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: verified-publication
+          path: target/publication
+      - name: Attest the qualification of the exact distribution assets
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: target/publication/*
+          predicate-type: https://github.com/PlenoraETL/plenora-storage-tools/release-qualification/v2
+          predicate-path: target/publication/release-qualification.json
+      - name: Verify the GitHub roundtrip and publish the draft
+        run: python scripts/release_publication.py publish --tag "$RELEASE_TAG" --directory target/publication

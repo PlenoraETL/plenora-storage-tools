@@ -3,6 +3,18 @@
 Python >= 3.10, backed by the same Rust engine as the CLI. The standard wheel
 contains local, S3, SFTP, FTP, explicit FTPS, Azure Blob, GCS, SMB and WebDAV.
 
+## Installation
+
+Distribution is through [GitHub Releases](https://github.com/PlenoraETL/plenora-storage-tools/releases).
+When a qualified release is published, download the wheel for your platform,
+verify its SHA-256 against the release checksums and install the downloaded file
+with `python -m pip install <wheel-file>`. The first 1.0 is still a candidate;
+availability of source code does not imply that a production release is published.
+The supported targets and fixture-only compatibility scope are listed in the
+[compatibility matrix](../../docs/compatibility-1.0.md).
+
+## Basic use
+
 ```python
 from pathlib import Path
 from plenora_storage import Connection, Engine
@@ -27,7 +39,7 @@ Callback exception text is never exposed in storage errors.
 Python byte buffer is required. Listing returns one page and a cursor owned by
 the current engine. `copy` operates within one connection. Explicit `overwrite`,
 `ignore_missing`, and `publication_policy` prevent accidental mutation defaults.
-Provider configuration and limits are described in `docs/provider-expansion.md`
+Provider configuration and limits are described in the [provider guide](../../docs/provider-expansion.md)
 and the repository's vendored contracts.
 
 `AsyncEngine` offers the same methods with `await` and `async with`. Cancelling
@@ -48,6 +60,37 @@ matches installed distribution metadata; prereleases use PEP 440 notation
 deterministic async lifecycle method; `await close()` remains an alias.
 The common Python SDK contract and installed-wheel tests are included in the
 adoption manifest. Operational qualification of each final wheel is separate.
+
+## Typed results and examples
+
+Results remain dictionaries. The public stubs describe `TestResult`, `ListResult`,
+`ObjectInfo`, `TransferResult` and `DeleteResult` from `plenora_storage.types`.
+Nullable metadata keys are present with `None` when the provider has no value.
+The SDK uses `publication_policy="atomic_required"` or `"best_effort"`; these
+Python values use underscores, unlike the CLI flag values.
+
+```python
+from plenora_storage import Engine, Connection
+from plenora_storage.types import TransferResult
+
+def upload(engine: Engine, connection: Connection) -> str:
+    result: TransferResult = engine.put(
+        connection, "report.csv", "report.csv", overwrite=False,
+        publication_policy="atomic_required", timeout_ms=5000,
+    )
+    return result["checksum"]["value"]
+```
+
+The [local example](examples/local_roundtrip.py) exercises sync upload and async
+download in a temporary directory and needs no account. Run it with
+`python crates/plenora-storage-py/examples/local_roundtrip.py` from the repository
+after installing the wheel. The CI matrix runs this example, installed-wheel
+tests and a strict mypy consumer on Python 3.10–3.14 on Linux and Windows.
+The consumer also checks that invalid policy values, unknown controls and wrong
+result types are rejected. Dynamic provider configuration and capability
+extensions remain open mappings.
+
+## Development
 
 Build locally with `maturin build --locked --manifest-path
 crates/plenora-storage-py/Cargo.toml`. Select providers with `--no-default-features

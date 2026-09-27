@@ -14,7 +14,9 @@ class PythonCoverageTests(unittest.TestCase):
         self.assertEqual(test_count('Ran 25 tests in 1.0s\nOK', 0), 25)
         for log, status in [('Ran 0 tests in 0.0s\nOK', 0), ('', 0),
                             ('Ran 25 tests in 1.0s\nOK (skipped=1)', 0),
-                            ('Ran 25 tests in 1.0s', 1)]:
+                            ('Ran 25 tests in 1.0s', 1),
+                            ('Ran 25 tests in 1.0s\nFAILED (failures=1)', 0),
+                            ('Ran 25 tests in 1.0s', 0)]:
             with self.assertRaises(ValueError):
                 test_count(log, status)
 

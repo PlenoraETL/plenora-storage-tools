@@ -1245,6 +1245,4195 @@
       "returns": "str"
     }
   },
+  "public_typing": {
+    "__init__.pyi": {
+      "body": [
+        {
+          "level": 0,
+          "module": "dataclasses",
+          "names": [
+            {
+              "name": "dataclass",
+              "node": "alias"
+            }
+          ],
+          "node": "ImportFrom"
+        },
+        {
+          "level": 0,
+          "module": "os",
+          "names": [
+            {
+              "name": "PathLike",
+              "node": "alias"
+            }
+          ],
+          "node": "ImportFrom"
+        },
+        {
+          "level": 0,
+          "module": "typing",
+          "names": [
+            {
+              "name": "Any",
+              "node": "alias"
+            },
+            {
+              "name": "Callable",
+              "node": "alias"
+            },
+            {
+              "name": "Mapping",
+              "node": "alias"
+            }
+          ],
+          "node": "ImportFrom"
+        },
+        {
+          "level": 1,
+          "module": "_native",
+          "names": [
+            {
+              "asname": "CancellationToken",
+              "name": "CancellationToken",
+              "node": "alias"
+            }
+          ],
+          "node": "ImportFrom"
+        },
+        {
+          "level": 1,
+          "module": "types",
+          "names": [
+            {
+              "name": "DeleteResult",
+              "node": "alias"
+            },
+            {
+              "name": "ListResult",
+              "node": "alias"
+            },
+            {
+              "name": "ObjectInfo",
+              "node": "alias"
+            },
+            {
+              "name": "OperationResult",
+              "node": "alias"
+            },
+            {
+              "name": "PublicationPolicy",
+              "node": "alias"
+            },
+            {
+              "name": "TestResult",
+              "node": "alias"
+            },
+            {
+              "name": "TransferResult",
+              "node": "alias"
+            }
+          ],
+          "node": "ImportFrom"
+        },
+        {
+          "annotation": {
+            "ctx": {
+              "node": "Load"
+            },
+            "id": "str",
+            "node": "Name"
+          },
+          "node": "AnnAssign",
+          "simple": 1,
+          "target": {
+            "ctx": {
+              "node": "Store"
+            },
+            "id": "__version__",
+            "node": "Name"
+          }
+        },
+        {
+          "annotation": {
+            "ctx": {
+              "node": "Load"
+            },
+            "node": "Subscript",
+            "slice": {
+              "ctx": {
+                "node": "Load"
+              },
+              "id": "str",
+              "node": "Name"
+            },
+            "value": {
+              "ctx": {
+                "node": "Load"
+              },
+              "id": "list",
+              "node": "Name"
+            }
+          },
+          "node": "AnnAssign",
+          "simple": 1,
+          "target": {
+            "ctx": {
+              "node": "Store"
+            },
+            "id": "__all__",
+            "node": "Name"
+          }
+        },
+        {
+          "node": "Assign",
+          "targets": [
+            {
+              "ctx": {
+                "node": "Store"
+              },
+              "id": "CredentialResolver",
+              "node": "Name"
+            }
+          ],
+          "value": {
+            "ctx": {
+              "node": "Load"
+            },
+            "node": "Subscript",
+            "slice": {
+              "ctx": {
+                "node": "Load"
+              },
+              "elts": [
+                {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "elts": [
+                    {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "str",
+                      "node": "Name"
+                    }
+                  ],
+                  "node": "List"
+                },
+                {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "node": "Subscript",
+                  "slice": {
+                    "ctx": {
+                      "node": "Load"
+                    },
+                    "elts": [
+                      {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "str",
+                        "node": "Name"
+                      },
+                      {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "str",
+                        "node": "Name"
+                      }
+                    ],
+                    "node": "Tuple"
+                  },
+                  "value": {
+                    "ctx": {
+                      "node": "Load"
+                    },
+                    "id": "Mapping",
+                    "node": "Name"
+                  }
+                }
+              ],
+              "node": "Tuple"
+            },
+            "value": {
+              "ctx": {
+                "node": "Load"
+              },
+              "id": "Callable",
+              "node": "Name"
+            }
+          }
+        },
+        {
+          "args": {
+            "node": "arguments"
+          },
+          "body": [
+            {
+              "node": "Expr",
+              "value": {
+                "node": "Constant",
+                "value": {
+                  "literal": "ellipsis"
+                }
+              }
+            }
+          ],
+          "name": "version",
+          "node": "FunctionDef",
+          "returns": {
+            "ctx": {
+              "node": "Load"
+            },
+            "id": "str",
+            "node": "Name"
+          }
+        },
+        {
+          "args": {
+            "args": [
+              {
+                "annotation": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "BaseException",
+                  "node": "Name"
+                },
+                "arg": "error",
+                "node": "arg"
+              }
+            ],
+            "node": "arguments"
+          },
+          "body": [
+            {
+              "node": "Expr",
+              "value": {
+                "node": "Constant",
+                "value": {
+                  "literal": "ellipsis"
+                }
+              }
+            }
+          ],
+          "name": "cancellation_outcome",
+          "node": "FunctionDef",
+          "returns": {
+            "left": {
+              "left": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "OperationResult",
+                "node": "Name"
+              },
+              "node": "BinOp",
+              "op": {
+                "node": "BitOr"
+              },
+              "right": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "PlenoraError",
+                "node": "Name"
+              }
+            },
+            "node": "BinOp",
+            "op": {
+              "node": "BitOr"
+            },
+            "right": {
+              "node": "Constant"
+            }
+          }
+        },
+        {
+          "bases": [
+            {
+              "ctx": {
+                "node": "Load"
+              },
+              "id": "Exception",
+              "node": "Name"
+            }
+          ],
+          "body": [
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "str",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "code",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "str",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "category",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "str",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "phase",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "str",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "remote_effect",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "node": "Subscript",
+                "slice": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "elts": [
+                    {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "str",
+                      "node": "Name"
+                    },
+                    {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "Any",
+                      "node": "Name"
+                    }
+                  ],
+                  "node": "Tuple"
+                },
+                "value": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "dict",
+                  "node": "Name"
+                }
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "retry",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "left": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "str",
+                  "node": "Name"
+                },
+                "node": "BinOp",
+                "op": {
+                  "node": "BitOr"
+                },
+                "right": {
+                  "node": "Constant"
+                }
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "provider",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "node": "Subscript",
+                "slice": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "elts": [
+                    {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "str",
+                      "node": "Name"
+                    },
+                    {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "Any",
+                      "node": "Name"
+                    }
+                  ],
+                  "node": "Tuple"
+                },
+                "value": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "dict",
+                  "node": "Name"
+                }
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "details",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "str",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "message",
+                "node": "Name"
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "node": "Subscript",
+                      "slice": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "elts": [
+                          {
+                            "ctx": {
+                              "node": "Load"
+                            },
+                            "id": "str",
+                            "node": "Name"
+                          },
+                          {
+                            "ctx": {
+                              "node": "Load"
+                            },
+                            "id": "Any",
+                            "node": "Name"
+                          }
+                        ],
+                        "node": "Tuple"
+                      },
+                      "value": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "Mapping",
+                        "node": "Name"
+                      }
+                    },
+                    "arg": "document",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "__init__",
+              "node": "FunctionDef",
+              "returns": {
+                "node": "Constant"
+              }
+            }
+          ],
+          "name": "PlenoraError",
+          "node": "ClassDef"
+        },
+        {
+          "bases": [
+            {
+              "ctx": {
+                "node": "Load"
+              },
+              "id": "PlenoraError",
+              "node": "Name"
+            }
+          ],
+          "body": [
+            {
+              "node": "Expr",
+              "value": {
+                "node": "Constant",
+                "value": {
+                  "literal": "ellipsis"
+                }
+              }
+            }
+          ],
+          "name": "StorageError",
+          "node": "ClassDef"
+        },
+        {
+          "body": [
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "bool",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "allow_insecure_http",
+                "node": "Name"
+              },
+              "value": {
+                "node": "Constant",
+                "value": false
+              }
+            },
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "bool",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "allow_insecure_ftp",
+                "node": "Name"
+              },
+              "value": {
+                "node": "Constant",
+                "value": false
+              }
+            },
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "bool",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "allow_private_network",
+                "node": "Name"
+              },
+              "value": {
+                "node": "Constant",
+                "value": false
+              }
+            },
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "bool",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "allow_unverified_ssh",
+                "node": "Name"
+              },
+              "value": {
+                "node": "Constant",
+                "value": false
+              }
+            },
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "int",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "max_transfer_bytes",
+                "node": "Name"
+              },
+              "value": {
+                "node": "Constant",
+                "value": 1073741824
+              }
+            },
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "int",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "max_list_items",
+                "node": "Name"
+              },
+              "value": {
+                "node": "Constant",
+                "value": 10000
+              }
+            },
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "int",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "max_buffered_put_bytes",
+                "node": "Name"
+              },
+              "value": {
+                "node": "Constant",
+                "value": 67108864
+              }
+            }
+          ],
+          "decorator_list": [
+            {
+              "func": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "dataclass",
+                "node": "Name"
+              },
+              "keywords": [
+                {
+                  "arg": "frozen",
+                  "node": "keyword",
+                  "value": {
+                    "node": "Constant",
+                    "value": true
+                  }
+                }
+              ],
+              "node": "Call"
+            }
+          ],
+          "name": "EngineConfig",
+          "node": "ClassDef"
+        },
+        {
+          "body": [
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "str",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "provider",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "str",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "config_contract",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "node": "Subscript",
+                "slice": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "elts": [
+                    {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "str",
+                      "node": "Name"
+                    },
+                    {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "Any",
+                      "node": "Name"
+                    }
+                  ],
+                  "node": "Tuple"
+                },
+                "value": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "Mapping",
+                  "node": "Name"
+                }
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "config",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "str",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "credential_ref",
+                "node": "Name"
+              }
+            }
+          ],
+          "decorator_list": [
+            {
+              "func": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "dataclass",
+                "node": "Name"
+              },
+              "keywords": [
+                {
+                  "arg": "frozen",
+                  "node": "keyword",
+                  "value": {
+                    "node": "Constant",
+                    "value": true
+                  }
+                },
+                {
+                  "arg": "repr",
+                  "node": "keyword",
+                  "value": {
+                    "node": "Constant",
+                    "value": false
+                  }
+                }
+              ],
+              "node": "Call"
+            }
+          ],
+          "name": "Connection",
+          "node": "ClassDef"
+        },
+        {
+          "body": [
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "EngineConfig",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "config",
+                    "node": "arg"
+                  }
+                ],
+                "defaults": [
+                  {
+                    "node": "Constant"
+                  }
+                ],
+                "kw_defaults": [
+                  {
+                    "node": "Constant"
+                  }
+                ],
+                "kwonlyargs": [
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "CredentialResolver",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "credential_resolver",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "__init__",
+              "node": "FunctionDef",
+              "returns": {
+                "node": "Constant"
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "decorator_list": [
+                {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "property",
+                  "node": "Name"
+                }
+              ],
+              "name": "is_closed",
+              "node": "FunctionDef",
+              "returns": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "bool",
+                "node": "Name"
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "close",
+              "node": "FunctionDef",
+              "returns": {
+                "node": "Constant"
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "__enter__",
+              "node": "FunctionDef",
+              "returns": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "Engine",
+                "node": "Name"
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments",
+                "vararg": {
+                  "annotation": {
+                    "ctx": {
+                      "node": "Load"
+                    },
+                    "id": "Any",
+                    "node": "Name"
+                  },
+                  "arg": "_args",
+                  "node": "arg"
+                }
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "__exit__",
+              "node": "FunctionDef",
+              "returns": {
+                "node": "Constant"
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "capabilities",
+              "node": "FunctionDef",
+              "returns": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "node": "Subscript",
+                "slice": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "elts": [
+                    {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "str",
+                      "node": "Name"
+                    },
+                    {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "Any",
+                      "node": "Name"
+                    }
+                  ],
+                  "node": "Tuple"
+                },
+                "value": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "dict",
+                  "node": "Name"
+                }
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "Connection",
+                      "node": "Name"
+                    },
+                    "arg": "connection",
+                    "node": "arg"
+                  }
+                ],
+                "kw_defaults": [
+                  {
+                    "node": "Constant"
+                  },
+                  {
+                    "node": "Constant"
+                  }
+                ],
+                "kwonlyargs": [
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "CancellationToken",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "cancellation",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "int",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "timeout_ms",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "test",
+              "node": "FunctionDef",
+              "returns": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "TestResult",
+                "node": "Name"
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "Connection",
+                      "node": "Name"
+                    },
+                    "arg": "connection",
+                    "node": "arg"
+                  }
+                ],
+                "kw_defaults": [
+                  {
+                    "node": "Constant"
+                  },
+                  {
+                    "node": "Constant"
+                  },
+                  {
+                    "node": "Constant"
+                  },
+                  {
+                    "node": "Constant"
+                  },
+                  {
+                    "node": "Constant"
+                  }
+                ],
+                "kwonlyargs": [
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "str",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "prefix",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "str",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "cursor",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "int",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "max_items",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "CancellationToken",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "cancellation",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "int",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "timeout_ms",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "list",
+              "node": "FunctionDef",
+              "returns": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "ListResult",
+                "node": "Name"
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "Connection",
+                      "node": "Name"
+                    },
+                    "arg": "connection",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "str",
+                      "node": "Name"
+                    },
+                    "arg": "key",
+                    "node": "arg"
+                  }
+                ],
+                "kw_defaults": [
+                  {
+                    "node": "Constant"
+                  },
+                  {
+                    "node": "Constant"
+                  }
+                ],
+                "kwonlyargs": [
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "CancellationToken",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "cancellation",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "int",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "timeout_ms",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "stat",
+              "node": "FunctionDef",
+              "returns": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "ObjectInfo",
+                "node": "Name"
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "Connection",
+                      "node": "Name"
+                    },
+                    "arg": "connection",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "str",
+                      "node": "Name"
+                    },
+                    "arg": "key",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "str",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "node": "Subscript",
+                        "slice": {
+                          "ctx": {
+                            "node": "Load"
+                          },
+                          "id": "str",
+                          "node": "Name"
+                        },
+                        "value": {
+                          "ctx": {
+                            "node": "Load"
+                          },
+                          "id": "PathLike",
+                          "node": "Name"
+                        }
+                      }
+                    },
+                    "arg": "output",
+                    "node": "arg"
+                  }
+                ],
+                "kw_defaults": [
+                  null,
+                  {
+                    "node": "Constant"
+                  },
+                  {
+                    "node": "Constant"
+                  }
+                ],
+                "kwonlyargs": [
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "bool",
+                      "node": "Name"
+                    },
+                    "arg": "overwrite",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "CancellationToken",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "cancellation",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "int",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "timeout_ms",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "get",
+              "node": "FunctionDef",
+              "returns": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "TransferResult",
+                "node": "Name"
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "Connection",
+                      "node": "Name"
+                    },
+                    "arg": "connection",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "str",
+                      "node": "Name"
+                    },
+                    "arg": "key",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "str",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "node": "Subscript",
+                        "slice": {
+                          "ctx": {
+                            "node": "Load"
+                          },
+                          "id": "str",
+                          "node": "Name"
+                        },
+                        "value": {
+                          "ctx": {
+                            "node": "Load"
+                          },
+                          "id": "PathLike",
+                          "node": "Name"
+                        }
+                      }
+                    },
+                    "arg": "input",
+                    "node": "arg"
+                  }
+                ],
+                "kw_defaults": [
+                  null,
+                  null,
+                  {
+                    "node": "Constant"
+                  },
+                  {
+                    "node": "Constant"
+                  },
+                  {
+                    "node": "Constant"
+                  }
+                ],
+                "kwonlyargs": [
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "bool",
+                      "node": "Name"
+                    },
+                    "arg": "overwrite",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "PublicationPolicy",
+                      "node": "Name"
+                    },
+                    "arg": "publication_policy",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "str",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "content_type",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "CancellationToken",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "cancellation",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "int",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "timeout_ms",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "put",
+              "node": "FunctionDef",
+              "returns": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "TransferResult",
+                "node": "Name"
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "Connection",
+                      "node": "Name"
+                    },
+                    "arg": "connection",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "str",
+                      "node": "Name"
+                    },
+                    "arg": "source_key",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "str",
+                      "node": "Name"
+                    },
+                    "arg": "destination_key",
+                    "node": "arg"
+                  }
+                ],
+                "kw_defaults": [
+                  null,
+                  null,
+                  {
+                    "node": "Constant"
+                  },
+                  {
+                    "node": "Constant"
+                  }
+                ],
+                "kwonlyargs": [
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "bool",
+                      "node": "Name"
+                    },
+                    "arg": "overwrite",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "PublicationPolicy",
+                      "node": "Name"
+                    },
+                    "arg": "publication_policy",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "CancellationToken",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "cancellation",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "int",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "timeout_ms",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "copy",
+              "node": "FunctionDef",
+              "returns": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "ObjectInfo",
+                "node": "Name"
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "Connection",
+                      "node": "Name"
+                    },
+                    "arg": "connection",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "str",
+                      "node": "Name"
+                    },
+                    "arg": "key",
+                    "node": "arg"
+                  }
+                ],
+                "kw_defaults": [
+                  null,
+                  {
+                    "node": "Constant"
+                  },
+                  {
+                    "node": "Constant"
+                  }
+                ],
+                "kwonlyargs": [
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "bool",
+                      "node": "Name"
+                    },
+                    "arg": "ignore_missing",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "CancellationToken",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "cancellation",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "int",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "timeout_ms",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "delete",
+              "node": "FunctionDef",
+              "returns": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "DeleteResult",
+                "node": "Name"
+              }
+            }
+          ],
+          "name": "Engine",
+          "node": "ClassDef"
+        },
+        {
+          "body": [
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "EngineConfig",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "config",
+                    "node": "arg"
+                  }
+                ],
+                "defaults": [
+                  {
+                    "node": "Constant"
+                  }
+                ],
+                "kw_defaults": [
+                  {
+                    "node": "Constant"
+                  }
+                ],
+                "kwonlyargs": [
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "CredentialResolver",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "credential_resolver",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "__init__",
+              "node": "FunctionDef",
+              "returns": {
+                "node": "Constant"
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "decorator_list": [
+                {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "property",
+                  "node": "Name"
+                }
+              ],
+              "name": "is_closed",
+              "node": "FunctionDef",
+              "returns": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "bool",
+                "node": "Name"
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "close",
+              "node": "AsyncFunctionDef",
+              "returns": {
+                "node": "Constant"
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "aclose",
+              "node": "AsyncFunctionDef",
+              "returns": {
+                "node": "Constant"
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "__aenter__",
+              "node": "AsyncFunctionDef",
+              "returns": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "AsyncEngine",
+                "node": "Name"
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments",
+                "vararg": {
+                  "annotation": {
+                    "ctx": {
+                      "node": "Load"
+                    },
+                    "id": "Any",
+                    "node": "Name"
+                  },
+                  "arg": "_args",
+                  "node": "arg"
+                }
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "__aexit__",
+              "node": "AsyncFunctionDef",
+              "returns": {
+                "node": "Constant"
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "capabilities",
+              "node": "FunctionDef",
+              "returns": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "node": "Subscript",
+                "slice": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "elts": [
+                    {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "str",
+                      "node": "Name"
+                    },
+                    {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "Any",
+                      "node": "Name"
+                    }
+                  ],
+                  "node": "Tuple"
+                },
+                "value": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "dict",
+                  "node": "Name"
+                }
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "Connection",
+                      "node": "Name"
+                    },
+                    "arg": "connection",
+                    "node": "arg"
+                  }
+                ],
+                "kw_defaults": [
+                  {
+                    "node": "Constant"
+                  },
+                  {
+                    "node": "Constant"
+                  }
+                ],
+                "kwonlyargs": [
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "CancellationToken",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "cancellation",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "int",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "timeout_ms",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "test",
+              "node": "AsyncFunctionDef",
+              "returns": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "TestResult",
+                "node": "Name"
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "Connection",
+                      "node": "Name"
+                    },
+                    "arg": "connection",
+                    "node": "arg"
+                  }
+                ],
+                "kw_defaults": [
+                  {
+                    "node": "Constant"
+                  },
+                  {
+                    "node": "Constant"
+                  },
+                  {
+                    "node": "Constant"
+                  },
+                  {
+                    "node": "Constant"
+                  },
+                  {
+                    "node": "Constant"
+                  }
+                ],
+                "kwonlyargs": [
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "str",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "prefix",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "str",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "cursor",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "int",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "max_items",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "CancellationToken",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "cancellation",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "int",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "timeout_ms",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "list",
+              "node": "AsyncFunctionDef",
+              "returns": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "ListResult",
+                "node": "Name"
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "Connection",
+                      "node": "Name"
+                    },
+                    "arg": "connection",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "str",
+                      "node": "Name"
+                    },
+                    "arg": "key",
+                    "node": "arg"
+                  }
+                ],
+                "kw_defaults": [
+                  {
+                    "node": "Constant"
+                  },
+                  {
+                    "node": "Constant"
+                  }
+                ],
+                "kwonlyargs": [
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "CancellationToken",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "cancellation",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "int",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "timeout_ms",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "stat",
+              "node": "AsyncFunctionDef",
+              "returns": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "ObjectInfo",
+                "node": "Name"
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "Connection",
+                      "node": "Name"
+                    },
+                    "arg": "connection",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "str",
+                      "node": "Name"
+                    },
+                    "arg": "key",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "str",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "node": "Subscript",
+                        "slice": {
+                          "ctx": {
+                            "node": "Load"
+                          },
+                          "id": "str",
+                          "node": "Name"
+                        },
+                        "value": {
+                          "ctx": {
+                            "node": "Load"
+                          },
+                          "id": "PathLike",
+                          "node": "Name"
+                        }
+                      }
+                    },
+                    "arg": "output",
+                    "node": "arg"
+                  }
+                ],
+                "kw_defaults": [
+                  null,
+                  {
+                    "node": "Constant"
+                  },
+                  {
+                    "node": "Constant"
+                  }
+                ],
+                "kwonlyargs": [
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "bool",
+                      "node": "Name"
+                    },
+                    "arg": "overwrite",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "CancellationToken",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "cancellation",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "int",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "timeout_ms",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "get",
+              "node": "AsyncFunctionDef",
+              "returns": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "TransferResult",
+                "node": "Name"
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "Connection",
+                      "node": "Name"
+                    },
+                    "arg": "connection",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "str",
+                      "node": "Name"
+                    },
+                    "arg": "key",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "str",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "node": "Subscript",
+                        "slice": {
+                          "ctx": {
+                            "node": "Load"
+                          },
+                          "id": "str",
+                          "node": "Name"
+                        },
+                        "value": {
+                          "ctx": {
+                            "node": "Load"
+                          },
+                          "id": "PathLike",
+                          "node": "Name"
+                        }
+                      }
+                    },
+                    "arg": "input",
+                    "node": "arg"
+                  }
+                ],
+                "kw_defaults": [
+                  null,
+                  null,
+                  {
+                    "node": "Constant"
+                  },
+                  {
+                    "node": "Constant"
+                  },
+                  {
+                    "node": "Constant"
+                  }
+                ],
+                "kwonlyargs": [
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "bool",
+                      "node": "Name"
+                    },
+                    "arg": "overwrite",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "PublicationPolicy",
+                      "node": "Name"
+                    },
+                    "arg": "publication_policy",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "str",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "content_type",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "CancellationToken",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "cancellation",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "int",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "timeout_ms",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "put",
+              "node": "AsyncFunctionDef",
+              "returns": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "TransferResult",
+                "node": "Name"
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "Connection",
+                      "node": "Name"
+                    },
+                    "arg": "connection",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "str",
+                      "node": "Name"
+                    },
+                    "arg": "source_key",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "str",
+                      "node": "Name"
+                    },
+                    "arg": "destination_key",
+                    "node": "arg"
+                  }
+                ],
+                "kw_defaults": [
+                  null,
+                  null,
+                  {
+                    "node": "Constant"
+                  },
+                  {
+                    "node": "Constant"
+                  }
+                ],
+                "kwonlyargs": [
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "bool",
+                      "node": "Name"
+                    },
+                    "arg": "overwrite",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "PublicationPolicy",
+                      "node": "Name"
+                    },
+                    "arg": "publication_policy",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "CancellationToken",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "cancellation",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "int",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "timeout_ms",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "copy",
+              "node": "AsyncFunctionDef",
+              "returns": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "ObjectInfo",
+                "node": "Name"
+              }
+            },
+            {
+              "args": {
+                "args": [
+                  {
+                    "arg": "self",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "Connection",
+                      "node": "Name"
+                    },
+                    "arg": "connection",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "str",
+                      "node": "Name"
+                    },
+                    "arg": "key",
+                    "node": "arg"
+                  }
+                ],
+                "kw_defaults": [
+                  null,
+                  {
+                    "node": "Constant"
+                  },
+                  {
+                    "node": "Constant"
+                  }
+                ],
+                "kwonlyargs": [
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "bool",
+                      "node": "Name"
+                    },
+                    "arg": "ignore_missing",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "CancellationToken",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "cancellation",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "left": {
+                        "ctx": {
+                          "node": "Load"
+                        },
+                        "id": "int",
+                        "node": "Name"
+                      },
+                      "node": "BinOp",
+                      "op": {
+                        "node": "BitOr"
+                      },
+                      "right": {
+                        "node": "Constant"
+                      }
+                    },
+                    "arg": "timeout_ms",
+                    "node": "arg"
+                  }
+                ],
+                "node": "arguments"
+              },
+              "body": [
+                {
+                  "node": "Expr",
+                  "value": {
+                    "node": "Constant",
+                    "value": {
+                      "literal": "ellipsis"
+                    }
+                  }
+                }
+              ],
+              "name": "delete",
+              "node": "AsyncFunctionDef",
+              "returns": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "DeleteResult",
+                "node": "Name"
+              }
+            }
+          ],
+          "name": "AsyncEngine",
+          "node": "ClassDef"
+        }
+      ],
+      "node": "Module"
+    },
+    "types.py": {
+      "body": [
+        {
+          "node": "Expr",
+          "value": {
+            "node": "Constant",
+            "value": "Public result shapes; values remain ordinary dictionaries at runtime.\n\nKeys follow the storage v1 schemas. Nullable metadata is always present: None\nmeans the provider did not supply that value, not that the object is absent.\n"
+          }
+        },
+        {
+          "level": 0,
+          "module": "typing",
+          "names": [
+            {
+              "name": "Literal",
+              "node": "alias"
+            },
+            {
+              "name": "TypedDict",
+              "node": "alias"
+            }
+          ],
+          "node": "ImportFrom"
+        },
+        {
+          "node": "Assign",
+          "targets": [
+            {
+              "ctx": {
+                "node": "Store"
+              },
+              "id": "PublicationPolicy",
+              "node": "Name"
+            }
+          ],
+          "value": {
+            "ctx": {
+              "node": "Load"
+            },
+            "node": "Subscript",
+            "slice": {
+              "ctx": {
+                "node": "Load"
+              },
+              "elts": [
+                {
+                  "node": "Constant",
+                  "value": "best_effort"
+                },
+                {
+                  "node": "Constant",
+                  "value": "atomic_required"
+                }
+              ],
+              "node": "Tuple"
+            },
+            "value": {
+              "ctx": {
+                "node": "Load"
+              },
+              "id": "Literal",
+              "node": "Name"
+            }
+          }
+        },
+        {
+          "bases": [
+            {
+              "ctx": {
+                "node": "Load"
+              },
+              "id": "TypedDict",
+              "node": "Name"
+            }
+          ],
+          "body": [
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "str",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "provider",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "bool",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "reachable",
+                "node": "Name"
+              }
+            }
+          ],
+          "name": "TestResult",
+          "node": "ClassDef"
+        },
+        {
+          "bases": [
+            {
+              "ctx": {
+                "node": "Load"
+              },
+              "id": "TypedDict",
+              "node": "Name"
+            }
+          ],
+          "body": [
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "str",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "key",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "int",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "size",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "left": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "str",
+                  "node": "Name"
+                },
+                "node": "BinOp",
+                "op": {
+                  "node": "BitOr"
+                },
+                "right": {
+                  "node": "Constant"
+                }
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "last_modified",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "left": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "str",
+                  "node": "Name"
+                },
+                "node": "BinOp",
+                "op": {
+                  "node": "BitOr"
+                },
+                "right": {
+                  "node": "Constant"
+                }
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "etag",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "left": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "str",
+                  "node": "Name"
+                },
+                "node": "BinOp",
+                "op": {
+                  "node": "BitOr"
+                },
+                "right": {
+                  "node": "Constant"
+                }
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "version",
+                "node": "Name"
+              }
+            }
+          ],
+          "name": "ObjectInfo",
+          "node": "ClassDef"
+        },
+        {
+          "bases": [
+            {
+              "ctx": {
+                "node": "Load"
+              },
+              "id": "TypedDict",
+              "node": "Name"
+            }
+          ],
+          "body": [
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "node": "Subscript",
+                "slice": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "ObjectInfo",
+                  "node": "Name"
+                },
+                "value": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "list",
+                  "node": "Name"
+                }
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "objects",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "bool",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "truncated",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "left": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "str",
+                  "node": "Name"
+                },
+                "node": "BinOp",
+                "op": {
+                  "node": "BitOr"
+                },
+                "right": {
+                  "node": "Constant"
+                }
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "next_cursor",
+                "node": "Name"
+              }
+            }
+          ],
+          "name": "ListResult",
+          "node": "ClassDef"
+        },
+        {
+          "bases": [
+            {
+              "ctx": {
+                "node": "Load"
+              },
+              "id": "TypedDict",
+              "node": "Name"
+            }
+          ],
+          "body": [
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "node": "Subscript",
+                "slice": {
+                  "node": "Constant",
+                  "value": "sha256"
+                },
+                "value": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "Literal",
+                  "node": "Name"
+                }
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "algorithm",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "str",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "value",
+                "node": "Name"
+              }
+            }
+          ],
+          "name": "Checksum",
+          "node": "ClassDef"
+        },
+        {
+          "bases": [
+            {
+              "ctx": {
+                "node": "Load"
+              },
+              "id": "TypedDict",
+              "node": "Name"
+            }
+          ],
+          "body": [
+            {
+              "annotation": {
+                "left": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "str",
+                  "node": "Name"
+                },
+                "node": "BinOp",
+                "op": {
+                  "node": "BitOr"
+                },
+                "right": {
+                  "node": "Constant"
+                }
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "content_type",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "left": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "int",
+                  "node": "Name"
+                },
+                "node": "BinOp",
+                "op": {
+                  "node": "BitOr"
+                },
+                "right": {
+                  "node": "Constant"
+                }
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "size",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "left": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "str",
+                  "node": "Name"
+                },
+                "node": "BinOp",
+                "op": {
+                  "node": "BitOr"
+                },
+                "right": {
+                  "node": "Constant"
+                }
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "sha256",
+                "node": "Name"
+              }
+            }
+          ],
+          "name": "ArtifactMetadata",
+          "node": "ClassDef"
+        },
+        {
+          "bases": [
+            {
+              "ctx": {
+                "node": "Load"
+              },
+              "id": "TypedDict",
+              "node": "Name"
+            }
+          ],
+          "body": [
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "str",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "key",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "int",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "bytes_transferred",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "Checksum",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "checksum",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "ArtifactMetadata",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "artifact",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "left": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "str",
+                  "node": "Name"
+                },
+                "node": "BinOp",
+                "op": {
+                  "node": "BitOr"
+                },
+                "right": {
+                  "node": "Constant"
+                }
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "etag",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "left": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "str",
+                  "node": "Name"
+                },
+                "node": "BinOp",
+                "op": {
+                  "node": "BitOr"
+                },
+                "right": {
+                  "node": "Constant"
+                }
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "version",
+                "node": "Name"
+              }
+            }
+          ],
+          "name": "TransferResult",
+          "node": "ClassDef"
+        },
+        {
+          "bases": [
+            {
+              "ctx": {
+                "node": "Load"
+              },
+              "id": "TypedDict",
+              "node": "Name"
+            }
+          ],
+          "body": [
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "str",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "key",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "bool",
+                "node": "Name"
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "deleted",
+                "node": "Name"
+              }
+            }
+          ],
+          "name": "DeleteResult",
+          "node": "ClassDef"
+        },
+        {
+          "node": "Assign",
+          "targets": [
+            {
+              "ctx": {
+                "node": "Store"
+              },
+              "id": "OperationResult",
+              "node": "Name"
+            }
+          ],
+          "value": {
+            "left": {
+              "left": {
+                "left": {
+                  "left": {
+                    "ctx": {
+                      "node": "Load"
+                    },
+                    "id": "TestResult",
+                    "node": "Name"
+                  },
+                  "node": "BinOp",
+                  "op": {
+                    "node": "BitOr"
+                  },
+                  "right": {
+                    "ctx": {
+                      "node": "Load"
+                    },
+                    "id": "ObjectInfo",
+                    "node": "Name"
+                  }
+                },
+                "node": "BinOp",
+                "op": {
+                  "node": "BitOr"
+                },
+                "right": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "ListResult",
+                  "node": "Name"
+                }
+              },
+              "node": "BinOp",
+              "op": {
+                "node": "BitOr"
+              },
+              "right": {
+                "ctx": {
+                  "node": "Load"
+                },
+                "id": "TransferResult",
+                "node": "Name"
+              }
+            },
+            "node": "BinOp",
+            "op": {
+              "node": "BitOr"
+            },
+            "right": {
+              "ctx": {
+                "node": "Load"
+              },
+              "id": "DeleteResult",
+              "node": "Name"
+            }
+          }
+        }
+      ],
+      "node": "Module"
+    }
+  },
   "root_error": true,
   "schema_version": 1,
   "type_aliases": {

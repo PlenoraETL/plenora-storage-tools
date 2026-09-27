@@ -5,6 +5,11 @@ provider sulle fixture dichiarate, con i cloud reali esplicitamente non
 qualificati. Le prove su account cloud sono rinviate e non bloccano questa
 release; il manifest e la ricevuta riportano tale limite.
 
+Per la serie 1.0 la ricevuta richiede anche il [bundle completo delle evidenze](release-evidence-bundle.md):
+API, parser fuzz, coverage, matrice Python con typing, trasferimenti, soak e
+confronto delle prestazioni. Lo stesso documento descrive la pubblicazione da
+bozza GitHub con prove degli asset scaricati su Linux e Windows.
+
 La release corrente comprende Rust, CLI e SDK Python; la [matrice](provider-expansion.md) descrive i sei aggiunti. Gli
 artefatti preparati diventano distribuibili quando `release-qualification.json`
 registra `qualified_for_publication` per i loro digest. Non pubblicare un

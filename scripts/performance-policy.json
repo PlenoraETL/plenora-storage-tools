@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "minimum_rounds": 5,
+  "maximum_regression_percent": {
+    "median": 10,
+    "p95": 20,
+    "maximum": 10
+  }
+}

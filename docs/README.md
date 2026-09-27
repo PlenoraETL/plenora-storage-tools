@@ -13,11 +13,13 @@ artefatti attestano una qualifica.
 | [Compatibilità 1.0](compatibility-1.0.md) | Sistemi e limiti del supporto dichiarato |
 | [Provider](provider-expansion.md) | Configurazione e garanzie dei sei adapter aggiunti dalla 0.2.0 |
 | [Distribuzione](release.md) | Packaging e procedura di qualifica |
+| [Evidenze finali](release-evidence-bundle.md) | Bundle dei gate 1.0, benchmark e workflow di pubblicazione |
 | [Affidabilità](reliability.md) | Trasferimenti, coverage, fuzz e stress; identità delle misure riportate |
 | [Adozione dei contratti](contract-adoption.md) | Profilo e prove di conformità |
 | [Migrazione](migration-1.0.md) | Passaggio alla serie 1.0 |
 | [Allineamento](database-alignment.md) | Principi del riferimento Database Tools |
 | [Confronto con Database Tools](database-reference-review.md) | Analisi al 27 settembre 2026, differenze e criteri di completamento |
+| [Consolidamento](quality-alignment-progress.md) | Interventi successivi al confronto e qualifiche ancora da completare |
 | [Piano 1.0](roadmap-1.0.0.md) | Milestone, perimetro e criteri di uscita |
 
 ## Resoconti e baseline storiche

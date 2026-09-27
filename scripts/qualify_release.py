@@ -11,6 +11,7 @@ from build_release import ROOT, digest, source_digest
 from qualify_extended_faults import EXPECTED_TESTS, LEGACY_TESTS
 from qualify_local_faults import validate_report as validate_local_faults
 from release_scope import qualification_scope
+from release_evidence import validate_bundle
 from versioning import parse_version
 
 
@@ -22,6 +23,9 @@ def main():
     parser.add_argument('--evidence', required=True, type=Path)
     args = parser.parse_args()
     output = args.directory.resolve()
+    # A failed retry must not leave an earlier publication receipt usable.
+    for name in ('release-qualification.json', 'SHA256SUMS'):
+        (output / name).unlink(missing_ok=True)
     subprocess.run([sys.executable, str(ROOT / 'scripts/verify_release.py'), str(output)], check=True)
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     status = subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True)
@@ -35,6 +39,7 @@ def main():
     archive_evidence.mkdir(exist_ok=True)
     targets = ['x86_64-unknown-linux-gnu', 'x86_64-pc-windows-msvc']
     records = []
+    subjects = {}
     for target in targets:
         folder = output / target
         manifest = json.loads((folder / 'release-manifest.json').read_text())
@@ -73,6 +78,7 @@ def main():
             python_report = json.loads(python_path.read_text())
             assert python_report['version'] == manifest['version']
             assert python_report['wheel_sha256'] == digest(folder / python_report['wheel'])
+            subjects[target] = {'binary_sha256': digest(binary), 'wheel_sha256': python_report['wheel_sha256']}
             assert {r['provider'] for r in python_report['results']} == {'local', 's3', 'sftp', 'ftp', 'ftps', 'azure', 'gcs', 'smb', 'webdav'}
             assert all(r['status'] == 'PASS' and r['operations'] == 7 and r['async_stat'] == 'PASS'
                        for r in python_report['results'])
@@ -105,15 +111,28 @@ def main():
         for source in [suite_path, audit_path, deny_path]:
             shutil.copyfile(source, archive_evidence / source.name)
         records.append({'target': target, 'binary_sha256': digest(binary),
+                        **({'wheel': python_report['wheel'], 'wheel_sha256': python_report['wheel_sha256']}
+                           if parse_version(manifest['version']).requires((0, 2, 1)) else {}),
                         'tests_passed': sum(int(passed) for passed, _, _ in counts),
                         'tests_ignored': sum(int(ignored) for _, _, ignored in counts),
                         'providers': qualification['results'],
                         'evidence': [{'name': p.name, 'sha256': digest(p)} for p in evidence]})
-    receipt = {'schema_version': 1, 'component': 'plenora-storage-tools', 'version': output.name,
+    additional = []
+    if parse_version(output.name).requires((1, 0, 0)):
+        bundle = args.evidence / 'gates'
+        version = parse_version(output.name)
+        additional = validate_bundle(bundle, revision, subjects, version.python,
+                                     minimum_soak_seconds=3600 if version.stage == 'alpha' else 86400)
+        for entry in additional:
+            destination = archive_evidence / 'gates' / entry['name']
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(bundle / entry['name'], destination)
+            assert digest(destination) == entry['sha256'], 'evidence changed while archiving'
+    receipt = {'schema_version': 2, 'component': 'plenora-storage-tools', 'version': output.name,
                'status': 'qualified_for_publication', 'source_revision': revision,
                'source_sha256': source_digest(), 'advisory_database': audit['database'],
                'qualification_scope': qualification_scope(),
-               'platforms': records}
+               'platforms': records, 'additional_gates': additional}
     path = output / 'release-qualification.json'
     path.write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8')
     (output / 'SHA256SUMS').write_text(f'{digest(path)}  {path.name}\n' + ''.join(

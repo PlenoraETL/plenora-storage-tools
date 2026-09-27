@@ -16,6 +16,25 @@ from plenora_storage import AsyncEngine, CancellationToken, Connection, Engine, 
 
 
 class SDKTests(unittest.TestCase):
+    def test_public_result_types_match_contract_keys_and_nullable_metadata(self):
+        import json
+        from typing import get_type_hints
+        from plenora_storage import types
+        root = Path(__file__).resolve().parents[4] / 'contracts/schemas'
+        common = json.loads((root / 'plenora-storage-common-v1.schema.json').read_text())['$defs']
+        for name, schema in [(types.ObjectInfo, common['object']),
+                             (types.TransferResult, common['transfer']),
+                             (types.Checksum, common['integrity']),
+                             (types.ArtifactMetadata, common['artifactMetadata']),
+                             (types.TestResult, json.loads((root / 'plenora-storage-test-output-v1.schema.json').read_text())),
+                             (types.ListResult, json.loads((root / 'plenora-storage-list-output-v1.schema.json').read_text())),
+                             (types.DeleteResult, json.loads((root / 'plenora-storage-delete-output-v1.schema.json').read_text()))]:
+            self.assertEqual(name.__required_keys__, set(schema['required']))
+            self.assertEqual(set(get_type_hints(name)), set(schema['properties']))
+        self.assertEqual(get_type_hints(types.ObjectInfo)['etag'], str | None)
+        self.assertEqual(get_type_hints(types.TransferResult)['bytes_transferred'], int)
+        self.assertIsInstance(self.engine.test(self.connection), dict)
+
     def test_installed_api_matches_baseline_and_detects_signature_changes(self):
         root = Path(__file__).resolve().parents[4]
         spec = importlib.util.spec_from_file_location('storage_api_snapshot', root / 'scripts/check_python_api.py')
