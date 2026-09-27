@@ -55,6 +55,12 @@ pub trait StorageProvider: Send + Sync {
         context: &OperationContext<'_>,
     ) -> StorageResult<ObjectMetadata>;
 
+    /// Writes the object and flushes the caller's sink before returning success.
+    /// The adapter does not close the sink or promise filesystem durability.
+    ///
+    /// # Errors
+    /// Write/flush failures and interruption after bytes were accepted must retain
+    /// an ambiguous artifact effect; caller-owned sinks cannot be rolled back here.
     async fn get(
         &self,
         connection: &ProviderConnection,

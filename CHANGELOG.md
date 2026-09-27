@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.0.0-rc.2 — in preparation
+
+- Flush SFTP download sinks under deadline/cancellation control before reporting success; preserve redacted I/O errors and ambiguous effects. Exercise partial writes, flush failures/cancellation and source failures across all nine fixture providers.
+- Add typed Python result dictionaries and strict installed-wheel consumers, separate Rust test sources from product coverage, and split CLI argument/output responsibilities while preserving public contracts.
+- Require complete artifact-bound qualification evidence, expand dependency inventories and prepare GitHub draft publication with checks after download on both supported targets.
+- Keep real cloud accounts outside the qualified scope; this candidate is not yet qualified or published.
+
 ## 1.0.0-rc.1 — in qualification
 
 - Prepare the first release candidate for qualification on Windows and Linux; publication and stable promotion require the remaining release gates.

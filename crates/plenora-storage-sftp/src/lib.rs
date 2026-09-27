@@ -549,6 +549,21 @@ impl StorageProvider for SftpProvider {
         // Once bytes are offered to the caller-owned sink, failures can leave
         // an externally visible partial artifact.
         let (bytes_transferred, digest) = copy_with_control(&mut file, sink, context, true).await?;
+        // Completing writes does not publish a caller-owned buffered sink.
+        // Match the other adapters: flush under the same control, and preserve
+        // ambiguity if the sink fails after accepting bytes.
+        context
+            .control
+            .run(
+                async {
+                    sink.flush()
+                        .await
+                        .map_err(|_| transfer_io_error(ErrorPhase::Write, true))
+                },
+                ErrorPhase::Write,
+                true,
+            )
+            .await?;
         Ok(transfer_result(
             request.key.clone(),
             bytes_transferred,
