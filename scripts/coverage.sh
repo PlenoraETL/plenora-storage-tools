@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+python3 scripts/check_test_layout.py
 rustup component add llvm-tools-preview
 cargo install cargo-llvm-cov --version 0.9.1 --locked --root target/coverage-tools
 mkdir -p .fixtures/evidence
@@ -24,10 +25,11 @@ python3 scripts/run_logged.py .fixtures/evidence/coverage-cli.log python3 script
 python3 scripts/run_logged.py .fixtures/evidence/coverage-extended.log python3 scripts/qualify_extended.py
 python3 scripts/run_logged.py .fixtures/evidence/coverage-regressions.log python3 scripts/audit_release_readiness.py
 python3 scripts/run_logged.py .fixtures/evidence/coverage-extended-faults.log python3 scripts/qualify_extended_faults.py
-python3 scripts/run_logged.py .fixtures/evidence/coverage-python-build.log python3 scripts/build_python.py --debug
+python3 scripts/run_logged.py .fixtures/evidence/coverage-python-build.log python3 scripts/build_python.py \
+  --debug --environment .fixtures/coverage-sdk-env
 version="$(python3 scripts/release_version.py --python)"
 python3 scripts/run_logged.py .fixtures/evidence/coverage-python-live.log \
-  target/python-sdk-test/bin/python scripts/qualify_python.py \
+  .fixtures/coverage-sdk-env/bin/python scripts/qualify_python.py \
     --wheel target/python-wheels/plenora_storage-"${version}"-*.whl \
     --output .fixtures/evidence/coverage-python-qualification.json
 cargo llvm-cov report --json --output-path .fixtures/evidence/rust-coverage.json

@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+from check_test_layout import test_files
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -26,6 +27,8 @@ def apply_thresholds(report, policy):
 def summarize(document):
     crates = {}
     seen = set()
+    dedicated = {'crates/' + p.relative_to(ROOT / 'crates').as_posix() for p in test_files(ROOT)[1]}
+    excluded = []
     for section in document['data']:
         for source in section['files']:
             path = source['filename'].replace('\\', '/')
@@ -34,6 +37,10 @@ def summarize(document):
             if path in seen:
                 raise ValueError('duplicate coverage file')
             seen.add(path)
+            relative = 'crates/' + path.split('/crates/', 1)[1]
+            if relative in dedicated:
+                excluded.append(relative)
+                continue
             crate = path.split('/crates/', 1)[1].split('/', 1)[0]
             if not crate.startswith('plenora-'):
                 continue
@@ -54,7 +61,8 @@ def summarize(document):
     return {'schema_version': 1, 'crates': dict(sorted(crates.items())),
             'product_excluding_smb_fork': {'lines': lines, 'covered': covered,
                                          'percent': round(100 * covered / lines, 2) if lines else None},
-            'scope': 'Rust source including inline test modules; Python wrapper and server interoperability are separate gates',
+            'excluded_test_files': sorted(excluded),
+            'scope': 'Owned Rust production sources; cfg(test) child files excluded. SMB fork is separate and retains upstream inline tests. Python wrapper and interoperability are separate gates.',
             'threshold_status': 'baseline_measurement_only'}
 
 

@@ -49,8 +49,12 @@ Rust e le prove pubbliche CLI/Python sul codice strumentato. Il report completo
 `.fixtures/evidence/`. Il fork SMB è escluso dal totale del prodotto e riportato
 separatamente. I test della wheel non misurano automaticamente le righe Python:
 il report LLVM riguarda il codice Rust, incluso il bridge nativo.
-Le righe dei moduli di test inline nei file Rust rientrano nella misura LLVM:
-la percentuale non va presentata come coverage del solo codice di produzione.
+I test dei crate Storage sono ora in file figli privati, referenziati sotto
+`cfg(test)`. `check_test_layout.py` impedisce di reintrodurli nei file di
+prodotto; il riepilogo esclude questi file usando le dichiarazioni effettive,
+non il solo nome. Il fork SMB conserva i test upstream ed è riportato a parte.
+La baseline storica seguente includeva ancora i test inline: i suoi numeri e
+le relative soglie non costituiscono una misura del nuovo denominatore.
 
 La campagna sul commit `ddf4a3f05cbfc6bb90fe8972124a07b2666123d0`, con test
 Rust e prove CLI/Python su tutte le fixture, misura 6.504/7.583 righe (85,77%)
@@ -74,8 +78,9 @@ bloccare regressioni senza trattare la percentuale come prova di correttezza.
 queste soglie e rifiuta crate mancanti o non ancora censiti nella policy. Il
 report conserva commit, stato del checkout e digest del report LLVM originale.
 Il confronto usa i conteggi esatti; arrotondare la percentuale non permette di
-superare una soglia. Restano da censire e chiudere i percorsi di sicurezza/commit
-non coperti: la misura include test inline e non sostituisce quella revisione.
+superare una soglia. Le soglie storiche restano conservative fino a una nuova
+misura sul prodotto separato dai test; non vengono ridotte senza evidenza.
+Restano da censire e chiudere i percorsi di sicurezza/commit non coperti.
 
 Il wrapper Python ha un gate distinto nella matrice CPython 3.10–3.14 su Linux
 e Windows. `scripts/check_installed_sdk.py --coverage` usa coverage.py 7.16.1

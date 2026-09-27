@@ -11,6 +11,7 @@ from pathlib import Path
 
 from check_installed_sdk import enforce_coverage, test_count
 from check_rust_api import packages
+from check_test_layout import check as check_test_layout
 from check_performance import compare
 from fixture_connections import BUFFERED, PROVIDERS
 from fuzz_parsers import TARGETS as FUZZ_TARGETS, stats
@@ -102,6 +103,7 @@ subjects maps target triples to binary_sha256 and wheel_sha256 from manifests
 already checked by verify_release.py. No caller-supplied waiver is accepted.
 """
     evidence = Evidence(root)
+    check_test_layout(ROOT)
     policy = json.loads((ROOT / 'scripts/coverage-policy.json').read_text())
     for target in TARGETS:
         prefix = f'api/{target}'
@@ -185,7 +187,7 @@ already checked by verify_release.py. No caller-supplied waiver is accepted.
     raw = evidence.read('coverage/rust-coverage.json', coverage['raw_report_sha256'])
     actual = apply_thresholds(summarize(json.loads(raw)), policy['rust_lines'])
     require(actual['threshold_status'] == coverage['threshold_status'] == 'PASS'
-            and all(coverage[key] == actual[key] for key in ('crates', 'thresholds', 'product_excluding_smb_fork')),
+            and all(coverage[key] == actual[key] for key in ('crates', 'thresholds', 'product_excluding_smb_fork', 'excluded_test_files')),
             'Rust coverage failed or differs from raw counters')
 
     linux = subjects[TARGETS[0]]

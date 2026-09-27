@@ -12,6 +12,14 @@ def source(crate, covered, count):
 
 
 class CoverageTests(unittest.TestCase):
+    def test_cfg_test_child_files_cannot_inflate_product_coverage(self):
+        product = source('plenora-storage-core', 1, 10)
+        test = source('plenora-storage-core', 1000, 1000)
+        test['filename'] = '/workspace/crates/plenora-storage-core/src/capability_tests.rs'
+        result = summarize({'data': [{'files': [product, test]}]})
+        self.assertEqual(result['product_excluding_smb_fork']['percent'], 10)
+        self.assertEqual(result['excluded_test_files'], ['crates/plenora-storage-core/src/capability_tests.rs'])
+
     def test_per_crate_gate_rejects_missing_and_undercovered_crates(self):
         report = summarize({'data': [{'files': [source('plenora-smb2', 999, 1000),
                                                source('plenora-storage-core', 8599, 10000)]}]})
