@@ -14,6 +14,7 @@ from build_python import build as build_python
 from render_sbom import render as render_sbom
 from package_cli import build as package_cli
 from package_source import build as package_source, extract
+from release_scope import qualification_scope
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'contracts/upstream'))
 from conformance_checks import adoption_errors
@@ -178,6 +179,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     manifest = {
         'schema_version': 1, 'component': 'plenora-storage-tools', 'version': version,
         'target': target, 'status': 'built',
+        'qualification_scope': qualification_scope(),
         'source_sha256': source_digest(),
         'source_revision': revision.stdout.strip() if revision.returncode == 0 else None,
         'source_committed': not args.allow_dirty,

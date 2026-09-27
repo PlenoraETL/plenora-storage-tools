@@ -4,6 +4,11 @@ Libreria Rust, CLI e SDK Python per accedere a nove sistemi di storage con gli s
 contratti pubblici: S3-compatible, SFTP, FTP, filesystem locale, FTPS,
 Azure Blob / ADLS Gen2, SMB, Google Cloud Storage e WebDAV.
 
+Per la prima 1.0 la [qualifica di compatibilità](docs/compatibility-1.0.md)
+riguarda le fixture dichiarate, tra cui MinIO, Azurite e fake-gcs-server.
+Le prove su AWS S3, Azure Blob e GCS reali sono rinviate: i tre adapter restano
+disponibili, ma i servizi cloud gestiti non sono ancora qualificati.
+
 L'inventario corrente deriva dal codice in [docs/STATO.md](docs/STATO.md).
 L'[aggiornamento 0.2.2](docs/dependency-update-0.2.2.md) descrive le nuove dipendenze e le migrazioni.
 Il [modello di qualità](docs/database-alignment.md) segue Database Tools.

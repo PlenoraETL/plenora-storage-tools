@@ -7,6 +7,7 @@ import sys
 from versioning import parse_version
 from package_cli import verify_archive
 from qualify_local_faults import validate_report as validate_local_faults
+from release_scope import validate_scope
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'contracts/upstream'))
 from conformance_checks import adoption_errors
@@ -57,6 +58,7 @@ def main():
             assert sums[item['name']] == item['sha256'], item['name']
             assert (folder / item['name']).stat().st_size == item['size'], item['name']
         if parse_version(manifest['version']).requires((1, 0, 0)):
+            validate_scope(manifest['qualification_scope'])
             binary = 'plenora-storage.exe' if 'windows' in manifest['target'] else 'plenora-storage'
             extension = '.zip' if 'windows' in manifest['target'] else '.tar.gz'
             archive = f"plenora-storage-{manifest['version']}-{manifest['target']}{extension}"

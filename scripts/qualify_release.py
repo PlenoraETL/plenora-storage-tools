@@ -10,6 +10,7 @@ import sys
 from build_release import ROOT, digest, source_digest
 from qualify_extended_faults import EXPECTED_TESTS, LEGACY_TESTS
 from qualify_local_faults import validate_report as validate_local_faults
+from release_scope import qualification_scope
 from versioning import parse_version
 
 
@@ -111,6 +112,7 @@ def main():
     receipt = {'schema_version': 1, 'component': 'plenora-storage-tools', 'version': output.name,
                'status': 'qualified_for_publication', 'source_revision': revision,
                'source_sha256': source_digest(), 'advisory_database': audit['database'],
+               'qualification_scope': qualification_scope(),
                'platforms': records}
     path = output / 'release-qualification.json'
     path.write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8')

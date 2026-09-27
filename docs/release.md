@@ -1,5 +1,10 @@
 # Qualifica e distribuzione
 
+La prima 1.0 segue il [perimetro approvato](compatibility-1.0.md): tutti i nove
+provider sulle fixture dichiarate, con i cloud reali esplicitamente non
+qualificati. Le prove su account cloud sono rinviate e non bloccano questa
+release; il manifest e la ricevuta riportano tale limite.
+
 La release corrente comprende Rust, CLI e SDK Python; la [matrice](provider-expansion.md) descrive i sei aggiunti. Gli
 artefatti preparati diventano distribuibili quando `release-qualification.json`
 registra `qualified_for_publication` per i loro digest. Non pubblicare un

@@ -4,6 +4,11 @@ Stato: esecuzione autorizzata, non attestazione di release. Riferimento iniziale
 `main`, commit `78fc26f0d9c40de9642368af0f67f9cff1f0fa11`, versione sorgente 0.2.2.
 Verifica iniziale: 19 settembre 2026. Distribuzione scelta: **solo GitHub Releases**.
 
+Aggiornamento autorizzato il 27 settembre 2026: le prove su account cloud reali
+sono rinviate oltre la prima 1.0. Tutti i provider restano inclusi; il claim di
+compatibilità è limitato ai sistemi della [matrice 1.0](compatibility-1.0.md).
+Gli altri criteri di uscita rimangono invariati.
+
 ## Obiettivo e perimetro
 
 Pubblicare una 1.0.0 installabile e supportabile con API stabili Rust, CLI e SDK
@@ -134,7 +139,7 @@ FTPS, SMB e WebDAV non diventano atomici per il solo passaggio alla 1.0.
 | Area | Prova richiesta |
 | --- | --- |
 | Provider | Sette operazioni, vuoti e file grandi, paginazione, conflitti, concorrenza, metadata e credenziali corrette/errate sui sistemi dichiarati |
-| Cloud | AWS S3, Azure Blob e GCS reali per dichiararne supporto di produzione; account e namespace dedicati, budget fissato e cleanup limitato agli oggetti della prova |
+| Cloud | Prima 1.0: MinIO, Azurite e fake-gcs-server. AWS S3, Azure Blob e GCS reali rinviati e dichiarati non qualificati; richiederanno account, namespace e budget dedicati |
 | Altri server | MinIO, OpenSSH, Pure-FTPd, FTPS TLS, Samba cifrato e WsgiDAV come baseline; Windows Server/Nextcloud soltanto dopo prove dedicate |
 | Coverage | Report separati per core, adapter, CLI, Python e fork SMB; baseline e soglie per modulo, con percorsi di sicurezza/commit inventariati; il volume di test upstream SMB non maschera lacune del prodotto |
 | Fuzz | Target per configurazioni, nomi/path, risposte XML/FTP e cursor; seed, durata e risultati conservati; crash riproducibili trasformati in regressioni |
@@ -144,8 +149,9 @@ FTPS, SMB e WebDAV non diventano atomici per il solo passaggio alla 1.0.
 
 Le soglie numeriche di coverage e throughput si fissano dopo la prima misura,
 prima della RC; non si inventano risultati o SLO a partire dal conteggio dei test.
-L'assenza di account cloud blocca il relativo claim di supporto reale: va risolta
-prima della 1.0 proposta, oppure il perimetro va ristretto esplicitamente.
+Il perimetro della prima 1.0 è stato ristretto esplicitamente alle fixture:
+l'assenza di account cloud non blocca la release, ma impedisce di dichiarare
+qualificati i corrispondenti servizi reali.
 
 ### M4 — GitHub Release candidate
 
@@ -192,8 +198,9 @@ Primo intervento: M0, cominciando dai log Actions e dalla gestione prerelease.
 M1 determina i cambiamenti ammessi; M2 e M3 procedono per provider; soltanto
 dopo si passa a RC e finale. Non serve pubblicare retroattivamente le versioni 0.x.
 
-Servono accessi agli account cloud di test, disponibilità della VM, permessi di
-pubblicazione GitHub e un referente per il supporto. Non servono account di
+Servono disponibilità della VM, permessi di pubblicazione GitHub e un referente
+per il supporto. Gli account cloud di test servono alla qualifica futura,
+rinviata oltre la prima 1.0. Non servono account di
 pubblicazione crates.io/PyPI. Stime e date si fissano dopo M0/M1 e la prima
 misura sui trasferimenti: i rischi principali sono autenticazione, file grandi,
 interoperabilità cloud e chiusura delle differenze tra runner locali e CI.
