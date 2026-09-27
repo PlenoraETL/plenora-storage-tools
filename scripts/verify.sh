@@ -19,6 +19,7 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo test --workspace --all-targets --locked -- --include-ignored
 cargo build --quiet --locked -p plenora-storage-cli
+python3 scripts/release_publication.py smoke-cli --binary target/debug/plenora-storage
 python3 scripts/qualify_local_faults.py
 
 cli_tmp="$(mktemp -d)"

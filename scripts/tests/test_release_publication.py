@@ -12,6 +12,28 @@ from versioning import workspace_version
 
 
 class PublicationTests(unittest.TestCase):
+    def test_cli_smoke_uses_json_protocol_and_rejects_wrong_identity(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            binary = Path(temporary) / 'fixture-cli'
+            binary.write_bytes(b'fixture')
+            version = workspace_version().native
+            identity = dict(status='ok', command='version', protocol_version=2, component_version=version,
+                            result=dict(component_version=version, cli_protocol_version=2))
+            catalog = dict(status='ok', result=dict(component_version=version, operations=[{}] * 7))
+            def invoke(command, **kwargs):
+                self.assertEqual(command[0], str(binary))
+                self.assertEqual(command[1:3], ['--format', 'json'])
+                return json.dumps(identity if command[3] == '--version' else catalog)
+            with patch.object(publication.subprocess, 'check_output', side_effect=invoke):
+                self.assertEqual(publication.smoke_cli(binary, version)['status'], 'PASS')
+                identity['result']['component_version'] = version + '.different'
+                with self.assertRaises(ValueError):
+                    publication.smoke_cli(binary, version)
+                identity['result']['component_version'] = version
+                identity['status'] = 'error'
+                with self.assertRaises(ValueError):
+                    publication.smoke_cli(binary, version)
+
     def test_roundtrip_inventory_rejects_changed_bytes_extra_assets_and_stale_receipt(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

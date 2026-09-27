@@ -144,6 +144,20 @@ def bundle_input(release, evidence, output):
             stream.add(release / name, arcname=destination, recursive=False)
 
 
+def smoke_cli(binary, version):
+    """Use the same machine protocol required of installed CLI consumers."""
+    identity = json.loads(subprocess.check_output([str(binary), '--format', 'json', '--version'], text=True))
+    require(identity['status'] == 'ok' and identity['command'] == 'version'
+            and identity['protocol_version'] == 2
+            and identity['component_version'] == version
+            and identity['result'] == {'component_version': version, 'cli_protocol_version': 2},
+            'downloaded CLI version or protocol differs')
+    catalog = json.loads(subprocess.check_output([str(binary), '--format', 'json', 'capabilities'], text=True))
+    require(catalog['status'] == 'ok' and catalog['result']['component_version'] == version
+            and len(catalog['result']['operations']) == 7, 'downloaded CLI discovery differs')
+    return {'status': 'PASS', 'version': version, 'binary_sha256': digest(binary)}
+
+
 def smoke(directory):
     check_files(directory)
     version = workspace_version().native
@@ -163,11 +177,7 @@ def smoke(directory):
         receipt = json.loads((directory / 'release-qualification.json').read_text())
         record = next(p for p in receipt['platforms'] if p['target'] == target)
         require(digest(binary) == record['binary_sha256'], 'downloaded CLI differs from qualified binary')
-        output = subprocess.check_output([str(binary), '--version'], text=True)
-        require(version in output, 'downloaded CLI version differs')
-        catalog = json.loads(subprocess.check_output([str(binary), '--format', 'json', 'capabilities'], text=True))
-        require(catalog['result']['component_version'] == version and len(catalog['result']['operations']) == 7,
-                'downloaded CLI discovery differs')
+        smoke_cli(binary, version)
         wheel_tag = 'win_amd64' if sys.platform == 'win32' else 'manylinux'
         wheels = [path for path in directory.glob('*.whl') if wheel_tag in path.name]
         require(len(wheels) == 1, 'downloaded wheel is missing or ambiguous')
@@ -206,11 +216,12 @@ def publish(directory, tag):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['bundle', 'draft', 'prepare', 'smoke', 'upload', 'publish'])
+    parser.add_argument('action', choices=['bundle', 'draft', 'prepare', 'smoke', 'smoke-cli', 'upload', 'publish'])
     parser.add_argument('--tag')
     parser.add_argument('--directory', type=Path)
     parser.add_argument('--archive', type=Path)
     parser.add_argument('--evidence', type=Path)
+    parser.add_argument('--binary', type=Path)
     args = parser.parse_args()
     if args.action == 'bundle':
         bundle_input(args.directory.resolve(), args.evidence.resolve(), args.archive.resolve())
@@ -220,6 +231,8 @@ if __name__ == '__main__':
         prepare(args.archive, args.directory.resolve(), args.tag)
     elif args.action == 'smoke':
         smoke(args.directory.resolve())
+    elif args.action == 'smoke-cli':
+        print(json.dumps(smoke_cli(args.binary.resolve(), workspace_version().native)))
     elif args.action == 'upload':
         upload(args.directory.resolve(), args.tag)
     else:
