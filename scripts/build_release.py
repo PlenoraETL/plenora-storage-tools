@@ -12,6 +12,7 @@ import sys
 
 from build_python import build as build_python
 from render_sbom import render as render_sbom
+from render_sbom import render_qualification
 from package_cli import build as package_cli
 from package_source import build as package_source, extract
 from release_scope import qualification_scope
@@ -131,6 +132,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     python_files = build_python(output)
     files.extend(python_files)
     wheel = next(path for path in python_files if path.suffix == '.whl')
+    qualification_sbom = output / 'qualification-sbom.cdx.json'
+    qualification_sbom.write_text(json.dumps(render_qualification(), indent=2) + '\n', encoding='utf-8')
+    files.append(qualification_sbom)
     sbom_path = output / 'storage-sbom.cdx.json'
     sbom_path.write_text(json.dumps(render_sbom(files), indent=2) + '\n', encoding='utf-8')
     files.append(sbom_path)

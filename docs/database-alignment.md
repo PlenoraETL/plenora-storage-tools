@@ -22,7 +22,12 @@ Seguire questi principi non significa avere già la stessa maturità del riferim
 
 L'inventario SBOM comprende dipendenze opzionali, di sviluppo e di tutti i target:
 non afferma che ciascuna sia collegata a ogni binario. Non include pacchetti del
-sistema operativo o strumenti di build. Lo schema di riferimento è quello
+sistema operativo o strumenti esterni di build. Un secondo inventario,
+`qualification-sbom.cdx.json`, comprende i grafi dei lockfile fuzz/API e i pin
+Python dichiarati nei file requirements. Questi pin non descrivono un ambiente
+installato né tutte le sue dipendenze transitive. Entrambi gli inventari sono
+ricostruiti e confrontati dal gate finale; la SBOM di prodotto lega anche gli
+artefatti ai loro digest. Lo schema di riferimento è quello
 [ufficiale CycloneDX 1.6](https://github.com/CycloneDX/specification/blob/1.6/schema/bom-1.6.schema.json).
 
 Lo SDK Python espone le sette operazioni tramite file e conserva risultati

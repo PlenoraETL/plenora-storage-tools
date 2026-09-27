@@ -14,13 +14,21 @@ use serde::de::DeserializeOwned;
 use sha2::{Digest, Sha256};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-/// Factory used by the additional provider adapters.
+/// Supplies connection validation and backend construction for an adapter.
+///
+/// Implementations must declare only publication and metadata guarantees they
+/// enforce. The shared provider validates requests before consuming upload data
+/// and treats interrupted mutations conservatively when their effect is unknown.
 #[async_trait]
 pub trait ProviderFactory: Send + Sync + 'static {
     const ID: &'static str;
     const CONTRACT: &'static str;
     const ATOMIC: bool;
     const METADATA: bool = false;
+    /// Checks configuration and engine policy without opening a connection.
+    ///
+    /// # Errors
+    /// Returns a public configuration or policy error without credential values.
     fn validate(connection: &ProviderConnection, policy: &EngineConfig) -> StorageResult<()>;
     #[doc(hidden)]
     async fn connect(
@@ -55,13 +63,17 @@ pub trait Backend: Send {
 }
 
 /// Provider with streaming downloads and bounded, fully validated uploads.
+///
 /// Upload and copy buffers are limited by `max_buffered_put_bytes`.
+/// The limit is per operation; callers must also bound aggregate concurrency.
+/// Backend connection, commit and read failures retain their error effect axes.
 pub struct Provider<F: ProviderFactory> {
     credentials: Arc<dyn CredentialResolver>,
     factory: PhantomData<F>,
 }
 
 impl<F: ProviderFactory> Provider<F> {
+    /// Retains a resolver without contacting the backend or requesting secrets.
     #[must_use]
     pub fn new(credentials: Arc<dyn CredentialResolver>) -> Self {
         Self {

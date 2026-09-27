@@ -13,6 +13,7 @@ from qualify_local_faults import validate_report as validate_local_faults
 from release_scope import qualification_scope
 from release_evidence import validate_bundle
 from versioning import parse_version
+from render_sbom import verify as verify_sbom, verify_qualification as verify_qualification_sbom
 
 
 def main():
@@ -45,6 +46,12 @@ def main():
         manifest = json.loads((folder / 'release-manifest.json').read_text())
         assert manifest['source_committed'] and manifest['source_revision'] == revision
         assert manifest['source_sha256'] == source_digest(), 'source snapshot changed'
+        if parse_version(manifest['version']).requires((1, 0, 0)):
+            verify_qualification_sbom(json.loads((folder / 'qualification-sbom.cdx.json').read_text()))
+            # These two files are produced after the inventoried build assets.
+            inventoried = [folder / item['name'] for item in manifest['artifacts']
+                          if item['name'] not in {'storage-sbom.cdx.json', 'adoption-manifest-v4.json'}]
+            verify_sbom(json.loads((folder / 'storage-sbom.cdx.json').read_text()), inventoried)
         qualification_path = folder / 'qualification.json'
         qualification = json.loads(qualification_path.read_text())
         assert {r['provider'] for r in qualification['results']} == {'s3', 'sftp', 'ftp'}
@@ -73,6 +80,8 @@ def main():
             assert all(r['status'] == 'PASS' and r['reported_effect'] == 'unknown' for r in faults['results'])
         evidence = [qualification_path, regression_path, suite_path, audit_path, deny_path,
                     folder / 'adoption-manifest-v4.json', folder / 'release-manifest.json']
+        if parse_version(manifest['version']).requires((1, 0, 0)):
+            evidence.append(folder / 'qualification-sbom.cdx.json')
         if parse_version(manifest['version']).requires((0, 2, 1)):
             python_path = folder / 'python-qualification.json'
             python_report = json.loads(python_path.read_text())

@@ -1,4 +1,10 @@
 //! Additional storage providers sharing the v1 operations and bounded transfers.
+//!
+//! Local, Azure Blob, GCS, SMB and `WebDAV` use streaming downloads and bounded
+//! upload/copy buffers. Discovery describes supported request policies; protocol
+//! support does not certify every server implementation or real cloud account.
+//! Local access uses process permissions. Remote credentials are resolved when
+//! an operation connects, and GCS token refresh remains the host's responsibility.
 #![forbid(unsafe_code)]
 
 // Entry points exist only in instrumented fuzz builds, never in product builds.

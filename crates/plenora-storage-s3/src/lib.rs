@@ -1,4 +1,9 @@
 //! S3-compatible adapter for `plenora-storage-core`.
+//!
+//! Overwriting uploads use multipart streaming; create-if-absent uploads are
+//! buffered within the engine limit. A failed completion may already have
+//! published the object: callers must inspect the error's effect and retry axes.
+//! The adapter disables automatic HTTP retries and pins validated DNS addresses.
 
 #![forbid(unsafe_code)]
 
@@ -39,11 +44,14 @@ pub const CONFIG_CONTRACT: &str = "plenora-storage-s3-connection-v1";
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+/// Non-secret S3 addressing; credentials are supplied by the configured resolver.
 pub struct S3ConnectionConfig {
+    /// Base service URL; HTTP requires explicit engine authorization.
     pub endpoint: String,
     pub bucket: String,
     #[serde(default = "default_region")]
     pub region: String,
+    /// Address the bucket through a host prefix instead of a path segment.
     #[serde(default)]
     pub virtual_hosted_style: bool,
 }
@@ -52,11 +60,13 @@ fn default_region() -> String {
     "us-east-1".to_owned()
 }
 
+/// S3 adapter that resolves credentials for each operation's connection.
 pub struct S3Provider {
     credentials: Arc<dyn CredentialResolver>,
 }
 
 impl S3Provider {
+    /// Retains the resolver without opening a connection or resolving secrets.
     #[must_use]
     pub fn new(credentials: Arc<dyn CredentialResolver>) -> Self {
         Self { credentials }

@@ -1,4 +1,8 @@
 //! SFTP adapter for `plenora-storage-core`.
+//!
+//! Transfers stream through bounded chunks. Atomic publication additionally
+//! requires a qualified rename connection, overwrite enabled and the server's
+//! POSIX rename extension. Cancellation during rename can leave an unknown effect.
 
 #![forbid(unsafe_code)]
 
@@ -40,6 +44,7 @@ static TEMPORARY_NAME_NONCE: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+/// SSH addressing and publication policy, separate from authentication material.
 pub struct SftpConnectionConfig {
     pub host: String,
     #[serde(default = "default_port")]
@@ -47,8 +52,11 @@ pub struct SftpConnectionConfig {
     #[serde(default = "default_root")]
     pub root: String,
     #[serde(default)]
+    /// SHA-256 host-key fingerprint; omission requires explicit engine permission.
     pub host_key_sha256: Option<String>,
     #[serde(default)]
+    /// Declares that the deployment has qualified the server's atomic rename.
+    /// This does not bypass extension detection or the overwrite requirement.
     pub atomic_rename: bool,
 }
 
@@ -60,11 +68,13 @@ fn default_root() -> String {
     ".".to_owned()
 }
 
+/// SFTP adapter; server keys are checked before credential authentication.
 pub struct SftpProvider {
     credentials: Arc<dyn CredentialResolver>,
 }
 
 impl SftpProvider {
+    /// Retains the resolver; network and credential work begin with an operation.
     #[must_use]
     pub fn new(credentials: Arc<dyn CredentialResolver>) -> Self {
         Self { credentials }

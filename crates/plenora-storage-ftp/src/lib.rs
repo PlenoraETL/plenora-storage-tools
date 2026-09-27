@@ -1,4 +1,8 @@
 //! FTP adapter for `plenora-storage-core`.
+//!
+//! FTP and explicit FTPS share streaming transfers and publication checks.
+//! Neither promises atomic publication or create-if-absent: unsupported policies
+//! fail before upload. A lost final reply can leave the remote effect unknown.
 
 #![forbid(unsafe_code)]
 
@@ -48,6 +52,7 @@ pub enum FtpMode {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+/// Non-secret configuration shared by FTP and explicit FTPS.
 pub struct FtpConnectionConfig {
     pub host: String,
     #[serde(default = "default_port")]
@@ -57,6 +62,7 @@ pub struct FtpConnectionConfig {
     #[serde(default)]
     pub mode: FtpMode,
     #[serde(default)]
+    /// Additional PEM trust anchors for FTPS; rejected for plaintext FTP.
     pub tls_ca_pem: Option<String>,
 }
 
@@ -68,12 +74,14 @@ fn default_root() -> String {
     ".".to_owned()
 }
 
+/// FTP/FTPS adapter with passive data connections constrained to the control peer.
 pub struct FtpProvider {
     credentials: Arc<dyn CredentialResolver>,
     secure: bool,
 }
 
 impl FtpProvider {
+    /// Creates plaintext FTP; use [`Self::new_ftps`] for explicit FTPS.
     #[must_use]
     pub fn new(credentials: Arc<dyn CredentialResolver>) -> Self {
         Self {
