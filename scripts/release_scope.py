@@ -13,6 +13,10 @@ def qualification_scope():
             'aws_s3': 'not_qualified', 'azure_blob': 'not_qualified',
             'google_cloud_storage': 'not_qualified',
         },
+        'fixture_configuration': {
+            'webdav': {'server': 'WsgiDAV', 'version': '4.3.5', 'workers': 1,
+                       'multithreaded_create_if_absent': 'not_qualified'},
+        },
     }
 
 

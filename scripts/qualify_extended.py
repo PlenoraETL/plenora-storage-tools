@@ -33,7 +33,7 @@ def main():
             'azure': {'endpoint': f'http://{HOST or "azure"}:10000/devstoreaccount1', 'account': 'devstoreaccount1', 'container': 'plenora-test'},
             'gcs': {'endpoint': f'http://{HOST or "gcs"}:4443', 'bucket': 'plenora-test'},
             'smb': {'host': HOST or 'smb', 'port': 1445 if HOST else 445, 'share': 'storage'},
-            'webdav': {'endpoint': f'http://{HOST or "webdav"}:{8088 if HOST else 8080}/'},
+            'webdav': {'endpoint': f'http://{HOST or "webdav"}:{os.environ.get("PLENORA_WEBDAV_PORT", 8088 if HOST else 8080)}/'},
             'ftps': {'host': HOST or 'ftps', 'port': 2122 if HOST else 21, 'tls_ca_pem': cert_path.read_text()},
         }
         env = dict(os.environ, PLENORA_EXTENDED_CREDENTIALS=json.dumps({

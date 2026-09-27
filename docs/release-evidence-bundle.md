@@ -7,7 +7,8 @@ e il relativo `SHA256SUMS` nella directory candidata.
 
 ## Preparazione delle evidenze
 
-Le prove di base restano quelle di [release.md](release.md). Sotto la directory
+Le prove di base restano quelle di [release.md](release.md), incluso
+`webdav-fixture.json` accanto agli artefatti di ciascun target. Sotto la directory
 passata a `qualify_release.py --evidence` aggiungere `gates/` con questa struttura:
 
 | Percorso relativo a gates | Origine e controllo |

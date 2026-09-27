@@ -13,6 +13,7 @@ DOCUMENTS = [
     'docs/README.md', 'docs/database-reference-review.md', 'docs/release-evidence-bundle.md',
     'docs/quality-alignment-progress.md',
     'docs/migration-1.0.md', 'docs/reliability.md', 'docs/compatibility-1.0.md',
+    'docs/webdav-compatibility.md',
     'crates/plenora-storage-py/README.md',
     'crates/plenora-storage-py/examples/local_roundtrip.py',
     'crates/plenora-smb2/PROVENANCE.md', 'crates/plenora-smb2/LICENSE-MIT',

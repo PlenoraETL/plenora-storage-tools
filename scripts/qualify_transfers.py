@@ -23,8 +23,9 @@ from fixture_connections import ATOMIC, BUFFERED, PROVIDERS, ROOT, fixture
 
 def measurement_environment():
     """Identify the test platform without recording host names or endpoints."""
+    fixture_files = subprocess.check_output(['git', 'ls-files', '--', 'docker'], cwd=ROOT, text=True).splitlines()
     sources = [ROOT / 'docker-compose.yml', ROOT / 'compose.extended.yml',
-               *sorted((ROOT / 'docker').rglob('Dockerfile'))]
+               *(ROOT / name for name in sorted(fixture_files))]
     fixture_hash = hashlib.sha256()
     for path in sources:
         fixture_hash.update(path.relative_to(ROOT).as_posix().encode() + b'\0' + path.read_bytes())

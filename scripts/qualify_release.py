@@ -14,6 +14,7 @@ from release_scope import qualification_scope
 from release_evidence import validate_bundle
 from versioning import parse_version
 from render_sbom import verify as verify_sbom, verify_qualification as verify_qualification_sbom
+from check_webdav_fixture import validate_report as validate_webdav_fixture
 
 
 def main():
@@ -82,6 +83,9 @@ def main():
                     folder / 'adoption-manifest-v4.json', folder / 'release-manifest.json']
         if parse_version(manifest['version']).requires((1, 0, 0)):
             evidence.append(folder / 'qualification-sbom.cdx.json')
+            fixture_path = folder / 'webdav-fixture.json'
+            validate_webdav_fixture(json.loads(fixture_path.read_text()), revision)
+            evidence.append(fixture_path)
         if parse_version(manifest['version']).requires((0, 2, 1)):
             python_path = folder / 'python-qualification.json'
             python_report = json.loads(python_path.read_text())

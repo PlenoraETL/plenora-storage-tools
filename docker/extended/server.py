@@ -28,7 +28,11 @@ elif mode == 'webdav':
         'http_authenticator': {'accept_basic': True, 'accept_digest': False, 'default_to_digest': False},
         'verbose': 1,
     })
-    Server(('0.0.0.0', 8080), app).start()
+    # WsgiDAV 4.3.5 checks If-None-Match before creating the filesystem entry.
+    # Concurrent server workers can both accept an exclusive PUT. Qualify the
+    # single-worker deployment explicitly; this is not a claim for stock
+    # multithreaded WsgiDAV or for other servers that ignore preconditions.
+    Server(('0.0.0.0', 8080), app, numthreads=1, max=1).start()
 elif mode == 'azure-init':
     from azure.storage.blob import BlobServiceClient
     from azure.core.exceptions import ResourceExistsError

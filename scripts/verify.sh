@@ -15,6 +15,7 @@ PLENORA_SFTP_HOST_KEY_SHA256="$(cat .fixtures/sftp-fingerprint)"
 export PLENORA_SFTP_PRIVATE_KEY_FILE="$PWD/.fixtures/sftp-client"
 export PLENORA_SFTP_ENCRYPTED_KEY_FILE="$PWD/.fixtures/sftp-client-encrypted"
 
+python3 scripts/check_webdav_fixture.py
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo test --workspace --all-targets --locked -- --include-ignored

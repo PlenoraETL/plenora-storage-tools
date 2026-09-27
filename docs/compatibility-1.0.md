@@ -18,13 +18,17 @@ e non certifica il funzionamento sui servizi cloud gestiti.
 | Azure Blob | Azurite |
 | Google Cloud Storage | fake-gcs-server |
 | SMB | Samba con cifratura SMB3 |
-| WebDAV | WsgiDAV |
+| WebDAV | WsgiDAV 4.3.5 / Cheroot 11.1.2, un solo worker |
 
 Questa tabella definisce il perimetro; gli esiti effettivi e i digest sono nella
 ricevuta della singola release. Le versioni delle fixture sono fissate nei file
 Compose e Docker del commit qualificato. Una capability nella discovery indica
 un comportamento implementato, non la certificazione di ogni server che espone
 quel protocollo.
+
+La [qualifica WebDAV](webdav-compatibility.md) descrive la corsa rilevata con
+più worker, la configurazione seriale richiesta e il gate HTTP indipendente.
+WsgiDAV con più worker non è qualificato per create-if-absent concorrente.
 
 AWS S3, Azure Blob gestito e Google Cloud Storage reale restano **non qualificati**.
 In particolare non si estendono le prove degli emulatori a IAM/RBAC, credenziali

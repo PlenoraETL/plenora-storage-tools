@@ -20,6 +20,15 @@ class ReleaseScopeTests(unittest.TestCase):
         del missing['real_cloud_services']
         with self.assertRaises(ValueError):
             validate_scope(missing)
+        for workers in (2, 10):
+            altered = copy.deepcopy(scope)
+            altered['fixture_configuration']['webdav']['workers'] = workers
+            with self.subTest(workers=workers), self.assertRaises(ValueError):
+                validate_scope(altered)
+        altered = copy.deepcopy(scope)
+        del altered['fixture_configuration']
+        with self.assertRaises(ValueError):
+            validate_scope(altered)
         missing = copy.deepcopy(scope)
         del missing['provider_systems']['azure']
         with self.assertRaises(ValueError):

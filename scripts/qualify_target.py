@@ -48,6 +48,8 @@ def qualify(folder, host=None, ca=None, pin=None):
         else:
             subprocess.run(command, cwd=ROOT, env=env, check=True)
 
+    subprocess.run([sys.executable, str(ROOT / 'scripts/check_webdav_fixture.py'),
+                    '--output', str(folder / 'webdav-fixture.json')], cwd=ROOT, env=env, check=True)
     run('qualify_cli', 'qualification.json')
     for name, report, destination in [
         ('qualify_extended', 'extended-qualification.json', 'extended-qualification.json'),

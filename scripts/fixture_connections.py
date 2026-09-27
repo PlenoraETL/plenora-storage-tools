@@ -21,7 +21,7 @@ def fixture(provider, local_root):
                   'account': 'devstoreaccount1', 'container': 'plenora-test'},
         'gcs': {'endpoint': f'http://{host or "gcs"}:4443', 'bucket': 'plenora-test'},
         'smb': {'host': host or 'smb', 'port': 1445 if host else 445, 'share': 'storage'},
-        'webdav': {'endpoint': f'http://{host or "webdav"}:{8088 if host else 8080}/'},
+        'webdav': {'endpoint': f'http://{host or "webdav"}:{os.environ.get("PLENORA_WEBDAV_PORT", 8088 if host else 8080)}/'},
     }
     config = configurations[provider]
     if provider == 'sftp':
