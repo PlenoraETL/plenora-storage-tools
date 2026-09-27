@@ -1,9 +1,14 @@
 # WebDAV: configurazione qualificabile
 
-La fixture della 1.0 usa **WsgiDAV 4.3.5 e Cheroot 11.1.2 con un solo worker**
-(`numthreads=1`, `max=1`). I client possono inviare operazioni concorrenti;
-il server le serve in sequenza. Questa configurazione non certifica WsgiDAV
-con più worker, né altri server WebDAV.
+La fixture della 1.0 usa **WsgiDAV 4.3.5 e Cheroot 11.1.2 con richieste WSGI
+serializzate da un lock in un solo processo**. I 32 worker HTTP gestiscono le
+connessioni; una sola richiesta applicativa alla volta valuta le precondizioni
+e accede al filesystem. Il lock resta acquisito fino alla chiusura della risposta.
+La coda di ascolto è 64 e il limite di connessioni persistenti è 256.
+
+Questo è un adattamento esplicito del laboratorio, non una certificazione di
+WsgiDAV predefinito, di più processi che condividono il filesystem, né di altri
+server WebDAV. Codice e configurazione sono in `docker/extended/server.py`.
 
 ## Difetto osservato durante RC.2
 
@@ -20,11 +25,18 @@ Storage invia già la precondizione prevista da
 [RFC 9110, sezione 13.1.2](https://www.rfc-editor.org/rfc/rfc9110.html#section-13.1.2).
 Un controllo di esistenza nel client non eliminerebbe questa corsa tra processi.
 
-La prova HTTP indipendente, ripetuta su un'istanza separata con un solo worker,
-ha rilevato **zero round con più scrittori riusciti su 30**. Questo risultato
-motiva la configurazione della nuova fixture; non promuove gli artefatti o
-i report della precedente campagna fallita. Il candidato deve essere ricostruito
-e qualificato sul nuovo commit. Le ricevute precedenti restano storiche.
+Una prima prova con un solo worker ha rilevato zero round con più scrittori
+riusciti su 30. Il benchmark successivo ha però mostrato attese di 10–20 secondi
+nella gestione delle connessioni. Inoltre il probe remoto da Windows ha
+rilevato reset con i limiti predefiniti delle connessioni. Per questo la
+configurazione finale serializza le richieste WSGI mantenendo i worker HTTP.
+
+Il prototipo finale ha superato il probe Windows completo e le sette operazioni
+della CLI, inclusa la creazione concorrente. Una campagna Linux di sviluppo con
+quattro client e cinque round WebDAV ha misurato 140 operazioni, con massimo
+42 ms; non è un SLO né il confronto finale della release. Le vecchie campagne
+fallite o interrotte restano conservate. Il candidato deve essere ricostruito
+e qualificato sul nuovo commit; queste prove non promuovono altri artefatti.
 
 ## Gate riproducibile
 
@@ -35,7 +47,9 @@ Il report omette endpoint, credenziali e contenuti dei file.
 
 Nella verifica del nuovo gate, la fixture con più worker ha fallito in 13 round
 su 30; l'istanza a un worker ha superato tutti i round, inclusa la verifica
-del contenuto. Sono campagne distinte dalla riproduzione iniziale sopra.
+del contenuto. Anche il successivo prototipo con serializzazione WSGI ha
+superato tutti i round da Windows. Sono campagne distinte dalla riproduzione
+iniziale sopra.
 
 Il controllo è eseguito da `scripts/verify.sh` nei workflow CI e release-candidate,
 e da `scripts/qualify_target.py` sulla fixture usata per ciascun target finale.

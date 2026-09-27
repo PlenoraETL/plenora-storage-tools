@@ -1,0 +1,1637 @@
+{
+  "status": "FAIL",
+  "binary_sha256": "2ff3ad9d47f71a08bb173af6cb8103f1f324e7cc88294303b8323370b95bee20",
+  "policy": {
+    "schema_version": 1,
+    "minimum_rounds": 5,
+    "maximum_regression_percent": {
+      "median": 10,
+      "p95": 20,
+      "maximum": 10
+    }
+  },
+  "results": [
+    {
+      "provider": "azure",
+      "operation": "copy",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.032049999999999995,
+      "candidate": 0.02895,
+      "regression_percent": -9.672386895475803,
+      "status": "PASS"
+    },
+    {
+      "provider": "azure",
+      "operation": "copy",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0487,
+      "candidate": 0.0375,
+      "regression_percent": -22.997946611909658,
+      "status": "PASS"
+    },
+    {
+      "provider": "azure",
+      "operation": "copy",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 12754944,
+      "candidate": 12333056,
+      "regression_percent": -3.307642903018626,
+      "status": "PASS"
+    },
+    {
+      "provider": "azure",
+      "operation": "delete",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.0174,
+      "candidate": 0.014249999999999999,
+      "regression_percent": -18.103448275862068,
+      "status": "PASS"
+    },
+    {
+      "provider": "azure",
+      "operation": "delete",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0279,
+      "candidate": 0.026,
+      "regression_percent": -6.810035842293916,
+      "status": "PASS"
+    },
+    {
+      "provider": "azure",
+      "operation": "delete",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11714560,
+      "candidate": 11620352,
+      "regression_percent": -0.8041958041958064,
+      "status": "PASS"
+    },
+    {
+      "provider": "azure",
+      "operation": "get",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.02285,
+      "candidate": 0.01635,
+      "regression_percent": -28.446389496717718,
+      "status": "PASS"
+    },
+    {
+      "provider": "azure",
+      "operation": "get",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0321,
+      "candidate": 0.0257,
+      "regression_percent": -19.937694704049836,
+      "status": "PASS"
+    },
+    {
+      "provider": "azure",
+      "operation": "get",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 12087296,
+      "candidate": 12046336,
+      "regression_percent": -0.3388681802778737,
+      "status": "PASS"
+    },
+    {
+      "provider": "azure",
+      "operation": "put",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.0287,
+      "candidate": 0.0236,
+      "regression_percent": -17.770034843205572,
+      "status": "PASS"
+    },
+    {
+      "provider": "azure",
+      "operation": "put",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0403,
+      "candidate": 0.0307,
+      "regression_percent": -23.821339950372213,
+      "status": "PASS"
+    },
+    {
+      "provider": "azure",
+      "operation": "put",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11776000,
+      "candidate": 11857920,
+      "regression_percent": 0.6956521739130528,
+      "status": "PASS"
+    },
+    {
+      "provider": "azure",
+      "operation": "stat",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.0108,
+      "candidate": 0.009999999999999998,
+      "regression_percent": -7.40740740740743,
+      "status": "PASS"
+    },
+    {
+      "provider": "azure",
+      "operation": "stat",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0276,
+      "candidate": 0.0184,
+      "regression_percent": -33.333333333333336,
+      "status": "PASS"
+    },
+    {
+      "provider": "azure",
+      "operation": "stat",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11575296,
+      "candidate": 11530240,
+      "regression_percent": -0.38924274593064023,
+      "status": "PASS"
+    },
+    {
+      "provider": "azure",
+      "operation": "test",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.012150000000000001,
+      "candidate": 0.0119,
+      "regression_percent": -2.0576131687242816,
+      "status": "PASS"
+    },
+    {
+      "provider": "azure",
+      "operation": "test",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0236,
+      "candidate": 0.0151,
+      "regression_percent": -36.01694915254237,
+      "status": "PASS"
+    },
+    {
+      "provider": "azure",
+      "operation": "test",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11841536,
+      "candidate": 11857920,
+      "regression_percent": 0.13836042891732792,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftp",
+      "operation": "copy",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 5.34535,
+      "candidate": 5.52895,
+      "regression_percent": 3.4347610540002016,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftp",
+      "operation": "copy",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 6.5015,
+      "candidate": 5.8578,
+      "regression_percent": -9.900792124894252,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftp",
+      "operation": "copy",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11431936,
+      "candidate": 11423744,
+      "regression_percent": -0.07165890361877647,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftp",
+      "operation": "delete",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 2.81445,
+      "candidate": 2.6304499999999997,
+      "regression_percent": -6.537689424221438,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftp",
+      "operation": "delete",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 3.0526,
+      "candidate": 2.9713,
+      "regression_percent": -2.6633034134835976,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftp",
+      "operation": "delete",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11436032,
+      "candidate": 11427840,
+      "regression_percent": -0.07163323782235498,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftp",
+      "operation": "get",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 2.9215,
+      "candidate": 2.6784,
+      "regression_percent": -8.321067944549032,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftp",
+      "operation": "get",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 3.3769,
+      "candidate": 3.0246,
+      "regression_percent": -10.43264532559448,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftp",
+      "operation": "get",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11431936,
+      "candidate": 11423744,
+      "regression_percent": -0.07165890361877647,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftp",
+      "operation": "put",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 2.7259,
+      "candidate": 2.6737,
+      "regression_percent": -1.9149638651454581,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftp",
+      "operation": "put",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 3.3651,
+      "candidate": 3.0134,
+      "regression_percent": -10.45139817538855,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftp",
+      "operation": "put",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11431936,
+      "candidate": 11423744,
+      "regression_percent": -0.07165890361877647,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftp",
+      "operation": "stat",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 2.753,
+      "candidate": 2.67705,
+      "regression_percent": -2.758808572466409,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftp",
+      "operation": "stat",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 3.3278,
+      "candidate": 2.988,
+      "regression_percent": -10.21095017729431,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftp",
+      "operation": "stat",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11419648,
+      "candidate": 11427840,
+      "regression_percent": 0.0717360114777632,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftp",
+      "operation": "test",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 2.7731500000000002,
+      "candidate": 2.5955500000000002,
+      "regression_percent": -6.404269513008676,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftp",
+      "operation": "test",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 3.0794,
+      "candidate": 3.0605,
+      "regression_percent": -0.613755926479187,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftp",
+      "operation": "test",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11427840,
+      "candidate": 11427840,
+      "regression_percent": 0.0,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftps",
+      "operation": "copy",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.05085,
+      "candidate": 0.0474,
+      "regression_percent": -6.784660766961659,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftps",
+      "operation": "copy",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0891,
+      "candidate": 0.0685,
+      "regression_percent": -23.12008978675645,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftps",
+      "operation": "copy",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11415552,
+      "candidate": 11431936,
+      "regression_percent": 0.14352350197344155,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftps",
+      "operation": "delete",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.03195,
+      "candidate": 0.0299,
+      "regression_percent": -6.416275430359941,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftps",
+      "operation": "delete",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0614,
+      "candidate": 0.0513,
+      "regression_percent": -16.449511400651474,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftps",
+      "operation": "delete",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11423744,
+      "candidate": 11427840,
+      "regression_percent": 0.0358551452133371,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftps",
+      "operation": "get",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.041249999999999995,
+      "candidate": 0.0335,
+      "regression_percent": -18.787878787878775,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftps",
+      "operation": "get",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0664,
+      "candidate": 0.0505,
+      "regression_percent": -23.945783132530117,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftps",
+      "operation": "get",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11431936,
+      "candidate": 11431936,
+      "regression_percent": 0.0,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftps",
+      "operation": "put",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.04125,
+      "candidate": 0.037349999999999994,
+      "regression_percent": -9.454545454545471,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftps",
+      "operation": "put",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0552,
+      "candidate": 0.0514,
+      "regression_percent": -6.8840579710144905,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftps",
+      "operation": "put",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11436032,
+      "candidate": 11431936,
+      "regression_percent": -0.03581661891117749,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftps",
+      "operation": "stat",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.0299,
+      "candidate": 0.0278,
+      "regression_percent": -7.023411371237465,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftps",
+      "operation": "stat",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0416,
+      "candidate": 0.0497,
+      "regression_percent": 19.471153846153854,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftps",
+      "operation": "stat",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11423744,
+      "candidate": 11427840,
+      "regression_percent": 0.0358551452133371,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftps",
+      "operation": "test",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.03005,
+      "candidate": 0.02895,
+      "regression_percent": -3.660565723793674,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftps",
+      "operation": "test",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0492,
+      "candidate": 0.0462,
+      "regression_percent": -6.0975609756097615,
+      "status": "PASS"
+    },
+    {
+      "provider": "ftps",
+      "operation": "test",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11427840,
+      "candidate": 11431936,
+      "regression_percent": 0.03584229390680704,
+      "status": "PASS"
+    },
+    {
+      "provider": "gcs",
+      "operation": "copy",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.0281,
+      "candidate": 0.0245,
+      "regression_percent": -12.811387900355864,
+      "status": "PASS"
+    },
+    {
+      "provider": "gcs",
+      "operation": "copy",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0531,
+      "candidate": 0.0345,
+      "regression_percent": -35.02824858757062,
+      "status": "PASS"
+    },
+    {
+      "provider": "gcs",
+      "operation": "copy",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11427840,
+      "candidate": 11431936,
+      "regression_percent": 0.03584229390680704,
+      "status": "PASS"
+    },
+    {
+      "provider": "gcs",
+      "operation": "delete",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.008799999999999999,
+      "candidate": 0.00775,
+      "regression_percent": -11.931818181818166,
+      "status": "PASS"
+    },
+    {
+      "provider": "gcs",
+      "operation": "delete",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0225,
+      "candidate": 0.0239,
+      "regression_percent": 6.22222222222224,
+      "status": "PASS"
+    },
+    {
+      "provider": "gcs",
+      "operation": "delete",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11444224,
+      "candidate": 11427840,
+      "regression_percent": -0.14316392269148048,
+      "status": "PASS"
+    },
+    {
+      "provider": "gcs",
+      "operation": "get",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.01705,
+      "candidate": 0.01255,
+      "regression_percent": -26.392961876832842,
+      "status": "PASS"
+    },
+    {
+      "provider": "gcs",
+      "operation": "get",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0419,
+      "candidate": 0.0246,
+      "regression_percent": -41.288782816229116,
+      "status": "PASS"
+    },
+    {
+      "provider": "gcs",
+      "operation": "get",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11431936,
+      "candidate": 11431936,
+      "regression_percent": 0.0,
+      "status": "PASS"
+    },
+    {
+      "provider": "gcs",
+      "operation": "put",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.02525,
+      "candidate": 0.0219,
+      "regression_percent": -13.267326732673279,
+      "status": "PASS"
+    },
+    {
+      "provider": "gcs",
+      "operation": "put",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0384,
+      "candidate": 0.0342,
+      "regression_percent": -10.93749999999999,
+      "status": "PASS"
+    },
+    {
+      "provider": "gcs",
+      "operation": "put",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11431936,
+      "candidate": 11431936,
+      "regression_percent": 0.0,
+      "status": "PASS"
+    },
+    {
+      "provider": "gcs",
+      "operation": "stat",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.0109,
+      "candidate": 0.008199999999999999,
+      "regression_percent": -24.770642201834868,
+      "status": "PASS"
+    },
+    {
+      "provider": "gcs",
+      "operation": "stat",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0226,
+      "candidate": 0.0186,
+      "regression_percent": -17.699115044247794,
+      "status": "PASS"
+    },
+    {
+      "provider": "gcs",
+      "operation": "stat",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11427840,
+      "candidate": 11427840,
+      "regression_percent": 0.0,
+      "status": "PASS"
+    },
+    {
+      "provider": "gcs",
+      "operation": "test",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.009850000000000001,
+      "candidate": 0.008650000000000001,
+      "regression_percent": -12.182741116751261,
+      "status": "PASS"
+    },
+    {
+      "provider": "gcs",
+      "operation": "test",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0172,
+      "candidate": 0.013,
+      "regression_percent": -24.418604651162788,
+      "status": "PASS"
+    },
+    {
+      "provider": "gcs",
+      "operation": "test",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11427840,
+      "candidate": 11419648,
+      "regression_percent": -0.07168458781362519,
+      "status": "PASS"
+    },
+    {
+      "provider": "local",
+      "operation": "copy",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.0072499999999999995,
+      "candidate": 0.008400000000000001,
+      "regression_percent": 15.862068965517274,
+      "status": "FAIL"
+    },
+    {
+      "provider": "local",
+      "operation": "copy",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.018,
+      "candidate": 0.0193,
+      "regression_percent": 7.222222222222241,
+      "status": "PASS"
+    },
+    {
+      "provider": "local",
+      "operation": "copy",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11452416,
+      "candidate": 11456512,
+      "regression_percent": 0.03576537911302857,
+      "status": "PASS"
+    },
+    {
+      "provider": "local",
+      "operation": "delete",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.00285,
+      "candidate": 0.0027,
+      "regression_percent": -5.263157894736836,
+      "status": "PASS"
+    },
+    {
+      "provider": "local",
+      "operation": "delete",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0082,
+      "candidate": 0.0157,
+      "regression_percent": 91.46341463414632,
+      "status": "FAIL"
+    },
+    {
+      "provider": "local",
+      "operation": "delete",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11423744,
+      "candidate": 11427840,
+      "regression_percent": 0.0358551452133371,
+      "status": "PASS"
+    },
+    {
+      "provider": "local",
+      "operation": "get",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.00685,
+      "candidate": 0.008050000000000002,
+      "regression_percent": 17.518248175182507,
+      "status": "FAIL"
+    },
+    {
+      "provider": "local",
+      "operation": "get",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0181,
+      "candidate": 0.0214,
+      "regression_percent": 18.232044198895014,
+      "status": "PASS"
+    },
+    {
+      "provider": "local",
+      "operation": "get",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11448320,
+      "candidate": 11436032,
+      "regression_percent": -0.10733452593917336,
+      "status": "PASS"
+    },
+    {
+      "provider": "local",
+      "operation": "put",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.00745,
+      "candidate": 0.01415,
+      "regression_percent": 89.93288590604026,
+      "status": "FAIL"
+    },
+    {
+      "provider": "local",
+      "operation": "put",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0165,
+      "candidate": 0.0232,
+      "regression_percent": 40.60606060606058,
+      "status": "FAIL"
+    },
+    {
+      "provider": "local",
+      "operation": "put",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11440128,
+      "candidate": 11431936,
+      "regression_percent": -0.07160759040458764,
+      "status": "PASS"
+    },
+    {
+      "provider": "local",
+      "operation": "stat",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.00295,
+      "candidate": 0.0058,
+      "regression_percent": 96.61016949152541,
+      "status": "FAIL"
+    },
+    {
+      "provider": "local",
+      "operation": "stat",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0108,
+      "candidate": 0.0158,
+      "regression_percent": 46.296296296296305,
+      "status": "FAIL"
+    },
+    {
+      "provider": "local",
+      "operation": "stat",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11423744,
+      "candidate": 11419648,
+      "regression_percent": -0.0358551452133371,
+      "status": "PASS"
+    },
+    {
+      "provider": "local",
+      "operation": "test",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.00335,
+      "candidate": 0.0031999999999999997,
+      "regression_percent": -4.47761194029852,
+      "status": "PASS"
+    },
+    {
+      "provider": "local",
+      "operation": "test",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.017,
+      "candidate": 0.0191,
+      "regression_percent": 12.352941176470566,
+      "status": "PASS"
+    },
+    {
+      "provider": "local",
+      "operation": "test",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11427840,
+      "candidate": 11427840,
+      "regression_percent": 0.0,
+      "status": "PASS"
+    },
+    {
+      "provider": "s3",
+      "operation": "copy",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.015550000000000001,
+      "candidate": 0.01715,
+      "regression_percent": 10.289389067524102,
+      "status": "FAIL"
+    },
+    {
+      "provider": "s3",
+      "operation": "copy",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0253,
+      "candidate": 0.0257,
+      "regression_percent": 1.5810276679842028,
+      "status": "PASS"
+    },
+    {
+      "provider": "s3",
+      "operation": "copy",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11431936,
+      "candidate": 11431936,
+      "regression_percent": 0.0,
+      "status": "PASS"
+    },
+    {
+      "provider": "s3",
+      "operation": "delete",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.010249999999999999,
+      "candidate": 0.0108,
+      "regression_percent": 5.365853658536612,
+      "status": "PASS"
+    },
+    {
+      "provider": "s3",
+      "operation": "delete",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0186,
+      "candidate": 0.0269,
+      "regression_percent": 44.623655913978496,
+      "status": "FAIL"
+    },
+    {
+      "provider": "s3",
+      "operation": "delete",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11587584,
+      "candidate": 11509760,
+      "regression_percent": -0.6716154118062923,
+      "status": "PASS"
+    },
+    {
+      "provider": "s3",
+      "operation": "get",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.016050000000000002,
+      "candidate": 0.0151,
+      "regression_percent": -5.919003115264809,
+      "status": "PASS"
+    },
+    {
+      "provider": "s3",
+      "operation": "get",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0279,
+      "candidate": 0.0255,
+      "regression_percent": -8.602150537634422,
+      "status": "PASS"
+    },
+    {
+      "provider": "s3",
+      "operation": "get",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11522048,
+      "candidate": 11542528,
+      "regression_percent": 0.177746178457161,
+      "status": "PASS"
+    },
+    {
+      "provider": "s3",
+      "operation": "put",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.019799999999999998,
+      "candidate": 0.02105,
+      "regression_percent": 6.313131313131315,
+      "status": "PASS"
+    },
+    {
+      "provider": "s3",
+      "operation": "put",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0381,
+      "candidate": 0.0351,
+      "regression_percent": -7.874015748031504,
+      "status": "PASS"
+    },
+    {
+      "provider": "s3",
+      "operation": "put",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11718656,
+      "candidate": 11677696,
+      "regression_percent": -0.3495281370150316,
+      "status": "PASS"
+    },
+    {
+      "provider": "s3",
+      "operation": "stat",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.0102,
+      "candidate": 0.0109,
+      "regression_percent": 6.8627450980392135,
+      "status": "PASS"
+    },
+    {
+      "provider": "s3",
+      "operation": "stat",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.022,
+      "candidate": 0.018,
+      "regression_percent": -18.181818181818187,
+      "status": "PASS"
+    },
+    {
+      "provider": "s3",
+      "operation": "stat",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11427840,
+      "candidate": 11427840,
+      "regression_percent": 0.0,
+      "status": "PASS"
+    },
+    {
+      "provider": "s3",
+      "operation": "test",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.0104,
+      "candidate": 0.0092,
+      "regression_percent": -11.538461538461531,
+      "status": "PASS"
+    },
+    {
+      "provider": "s3",
+      "operation": "test",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0222,
+      "candidate": 0.0208,
+      "regression_percent": -6.30630630630632,
+      "status": "PASS"
+    },
+    {
+      "provider": "s3",
+      "operation": "test",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11608064,
+      "candidate": 11730944,
+      "regression_percent": 1.0585744530698715,
+      "status": "PASS"
+    },
+    {
+      "provider": "sftp",
+      "operation": "copy",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.1329,
+      "candidate": 0.13515,
+      "regression_percent": 1.6930022573363512,
+      "status": "PASS"
+    },
+    {
+      "provider": "sftp",
+      "operation": "copy",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.1756,
+      "candidate": 0.1743,
+      "regression_percent": -0.740318906605919,
+      "status": "PASS"
+    },
+    {
+      "provider": "sftp",
+      "operation": "copy",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11423744,
+      "candidate": 11431936,
+      "regression_percent": 0.0717102904266742,
+      "status": "PASS"
+    },
+    {
+      "provider": "sftp",
+      "operation": "delete",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.12104999999999999,
+      "candidate": 0.1207,
+      "regression_percent": -0.2891367203634809,
+      "status": "PASS"
+    },
+    {
+      "provider": "sftp",
+      "operation": "delete",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.1675,
+      "candidate": 0.1654,
+      "regression_percent": -1.2537313432835928,
+      "status": "PASS"
+    },
+    {
+      "provider": "sftp",
+      "operation": "delete",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11436032,
+      "candidate": 11427840,
+      "regression_percent": -0.07163323782235498,
+      "status": "PASS"
+    },
+    {
+      "provider": "sftp",
+      "operation": "get",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.1207,
+      "candidate": 0.12785000000000002,
+      "regression_percent": 5.923777961888987,
+      "status": "PASS"
+    },
+    {
+      "provider": "sftp",
+      "operation": "get",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.1405,
+      "candidate": 0.1606,
+      "regression_percent": 14.306049822064049,
+      "status": "PASS"
+    },
+    {
+      "provider": "sftp",
+      "operation": "get",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11431936,
+      "candidate": 11431936,
+      "regression_percent": 0.0,
+      "status": "PASS"
+    },
+    {
+      "provider": "sftp",
+      "operation": "put",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.1293,
+      "candidate": 0.1351,
+      "regression_percent": 4.485692188708423,
+      "status": "PASS"
+    },
+    {
+      "provider": "sftp",
+      "operation": "put",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.1771,
+      "candidate": 0.1863,
+      "regression_percent": 5.1948051948051965,
+      "status": "PASS"
+    },
+    {
+      "provider": "sftp",
+      "operation": "put",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11464704,
+      "candidate": 11448320,
+      "regression_percent": -0.14290818149339524,
+      "status": "PASS"
+    },
+    {
+      "provider": "sftp",
+      "operation": "stat",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.1192,
+      "candidate": 0.1247,
+      "regression_percent": 4.614093959731558,
+      "status": "PASS"
+    },
+    {
+      "provider": "sftp",
+      "operation": "stat",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.1697,
+      "candidate": 0.1703,
+      "regression_percent": 0.3535651149086716,
+      "status": "PASS"
+    },
+    {
+      "provider": "sftp",
+      "operation": "stat",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11431936,
+      "candidate": 11427840,
+      "regression_percent": -0.035829451809388235,
+      "status": "PASS"
+    },
+    {
+      "provider": "sftp",
+      "operation": "test",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.12325,
+      "candidate": 0.1254,
+      "regression_percent": 1.7444219066937272,
+      "status": "PASS"
+    },
+    {
+      "provider": "sftp",
+      "operation": "test",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.1686,
+      "candidate": 0.165,
+      "regression_percent": -2.1352313167259718,
+      "status": "PASS"
+    },
+    {
+      "provider": "sftp",
+      "operation": "test",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11423744,
+      "candidate": 11427840,
+      "regression_percent": 0.0358551452133371,
+      "status": "PASS"
+    },
+    {
+      "provider": "smb",
+      "operation": "copy",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.02785,
+      "candidate": 0.0228,
+      "regression_percent": -18.132854578096946,
+      "status": "PASS"
+    },
+    {
+      "provider": "smb",
+      "operation": "copy",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0387,
+      "candidate": 0.0478,
+      "regression_percent": 23.514211886304913,
+      "status": "FAIL"
+    },
+    {
+      "provider": "smb",
+      "operation": "copy",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 12931072,
+      "candidate": 13205504,
+      "regression_percent": 2.1222679759265173,
+      "status": "PASS"
+    },
+    {
+      "provider": "smb",
+      "operation": "delete",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.0108,
+      "candidate": 0.0098,
+      "regression_percent": -9.259259259259267,
+      "status": "PASS"
+    },
+    {
+      "provider": "smb",
+      "operation": "delete",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0314,
+      "candidate": 0.0232,
+      "regression_percent": -26.114649681528658,
+      "status": "PASS"
+    },
+    {
+      "provider": "smb",
+      "operation": "delete",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11423744,
+      "candidate": 11427840,
+      "regression_percent": 0.0358551452133371,
+      "status": "PASS"
+    },
+    {
+      "provider": "smb",
+      "operation": "get",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.0212,
+      "candidate": 0.017349999999999997,
+      "regression_percent": -18.160377358490575,
+      "status": "PASS"
+    },
+    {
+      "provider": "smb",
+      "operation": "get",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0456,
+      "candidate": 0.0314,
+      "regression_percent": -31.14035087719299,
+      "status": "PASS"
+    },
+    {
+      "provider": "smb",
+      "operation": "get",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11427840,
+      "candidate": 11431936,
+      "regression_percent": 0.03584229390680704,
+      "status": "PASS"
+    },
+    {
+      "provider": "smb",
+      "operation": "put",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.022,
+      "candidate": 0.019,
+      "regression_percent": -13.636363636363635,
+      "status": "PASS"
+    },
+    {
+      "provider": "smb",
+      "operation": "put",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0551,
+      "candidate": 0.0322,
+      "regression_percent": -41.56079854809438,
+      "status": "PASS"
+    },
+    {
+      "provider": "smb",
+      "operation": "put",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 12464128,
+      "candidate": 12627968,
+      "regression_percent": 1.3144922773578704,
+      "status": "PASS"
+    },
+    {
+      "provider": "smb",
+      "operation": "stat",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.011300000000000001,
+      "candidate": 0.01,
+      "regression_percent": -11.504424778761068,
+      "status": "PASS"
+    },
+    {
+      "provider": "smb",
+      "operation": "stat",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0275,
+      "candidate": 0.0197,
+      "regression_percent": -28.363636363636367,
+      "status": "PASS"
+    },
+    {
+      "provider": "smb",
+      "operation": "stat",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11427840,
+      "candidate": 11427840,
+      "regression_percent": 0.0,
+      "status": "PASS"
+    },
+    {
+      "provider": "smb",
+      "operation": "test",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.011800000000000001,
+      "candidate": 0.009850000000000001,
+      "regression_percent": -16.52542372881356,
+      "status": "PASS"
+    },
+    {
+      "provider": "smb",
+      "operation": "test",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0249,
+      "candidate": 0.0161,
+      "regression_percent": -35.34136546184739,
+      "status": "PASS"
+    },
+    {
+      "provider": "smb",
+      "operation": "test",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11427840,
+      "candidate": 11427840,
+      "regression_percent": 0.0,
+      "status": "PASS"
+    },
+    {
+      "provider": "webdav",
+      "operation": "copy",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.02815,
+      "candidate": 5.03155,
+      "regression_percent": 17774.067495559502,
+      "status": "FAIL"
+    },
+    {
+      "provider": "webdav",
+      "operation": "copy",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 10.0434,
+      "candidate": 20.0568,
+      "regression_percent": 99.70129637373797,
+      "status": "FAIL"
+    },
+    {
+      "provider": "webdav",
+      "operation": "copy",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11436032,
+      "candidate": 11431936,
+      "regression_percent": -0.03581661891117749,
+      "status": "PASS"
+    },
+    {
+      "provider": "webdav",
+      "operation": "delete",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.01325,
+      "candidate": 0.01405,
+      "regression_percent": 6.037735849056602,
+      "status": "PASS"
+    },
+    {
+      "provider": "webdav",
+      "operation": "delete",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 10.0272,
+      "candidate": 0.0249,
+      "regression_percent": -99.7516754427956,
+      "status": "PASS"
+    },
+    {
+      "provider": "webdav",
+      "operation": "delete",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11444224,
+      "candidate": 11427840,
+      "regression_percent": -0.14316392269148048,
+      "status": "PASS"
+    },
+    {
+      "provider": "webdav",
+      "operation": "get",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.020499999999999997,
+      "candidate": 0.02905,
+      "regression_percent": 41.70731707317075,
+      "status": "FAIL"
+    },
+    {
+      "provider": "webdav",
+      "operation": "get",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0336,
+      "candidate": 10.0295,
+      "regression_percent": 29749.702380952385,
+      "status": "FAIL"
+    },
+    {
+      "provider": "webdav",
+      "operation": "get",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11431936,
+      "candidate": 11440128,
+      "regression_percent": 0.07165890361877647,
+      "status": "PASS"
+    },
+    {
+      "provider": "webdav",
+      "operation": "put",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.0361,
+      "candidate": 0.0251,
+      "regression_percent": -30.47091412742382,
+      "status": "PASS"
+    },
+    {
+      "provider": "webdav",
+      "operation": "put",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 10.0332,
+      "candidate": 10.0384,
+      "regression_percent": 0.05182793126816687,
+      "status": "PASS"
+    },
+    {
+      "provider": "webdav",
+      "operation": "put",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11431936,
+      "candidate": 11427840,
+      "regression_percent": -0.035829451809388235,
+      "status": "PASS"
+    },
+    {
+      "provider": "webdav",
+      "operation": "stat",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.0123,
+      "candidate": 0.009250000000000001,
+      "regression_percent": -24.79674796747967,
+      "status": "PASS"
+    },
+    {
+      "provider": "webdav",
+      "operation": "stat",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0302,
+      "candidate": 0.0128,
+      "regression_percent": -57.6158940397351,
+      "status": "PASS"
+    },
+    {
+      "provider": "webdav",
+      "operation": "stat",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11423744,
+      "candidate": 11427840,
+      "regression_percent": 0.0358551452133371,
+      "status": "PASS"
+    },
+    {
+      "provider": "webdav",
+      "operation": "test",
+      "metric": "elapsed_seconds",
+      "statistic": "median",
+      "baseline": 0.0108,
+      "candidate": 0.00945,
+      "regression_percent": -12.5,
+      "status": "PASS"
+    },
+    {
+      "provider": "webdav",
+      "operation": "test",
+      "metric": "elapsed_seconds",
+      "statistic": "p95",
+      "baseline": 0.0218,
+      "candidate": 0.0142,
+      "regression_percent": -34.86238532110091,
+      "status": "PASS"
+    },
+    {
+      "provider": "webdav",
+      "operation": "test",
+      "metric": "peak_rss_bytes",
+      "statistic": "maximum",
+      "baseline": 11419648,
+      "candidate": 11427840,
+      "regression_percent": 0.0717360114777632,
+      "status": "PASS"
+    }
+  ],
+  "baseline_sha256": "19c506c18d86b9bd6c91fff42c390250bb6d092216c82301b3821a9f730b888f",
+  "candidate_sha256": "c82bcc27eb497ad32053319622195d30472403c425b204383dcd0e47783340c5"
+}

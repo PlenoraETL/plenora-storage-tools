@@ -5,7 +5,7 @@ provider sulle fixture dichiarate, con i cloud reali esplicitamente non
 qualificati. Le prove su account cloud sono rinviate e non bloccano questa
 release; il manifest e la ricevuta riportano tale limite.
 
-WebDAV richiede la [configurazione a un worker](webdav-compatibility.md).
+WebDAV richiede la [fixture con serializzazione applicativa](webdav-compatibility.md).
 Ogni target finale deve conservare `webdav-fixture.json`: trenta prove HTTP
 con otto scrittori, una sola creazione riuscita per chiave e dati preservati.
 Il gate finale verifica il report e ne registra il digest nella ricevuta.

@@ -8,7 +8,8 @@
 - Add typed Python result dictionaries and strict installed-wheel consumers, separate Rust test sources from product coverage, and split CLI argument/output responsibilities while preserving public contracts.
 - Require complete artifact-bound qualification evidence, expand dependency inventories and prepare GitHub draft publication with checks after download on both supported targets.
 - Keep real cloud accounts outside the qualified scope; this candidate is not yet qualified or published.
-- Restrict the WebDAV fixture claim to WsgiDAV 4.3.5 with one Cheroot worker after reproducing duplicate conditional writes on its default multithreaded server. Require an independent HTTP concurrency probe and record the deployment configuration in qualification scope.
+- Restrict the WebDAV fixture claim to WsgiDAV 4.3.5 with serialized application requests after reproducing duplicate conditional writes on its default server. Keep HTTP connection workers separate, require an independent HTTP concurrency probe and record the deployment configuration in qualification scope.
+- Calibrate the CLI performance gate with explicit absolute timing margins from preserved same-binary campaigns; retain relative limits, the memory budget and the original failed fixture evidence.
 
 ## 1.0.0-rc.1 — in qualification
 

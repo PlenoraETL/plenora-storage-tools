@@ -1,9 +1,13 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "minimum_rounds": 5,
   "maximum_regression_percent": {
     "median": 10,
     "p95": 20,
     "maximum": 10
+  },
+  "minimum_timing_budget_seconds": {
+    "median": 0.010,
+    "p95": 0.020
   }
 }

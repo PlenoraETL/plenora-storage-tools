@@ -50,11 +50,14 @@ nascondere una regressione. Cambiamenti di hardware, kernel o definizioni delle
 fixture richiedono una nuova baseline dichiarata. Il report registra questi
 dati senza nomi host, endpoint o credenziali.
 
-La policy iniziale consente +10% sulla mediana dei tempi, +20% sul p95 e +10%
+La policy 2 consente +10% sulla mediana dei tempi, +20% sul p95 e +10%
 sul massimo RSS per coppia provider/operazione, con almeno cinque round e lo
-stesso numero di campioni. È un budget di regressione da verificare con misure
-sul laboratorio, non uno SLO di throughput già qualificato. Un fallimento va
-indagato e l'eventuale revisione della policy va motivata con dati conservati.
+stesso numero di campioni. Per i tempi il margine è il maggiore tra quello
+percentuale e 10 ms sulla mediana / 20 ms sul p95. La
+[calibrazione](performance-calibration.md) conserva i campioni che hanno
+motivato il margine assoluto e il fallimento WebDAV che resta rilevato.
+È un budget di regressione, non uno SLO di throughput già qualificato.
+Un fallimento va indagato e le revisioni della policy richiedono dati conservati.
 Il workflow [reliability](../.github/workflows/reliability.yml) espone l'opzione
 `performance` per eseguire due campagne e il confronto sullo stesso runner.
 

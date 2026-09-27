@@ -14,8 +14,10 @@ def qualification_scope():
             'google_cloud_storage': 'not_qualified',
         },
         'fixture_configuration': {
-            'webdav': {'server': 'WsgiDAV', 'version': '4.3.5', 'workers': 1,
-                       'multithreaded_create_if_absent': 'not_qualified'},
+            'webdav': {'server': 'WsgiDAV', 'version': '4.3.5', 'http_workers': 32,
+                       'request_queue_size': 64, 'keep_alive_conn_limit': 256,
+                       'wsgi_serialization': 'single_process_lock',
+                       'unserialized_create_if_absent': 'not_qualified'},
         },
     }
 

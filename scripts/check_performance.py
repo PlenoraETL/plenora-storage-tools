@@ -51,9 +51,14 @@ def compare(baseline, candidate, binary, policy):
             previous, current = measure(old[key]), measure(new[key])
             limit = policy['maximum_regression_percent'][statistic]
             delta = (current / previous - 1) * 100
+            absolute = (policy['minimum_timing_budget_seconds'][statistic]
+                        if key[2] == 'elapsed_seconds' else 0)
+            require(math.isfinite(absolute) and absolute >= 0, 'invalid absolute performance budget')
+            allowed = previous + max(previous * limit / 100, absolute)
             results.append(dict(provider=key[0], operation=key[1], metric=key[2], statistic=statistic,
                                 baseline=previous, candidate=current, regression_percent=delta,
-                                status='PASS' if current <= previous * (1 + limit / 100) else 'FAIL'))
+                                allowed_maximum=allowed,
+                                status='PASS' if current <= allowed else 'FAIL'))
     return {'status': 'PASS' if all(r['status'] == 'PASS' for r in results) else 'FAIL',
             'binary_sha256': binary, 'policy': policy, 'results': results}
 

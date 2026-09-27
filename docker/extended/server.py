@@ -28,11 +28,27 @@ elif mode == 'webdav':
         'http_authenticator': {'accept_basic': True, 'accept_digest': False, 'default_to_digest': False},
         'verbose': 1,
     })
-    # WsgiDAV 4.3.5 checks If-None-Match before creating the filesystem entry.
-    # Concurrent server workers can both accept an exclusive PUT. Qualify the
-    # single-worker deployment explicitly; this is not a claim for stock
-    # multithreaded WsgiDAV or for other servers that ignore preconditions.
-    Server(('0.0.0.0', 8080), app, numthreads=1, max=1).start()
+    from threading import Lock
+    # Keep WsgiDAV's precondition check and filesystem mutation in one critical
+    # section. This fixture serializes application requests in a single process;
+    # it does not certify unmodified multithreaded WsgiDAV. HTTP workers remain
+    # available for connection handling instead of blocking behind idle sockets.
+    request_lock = Lock()
+
+    def serialized(environ, start_response):
+        with request_lock:
+            response = app(environ, start_response)
+            try:
+                yield from response
+            finally:
+                if hasattr(response, 'close'):
+                    response.close()
+
+    server = Server(('0.0.0.0', 8080), serialized, numthreads=32, max=32, request_queue_size=64)
+    # Leave room for fixture concurrency and recently closed client sockets;
+    # rejecting a body early while forcing connection close can lose the 412.
+    server.keep_alive_conn_limit = 256
+    server.start()
 elif mode == 'azure-init':
     from azure.storage.blob import BlobServiceClient
     from azure.core.exceptions import ResourceExistsError

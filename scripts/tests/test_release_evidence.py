@@ -185,3 +185,21 @@ class ReleaseEvidenceTests(unittest.TestCase):
         evidence = Evidence(self.root / 'nested')
         with self.assertRaises(ValueError):
             evidence.read('../report.json')
+
+    def test_timing_floor_does_not_waive_material_latency_or_memory_regressions(self):
+        policy = json.loads((ROOT / 'scripts/performance-policy.json').read_text())
+        baseline, candidate = transfer(), transfer()
+        for document, value in ((baseline, .003), (candidate, .005)):
+            for row in document['results']:
+                for measure in row['measurements']:
+                    measure['elapsed_seconds'] = value
+        self.assertEqual(compare(baseline, candidate, BINARY, policy)['status'], 'PASS')
+        for row in candidate['results']:
+            for measure in row['measurements']:
+                measure['elapsed_seconds'] = .1
+        self.assertEqual(compare(baseline, candidate, BINARY, policy)['status'], 'FAIL')
+        for row in candidate['results']:
+            for measure in row['measurements']:
+                measure['elapsed_seconds'] = .003
+                measure['peak_rss_bytes'] = 1200
+        self.assertEqual(compare(baseline, candidate, BINARY, policy)['status'], 'FAIL')
