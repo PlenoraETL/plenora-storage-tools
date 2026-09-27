@@ -25,10 +25,10 @@ on:
         type: boolean
         default: false
       soak_minutes:
-        description: Persistent Python SDK soak (alpha 60 minutes; RC 24 hours on dedicated VM)
+        description: Persistent Python SDK soak (120 minutes for every version; shorter runs are diagnostic)
         type: choice
-        options: ['0', '10', '60']
-        default: '0'
+        options: ['0', '10', '60', '120']
+        default: '120'
 
 permissions:
   contents: read
@@ -36,7 +36,7 @@ permissions:
 jobs:
   transfers:
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 360
     env:
       PAYLOAD_BYTES: ${{ inputs.payload_bytes }}
       WORKERS: ${{ inputs.workers }}

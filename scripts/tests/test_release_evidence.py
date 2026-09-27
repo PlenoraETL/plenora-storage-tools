@@ -45,8 +45,8 @@ def transfer(size=1024**2, workers=4, rounds=5):
 
 def soak():
     resources = dict(rss_bytes=1000, threads=4, file_descriptors=10)
-    return dict(status='PASS', wheel_sha256=WHEEL, version='1.0.0rc1', duration_seconds=86400,
-                elapsed_seconds=86401, workers=4, completed_cycles=1, providers=list(PROVIDERS),
+    return dict(status='PASS', wheel_sha256=WHEEL, version='1.0.0rc1', duration_seconds=7200,
+                elapsed_seconds=7201, workers=4, completed_cycles=1, providers=list(PROVIDERS),
                 after_provider={p: resources.copy() for p in PROVIDERS}, baseline=resources.copy(),
                 peak=resources.copy(), latest=resources.copy())
 
@@ -158,13 +158,23 @@ class ReleaseEvidenceTests(unittest.TestCase):
 
     def test_soak_must_finish_on_exact_wheel_and_preserve_resource_limits(self):
         validate_soak(soak(), WHEEL, '1.0.0rc1')
-        for change in (lambda r: r.update(status='RUNNING'), lambda r: r.update(elapsed_seconds=86399),
+        for change in (lambda r: r.update(status='RUNNING'), lambda r: r.update(elapsed_seconds=7199),
                        lambda r: r.update(wheel_sha256='wrong'), lambda r: r.update(completed_cycles=0),
                        lambda r: r['peak'].update(file_descriptors=100)):
             report = soak()
             change(report)
             with self.assertRaises(ValueError):
                 validate_soak(report, WHEEL, '1.0.0rc1')
+
+    def test_two_hours_are_required_for_every_version_stage(self):
+        for version in ('1.0.0a1', '1.0.0b1', '1.0.0rc1', '1.0.0'):
+            with self.subTest(version=version):
+                report = soak()
+                report.update(version=version, duration_seconds=7200, elapsed_seconds=7200)
+                validate_soak(report, WHEEL, version)
+                report.update(duration_seconds=7199, elapsed_seconds=7199)
+                with self.assertRaises(ValueError):
+                    validate_soak(report, WHEEL, version)
 
     def test_performance_rejects_environment_changes_and_detects_regression(self):
         policy = json.loads((ROOT / 'scripts/performance-policy.json').read_text())

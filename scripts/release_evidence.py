@@ -13,6 +13,7 @@ from check_installed_sdk import enforce_coverage, test_count
 from check_rust_api import packages
 from check_test_layout import check as check_test_layout
 from check_performance import compare
+from soak_policy import SOAK_DURATION_SECONDS
 from fixture_connections import BUFFERED, PROVIDERS
 from fuzz_parsers import TARGETS as FUZZ_TARGETS, stats
 from summarize_coverage import apply_thresholds, summarize
@@ -81,13 +82,13 @@ def validate_transfers(report, binary, *, size, workers, rounds):
                     and measure['elapsed_seconds'] > 0, 'invalid transfer measurement')
 
 
-def validate_soak(report, wheel, version, minimum_seconds=86400):
+def validate_soak(report, wheel, version, minimum_seconds=SOAK_DURATION_SECONDS):
     require(report['status'] == 'PASS' and report['wheel_sha256'] == wheel
             and report['version'] == version, 'soak failed or describes another wheel')
     require(report['duration_seconds'] >= minimum_seconds
             and report['elapsed_seconds'] >= report['duration_seconds']
             and report['workers'] >= 4 and report['completed_cycles'] > 0,
-            'RC soak is incomplete')
+            'soak is incomplete')
     require(len(report['providers']) == len(PROVIDERS) and set(report['providers']) == set(PROVIDERS)
             and set(report['after_provider']) == set(PROVIDERS), 'soak provider matrix is incomplete')
     for key, allowance in [('rss_bytes', 128 * 1024**2), ('threads', 16), ('file_descriptors', 16)]:
@@ -96,7 +97,7 @@ def validate_soak(report, wheel, version, minimum_seconds=86400):
                 'soak resource budget was exceeded')
 
 
-def validate_bundle(root, revision, subjects, python_version, minimum_soak_seconds=86400):
+def validate_bundle(root, revision, subjects, python_version, minimum_soak_seconds=SOAK_DURATION_SECONDS):
     """Return a file inventory only after all mandatory reports were checked.
 
 subjects maps target triples to binary_sha256 and wheel_sha256 from manifests

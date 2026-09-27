@@ -23,8 +23,10 @@ passata a `qualify_release.py --evidence` aggiungere `gates/` con questa struttu
 | `performance/baseline.json`, `performance/candidate.json`, `performance/report.json` | Due campagne indipendenti e confronto descritto sotto |
 
 I target sono `x86_64-unknown-linux-gnu` e `x86_64-pc-windows-msvc`; i nomi Python
-sono `3.10`, `3.11`, `3.12`, `3.13`, `3.14`. La soglia del soak resta un'ora per
-le alfa e 24 ore per RC/stabile. Non sommare campagne parziali e non riassegnare
+sono `3.10`, `3.11`, `3.12`, `3.13`, `3.14`. Dal 28 settembre 2026 la soglia
+provvisoria del soak è **due ore per tutte le versioni**, incluse alfa, beta,
+RC e stabili, come definito in `scripts/soak_policy.py`. La durata sarà
+rivalutata prima del rilascio definitivo. Non sommare campagne parziali e non riassegnare
 un report a un'altra wheel, anche se deriva dallo stesso commit.
 
 Il validatore rilegge log, contatori e hash; non accetta il solo `PASS` di un

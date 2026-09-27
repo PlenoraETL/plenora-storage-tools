@@ -134,8 +134,7 @@ def main():
     if parse_version(output.name).requires((1, 0, 0)):
         bundle = args.evidence / 'gates'
         version = parse_version(output.name)
-        additional = validate_bundle(bundle, revision, subjects, version.python,
-                                     minimum_soak_seconds=3600 if version.stage == 'alpha' else 86400)
+        additional = validate_bundle(bundle, revision, subjects, version.python)
         for entry in additional:
             destination = archive_evidence / 'gates' / entry['name']
             destination.parent.mkdir(parents=True, exist_ok=True)

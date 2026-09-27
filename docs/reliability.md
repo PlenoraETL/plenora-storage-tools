@@ -177,7 +177,7 @@ compilazione e la campagna usano il lockfile senza accesso alla rete.
 ```sh
 python3 scripts/build_python.py --output .fixtures/soak-wheel
 target/python-sdk-test/bin/python scripts/stress_python.py \
-  --wheel .fixtures/soak-wheel/*.whl --duration-seconds 3600 \
+  --wheel .fixtures/soak-wheel/*.whl --duration-seconds 7200 \
   --output .fixtures/evidence/soak-python.json
 ```
 
@@ -186,9 +186,17 @@ i nove provider. Ogni ciclo verifica put/copy/get, checksum e cleanup; dopo il
 primo ciclo impone crescita massima di 128 MiB RSS, 16 descrittori e 16 thread.
 Il report identifica la wheel effettivamente installata e registra risorse per
 provider, picchi e avanzamento. `RUNNING` non equivale a una prova superata.
-Per l'alfa la durata richiesta è un'ora; per la RC si passa esplicitamente
-`--duration-seconds 86400` sulla VM dedicata. Il workflow offre prove di 10 o
-60 minuti. Questa campagna non misura un engine asyncio persistente.
+La durata provvisoria richiesta dal 28 settembre 2026 è **due ore per tutte
+le versioni** (alfa, beta, RC e stabili), anche senza specificare
+`--duration-seconds`. Il gate e il runner condividono `scripts/soak_policy.py`.
+La durata sarà rivalutata prima del rilascio definitivo. Il workflow propone
+120 minuti; le opzioni da 10 o 60 minuti restano diagnostiche e non soddisfano
+il gate. Il timeout del job include anche build, trasferimenti e raccolta
+delle evidenze. Questa campagna non misura un engine asyncio persistente.
+
+I report storici conservano durata ed esito originali. Una campagna da 24 ore
+interrotta non diventa automaticamente una campagna completata da due ore:
+le nuove prove usano un report distinto e terminano tutti i cicli e il cleanup.
 
 ## Compatibilità Python
 
