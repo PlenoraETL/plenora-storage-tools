@@ -9,13 +9,15 @@ riguarda le fixture dichiarate, tra cui MinIO, Azurite e fake-gcs-server.
 Le prove su AWS S3, Azure Blob e GCS reali sono rinviate: i tre adapter restano
 disponibili, ma i servizi cloud gestiti non sono ancora qualificati.
 
-L'inventario corrente deriva dal codice in [docs/STATO.md](docs/STATO.md).
-L'[aggiornamento 0.2.2](docs/dependency-update-0.2.2.md) descrive le nuove dipendenze e le migrazioni.
-Il [modello di qualità](docs/database-alignment.md) segue Database Tools.
+L'[indice della documentazione](docs/README.md) raccoglie le guide correnti e
+separa i resoconti storici. L'inventario deriva dal codice in
+[docs/STATO.md](docs/STATO.md). Il [modello di qualità](docs/database-alignment.md)
+segue Database Tools; il [confronto verificato](docs/database-reference-review.md)
+descrive le differenze ancora da colmare.
 Configurazione, credenziali, garanzie e sistemi effettivamente verificati sono
 nella [guida ai nuovi provider](docs/provider-expansion.md).
 La qualifica della release è separata dalla build:
-[criteri di distribuzione](docs/release-readiness.md).
+[criteri di distribuzione](docs/release.md).
 
 ## Superfici iniziali
 
@@ -79,7 +81,8 @@ processi. La libreria Rust conserva la paginazione per Engine.
   di probe e nessun file non creato da questo comando viene mai sostituito o
   rimosso. Richiede un filesystem che supporti gli hard link.
 - Le upload condizionali (`overwrite=false` su S3) devono essere bufferizzate in
-  memoria. Anche local, Azure, GCS, SMB e WebDAV bufferizzano put/copy. Il limite ? `--max-buffered-put-bytes`, distinto da
+  memoria. Anche local, Azure, GCS, SMB e WebDAV bufferizzano put/copy. Il limite
+  è `--max-buffered-put-bytes`, distinto da
   `--max-transfer-bytes`, che riguarda i trasferimenti in streaming.
 - `copy` rifiuta sorgente e destinazione uguali prima di qualunque mutazione.
 
