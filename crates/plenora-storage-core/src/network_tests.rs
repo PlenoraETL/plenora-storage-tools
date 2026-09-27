@@ -1,4 +1,3 @@
-
 use super::{is_public_address, resolve_network_target};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 

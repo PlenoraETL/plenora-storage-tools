@@ -1,4 +1,3 @@
-
 use super::{optional_prefix_path, required_path};
 
 #[test]

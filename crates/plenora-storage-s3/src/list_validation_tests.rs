@@ -1,4 +1,3 @@
-
 use super::validate_list_response;
 
 #[test]

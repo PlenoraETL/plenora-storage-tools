@@ -1,4 +1,3 @@
-
 use super::{
     atomic_replace, discard_staged_object, qualify_atomic_session, remote_path, scan_directory,
     validate_key,

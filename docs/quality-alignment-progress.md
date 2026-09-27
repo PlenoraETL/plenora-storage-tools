@@ -11,6 +11,7 @@ descrive gli interventi, senza attribuire loro qualifiche dei candidati preceden
 | SDK Python | Tipi pubblici dei risultati, policy Literal, controlli nominati negli stub, baseline dei tipi, consumer mypy strict ed esempio sync/async | Confermare la matrice completa CPython 3.10–3.14 sui due target per la wheel finale |
 | Documenti | Controllo README dello SDK, link locali, ancore, script citati ed esempi Python; procedure correnti indicizzate | Eseguire e verificare le istruzioni con gli asset finali |
 | Layout e coverage Rust | Quindici moduli di test spostati in file figli privati, con controllo in CI; il riepilogo LLVM esclude i file test dal prodotto | Misurare nuovamente la coverage sulle fixture e calibrare le soglie per il nuovo denominatore |
+| Commenti e API Rust | Controllo dei riferimenti al debito tecnico nei commenti reali; rustdoc di engine, policy, lifecycle e interpretazione degli effetti | Estendere la revisione della documentazione ai dettagli degli adapter |
 | Performance | Identità delle campagne, ambiente misurato, confronto mediana/p95/RSS e workflow eseguibile | Misurare sul laboratorio dedicato e valutare la stabilità delle soglie iniziali; nessun SLO già attestato |
 
 La verifica locale Windows del primo sviluppo ha eseguito 26 test sulla wheel
@@ -20,6 +21,6 @@ dieci combinazioni né degli artefatti RC costruiti in precedenza.
 
 Restano interventi distinti: nuova baseline della coverage del solo prodotto,
 suddivisione dei moduli per responsabilità,
-documentazione degli errori Rust, controlli sui commenti e ampliamento della
+revisione della documentazione degli adapter e ampliamento della
 SBOM agli ambiti di build/qualifica. Non si dichiarano completati per la sola
 presenza dei nuovi gate di distribuzione.

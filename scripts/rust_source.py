@@ -10,7 +10,7 @@ RAW = re.compile(r'(?:br|cr|r)(#*)"')
 CHARACTER = re.compile(r"'(?:\\(?:u\{[0-9a-fA-F_]+\}|x[0-9a-fA-F]{2}|.)|[^\\'\n])'")
 
 
-def mask_noncode(source):
+def mask_noncode(source, comments=None):
     masked = list(source)
     index = 0
 
@@ -21,10 +21,13 @@ def mask_noncode(source):
 
     while index < len(source):
         start = index
+        comment = False
         if source.startswith('//', index):
+            comment = True
             end = source.find('\n', index)
             index = len(source) if end < 0 else end
         elif source.startswith('/*', index):
+            comment = True
             depth, index = 1, index + 2
             while index < len(source) and depth:
                 if source.startswith('/*', index):
@@ -54,6 +57,8 @@ def mask_noncode(source):
             index += 1
             continue
         hide(start, index)
+        if comment and comments is not None:
+            comments.append((start, source[start:index]))
     return ''.join(masked)
 
 

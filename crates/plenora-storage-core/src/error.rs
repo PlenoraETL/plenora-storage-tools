@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, fmt};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+/// Result whose error includes the phase, remote effect and retry disposition.
 pub type StorageResult<T> = Result<T, StorageError>;
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -37,6 +38,8 @@ pub enum ErrorPhase {
     Cleanup,
 }
 
+/// What can be proved about a mutation, independently of its failure category.
+/// A timeout or cancellation alone never implies `None` or `RolledBack`.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum RemoteEffect {
@@ -58,6 +61,8 @@ pub enum RetryDisposition {
     After { delay_ms: u64 },
 }
 
+/// Public operational failure. Custom providers are responsible for redacting
+/// message/details before construction; the type does not sanitize arbitrary text.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct StorageError {

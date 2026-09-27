@@ -7,11 +7,18 @@ use crate::{
     ProviderListResult, PutRequest, StatRequest, StorageResult, TestResult, TransferResult,
 };
 
+/// Borrowed host policy and controls for one operation; adapters must honor both.
 pub struct OperationContext<'a> {
     pub policy: &'a EngineConfig,
     pub control: &'a ExecutionControl,
 }
 
+/// Adapter contract shared by Rust, CLI and Python operations.
+///
+/// Capabilities describe proven behavior. Implementations must reject unsupported
+/// publication policies before effects, preserve caller controls, and return
+/// redacted errors with the provable remote effect. Neither the engine nor an
+/// adapter may infer rollback merely because a commit response was lost.
 #[async_trait]
 pub trait StorageProvider: Send + Sync {
     fn id(&self) -> &'static str;

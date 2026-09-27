@@ -33,6 +33,8 @@ struct CursorState {
     expires_at: Instant,
 }
 
+/// Host authorizations and per-operation resource bounds shared by all adapters.
+/// Enabling one transport exception does not enable the others.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
 // Each flag is an independent, fail-closed host authorization. Keeping them
@@ -42,15 +44,20 @@ pub struct EngineConfig {
     /// Retained for source compatibility. The qualified v1 catalog is available
     /// without experimental opt-in; this flag does not relax transport policy.
     pub allow_experimental_contracts: bool,
+    /// Allow HTTP endpoints; certificate verification remains required for HTTPS.
     pub allow_insecure_http: bool,
+    /// Permit unencrypted FTP independently of HTTP and private-network access.
     pub allow_insecure_ftp: bool,
+    /// Permit destinations on private networks after address validation.
     pub allow_private_network: bool,
+    /// Permit SFTP without a host-key pin. Keep false for authenticated hosts.
     pub allow_unverified_ssh: bool,
+    /// Maximum bytes admitted for one transfer, including streaming transfers.
     pub max_transfer_bytes: u64,
+    /// Upper bound on the number of objects collected for one listing request.
     pub max_list_items: usize,
-    /// Upper bound for a single upload that a provider must buffer in memory to
-    /// obtain a conditional publication. It is deliberately far below
-    /// `max_transfer_bytes`, which streams and therefore costs no memory.
+    /// Maximum buffered upload/copy payload, including conditional S3 uploads.
+    /// Streaming still uses working memory but does not retain the entire file.
     pub max_buffered_put_bytes: u64,
 }
 
@@ -72,6 +79,10 @@ impl Default for EngineConfig {
     }
 }
 
+/// Provider registry and engine-owned pagination state.
+///
+/// Calls share policy, not an application transaction. Provider capabilities
+/// determine publication guarantees; an ambiguous mutation requires recovery.
 pub struct Engine {
     config: EngineConfig,
     providers: BTreeMap<String, Arc<dyn StorageProvider>>,
@@ -81,6 +92,7 @@ pub struct Engine {
 }
 
 impl Engine {
+    /// Create an empty registry. The application factory registers enabled providers.
     #[must_use]
     pub fn new(config: EngineConfig) -> Self {
         Self {
@@ -92,6 +104,10 @@ impl Engine {
         }
     }
 
+    /// Register an adapter without replacing an existing adapter of the same ID.
+    ///
+    /// # Errors
+    /// Returns `ENGINE_CLOSED` after closure or `DUPLICATE_PROVIDER` for a reused ID.
     pub fn register_provider(&mut self, provider: Arc<dyn StorageProvider>) -> StorageResult<()> {
         if self.closed.load(Ordering::Acquire) {
             return Err(StorageError::engine_closed());
@@ -126,6 +142,8 @@ impl Engine {
         CapabilityDocument::new(surface, providers)
     }
 
+    /// Reject new operations and invalidate pagination cursors.
+    /// Calls already admitted retain their own cancellation controls and may finish.
     pub fn close(&self) {
         self.closed.store(true, Ordering::Release);
         if let Ok(mut cursors) = self.cursors.lock() {
@@ -144,6 +162,10 @@ impl Engine {
     /// A consumer that must create an external effect before invoking the
     /// Engine — resolving an artifact sink, for example — calls this first so
     /// that a locally invalid request cannot produce that effect.
+    ///
+    /// # Errors
+    /// Rejects a closed engine, unavailable provider, invalid connection, unsupported
+    /// configuration contract or unsafe key. This is not a remote permissions probe.
     pub fn preflight(&self, connection: &ProviderConnection, keys: &[&str]) -> StorageResult<()> {
         self.provider(connection)?;
         for key in keys {
@@ -181,6 +203,11 @@ impl Engine {
         }
     }
 
+    /// Probe the configured provider without creating a stored object.
+    ///
+    /// # Errors
+    /// Reports admission, connection, authentication or control failures with their
+    /// public phase and retry disposition; successful probing does not prove write access.
     pub async fn test(
         &self,
         connection: &ProviderConnection,
@@ -191,6 +218,12 @@ impl Engine {
             .await
     }
 
+    /// Return a bounded page and an opaque cursor owned by this engine.
+    /// Keep the connection, prefix and page-size arguments unchanged when resuming.
+    ///
+    /// # Errors
+    /// Rejects invalid/expired cursors, invalid prefixes and provider/control errors.
+    /// Closing the engine invalidates its outstanding cursors.
     pub async fn list(
         &self,
         connection: &ProviderConnection,
@@ -224,6 +257,11 @@ impl Engine {
         })
     }
 
+    /// Read object metadata. Unavailable optional metadata remains `None`.
+    ///
+    /// # Errors
+    /// A missing object is a `NotFound` error, distinct from absent metadata.
+    /// Admission and provider/control failures retain their public error axes.
     pub async fn stat(
         &self,
         connection: &ProviderConnection,
@@ -237,6 +275,12 @@ impl Engine {
             .await
     }
 
+    /// Transfer object bytes into a caller-owned sink.
+    ///
+    /// # Errors
+    /// A failed read/write or interruption may leave bytes in the sink. Callers
+    /// requiring atomic local publication must use staging; this stream API does
+    /// not replace or roll back a caller-owned destination.
     pub async fn get<W>(
         &self,
         connection: &ProviderConnection,
@@ -254,6 +298,13 @@ impl Engine {
             .await
     }
 
+    /// Consume a source once and publish according to the explicit request policy.
+    ///
+    /// # Errors
+    /// Rejects a declared length above the transfer limit before reading the source.
+    /// Buffer bounds and publication guarantees are provider-specific. On a failure
+    /// near commit, inspect `remote_effect` and `retry`; do not assume rollback or
+    /// replay a partially consumed source automatically.
     pub async fn put<R>(
         &self,
         connection: &ProviderConnection,
@@ -284,6 +335,11 @@ impl Engine {
             .await
     }
 
+    /// Delete one object using the caller's explicit missing-object policy.
+    ///
+    /// # Errors
+    /// Missing objects fail unless `ignore_missing` is set. Other provider/control
+    /// failures retain their effect and retry disposition, including ambiguous deletion.
     pub async fn delete(
         &self,
         connection: &ProviderConnection,
@@ -297,6 +353,11 @@ impl Engine {
             .await
     }
 
+    /// Copy within one provider connection using its declared publication guarantees.
+    ///
+    /// # Errors
+    /// Rejects unsafe or equal source/destination keys before mutation. Unsupported
+    /// publication policies, size bounds and remote/control failures remain explicit.
     pub async fn copy(
         &self,
         connection: &ProviderConnection,

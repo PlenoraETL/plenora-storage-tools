@@ -1,4 +1,3 @@
-
 use super::{directory_may_contain, key_matches_prefix};
 
 #[test]

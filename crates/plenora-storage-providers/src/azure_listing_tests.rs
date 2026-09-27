@@ -1,4 +1,3 @@
-
 use super::validate;
 #[test]
 fn unrelated_xml_is_not_an_empty_listing() {
