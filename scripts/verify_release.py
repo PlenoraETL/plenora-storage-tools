@@ -11,6 +11,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'contracts/upstream
 from conformance_checks import adoption_errors
 
 
+def validate_identity(folder, manifest):
+    if manifest['version'] != folder.parent.name:
+        raise ValueError('manifest version differs from the release directory')
+    parse_version(manifest['version'])
+    if manifest['target'] != folder.name or folder.name not in {
+        'x86_64-pc-windows-msvc', 'x86_64-unknown-linux-gnu'
+    }:
+        raise ValueError('manifest target differs from its supported platform directory')
+
+
 def digest(path):
     result = hashlib.sha256()
     with path.open('rb') as stream:
@@ -20,6 +30,8 @@ def digest(path):
 
 
 def main():
+    if not __debug__:
+        raise RuntimeError('release verification cannot run with Python optimization enabled')
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory', type=Path, help='A version directory under dist/')
     args = parser.parse_args()
@@ -30,6 +42,7 @@ def main():
     for path in manifests:
         folder = path.parent
         manifest = json.loads(path.read_text())
+        validate_identity(folder, manifest)
         sources.add(manifest['source_sha256'])
         sums = {}
         for line in (folder / 'SHA256SUMS').read_text().splitlines():

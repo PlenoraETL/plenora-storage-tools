@@ -68,6 +68,13 @@ La verifica non usa i sorgenti dei crate nel checkout.
 Cargo e contratti, per confrontare il contenuto qualificato tra piattaforme.
 Non è una firma digitale né una promessa di build identiche bit per bit.
 
+I gate rifiutano manifest la cui versione o piattaforma differiscono dalla
+directory candidata: spostare gli asset alfa in `dist/1.0.0` non li promuove.
+`verify_release.py` e `qualify_release.py` rifiutano inoltre Python con `-O` o
+`PYTHONOPTIMIZE`, perché la modalità ottimizzata disabiliterebbe le asserzioni
+su cui si basano alcuni controlli. Queste condizioni hanno regressioni negative
+nel job `product-quality` della CI.
+
 ## Ambito e limiti operativi
 
 - Rust richiede Tokio; toolchain minima dichiarata: 1.92. Non è dichiarata

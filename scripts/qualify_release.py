@@ -13,6 +13,8 @@ from versioning import parse_version
 
 
 def main():
+    if not __debug__:
+        raise RuntimeError('release qualification cannot run with Python optimization enabled')
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory', type=Path)
     parser.add_argument('--evidence', required=True, type=Path)
