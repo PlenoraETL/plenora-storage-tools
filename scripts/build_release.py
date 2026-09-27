@@ -13,7 +13,7 @@ import sys
 from build_python import build as build_python
 from render_sbom import render as render_sbom
 from package_cli import build as package_cli
-from package_source import build as package_source
+from package_source import build as package_source, extract
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'contracts/upstream'))
 from conformance_checks import adoption_errors
@@ -91,19 +91,9 @@ def main():
 
     # A consumer sees only extracted archives, never the workspace sources.
     with tempfile.TemporaryDirectory(prefix='storage-consumer-') as temporary:
-        consumer = Path(temporary)
+        consumer = Path(temporary).resolve()
         for archive in packages:
-            with tarfile.open(archive) as stream:
-                for member in stream:
-                    path = (consumer / member.name).resolve()
-                    if consumer not in path.parents or not (member.isfile() or member.isdir()):
-                        raise ValueError('unsafe crate archive member')
-                    if member.isdir():
-                        path.mkdir(parents=True, exist_ok=True)
-                    else:
-                        path.parent.mkdir(parents=True, exist_ok=True)
-                        with stream.extractfile(member) as source, path.open('wb') as destination:
-                            shutil.copyfileobj(source, destination)
+            extract(archive, consumer, archive.stem)
         dependency_lines = [f'{p["name"]} = {{ path = {json.dumps(str(consumer / (p["name"] + "-" + version)))}, version = "={version}" }}' for p in metadata['packages'] if p['name'] != 'plenora-storage-cli']
         manifest = '[package]\nname="storage-release-consumer"\nversion="0.0.0"\nedition="2024"\n[dependencies]\n' + '\n'.join(dependency_lines)
         manifest += '\n[patch.crates-io]\n' + '\n'.join(dependency_lines) + '\n'

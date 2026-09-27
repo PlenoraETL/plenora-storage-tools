@@ -1,4 +1,5 @@
 import io
+import os
 from pathlib import Path
 import sys
 import tarfile
@@ -10,6 +11,27 @@ from package_source import extract
 
 
 class SourcePackageTests(unittest.TestCase):
+    def test_valid_crate_extracts_through_noncanonical_destination(self):
+        with tempfile.TemporaryDirectory(prefix='storage archive alias ') as temporary:
+            root = Path(temporary)
+            archive = root / 'example-1.0.0.crate'
+            content = b'[package]\nname="example"\nversion="1.0.0"\n'
+            with tarfile.open(archive, 'w:gz') as stream:
+                member = tarfile.TarInfo('example-1.0.0/Cargo.toml')
+                member.size = len(content)
+                stream.addfile(member, io.BytesIO(content))
+            destinations = [root / 'nested' / '..' / 'output']
+            if os.name == 'nt':
+                import ctypes
+                buffer = ctypes.create_unicode_buffer(32768)
+                length = ctypes.windll.kernel32.GetShortPathNameW(str(root), buffer, len(buffer))
+                self.assertGreater(length, 0)
+                destinations.append(Path(buffer.value) / 'short-output')
+            for destination in destinations:
+                extracted = extract(archive, destination, archive.stem)
+                self.assertEqual(extracted, destination.resolve() / archive.stem)
+                self.assertEqual((extracted / 'Cargo.toml').read_bytes(), content)
+
     def test_escaping_names_and_links_are_rejected_before_extraction(self):
         for name, kind in [('source/../../escape', tarfile.REGTYPE),
                            ('/absolute/path', tarfile.REGTYPE),
