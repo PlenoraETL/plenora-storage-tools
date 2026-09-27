@@ -9,6 +9,7 @@ import sys
 
 from build_release import ROOT, digest, source_digest
 from qualify_extended_faults import EXPECTED_TESTS, LEGACY_TESTS
+from qualify_local_faults import validate_report as validate_local_faults
 from versioning import parse_version
 
 
@@ -96,6 +97,10 @@ def main():
             evidence.extend([extended_path, faults_extended_path])
         if 'linux' in target:
             evidence.append(faults_path)
+            if parse_version(manifest['version']).requires((1, 0, 0)):
+                local_faults_path = folder / 'local-faults.json'
+                validate_local_faults(json.loads(local_faults_path.read_text()), digest(binary))
+                evidence.append(local_faults_path)
         for source in [suite_path, audit_path, deny_path]:
             shutil.copyfile(source, archive_evidence / source.name)
         records.append({'target': target, 'binary_sha256': digest(binary),

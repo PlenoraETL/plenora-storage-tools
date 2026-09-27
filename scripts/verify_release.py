@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 from versioning import parse_version
 from package_cli import verify_archive
+from qualify_local_faults import validate_report as validate_local_faults
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'contracts/upstream'))
 from conformance_checks import adoption_errors
@@ -95,6 +96,10 @@ def main():
                 report = json.loads(report_path.read_text())
                 binary = 'plenora-storage.exe' if 'windows' in manifest['target'] else 'plenora-storage'
                 assert report['binary_sha256'] == sums[binary], f'{name}: binary differs'
+        local_faults_path = folder / 'local-faults.json'
+        if local_faults_path.exists():
+            binary = 'plenora-storage.exe' if 'windows' in manifest['target'] else 'plenora-storage'
+            validate_local_faults(json.loads(local_faults_path.read_text()), sums[binary])
         results.append({'target': manifest['target'], 'artifacts': len(manifest['artifacts']),
                         'qualification_present': qualification_path.exists(), 'status': 'PASS'})
     assert len(sources) == 1, 'source snapshots differ across targets'

@@ -76,6 +76,8 @@ services:
       retries: 20
 
   storage-rust:
+    tmpfs:
+      - /storage-faults:size=4194304,mode=1777
     build:
       context: .
       dockerfile: Dockerfile

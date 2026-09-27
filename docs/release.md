@@ -36,6 +36,16 @@ artefatto prodotto da un checkout modificato o privo delle evidenze richieste.
    `qualify_extended_faults.py` sul binario finale. I log comprendono anche
    `smb-upstream-audit.json`.
 
+Per la serie 1.0 la qualifica Linux richiede anche `local-faults.json`, legato
+al digest del binario finale. `scripts/qualify_local_faults.py` esercita ENOSPC
+su un tmpfs isolato da 4 MiB ed EACCES con processi senza privilegi: upload e
+download devono preservare i file esistenti, eliminare gli staging e restituire
+categoria, fase, effetto e retry corretti senza esporre percorsi o contenuti.
+Il mount è configurato nel servizio Compose `storage-rust`; il gate viene
+eseguito sia da `verify.sh` nella CI sia da `qualify_target.py` sui candidati.
+Questa prova riguarda il filesystem locale Linux e non certifica quote o
+permessi dei server remoti.
+
 Il runner Docker deve eseguire i comandi relativi alla fiducia della CA come
 root: la CA è effimera ed è installata solo nel container di test. Le chiavi in
 `.fixtures` non sono artefatti di release. `COMPOSE_PROJECT_NAME` e `COMPOSE_FILE`

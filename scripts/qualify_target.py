@@ -58,6 +58,8 @@ def qualify(folder, host=None, ca=None, pin=None):
         shutil.copyfile(ROOT / 'target/release-readiness' / report, folder / destination)
     if not windows:
         run('qualify_commit_faults', 'commit-faults.json')
+        run('qualify_local_faults')
+        shutil.copyfile(ROOT / 'target/release-readiness/local-faults.json', folder / 'local-faults.json')
     wheels = [folder / p['name'] for p in manifest['artifacts'] if p['name'].endswith('.whl')]
     if len(wheels) != 1:
         raise ValueError('expected one manifested wheel for the target')
