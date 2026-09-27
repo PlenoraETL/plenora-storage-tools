@@ -8,6 +8,9 @@ permissions:
   contents: read
 
 jobs:
+  production-coverage:
+    uses: ./.github/workflows/coverage.yml
+
   parser-fuzz:
     uses: ./.github/workflows/parser-fuzz.yml
 

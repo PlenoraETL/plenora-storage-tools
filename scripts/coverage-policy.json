@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
   "rust_lines": {
-    "plenora-storage-cli": 81,
-    "plenora-storage-core": 86,
-    "plenora-storage-engine": 89,
-    "plenora-storage-ftp": 83,
-    "plenora-storage-providers": 86,
+    "plenora-smb2": 86,
+    "plenora-storage-cli": 79,
+    "plenora-storage-core": 84,
+    "plenora-storage-engine": 88,
+    "plenora-storage-ftp": 79,
+    "plenora-storage-providers": 85,
     "plenora-storage-py": 88,
-    "plenora-storage-s3": 73,
-    "plenora-storage-sftp": 82,
-    "plenora-smb2": 86
+    "plenora-storage-s3": 71,
+    "plenora-storage-sftp": 77
   },
   "python": {
     "line_percent": 98,

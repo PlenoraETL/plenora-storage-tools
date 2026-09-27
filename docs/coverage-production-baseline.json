@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "crates": {
+    "plenora-smb2": {
+      "lines": 33403,
+      "covered": 29550,
+      "files": 63,
+      "percent": 88.47
+    },
+    "plenora-storage-cli": {
+      "lines": 417,
+      "covered": 338,
+      "files": 1,
+      "percent": 81.06
+    },
+    "plenora-storage-core": {
+      "lines": 1397,
+      "covered": 1215,
+      "files": 9,
+      "percent": 86.97
+    },
+    "plenora-storage-engine": {
+      "lines": 209,
+      "covered": 189,
+      "files": 2,
+      "percent": 90.43
+    },
+    "plenora-storage-ftp": {
+      "lines": 1098,
+      "covered": 893,
+      "files": 1,
+      "percent": 81.33
+    },
+    "plenora-storage-providers": {
+      "lines": 1453,
+      "covered": 1272,
+      "files": 10,
+      "percent": 87.54
+    },
+    "plenora-storage-py": {
+      "lines": 188,
+      "covered": 170,
+      "files": 1,
+      "percent": 90.43
+    },
+    "plenora-storage-s3": {
+      "lines": 626,
+      "covered": 462,
+      "files": 2,
+      "percent": 73.8
+    },
+    "plenora-storage-sftp": {
+      "lines": 1043,
+      "covered": 830,
+      "files": 1,
+      "percent": 79.58
+    }
+  },
+  "product_excluding_smb_fork": {
+    "lines": 6431,
+    "covered": 5369,
+    "percent": 83.49
+  },
+  "excluded_test_files": [],
+  "scope": "Owned Rust production sources; cfg(test) child files excluded. SMB fork is separate and retains upstream inline tests. Python wrapper and interoperability are separate gates.",
+  "threshold_status": "baseline_measurement_only",
+  "raw_report_sha256": "beed790a1e8ecb5003fe5e8f71d516390f9590d12e530e016fcdea4596650769",
+  "source_revision": "d8827bb3cc1d8fd071727158f4951d1d9e213f37",
+  "dirty": false
+}

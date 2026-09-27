@@ -8,56 +8,25 @@ use std::{
     time::Instant,
 };
 
-use clap::{Args, Parser, Subcommand, ValueEnum, error::ErrorKind};
+use clap::{Parser, ValueEnum, error::ErrorKind};
 use futures_util::FutureExt;
 use plenora_storage_core::{
-    COMPONENT_ID, CopyRequest, DeleteRequest, Engine, EngineConfig, EnvironmentCredentialResolver,
-    ErrorCategory, ErrorPhase, ExecutionControl, ListRequest, ProviderConnection,
-    PublicationPolicy, RemoteEffect, RetryDisposition, StatRequest, StorageError, StorageResult,
-    Surface,
+    CopyRequest, DeleteRequest, Engine, EngineConfig, EnvironmentCredentialResolver, ErrorCategory,
+    ErrorPhase, ExecutionControl, ListRequest, ProviderConnection, PublicationPolicy, RemoteEffect,
+    RetryDisposition, StatRequest, StorageError, StorageResult, Surface,
 };
 use plenora_storage_engine::{PutFileOptions, get_to_file, put_from_file};
-use serde_json::{Value, json};
+use serde_json::json;
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use tokio::{fs, io::AsyncReadExt};
 
-const CLI_PROTOCOL_VERSION: u32 = 2;
+mod args;
+mod output;
 
-#[derive(Parser)]
-#[command(name = "plenora-storage", disable_version_flag = true)]
-// These are separate, global opt-ins so operators must authorize each relaxed
-// security boundary explicitly on the command line.
-#[allow(clippy::struct_excessive_bools)]
-struct Cli {
-    #[arg(long, global = true, value_enum)]
-    format: Option<OutputFormat>,
-    #[arg(long, global = true)]
-    version: bool,
-    #[arg(long, global = true)]
-    deadline: Option<String>,
-    #[arg(
-        long,
-        global = true,
-        help = "Compatibility option; qualified v1 operations no longer require experimental opt-in"
-    )]
-    allow_experimental_contracts: bool,
-    #[arg(long, global = true)]
-    allow_insecure_http: bool,
-    #[arg(long, global = true)]
-    allow_insecure_ftp: bool,
-    #[arg(long, global = true)]
-    allow_private_network: bool,
-    #[arg(long, global = true)]
-    allow_unverified_ssh: bool,
-    #[arg(long, global = true, default_value_t = 1_073_741_824)]
-    max_transfer_bytes: u64,
-    #[arg(long, global = true, default_value_t = 10_000)]
-    max_list_items: usize,
-    #[arg(long, global = true, default_value_t = plenora_storage_core::DEFAULT_MAX_BUFFERED_PUT_BYTES)]
-    max_buffered_put_bytes: u64,
-    #[command(subcommand)]
-    command: Option<Command>,
-}
+use args::{Cli, Command};
+use output::{CliOutcome, emit_error, emit_success, operation_result, value_result};
+
+const CLI_PROTOCOL_VERSION: u32 = 2;
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
 enum OutputFormat {
@@ -77,81 +46,6 @@ impl From<CliPublicationPolicy> for PublicationPolicy {
             CliPublicationPolicy::AtomicRequired => Self::AtomicRequired,
         }
     }
-}
-
-#[derive(Subcommand)]
-enum Command {
-    Capabilities,
-    Test(ConnectionArgs),
-    List {
-        #[command(flatten)]
-        connection: ConnectionArgs,
-        #[arg(long)]
-        prefix: Option<String>,
-        #[arg(long)]
-        cursor: Option<String>,
-        #[arg(long)]
-        max_items: Option<usize>,
-        /// Follow pages in this process, bounded by --max-list-items.
-        #[arg(long)]
-        all: bool,
-    },
-    Stat {
-        #[command(flatten)]
-        connection: ConnectionArgs,
-        #[arg(long)]
-        key: String,
-    },
-    Get {
-        #[command(flatten)]
-        connection: ConnectionArgs,
-        #[arg(long)]
-        key: String,
-        #[arg(long)]
-        output: PathBuf,
-        #[arg(long, action = clap::ArgAction::Set, required = true)]
-        overwrite: bool,
-    },
-    Put {
-        #[command(flatten)]
-        connection: ConnectionArgs,
-        #[arg(long)]
-        key: String,
-        #[arg(long)]
-        input: PathBuf,
-        #[arg(long, action = clap::ArgAction::Set, required = true)]
-        overwrite: bool,
-        #[arg(long, value_enum)]
-        publication_policy: CliPublicationPolicy,
-        #[arg(long)]
-        content_type: Option<String>,
-    },
-    Copy {
-        #[command(flatten)]
-        connection: ConnectionArgs,
-        #[arg(long)]
-        source_key: String,
-        #[arg(long)]
-        destination_key: String,
-        #[arg(long, action = clap::ArgAction::Set, required = true)]
-        overwrite: bool,
-        #[arg(long, value_enum)]
-        publication_policy: CliPublicationPolicy,
-    },
-    Delete {
-        #[command(flatten)]
-        connection: ConnectionArgs,
-        #[arg(long)]
-        key: String,
-        #[arg(long, action = clap::ArgAction::Set, required = true)]
-        ignore_missing: bool,
-    },
-}
-
-#[derive(Args)]
-struct ConnectionArgs {
-    #[arg(long)]
-    connection: PathBuf,
 }
 
 #[tokio::main]
@@ -281,9 +175,6 @@ async fn run() -> ExitCode {
         Err((command, contract, error)) => emit_error(command, contract, *error),
     }
 }
-
-type CliOutcome =
-    Result<(&'static str, &'static str, Value), (&'static str, &'static str, Box<StorageError>)>;
 
 async fn execute(
     engine: &Engine,
@@ -558,88 +449,6 @@ fn execution_control(deadline: Option<&str>) -> StorageResult<ExecutionControl> 
         })?
     };
     Ok(control.with_deadline(instant))
-}
-
-fn operation_result<T: serde::Serialize>(
-    command: &'static str,
-    contract: &'static str,
-    result: StorageResult<T>,
-) -> CliOutcome {
-    match result {
-        Ok(result) => value_result(command, contract, result),
-        Err(error) => Err((command, "plenora-cli-error-v1", Box::new(error))),
-    }
-}
-
-fn value_result<T: serde::Serialize>(
-    command: &'static str,
-    contract: &'static str,
-    result: T,
-) -> CliOutcome {
-    serde_json::to_value(result)
-        .map(|value| (command, contract, value))
-        .map_err(|_| {
-            (
-                command,
-                "plenora-cli-error-v1",
-                Box::new(StorageError::new(
-                    ErrorCategory::Internal,
-                    ErrorPhase::Cleanup,
-                    RemoteEffect::None,
-                    RetryDisposition::Never,
-                    "RESULT_SERIALIZATION_FAILED",
-                    "public result serialization failed",
-                )),
-            )
-        })
-}
-
-fn emit_success(command: &str, contract: &str, result: Value) -> ExitCode {
-    let envelope = json!({
-        "status": "ok",
-        "protocol_version": CLI_PROTOCOL_VERSION,
-        "component": COMPONENT_ID,
-        "component_version": env!("CARGO_PKG_VERSION"),
-        "contract": contract,
-        "command": command,
-        "result": result,
-    });
-    println!("{envelope}");
-    ExitCode::SUCCESS
-}
-
-fn emit_error(command: &str, contract: &str, error: StorageError) -> ExitCode {
-    let exit_code = error_exit_code(error.category);
-    let envelope = json!({
-        "status": "error",
-        "protocol_version": CLI_PROTOCOL_VERSION,
-        "component": COMPONENT_ID,
-        "component_version": env!("CARGO_PKG_VERSION"),
-        "contract": contract,
-        "command": command,
-        "error": error,
-    });
-    println!("{envelope}");
-    ExitCode::from(exit_code)
-}
-
-const fn error_exit_code(category: ErrorCategory) -> u8 {
-    match category {
-        ErrorCategory::InvalidConfiguration => 2,
-        ErrorCategory::Unsupported => 3,
-        ErrorCategory::ResourceLimit => 4,
-        ErrorCategory::Io
-        | ErrorCategory::NotFound
-        | ErrorCategory::Conflict
-        | ErrorCategory::Protocol
-        | ErrorCategory::Authentication
-        | ErrorCategory::Authorization
-        | ErrorCategory::Timeout
-        | ErrorCategory::Transient => 5,
-        ErrorCategory::Execution => 6,
-        ErrorCategory::Cancelled => 130,
-        ErrorCategory::Internal => 70,
-    }
 }
 
 #[cfg(test)]

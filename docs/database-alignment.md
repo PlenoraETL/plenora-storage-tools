@@ -39,8 +39,9 @@ distribuzione installata. Esistono gate distinti per parser fuzz, coverage Rust
 per crate e coverage Python sulla wheel installata, descritti nelle
 [prove di affidabilità](reliability.md). Il [gate finale](release-evidence-bundle.md)
 richiede ora anche il confronto delle prestazioni e l'aggregazione dei report.
-Restano da raccogliere le nuove evidenze complete e da misurare la coverage Rust
-del solo codice di prodotto. L'esistenza
+La coverage Rust del prodotto è ora distinta dai test e dispone di una baseline
+misurata e di un gate nella CI ordinaria. Restano da raccogliere le nuove
+evidenze complete del candidato finale. L'esistenza
 di un gate non certifica ogni candidato. Le prove su emulatori cloud, Samba e
 WsgiDAV non certificano automaticamente account cloud reali, Windows Server,
 Nextcloud, ACL/DFS ADLS o altri server.

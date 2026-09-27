@@ -1,5 +1,7 @@
+use super::output::error_exit_code;
 use super::*;
 use clap::CommandFactory;
+use serde_json::Value;
 
 fn describe(mut command: clap::Command) -> Value {
     command.build();

@@ -56,10 +56,12 @@ non il solo nome. Il fork SMB conserva i test upstream ed è riportato a parte.
 La baseline storica seguente includeva ancora i test inline: i suoi numeri e
 le relative soglie non costituiscono una misura del nuovo denominatore.
 
+### Baseline storica con test inline
+
 La campagna sul commit `ddf4a3f05cbfc6bb90fe8972124a07b2666123d0`, con test
 Rust e prove CLI/Python su tutte le fixture, misura 6.504/7.583 righe (85,77%)
-escludendo il fork SMB. Da questa misura derivano le soglie per crate in
-`scripts/coverage-policy.json`: circa 2–3 punti percentuali di margine, per
+escludendo il fork SMB. Da questa misura derivavano le soglie storiche riportate
+sotto: circa 2–3 punti percentuali di margine, per
 bloccare regressioni senza trattare la percentuale come prova di correttezza.
 
 | Crate | Baseline (%) | Minimo (%) |
@@ -74,12 +76,37 @@ bloccare regressioni senza trattare la percentuale come prova di correttezza.
 | bridge Python Rust | 90,43 | 88 |
 | fork SMB, separato | 88,46 | 86 |
 
-`coverage.sh`, eseguito dal workflow di affidabilità con `coverage=true`, impone
-queste soglie e rifiuta crate mancanti o non ancora censiti nella policy. Il
+### Baseline del codice di produzione
+
+La [misura del commit d8827bb](coverage-production-baseline.json) registra
+5.369/6.431 righe di prodotto coperte (83,49%), dopo la separazione dei quindici
+moduli di test. La campagna ha eseguito tutti i test Rust senza skip e le prove
+CLI/Python sulle fixture. Il report LLVM è identificato dal digest nella baseline;
+la misura non qualifica automaticamente un candidato successivo.
+
+| Crate | Baseline prodotto (%) | Minimo corrente (%) |
+| --- | ---: | ---: |
+| core | 86,97 | 84 |
+| engine | 90,43 | 88 |
+| CLI | 81,06 | 79 |
+| FTP/FTPS | 81,33 | 79 |
+| SFTP | 79,58 | 77 |
+| S3 | 73,80 | 71 |
+| providers | 87,54 | 85 |
+| bridge Python Rust | 90,43 | 88 |
+| fork SMB, separato e con test upstream | 88,47 | 86 |
+
+Le soglie correnti in `scripts/coverage-policy.json` mantengono almeno due punti
+di margine rispetto alla baseline, arrotondando verso il basso. Il denominatore
+è cambiato: queste soglie sostituiscono quelle che includevano il codice dei test,
+senza presentare il cambiamento della percentuale come una regressione funzionale.
+
+`coverage.sh`, eseguito dalla [CI ordinaria](../.github/workflows/coverage.yml)
+e dal workflow di affidabilità con `coverage=true`, impone le soglie correnti
+e rifiuta crate mancanti o non ancora censiti nella policy. Il
 report conserva commit, stato del checkout e digest del report LLVM originale.
 Il confronto usa i conteggi esatti; arrotondare la percentuale non permette di
-superare una soglia. Le soglie storiche restano conservative fino a una nuova
-misura sul prodotto separato dai test; non vengono ridotte senza evidenza.
+superare una soglia. Le soglie non vengono ridotte senza una misura conservata.
 Restano da censire e chiudere i percorsi di sicurezza/commit non coperti.
 
 Il wrapper Python ha un gate distinto nella matrice CPython 3.10–3.14 su Linux

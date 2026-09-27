@@ -10,8 +10,9 @@ descrive gli interventi, senza attribuire loro qualifiche dei candidati preceden
 | Distribuzione | Workflow da bozza GitHub, qualifica ripetuta, smoke dopo download su entrambi i target, attestazione della qualifica, checksum e pubblicazione solo dopo successo | Eseguire il workflow su una bozza qualificata; non è ancora una release pubblicata |
 | SDK Python | Tipi pubblici dei risultati, policy Literal, controlli nominati negli stub, baseline dei tipi, consumer mypy strict ed esempio sync/async | Confermare la matrice completa CPython 3.10–3.14 sui due target per la wheel finale |
 | Documenti | Controllo README dello SDK, link locali, ancore, script citati ed esempi Python; procedure correnti indicizzate | Eseguire e verificare le istruzioni con gli asset finali |
-| Layout e coverage Rust | Quindici moduli di test spostati in file figli privati, con controllo in CI; il riepilogo LLVM esclude i file test dal prodotto | Misurare nuovamente la coverage sulle fixture e calibrare le soglie per il nuovo denominatore |
+| Layout e coverage Rust | Quindici moduli di test spostati in file figli privati; misura del prodotto 83,49%, soglie ricalibrate e workflow nella CI ordinaria | Confermare il gate sul candidato finale e censire i percorsi critici non coperti |
 | Commenti e API Rust | Controllo dei riferimenti al debito tecnico nei commenti reali; rustdoc di engine, policy, lifecycle e interpretazione degli effetti | Estendere la revisione della documentazione ai dettagli degli adapter |
+| CLI | Parsing degli argomenti e costruzione degli envelope JSON separati dal dispatch; snapshot dei comandi e test del protocollo invariati | Verificare gli eseguibili finali sui due target |
 | Performance | Identità delle campagne, ambiente misurato, confronto mediana/p95/RSS e workflow eseguibile | Misurare sul laboratorio dedicato e valutare la stabilità delle soglie iniziali; nessun SLO già attestato |
 
 La verifica locale Windows del primo sviluppo ha eseguito 26 test sulla wheel
@@ -19,8 +20,7 @@ installata con Python 3.11.15, consumer mypy 2.3.1 e coverage Python del 100%
 (232 righe e 36 rami). È una prova di sviluppo locale, non la qualifica delle
 dieci combinazioni né degli artefatti RC costruiti in precedenza.
 
-Restano interventi distinti: nuova baseline della coverage del solo prodotto,
-suddivisione dei moduli per responsabilità,
+Restano interventi distinti: ulteriore suddivisione degli adapter per responsabilità,
 revisione della documentazione degli adapter e ampliamento della
 SBOM agli ambiti di build/qualifica. Non si dichiarano completati per la sola
 presenza dei nuovi gate di distribuzione.
