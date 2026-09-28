@@ -26,7 +26,7 @@ percent-encoding = { version = "2.3.2", optional = true }
 cap-std = { workspace = true, optional = true }
 futures-util.workspace = true
 object_store = { version = "0.14.2", default-features = false, features = ["azure"], optional = true }
-plenora-storage-core = { path = "../plenora-storage-core", version = "1.0.0-rc.2" }
+plenora-storage-core = { path = "../plenora-storage-core", version = "1.0.0" }
 quick-xml = { workspace = true, optional = true }
 reqwest = { workspace = true, features = ["rustls"], optional = true }
 rustls = { workspace = true, optional = true }

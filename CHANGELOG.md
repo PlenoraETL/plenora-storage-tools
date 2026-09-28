@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 1.0.0 — in qualification
+
+- Prepare the stable Rust library, CLI and Python SDK for Linux x86_64 and Windows x86_64, distributed only through GitHub Releases.
+- Retain the nine-provider scope and public contracts exercised by the release candidates, including typed Python results, cancellation outcomes, bounded transfers and redacted errors.
+- Require qualification of the final stable artifact bytes, including the provisional two-hour soak, platform and Python matrices, fault injection, API compatibility, coverage, dependency audits and performance budgets.
+- Fix cross-platform qualification SBOM reproducibility by preserving LF in dependency declaration files.
+- Keep AWS/Azure/GCS account compatibility unqualified and WebDAV compatibility limited to the explicitly configured fixture. Publication remains pending until the final evidence bundle and downloaded-asset checks pass.
+
 ## 1.0.0-rc.2 — in preparation
 
 - Flush SFTP download sinks under deadline/cancellation control before reporting success; preserve redacted I/O errors and ambiguous effects. Exercise partial writes, flush failures/cancellation and source failures across all nine fixture providers.

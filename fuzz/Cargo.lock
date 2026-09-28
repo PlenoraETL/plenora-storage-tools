@@ -1023,7 +1023,7 @@ checksum = "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
 
 [[package]]
 name = "plenora-storage-core"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "hex",
@@ -1037,7 +1037,7 @@ dependencies = [
 
 [[package]]
 name = "plenora-storage-ftp"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "hex",
@@ -1066,7 +1066,7 @@ dependencies = [
 
 [[package]]
 name = "plenora-storage-providers"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1087,7 +1087,7 @@ dependencies = [
 
 [[package]]
 name = "plenora-storage-s3"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "futures-util",

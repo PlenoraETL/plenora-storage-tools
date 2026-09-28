@@ -172,6 +172,25 @@ finale. Verificare prima `SHA256SUMS` della versione, poi quelli dei singoli
 target: i manifest, incluso quello di adozione, sono nella catena dei checksum.
 La pubblicazione è un passo separato dalla build e dalla qualifica.
 
+## Manutenzione della serie 1.0
+
+Il riferimento per supporto e manutenzione è il team PlenoraETL attraverso il
+[repository del progetto](https://github.com/PlenoraETL/plenora-storage-tools).
+Segnalare i difetti nelle issue indicando versione, piattaforma, provider,
+codice dell'errore e una riproduzione con dati sintetici; escludere credenziali,
+endpoint privati e contenuti dei file. Non è dichiarato un SLA di risposta.
+Per una vulnerabilità usare la segnalazione privata GitHub, quando disponibile;
+altrimenti chiedere ai maintainer un canale privato senza pubblicare i dettagli.
+
+Perdita o corruzione di dati, esposizione di segreti, blocchi incontrollabili e
+installazione non funzionante sui target dichiarati hanno priorità sui nuovi
+sviluppi e impediscono la promozione di una release affetta. Una patch 1.0.x
+preserva i contratti pubblici, aggiunge una regressione riproducibile e passa
+dalla stessa build e qualifica dei propri artefatti. Gli aggiornamenti delle
+dipendenze richiedono lockfile aggiornati, audit e controlli di compatibilità;
+le versioni distribuite restano immutabili. La durata provvisoria del soak è
+quella documentata nelle [prove di affidabilità](reliability.md).
+
 ## Gate aggiunti dal modello Database Tools
 
 `scripts/check_features.py` verifica ogni selezione di provider, inclusa la build
