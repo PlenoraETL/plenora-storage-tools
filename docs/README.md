@@ -19,8 +19,9 @@ artefatti attestano una qualifica.
 | [Migrazione](migration-1.0.md) | Passaggio alla serie 1.0 |
 | [Allineamento](database-alignment.md) | Principi del riferimento Database Tools |
 | [Confronto con Database Tools](database-reference-review.md) | Analisi al 27 settembre 2026, differenze e criteri di completamento |
-| [Consolidamento](quality-alignment-progress.md) | Interventi successivi al confronto e qualifiche ancora da completare |
-| [Piano 1.0](roadmap-1.0.0.md) | Milestone, perimetro e criteri di uscita |
+| [Consolidamento](quality-alignment-progress.md) | Interventi dopo il confronto, chiusura 1.0 e rimando alle attività successive |
+| [Piano 2.0](roadmap-2.0.0.md) | Sei ambiti di allineamento, milestone e criteri verificabili della prossima major |
+| [Piano 1.0](roadmap-1.0.0.md) | Piano storico: milestone, perimetro e criteri di uscita della prima release |
 
 ## Resoconti e baseline storiche
 

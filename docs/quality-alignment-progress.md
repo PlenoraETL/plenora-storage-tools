@@ -4,6 +4,29 @@ Interventi successivi al [confronto del 27 settembre](database-reference-review.
 Il confronto conserva le osservazioni dei commit esaminati; questo documento
 descrive gli interventi, senza attribuire loro qualifiche dei candidati precedenti.
 
+## Chiusura 1.0.0 e attività successive — 28 settembre 2026
+
+La [1.0.0 è pubblicata](https://github.com/PlenoraETL/plenora-storage-tools/releases/tag/v1.0.0)
+dal commit `67668f47a071e35d64169f3790634692fc5fbd12`. Il
+[workflow finale](https://github.com/PlenoraETL/plenora-storage-tools/actions/runs/36396706695)
+ha completato qualifica, prove dopo download Linux/Windows e pubblicazione.
+La ricevuta `release-qualification.json` distribuita con la release identifica
+gli artefatti e le evidenze finali, inclusa la matrice Python. Questo chiude le
+attese di qualifica del candidato 1.0 riportate sotto, non gli interventi di
+qualità interna ancora aperti.
+
+Il [piano 2.0.0](roadmap-2.0.0.md) raccoglie questi interventi: responsabilità
+degli adapter, rustdoc e lint, budget del codice, commenti, policy delle
+dipendenze e scansione degli artefatti, documentazione corrente. Tutti richiedono
+nuove prove sul codice 2.0. Per gli inventari il perimetro pianificato distingue
+componenti dichiarati, risolti e rilevati negli artefatti; non promette un
+inventario completo di ogni ambiente installato.
+
+## Situazione durante il consolidamento precedente alla pubblicazione
+
+La tabella e le osservazioni seguenti conservano lo stato di sviluppo di allora;
+le attese di pubblicazione non descrivono lo stato corrente della 1.0.0.
+
 | Area | Implementato | Verifica ancora necessaria per la release |
 | --- | --- | --- |
 | Ricevuta finale | Controllo API, fuzz, coverage, dieci combinazioni Python, typing, trasferimenti, soak e performance; verifica dei file originali; invalidazione della ricevuta precedente su un tentativo fallito | Raccogliere il bundle completo del nuovo candidato, con gli stessi digest che saranno pubblicati |

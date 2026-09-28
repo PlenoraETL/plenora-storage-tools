@@ -5,7 +5,9 @@ applicativo e qualità del rilascio. Storage mantiene i propri contratti e la
 licenza MIT/Apache-2.0. Il profilo database non è un profilo storage.
 
 Il [confronto del 27 settembre 2026](database-reference-review.md) identifica
-le revisioni esaminate, le differenze ancora aperte e i criteri di completamento.
+le revisioni esaminate e le differenze osservate in quel momento. Il
+[piano 2.0.0](roadmap-2.0.0.md) definisce gli interventi ancora da svolgere dopo
+la pubblicazione della 1.0.0 e i rispettivi criteri di completamento.
 Seguire questi principi non significa avere già la stessa maturità del riferimento.
 
 | Principio | Applicazione in Storage |
@@ -45,8 +47,10 @@ per crate e coverage Python sulla wheel installata, descritti nelle
 [prove di affidabilità](reliability.md). Il [gate finale](release-evidence-bundle.md)
 richiede ora anche il confronto delle prestazioni e l'aggregazione dei report.
 La coverage Rust del prodotto è ora distinta dai test e dispone di una baseline
-misurata e di un gate nella CI ordinaria. Restano da raccogliere le nuove
-evidenze complete del candidato finale. L'esistenza
+misurata e di un gate nella CI ordinaria. La
+[pubblicazione 1.0.0](https://github.com/PlenoraETL/plenora-storage-tools/actions/runs/36396706695)
+ha completato la qualifica e le prove dopo download dei suoi artefatti;
+la 2.0.0 richiederà nuove evidenze. L'esistenza
 di un gate non certifica ogni candidato. Le prove su emulatori cloud, Samba e
 WsgiDAV non certificano automaticamente account cloud reali, Windows Server,
 Nextcloud, ACL/DFS ADLS o altri server.
