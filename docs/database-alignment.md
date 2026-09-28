@@ -6,8 +6,8 @@ licenza MIT/Apache-2.0. Il profilo database non è un profilo storage.
 
 Il [confronto del 27 settembre 2026](database-reference-review.md) identifica
 le revisioni esaminate e le differenze osservate in quel momento. Il
-[piano 2.0.0](roadmap-2.0.0.md) definisce gli interventi ancora da svolgere dopo
-la pubblicazione della 1.0.0 e i rispettivi criteri di completamento.
+[piano 2.0.0](roadmap-2.0.0.md) registra gli interventi dopo la pubblicazione
+della 1.0.0, il loro stato e i rispettivi criteri di completamento.
 Seguire questi principi non significa avere già la stessa maturità del riferimento.
 
 | Principio | Applicazione in Storage |

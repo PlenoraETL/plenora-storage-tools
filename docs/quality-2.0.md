@@ -12,9 +12,10 @@ La [misura iniziale](code-size-baseline-1.0.0.json) è stata raccolta sui sorgen
 separatamente. Le metriche sono definite sotto; non rappresentano coverage o
 una percentuale di maturità.
 
-Il confronto locale delle API Rust sul target Windows dopo la separazione ha
-conservato tutte le firme della baseline 1.0 senza rigenerarla. Le API Linux,
-CLI e della wheel finale devono superare i rispettivi gate sul candidato.
+La [CI del primo ciclo](https://github.com/PlenoraETL/plenora-storage-tools/actions/runs/36404688410)
+ha conservato le firme Rust della baseline 1.0 su entrambi i target senza
+rigenerarla e verificato CLI e SDK installato. Le distribuzioni stabili finali
+devono superare nuovamente i rispettivi gate sul candidato.
 
 ## Dimensioni del prodotto
 
@@ -102,7 +103,26 @@ Il bundle finale 2.0 deve contenerne i report sotto `native-components/`; il gat
 di pubblicazione rifiuta scansioni mancanti, modificate o riferite ad altri
 artefatti. La ricevuta conserva i digest dei report e dei dati originali.
 
-## Workflow
+## Differenze rispetto al riferimento
+
+Il riferimento resta Database Tools `850723d86be9d0cb5d8b0643da6cae971c7ec068`:
+questa attività non ne riesegue la suite. Le differenze mantenute sono intenzionali:
+
+| Area | Scelta Storage e motivo |
+| --- | --- |
+| Rust pubblico | Vincoli compatibili per i tipi di interoperabilità, pin esatti per dipendenze private; evitare conflitti inutili nei consumer |
+| Provider | Nove sistemi e operazioni storage; nessuna equivalenza con transazioni, pooling o query database |
+| Python | Dizionari tipizzati e thread per chiamate async; conservare risultati e riconciliazione della cancellazione |
+| Fork SMB | Conteggi, API e manutenzione upstream separati; non applicare automaticamente la riscrittura dei sorgenti propri |
+| Compatibilità | Fixture dichiarate e due target; account cloud reali e server alternativi richiedono prove dedicate |
+| Inventari nativi | Componenti effettivamente rilevati e import; nessuna promessa di inventario completo dell'host o del linking statico |
+
+La struttura dei moduli, la documentazione pubblica, i controlli sui commenti e
+le dimensioni del prodotto ora hanno regole eseguibili analoghe al riferimento.
+La chiusura operativa resta legata alle evidenze della distribuzione finale,
+non al solo completamento di questi interventi.
+
+## Esecuzione dei gate
 
 I controlli di dimensione, commenti, dipendenze e rustdoc sono eseguiti dal job
 `product-quality` della [CI](../.github/workflows/ci.yml). Le prove dei casi

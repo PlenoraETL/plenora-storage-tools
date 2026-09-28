@@ -3,7 +3,11 @@
 Piano del 28 settembre 2026. Obiettivo approvato: completare i sei ambiti di
 allineamento rimasti aperti dopo la 1.0.0, su libreria Rust, CLI e SDK Python,
 per tutti i nove provider. Il primo ciclo `2.0.0-alpha.1` implementa separazione,
-documentazione e nuovi controlli; la qualifica della release resta da completare.
+documentazione e nuovi controlli. Il commit `d6909bf044fa1f99c5e83d8a9007c4b339bada9b`
+ha superato la [CI completa](https://github.com/PlenoraETL/plenora-storage-tools/actions/runs/36404688410),
+inclusi API sui due target, fixture, fuzz, coverage e dieci ambienti Python.
+Si congela ora il candidato stabile 2.0.0: build e qualifica dei suoi byte finali
+restano da completare. L'esito alfa non sostituisce queste prove.
 Le verifiche locali sono descritte in [Qualità 2.0](quality-2.0.md).
 Non è fissata una data di rilascio.
 
