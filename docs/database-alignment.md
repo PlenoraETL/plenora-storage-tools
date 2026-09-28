@@ -55,7 +55,8 @@ La coverage Rust del prodotto è ora distinta dai test e dispone di una baseline
 misurata e di un gate nella CI ordinaria. La
 [pubblicazione 1.0.0](https://github.com/PlenoraETL/plenora-storage-tools/actions/runs/36396706695)
 ha completato la qualifica e le prove dopo download dei suoi artefatti;
-la 2.0.0 richiederà nuove evidenze. L'esistenza
+la [2.0.0](release-2.0.0.md) ha completato a sua volta la qualifica con nuove
+evidenze riferite ai propri artefatti. L'esistenza
 di un gate non certifica ogni candidato. Le prove su emulatori cloud, Samba e
 WsgiDAV non certificano automaticamente account cloud reali, Windows Server,
 Nextcloud, ACL/DFS ADLS o altri server.

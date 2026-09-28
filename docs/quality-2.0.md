@@ -2,7 +2,8 @@
 
 La [roadmap](roadmap-2.0.0.md) definisce il perimetro. Questo documento descrive
 i controlli implementati; gli esiti di sviluppo non qualificano gli artefatti
-della release finale.
+della release finale. La [chiusura 2.0.0](release-2.0.0.md) collega le nuove
+prove degli artefatti pubblicati e le differenze intenzionali dal riferimento.
 
 ## Baseline e responsabilità
 

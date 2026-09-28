@@ -2,13 +2,13 @@
 
 ## Unreleased
 
-## 2.0.0 — in qualification
+## 2.0.0 — 2026-09-28
 
 - Implement the 2.0 maintainability plan while preserving the 1.0 Rust API baseline, CLI protocol and Python calls.
 - Separate provider validation, transfer, error mapping and publication responsibilities; extract CLI command execution.
 - Require public Rust documentation, scoped Clippy exceptions, product size budgets, source comment rules and explicit dependency pin policy in CI.
 - Scan the exact CLI archives and Python wheels with pinned Syft; require artifact-bound native inventories alongside lockfile SBOMs for 2.0 qualification.
-- Add migration guidance and current quality documentation. Final 2.0 publication still requires its own artifact qualification and two-hour soak.
+- Add migration guidance and current quality documentation. Publish qualified Rust sources, Linux/Windows CLI builds and Python wheels through GitHub Releases, with final artifact evidence and a two-hour soak.
 
 ## 1.0.0 — in qualification
 

@@ -13,6 +13,7 @@ artefatti attestano una qualifica.
 | [Compatibilità 1.0](compatibility-1.0.md) | Sistemi e limiti del supporto dichiarato |
 | [Provider](provider-expansion.md) | Configurazione e garanzie dei sei adapter aggiunti dalla 0.2.0 |
 | [Distribuzione](release.md) | Packaging e procedura di qualifica |
+| [Release 2.0.0](release-2.0.0.md) | Chiusura del piano, prove finali, pubblicazione e limiti |
 | [Evidenze finali](release-evidence-bundle.md) | Bundle dei gate 1.0, benchmark e workflow di pubblicazione |
 | [Affidabilità](reliability.md) | Trasferimenti, coverage, fuzz e stress; identità delle misure riportate |
 | [Adozione dei contratti](contract-adoption.md) | Profilo e prove di conformità |
@@ -20,7 +21,7 @@ artefatti attestano una qualifica.
 | [Allineamento](database-alignment.md) | Principi del riferimento Database Tools |
 | [Confronto con Database Tools](database-reference-review.md) | Analisi al 27 settembre 2026, differenze e criteri di completamento |
 | [Consolidamento](quality-alignment-progress.md) | Interventi dopo il confronto, chiusura 1.0 e rimando alle attività successive |
-| [Piano 2.0](roadmap-2.0.0.md) | Sei ambiti di allineamento, milestone e criteri verificabili della prossima major |
+| [Piano 2.0](roadmap-2.0.0.md) | Sei ambiti di allineamento completati e criteri di chiusura |
 | [Qualità 2.0](quality-2.0.md) | Metriche, commenti, rustdoc, dipendenze e scansione degli artefatti |
 | [Migrazione 2.0](migration-2.0.md) | Contratti mantenuti e aggiornamento delle distribuzioni |
 | [Piano 1.0](roadmap-1.0.0.md) | Piano storico: milestone, perimetro e criteri di uscita della prima release |

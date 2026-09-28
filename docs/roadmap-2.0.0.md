@@ -1,15 +1,15 @@
 # Piano 2.0.0: allineamento alla qualità di Database Tools
 
-Piano del 28 settembre 2026. Obiettivo approvato: completare i sei ambiti di
-allineamento rimasti aperti dopo la 1.0.0, su libreria Rust, CLI e SDK Python,
-per tutti i nove provider. Il primo ciclo `2.0.0-alpha.1` implementa separazione,
-documentazione e nuovi controlli. Il commit `d6909bf044fa1f99c5e83d8a9007c4b339bada9b`
-ha superato la [CI completa](https://github.com/PlenoraETL/plenora-storage-tools/actions/runs/36404688410),
-inclusi API sui due target, fixture, fuzz, coverage e dieci ambienti Python.
-Si congela ora il candidato stabile 2.0.0: build e qualifica dei suoi byte finali
-restano da completare. L'esito alfa non sostituisce queste prove.
-Le verifiche locali sono descritte in [Qualità 2.0](quality-2.0.md).
-Non è fissata una data di rilascio.
+Piano approvato e completato il 28 settembre 2026. I sei ambiti di allineamento
+sono chiusi per libreria Rust, CLI e SDK Python sui nove provider.
+La [release 2.0.0](https://github.com/PlenoraETL/plenora-storage-tools/releases/tag/v2.0.0)
+è pubblicata e verificata dopo download; il [resoconto finale](release-2.0.0.md)
+identifica commit, workflow, prove, tentativi ripetuti e limiti conservati.
+
+Il primo ciclo `d6909bf044fa1f99c5e83d8a9007c4b339bada9b` ha implementato
+separazione, documentazione e controlli. La qualifica finale riguarda invece
+`7dd45b12e46f4d7c8d7499f25976a122b1fbfac7` e i digest nella ricevuta pubblica.
+Le prove precedenti non sono state riutilizzate come attestazione dei nuovi byte.
 
 ## Baseline e perimetro
 
@@ -61,12 +61,12 @@ inventari generati. Tag, ricevute e artefatti 1.0.0 restano immutati.
 
 | Milestone | Ambiti | Dipendenze | Criterio di uscita | Stato |
 | --- | --- | --- | --- | --- |
-| M0 — Baseline | Inventario delle responsabilità, API e misure iniziali | Release 1.0.0 | Elenco dei moduli da intervenire, misura iniziale del prodotto e matrice dei contratti da preservare | Raccolta; inventario e architettura versionati |
-| M1 — Struttura e API | A1 e A2 | M0 | Nove adapter revisionati, documentazione pubblica completa e regressioni controllate sulle tre superfici | Implementato; Clippy, rustdoc, feature isolate e API Rust Windows verificati localmente; qualifica candidata da completare |
-| M2 — Manutenibilità | A3 e A4 | Baseline M0; soglie consolidate dopo M1 | Controlli di dimensione e commenti attivi in CI, con prove dei casi rifiutati | Implementato e testato localmente; workflow collegato |
-| M3 — Dipendenze e inventari | A5 | M0; prima di congelare gli artefatti | Policy applicata, scansioni degli artefatti dei due target e verifica integrata nella qualifica | Implementato; scanner provato sui byte 1.0 come sviluppo, non qualifica 2.0 |
-| M4 — Documentazione corrente | A6, aggiornata durante M1–M3 | Chiusura M1–M3 | Guide coerenti con codice, evidenze collegate e migrazione esplicita | Guide aggiornate; esiti finali da collegare |
-| M5 — Qualifica e rilascio | Tutti gli ambiti | M1–M4 | Nuovi artefatti 2.0 qualificati, pubblicati e verificati dopo download | Da fare |
+| M0 — Baseline | Inventario delle responsabilità, API e misure iniziali | Release 1.0.0 | Elenco dei moduli da intervenire, misura iniziale del prodotto e matrice dei contratti da preservare | Completata; baseline e architettura versionati |
+| M1 — Struttura e API | A1 e A2 | M0 | Nove adapter revisionati, documentazione pubblica completa e regressioni controllate sulle tre superfici | Completata; CI finale, API sui due target e qualifica Rust/CLI/SDK superate |
+| M2 — Manutenibilità | A3 e A4 | Baseline M0; soglie consolidate dopo M1 | Controlli di dimensione e commenti attivi in CI, con prove dei casi rifiutati | Completata; gate e test negativi superati nella CI finale |
+| M3 — Dipendenze e inventari | A5 | M0; prima di congelare gli artefatti | Policy applicata, scansioni degli artefatti dei due target e verifica integrata nella qualifica | Completata; audit e scansioni dei byte finali inclusi nella ricevuta |
+| M4 — Documentazione corrente | A6, aggiornata durante M1–M3 | Chiusura M1–M3 | Guide coerenti con codice, evidenze collegate e migrazione esplicita | Completata; guide correnti e resoconto finale collegati |
+| M5 — Qualifica e rilascio | Tutti gli ambiti | M1–M4 | Nuovi artefatti 2.0 qualificati, pubblicati e verificati dopo download | Completata; release pubblica e asset verificati |
 
 M1 procede per adapter, con modifiche revisionabili e prove del comportamento
 prima di passare al successivo. Un difetto comune va cercato anche negli altri
@@ -200,5 +200,5 @@ finale supera la procedura aggiornata di [qualifica](release.md):
 
 Per ogni milestone completata si aggiorna questo piano con commit e link alle
 prove. Le attività implementate ma non ancora qualificate restano distinte da
-quelle completate. Il prossimo controllo è la CI del candidato e la verifica
-dei provider sulla VM dedicata, prima di congelare i byte finali.
+quelle completate. La chiusura è documentata nel [resoconto finale](release-2.0.0.md);
+le ricevute e i tag precedenti rimangono immutati.

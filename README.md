@@ -4,6 +4,9 @@ Libreria Rust, CLI e SDK Python per accedere a nove sistemi di storage con gli s
 contratti pubblici: S3-compatible, SFTP, FTP, filesystem locale, FTPS,
 Azure Blob / ADLS Gen2, SMB, Google Cloud Storage e WebDAV.
 
+La [release 2.0.0](https://github.com/PlenoraETL/plenora-storage-tools/releases/tag/v2.0.0)
+è pubblicata; il [resoconto di qualifica](docs/release-2.0.0.md) riporta prove e limiti.
+
 Il [perimetro di compatibilità](docs/compatibility-1.0.md), mantenuto nella serie 2.0,
 riguarda le fixture dichiarate, tra cui MinIO, Azurite e fake-gcs-server.
 Le prove su AWS S3, Azure Blob e GCS reali sono rinviate: i tre adapter restano
