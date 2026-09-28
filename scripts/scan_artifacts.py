@@ -122,7 +122,7 @@ def scan_target(folder, output, syft, revision, *, development=False):
             subprocess.run([syft, 'scan', 'dir:' + str(directory), '--config', str(CONFIG),
                             '--source-name', name, '--source-version', version,
                             '-o', 'syft-json=' + str(raw_path),
-                            '-o', 'cyclonedx-json=' + str(cdx_path)],
+                            '-o', 'cyclonedx-json@1.6=' + str(cdx_path)],
                            cwd=ROOT, env=environment, check=True)
             raw = json.loads(raw_path.read_text(encoding='utf-8'))
             if raw.get('descriptor', {}).get('version') != SYFT_VERSION:
