@@ -1,5 +1,11 @@
 # Qualifica e distribuzione
 
+Per la serie 2.0 si aggiunge l'[inventario degli artefatti nativi](quality-2.0.md):
+il bundle dei gate deve includere `native-components/<target>/` per entrambi i
+target. `release-candidate.yml` lo produce con lo scanner fissato dalla policy;
+la qualifica e la pubblicazione ne verificano identità e dati originali.
+Le evidenze 1.0 non sostituiscono nessuna prova richiesta per la 2.0.
+
 La prima 1.0 segue il [perimetro approvato](compatibility-1.0.md): tutti i nove
 provider sulle fixture dichiarate, con i cloud reali esplicitamente non
 qualificati. Le prove su account cloud sono rinviate e non bloccano questa

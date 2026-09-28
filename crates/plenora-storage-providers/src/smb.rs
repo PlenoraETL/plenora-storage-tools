@@ -1,3 +1,6 @@
+mod operations;
+mod publication;
+
 use crate::{
     common::{Backend, ProviderFactory, Reader, failure, invalid, metadata, page, parse},
     keys::portable_key,
@@ -15,17 +18,23 @@ use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+/// Non-secret SMB3 share addressing; authenticated encryption is required.
 pub struct SmbConnectionConfig {
+    /// Server host or IP address, validated against the engine network policy before dialing.
     pub host: String,
     #[serde(default = "default_port")]
+    /// Nonzero SMB service port; defaults to 445.
     pub port: u16,
+    /// SMB share name; normalized portable key rules apply.
     pub share: String,
     #[serde(default)]
+    /// Optional normalized portable path inside the share; defaults to the share root.
     pub root: String,
 }
 const fn default_port() -> u16 {
     445
 }
+/// SMB3 backend factory requiring authenticated encryption and validated addresses.
 pub struct Smb;
 #[async_trait]
 impl ProviderFactory for Smb {
@@ -162,133 +171,6 @@ impl Reader for SmbReader {
                 .map_err(|error| smb_error(&error, false))?;
         }
         Ok(())
-    }
-}
-#[async_trait]
-impl Backend for SmbBackend {
-    async fn test(&mut self) -> StorageResult<()> {
-        let path = self.path("")?;
-        let info = self
-            .tree
-            .stat(&mut self.conn, &path)
-            .await
-            .map_err(|error| smb_error(&error, false))?;
-        if !info.is_directory {
-            return Err(invalid("SMB_ROOT_NOT_DIRECTORY"));
-        }
-        Ok(())
-    }
-    async fn list(
-        &mut self,
-        request: &ProviderListRequest,
-        limit: usize,
-    ) -> StorageResult<ProviderListResult> {
-        let mut stack = vec![String::new()];
-        let mut selected = BTreeMap::new();
-        let mut scanned = 0_usize;
-        while let Some(parent) = stack.pop() {
-            let path = self.path(&parent)?;
-            crate::smb_listing::directory(
-                &mut self.conn,
-                &self.tree,
-                &path,
-                &parent,
-                request,
-                limit,
-                &mut selected,
-                &mut stack,
-                &mut scanned,
-            )
-            .await?;
-        }
-        Ok(page(selected, limit))
-    }
-    async fn stat(&mut self, key: &str) -> StorageResult<ObjectMetadata> {
-        let path = self.path(key)?;
-        let info = self
-            .tree
-            .stat(&mut self.conn, &path)
-            .await
-            .map_err(|error| smb_error(&error, false))?;
-        if info.is_directory {
-            return Err(invalid("SMB_REGULAR_FILE_REQUIRED"));
-        }
-        Ok(metadata(key, info.size))
-    }
-    async fn get(&mut self, key: &str) -> StorageResult<(ObjectMetadata, Box<dyn Reader>)> {
-        let path = self.path(key)?;
-        let reader = self
-            .tree
-            .open_file_reader(self.conn.clone(), &path)
-            .await
-            .map_err(|error| smb_error(&error, false))?;
-        Ok((
-            metadata(key, reader.size()),
-            Box::new(SmbReader {
-                reader: Some(reader),
-                offset: 0,
-            }),
-        ))
-    }
-    async fn put(&mut self, request: &PutRequest, data: Bytes) -> StorageResult<()> {
-        let path = self.path(&request.key)?;
-        let mut prepared = false;
-        let result = async {
-            if let Some((parent, _)) = request.key.rsplit_once('/') {
-                let mut current = String::new();
-                for part in parent.split('/') {
-                    if !current.is_empty() {
-                        current.push('/');
-                    }
-                    current.push_str(part);
-                    let path = self.path(&current)?;
-                    match self.tree.stat(&mut self.conn, &path).await {
-                        Ok(info) if info.is_directory => {}
-                        Ok(_) => return Err(invalid("SMB_PARENT_NOT_DIRECTORY")),
-                        Err(error) if error.kind() == ErrorKind::NotFound => {
-                            prepared = true;
-                            if let Err(error) =
-                                self.tree.create_directory(&mut self.conn, &path).await
-                                && error.kind() != ErrorKind::AlreadyExists
-                            {
-                                return Err(smb_error(&error, true));
-                            }
-                        }
-                        Err(error) => return Err(smb_error(&error, false)),
-                    }
-                }
-            }
-            let mut writer = if request.overwrite {
-                self.tree.create_file_writer(self.conn.clone(), &path).await
-            } else {
-                self.tree
-                    .create_file_writer_exclusive(self.conn.clone(), &path)
-                    .await
-            }
-            .map_err(|error| smb_error(&error, true))?;
-            for chunk in data.chunks(64 * 1024) {
-                writer.write_chunk(chunk).await.map_err(|error| {
-                    smb_error(&error, true).cleanup_unconfirmed("destination_may_be_partial")
-                })?;
-            }
-            let size = writer.finish().await.map_err(|error| {
-                smb_error(&error, true).cleanup_unconfirmed("destination_may_be_partial")
-            })?;
-            if size != data.len() as u64 {
-                return Err(failure(ErrorCategory::Protocol, ErrorPhase::Commit, true));
-            }
-            Ok(())
-        }
-        .await;
-        result.map_err(|error: StorageError| error.with_preparation_effect(prepared))
-    }
-    async fn delete(&mut self, key: &str) -> StorageResult<()> {
-        let path = self.path(key)?;
-        self.stat(key).await?;
-        self.tree
-            .delete_file(&mut self.conn, &path)
-            .await
-            .map_err(|error| smb_error(&error, true))
     }
 }
 fn smb_error(error: &smb2::Error, mutating: bool) -> StorageError {

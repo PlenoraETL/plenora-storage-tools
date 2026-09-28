@@ -1,3 +1,6 @@
+mod operations;
+mod publication;
+
 use crate::{
     common::{Backend, ProviderFactory, Reader, failure, invalid, page, parse, select},
     http,
@@ -19,11 +22,16 @@ use std::{collections::BTreeMap, pin::Pin, sync::Arc};
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+/// Non-secret Azure Blob endpoint, account and container addressing.
 pub struct AzureConnectionConfig {
+    /// Service base URL without credentials; plaintext HTTP requires engine opt-in.
     pub endpoint: String,
+    /// Azure account name used for addressing and request signing.
     pub account: String,
+    /// Azure Blob container name within the selected account.
     pub container: String,
 }
+/// Azure Blob backend factory; account key or bearer token comes from the host resolver.
 pub struct Azure;
 
 fn name(s: &str) -> StorageResult<()> {
@@ -95,96 +103,6 @@ impl Reader for CloudReader {
             .map_err(|error| store_error(error, false))
     }
 }
-#[async_trait]
-impl Backend for Cloud {
-    async fn test(&mut self) -> StorageResult<()> {
-        self.store
-            .list(None)
-            .next()
-            .await
-            .transpose()
-            .map_err(|error| store_error(error, false))?;
-        Ok(())
-    }
-    async fn list(
-        &mut self,
-        request: &ProviderListRequest,
-        limit: usize,
-    ) -> StorageResult<ProviderListResult> {
-        let prefix = request
-            .prefix
-            .as_deref()
-            .filter(|policy| !policy.is_empty())
-            .map(|policy| path(policy.trim_end_matches('/')))
-            .transpose()?;
-        let mut stream = self.store.list(prefix.as_ref());
-        let mut selected = BTreeMap::new();
-        // Azure listing order must not be inferred from a generic store.
-        // Retain only the smallest page; deadline bounds total enumeration time.
-        while let Some(item) = stream.next().await {
-            let item = item.map_err(|error| store_error(error, false))?;
-            select(&mut selected, public_meta(item)?, request, limit)?;
-        }
-        Ok(page(selected, limit))
-    }
-    async fn stat(&mut self, key: &str) -> StorageResult<ObjectMetadata> {
-        public_meta(
-            self.store
-                .head(&path(key)?)
-                .await
-                .map_err(|error| store_error(error, false))?,
-        )
-    }
-    async fn get(&mut self, key: &str) -> StorageResult<(ObjectMetadata, Box<dyn Reader>)> {
-        let result = self
-            .store
-            .get(&path(key)?)
-            .await
-            .map_err(|error| store_error(error, false))?;
-        let meta = public_meta(result.meta.clone())?;
-        Ok((
-            meta,
-            Box::new(CloudReader {
-                stream: result.into_stream(),
-            }),
-        ))
-    }
-    async fn put(&mut self, request: &PutRequest, data: Bytes) -> StorageResult<()> {
-        let mut attributes = Attributes::new();
-        if let Some(value) = &request.content_type {
-            attributes.insert(Attribute::ContentType, AttributeValue::from(value.clone()));
-        }
-        for (key, value) in &request.metadata {
-            attributes.insert(
-                Attribute::Metadata(key.clone().into()),
-                AttributeValue::from(value.clone()),
-            );
-        }
-        let options = PutOptions {
-            mode: if request.overwrite {
-                PutMode::Overwrite
-            } else {
-                PutMode::Create
-            },
-            attributes,
-            ..PutOptions::default()
-        };
-        self.store
-            .put_opts(&path(&request.key)?, data.into(), options)
-            .await
-            .map_err(|error| store_error(error, true))?;
-        Ok(())
-    }
-    async fn delete(&mut self, key: &str) -> StorageResult<()> {
-        // Some object stores return success for an absent key. Probe preserves
-        // the v1 ignore_missing=false behavior (concurrent deletion is allowed).
-        self.stat(key).await?;
-        self.store
-            .delete(&path(key)?)
-            .await
-            .map_err(|error| store_error(error, true))
-    }
-}
 fn path(key: &str) -> StorageResult<Path> {
     validate_object_key(key)?;
     let policy = Path::parse(key).map_err(|_| invalid("OBJECT_KEY_INVALID"))?;
@@ -204,6 +122,10 @@ fn public_meta(meta: object_store::ObjectMeta) -> StorageResult<ObjectMetadata> 
         version: meta.version,
     })
 }
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Consume upstream errors at the redaction boundary"
+)]
 fn store_error(error: object_store::Error, mutating: bool) -> StorageError {
     let category =
         match error {

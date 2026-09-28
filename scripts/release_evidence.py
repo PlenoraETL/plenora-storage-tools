@@ -17,6 +17,7 @@ from soak_policy import SOAK_DURATION_SECONDS
 from fixture_connections import BUFFERED, PROVIDERS
 from fuzz_parsers import TARGETS as FUZZ_TARGETS, stats
 from summarize_coverage import apply_thresholds, summarize
+from scan_artifacts import validate as validate_native_inventory
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS = ('x86_64-unknown-linux-gnu', 'x86_64-pc-windows-msvc')
@@ -104,6 +105,9 @@ subjects maps target triples to binary_sha256 and wheel_sha256 from manifests
 already checked by verify_release.py. No caller-supplied waiver is accepted.
 """
     evidence = Evidence(root)
+    if int(python_version.split('.', 1)[0]) >= 2:
+        for target in TARGETS:
+            validate_native_inventory(evidence, 'native-components/' + target, revision, subjects[target])
     check_test_layout(ROOT)
     policy = json.loads((ROOT / 'scripts/coverage-policy.json').read_text())
     for target in TARGETS:

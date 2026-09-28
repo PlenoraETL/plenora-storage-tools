@@ -7,6 +7,9 @@ use std::sync::Arc;
 
 /// Build a reusable engine using only the providers compiled into this artifact.
 /// No credentials are resolved and no connection is opened during construction.
+///
+/// # Errors
+/// Returns a registration error if compiled providers have conflicting identities.
 pub fn build_engine(
     config: EngineConfig,
     credentials: Arc<dyn CredentialResolver>,

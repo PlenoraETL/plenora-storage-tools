@@ -17,32 +17,52 @@ use crate::{
     TestInput, TransferResult, validate_operation_schema_version,
 };
 
+/// Supported transport-neutral runtime binding version.
 pub const RUNTIME_BINDING_VERSION: u32 = 1;
+/// Media type for JSON operation envelopes.
 pub const JSON_CONTENT_TYPE: &str = "application/json";
+/// Media type for a terminal Plenora error envelope.
 pub const ERROR_CONTENT_TYPE: &str = "application/vnd.plenora.error+json";
+/// Versioned public error contract used by runtime dispatch.
 pub const ERROR_CONTRACT: &str = "plenora-error-v1";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Artifact stream direction required by an operation.
 pub enum ArtifactRole {
+    /// No artifact stream is required.
     None,
+    /// Resolve an input byte stream before upload.
     Source,
+    /// Resolve an output byte stream before download.
     Sink,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Static dispatch contract and controls for one runtime operation.
 pub struct RuntimeOperationDescriptor {
+    /// Stable storage operation selector.
     pub operation: &'static str,
+    /// Version of the interface or operation contract.
     pub version: u32,
+    /// Versioned request contract required for the selected operation.
     pub input_contract: &'static str,
+    /// Versioned response contract, or the error contract on failure.
     pub output_contract: &'static str,
+    /// Optional media type without parameters, validated before transfer.
     pub content_type: &'static str,
+    /// Whether execution can change external state.
     pub side_effect: SideEffect,
+    /// Whether dispatch resolves an input stream, an output stream, or neither.
     pub artifact_role: ArtifactRole,
+    /// Cooperative cancellation support.
     pub cancellation: bool,
+    /// Deadline support.
     pub deadline: bool,
+    /// Idempotency key support; false means the control must be rejected.
     pub idempotency_key: bool,
 }
 
+/// Complete static runtime operation inventory used for admission and routing.
 pub const RUNTIME_OPERATIONS: [RuntimeOperationDescriptor; 7] = [
     descriptor(
         "storage.test",
@@ -117,88 +137,133 @@ const fn descriptor(
 }
 
 #[derive(Clone, Copy, Debug)]
+/// Borrowed dispatch selectors validated before payload execution.
 pub struct RuntimeRoute<'a> {
+    /// Storage capability selector; checked before opening artifacts.
     pub capability_name: &'a str,
+    /// Required version of the runtime storage capability.
     pub capability_version: u32,
+    /// Stable storage operation selector.
     pub operation: &'a str,
+    /// Required version of the selected operation.
     pub operation_version: u32,
+    /// Versioned request contract required for the selected operation.
     pub input_contract: &'a str,
+    /// Optional media type without parameters, validated before transfer.
     pub content_type: &'a str,
+    /// Optional host idempotency key; currently rejected because these operations do not support it.
     pub idempotency_key: Option<&'a str>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+/// Transport-neutral invocation envelope with no inline file contents.
 pub struct RuntimeInvocation {
+    /// Optional media type without parameters, validated before transfer.
     pub content_type: String,
+    /// Operation metadata validated against the corresponding public contract.
     pub metadata: RuntimeRequestMetadata,
+    /// Operation JSON envelope; file contents are carried only by artifact streams.
     pub payload: Value,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+/// Identity, routing and execution controls from the host message.
 pub struct RuntimeRequestMetadata {
     #[serde(rename = "plenora.message.id")]
+    /// Canonical UUID identifying the invocation or result message.
     pub message_id: String,
     #[serde(
         rename = "plenora.message.causation_id",
         default,
         skip_serializing_if = "Option::is_none"
     )]
+    /// Optional canonical UUID linking this message to its cause.
     pub causation_id: Option<String>,
     #[serde(rename = "plenora.capability.name")]
+    /// Storage capability selector; checked before opening artifacts.
     pub capability_name: String,
     #[serde(rename = "plenora.capability.version")]
+    /// Required version of the runtime storage capability.
     pub capability_version: String,
     #[serde(rename = "plenora.capability.operation")]
+    /// Stable storage operation selector.
     pub operation: String,
     #[serde(rename = "plenora.operation.version")]
+    /// Required version of the selected operation.
     pub operation_version: String,
     #[serde(rename = "plenora.input.contract")]
+    /// Versioned request contract required for the selected operation.
     pub input_contract: String,
     #[serde(rename = "plenora.execution.deadline", default)]
+    /// Optional RFC 3339 deadline, translated into execution control before dispatch.
     pub deadline: Option<String>,
     #[serde(rename = "plenora.idempotency.key", default)]
+    /// Optional host idempotency key; currently rejected because these operations do not support it.
     pub idempotency_key: Option<String>,
     #[serde(rename = "plenora.trace.correlation_id")]
+    /// Canonical UUID retained across invocation and terminal result.
     pub correlation_id: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+/// Terminal operation or redacted error envelope with preserved correlation.
 pub struct RuntimeResultEnvelope {
+    /// Optional media type without parameters, validated before transfer.
     pub content_type: String,
+    /// Operation metadata validated against the corresponding public contract.
     pub metadata: RuntimeResultMetadata,
+    /// Operation JSON envelope; file contents are carried only by artifact streams.
     pub payload: Value,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+/// Identity and contract of the terminal runtime result.
 pub struct RuntimeResultMetadata {
     #[serde(rename = "plenora.message.id")]
+    /// Canonical UUID identifying the invocation or result message.
     pub message_id: String,
     #[serde(
         rename = "plenora.message.causation_id",
         default,
         skip_serializing_if = "Option::is_none"
     )]
+    /// Optional canonical UUID linking this message to its cause.
     pub causation_id: Option<String>,
     #[serde(rename = "plenora.capability.operation")]
+    /// Stable storage operation selector.
     pub operation: String,
     #[serde(rename = "plenora.operation.version")]
+    /// Required version of the selected operation.
     pub operation_version: String,
     #[serde(rename = "plenora.output.contract")]
+    /// Versioned response contract, or the error contract on failure.
     pub output_contract: String,
     #[serde(rename = "plenora.trace.correlation_id")]
+    /// Canonical UUID retained across invocation and terminal result.
     pub correlation_id: String,
 }
 
+/// Host-owned asynchronous source stream for an artifact reference.
 pub type ArtifactSource = Pin<Box<dyn AsyncRead + Send + Unpin>>;
+/// Host-owned asynchronous destination stream; publication belongs to its resolver.
 pub type ArtifactSink = Pin<Box<dyn AsyncWrite + Send + Unpin>>;
 
 #[async_trait]
+/// Application boundary that authorizes and opens artifact streams.
 pub trait ArtifactResolver: Send + Sync {
+    /// Authorize and open a source owned by the host.
+    ///
+    /// # Errors
+    /// Returns a redacted reference, authorization or open failure; never include raw callback exceptions.
     async fn open_source(&self, source: &ArtifactReference) -> StorageResult<ArtifactSource>;
+    /// Authorize and open a host-owned sink; opening may already mutate the destination.
+    ///
+    /// # Errors
+    /// Returns redacted authorization or open failures with the actual or unknown external effect.
     async fn open_sink(&self, sink: &ArtifactSinkReference) -> StorageResult<ArtifactSink>;
 }
 
@@ -207,9 +272,13 @@ pub trait ArtifactResolver: Send + Sync {
 ///
 /// a consumer normally backs both traits with the same secret authority.
 pub trait SecretResolver: Send + Sync {
+    ///
+    /// # Errors
+    /// Returns a redacted authorization failure when the host refuses access to the protected reference.
     fn authorize(&self, reference: &str) -> StorageResult<()>;
 }
 
+/// Borrowed engine and host resolvers implementing transport-neutral dispatch.
 pub struct RuntimeBinding<'a> {
     engine: &'a Engine,
     artifacts: &'a dyn ArtifactResolver,
@@ -217,6 +286,7 @@ pub struct RuntimeBinding<'a> {
 }
 
 impl<'a> RuntimeBinding<'a> {
+    /// Bind an engine and host resolvers without opening resources or resolving secrets.
     #[must_use]
     pub const fn new(
         engine: &'a Engine,
@@ -230,6 +300,7 @@ impl<'a> RuntimeBinding<'a> {
         }
     }
 
+    /// Validate and dispatch an invocation, returning a correlated success or redacted error envelope.
     pub async fn invoke(
         &self,
         invocation: RuntimeInvocation,
@@ -284,6 +355,10 @@ impl<'a> RuntimeBinding<'a> {
         }
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the seven dispatch arms together to audit admission before artifact effects"
+    )]
     async fn invoke_inner(
         &self,
         invocation: &RuntimeInvocation,
@@ -632,6 +707,9 @@ fn artifact_finalize_error() -> StorageError {
 
 /// Validates routing before a consumer-owned adapter resolves credentials or
 /// artifacts and before any storage operation can start.
+///
+/// # Errors
+/// Returns a validation error for unknown selectors, versions, input contract, content type or unsupported idempotency control.
 pub fn validate_runtime_route(
     route: RuntimeRoute<'_>,
 ) -> StorageResult<&'static RuntimeOperationDescriptor> {

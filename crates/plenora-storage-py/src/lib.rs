@@ -248,6 +248,10 @@ fn encode<T: serde::Serialize>(value: &T) -> StorageResult<String> {
     serde_json::to_string(value)
         .map_err(|_| invalid("SDK_RESULT_INVALID", "SDK result serialization failed"))
 }
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Consume the Rust error when translating it into the Python exception"
+)]
 fn python_error(error: StorageError) -> PyErr {
     PyValueError::new_err(
         serde_json::to_string(&error).unwrap_or_else(|_| "storage operation failed".to_owned()),

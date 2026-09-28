@@ -1,6 +1,5 @@
-use super::{
-    MAX_MLSD_LINE_BYTES, ensure_parent_directories, read_listing_line, scan_directory, validate_key,
-};
+use super::transfer::{parse_listing_entry, read_listing_line};
+use super::{MAX_MLSD_LINE_BYTES, ensure_parent_directories, scan_directory, validate_key};
 use plenora_storage_core::{EngineConfig, ExecutionControl, OperationContext};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
@@ -9,12 +8,12 @@ fn malformed_unix_modes_are_protocol_errors_not_panics() {
     for mode in ["é7", "7é", "雪", "💥", "éé", "888", "07x5", "", "07555"] {
         for name in ["unix.mode", "UNIX.mode", "UnIx.MoDe"] {
             let line = format!("type=file;{name}={mode}; entry");
-            assert!(super::parse_listing_entry(&line).is_err());
+            assert!(parse_listing_entry(&line).is_err());
         }
     }
     for mode in ["755", "0755", "4755", "000"] {
         let line = format!("type=file;size=123;UNIX.mode={mode}; entry");
-        let file = super::parse_listing_entry(&line).unwrap();
+        let file = parse_listing_entry(&line).unwrap();
         assert_eq!(file.name(), "entry");
         assert_eq!(file.size(), 123);
     }

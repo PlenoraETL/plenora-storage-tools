@@ -1,3 +1,4 @@
+//! Integration conformance for composition.
 use plenora_storage_core::{
     CredentialMaterial, CredentialResolver, EngineConfig, ProviderConnection, StorageResult,
 };

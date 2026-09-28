@@ -1,3 +1,4 @@
+//! Runtime dispatch, admission and artifact-effect conformance.
 use std::{
     collections::{BTreeMap, HashMap},
     pin::Pin,
@@ -466,6 +467,10 @@ fn artifact_metadata(bytes: &[u8]) -> Value {
 }
 
 #[tokio::test]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Exercise the seven operations over one shared runtime lifecycle"
+)]
 async fn runtime_binding_executes_all_seven_operations_and_artifacts() {
     let engine = engine();
     let artifacts = MemoryArtifacts::default();

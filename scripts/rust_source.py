@@ -64,7 +64,8 @@ def mask_noncode(source, comments=None):
 
 def inline_test_modules(source):
     code = mask_noncode(source)
-    pattern = r'#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\]\s*mod\s+(\w+)\s*\{'
+    pattern = (r'#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\]\s*'
+               r'(?:pub(?:\([^)]*\))?\s+)?mod\s+(\w+)\s*\{')
     result = []
     for match in re.finditer(pattern, code):
         opening = match.end() - 1

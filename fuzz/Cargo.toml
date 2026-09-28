@@ -14,7 +14,7 @@ libfuzzer-sys = "=0.4.13"
 plenora-storage-providers = { path = "../crates/plenora-storage-providers", default-features = false, features = ["azure", "webdav"] }
 plenora-storage-ftp = { path = "../crates/plenora-storage-ftp" }
 plenora-storage-s3 = { path = "../crates/plenora-storage-s3" }
-tokio = { version = "1.53.1", features = ["rt"] }
+tokio = { version = "=1.53.1", features = ["rt"] }
 
 [[bin]]
 name = "s3_xml"

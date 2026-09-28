@@ -11,6 +11,9 @@ use crate::{
 /// Validating a name and then letting the transport resolve it again would let
 /// a second, attacker-controlled resolution reach a private address that the
 /// policy just rejected.
+///
+/// # Errors
+/// Returns a redacted configuration, DNS or network-policy error; every resolved address must be permitted before any is returned.
 pub async fn resolve_network_target(
     host: &str,
     port: u16,

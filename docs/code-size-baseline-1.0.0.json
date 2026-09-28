@@ -1,0 +1,574 @@
+{
+  "areas": {
+    "plenora-smb2": {
+      "code_lines": 19154,
+      "physical_lines": 32489
+    },
+    "plenora-storage-cli": {
+      "code_lines": 629,
+      "physical_lines": 666
+    },
+    "plenora-storage-core": {
+      "code_lines": 2233,
+      "physical_lines": 2633
+    },
+    "plenora-storage-engine": {
+      "code_lines": 245,
+      "physical_lines": 281
+    },
+    "plenora-storage-ftp": {
+      "code_lines": 1285,
+      "physical_lines": 1413
+    },
+    "plenora-storage-providers": {
+      "code_lines": 2533,
+      "physical_lines": 2614
+    },
+    "plenora-storage-py": {
+      "code_lines": 247,
+      "physical_lines": 263
+    },
+    "plenora-storage-s3": {
+      "code_lines": 1148,
+      "physical_lines": 1281
+    },
+    "plenora-storage-sftp": {
+      "code_lines": 1371,
+      "physical_lines": 1497
+    },
+    "python-package": {
+      "code_lines": 352,
+      "physical_lines": 481
+    }
+  },
+  "files": {
+    "crates/plenora-smb2/src/auth/der.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 61,
+      "physical_lines": 83
+    },
+    "crates/plenora-smb2/src/auth/kerberos/authenticator.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 816,
+      "physical_lines": 1204
+    },
+    "crates/plenora-smb2/src/auth/kerberos/ccache.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 203,
+      "physical_lines": 305
+    },
+    "crates/plenora-smb2/src/auth/kerberos/crypto.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 452,
+      "physical_lines": 789
+    },
+    "crates/plenora-smb2/src/auth/kerberos/kdc.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 232,
+      "physical_lines": 367
+    },
+    "crates/plenora-smb2/src/auth/kerberos/messages.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 712,
+      "physical_lines": 1067
+    },
+    "crates/plenora-smb2/src/auth/kerberos/mod.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 6,
+      "physical_lines": 21
+    },
+    "crates/plenora-smb2/src/auth/mod.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 6,
+      "physical_lines": 15
+    },
+    "crates/plenora-smb2/src/auth/ntlm.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 452,
+      "physical_lines": 717
+    },
+    "crates/plenora-smb2/src/auth/spnego.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 206,
+      "physical_lines": 380
+    },
+    "crates/plenora-smb2/src/client/connection.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 3009,
+      "physical_lines": 5452
+    },
+    "crates/plenora-smb2/src/client/copy.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 358,
+      "physical_lines": 634
+    },
+    "crates/plenora-smb2/src/client/credits.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 117,
+      "physical_lines": 290
+    },
+    "crates/plenora-smb2/src/client/dfs.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 425,
+      "physical_lines": 658
+    },
+    "crates/plenora-smb2/src/client/diagnostics.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 311,
+      "physical_lines": 691
+    },
+    "crates/plenora-smb2/src/client/durable.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 293,
+      "physical_lines": 515
+    },
+    "crates/plenora-smb2/src/client/mod.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 1103,
+      "physical_lines": 1883
+    },
+    "crates/plenora-smb2/src/client/pipeline.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 96,
+      "physical_lines": 152
+    },
+    "crates/plenora-smb2/src/client/session.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 374,
+      "physical_lines": 547
+    },
+    "crates/plenora-smb2/src/client/shares.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 222,
+      "physical_lines": 316
+    },
+    "crates/plenora-smb2/src/client/stream.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 716,
+      "physical_lines": 1285
+    },
+    "crates/plenora-smb2/src/client/tree.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 2246,
+      "physical_lines": 3320
+    },
+    "crates/plenora-smb2/src/client/watcher.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 227,
+      "physical_lines": 482
+    },
+    "crates/plenora-smb2/src/crypto/compression.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 43,
+      "physical_lines": 89
+    },
+    "crates/plenora-smb2/src/crypto/encryption.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 195,
+      "physical_lines": 303
+    },
+    "crates/plenora-smb2/src/crypto/kdf.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 91,
+      "physical_lines": 175
+    },
+    "crates/plenora-smb2/src/crypto/mod.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 4,
+      "physical_lines": 9
+    },
+    "crates/plenora-smb2/src/crypto/signing.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 198,
+      "physical_lines": 308
+    },
+    "crates/plenora-smb2/src/error.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 228,
+      "physical_lines": 647
+    },
+    "crates/plenora-smb2/src/fuzzing.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 176,
+      "physical_lines": 287
+    },
+    "crates/plenora-smb2/src/lib.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 40,
+      "physical_lines": 118
+    },
+    "crates/plenora-smb2/src/msg/cancel.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 3,
+      "physical_lines": 16
+    },
+    "crates/plenora-smb2/src/msg/change_notify.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 110,
+      "physical_lines": 208
+    },
+    "crates/plenora-smb2/src/msg/close.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 104,
+      "physical_lines": 164
+    },
+    "crates/plenora-smb2/src/msg/copychunk.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 118,
+      "physical_lines": 218
+    },
+    "crates/plenora-smb2/src/msg/create.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 310,
+      "physical_lines": 487
+    },
+    "crates/plenora-smb2/src/msg/create_context.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 188,
+      "physical_lines": 329
+    },
+    "crates/plenora-smb2/src/msg/dfs.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 315,
+      "physical_lines": 519
+    },
+    "crates/plenora-smb2/src/msg/echo.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 6,
+      "physical_lines": 23
+    },
+    "crates/plenora-smb2/src/msg/flush.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 45,
+      "physical_lines": 86
+    },
+    "crates/plenora-smb2/src/msg/header.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 193,
+      "physical_lines": 323
+    },
+    "crates/plenora-smb2/src/msg/ioctl.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 159,
+      "physical_lines": 287
+    },
+    "crates/plenora-smb2/src/msg/lock.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 112,
+      "physical_lines": 178
+    },
+    "crates/plenora-smb2/src/msg/logoff.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 6,
+      "physical_lines": 23
+    },
+    "crates/plenora-smb2/src/msg/mod.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 104,
+      "physical_lines": 154
+    },
+    "crates/plenora-smb2/src/msg/negotiate.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 390,
+      "physical_lines": 636
+    },
+    "crates/plenora-smb2/src/msg/oplock_break.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 49,
+      "physical_lines": 98
+    },
+    "crates/plenora-smb2/src/msg/query_directory.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 170,
+      "physical_lines": 272
+    },
+    "crates/plenora-smb2/src/msg/query_info.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 158,
+      "physical_lines": 252
+    },
+    "crates/plenora-smb2/src/msg/read.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 142,
+      "physical_lines": 224
+    },
+    "crates/plenora-smb2/src/msg/session_setup.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 133,
+      "physical_lines": 227
+    },
+    "crates/plenora-smb2/src/msg/set_info.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 103,
+      "physical_lines": 169
+    },
+    "crates/plenora-smb2/src/msg/transform.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 105,
+      "physical_lines": 237
+    },
+    "crates/plenora-smb2/src/msg/tree_connect.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 119,
+      "physical_lines": 202
+    },
+    "crates/plenora-smb2/src/msg/tree_disconnect.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 6,
+      "physical_lines": 24
+    },
+    "crates/plenora-smb2/src/msg/write.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 126,
+      "physical_lines": 193
+    },
+    "crates/plenora-smb2/src/name.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 92,
+      "physical_lines": 260
+    },
+    "crates/plenora-smb2/src/pack/filetime.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 47,
+      "physical_lines": 77
+    },
+    "crates/plenora-smb2/src/pack/guid.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 62,
+      "physical_lines": 89
+    },
+    "crates/plenora-smb2/src/pack/mod.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 176,
+      "physical_lines": 291
+    },
+    "crates/plenora-smb2/src/rpc/mod.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 150,
+      "physical_lines": 293
+    },
+    "crates/plenora-smb2/src/rpc/srvsvc.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 137,
+      "physical_lines": 245
+    },
+    "crates/plenora-smb2/src/testing/mod.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 648,
+      "physical_lines": 927
+    },
+    "crates/plenora-smb2/src/transport/mock.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 225,
+      "physical_lines": 353
+    },
+    "crates/plenora-smb2/src/transport/mod.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 16,
+      "physical_lines": 50
+    },
+    "crates/plenora-smb2/src/transport/tcp.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 250,
+      "physical_lines": 398
+    },
+    "crates/plenora-smb2/src/types/flags.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 181,
+      "physical_lines": 325
+    },
+    "crates/plenora-smb2/src/types/mod.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 158,
+      "physical_lines": 233
+    },
+    "crates/plenora-smb2/src/types/status.rs": {
+      "area": "plenora-smb2",
+      "code_lines": 120,
+      "physical_lines": 290
+    },
+    "crates/plenora-storage-cli/src/args.rs": {
+      "area": "plenora-storage-cli",
+      "code_lines": 108,
+      "physical_lines": 116
+    },
+    "crates/plenora-storage-cli/src/main.rs": {
+      "area": "plenora-storage-cli",
+      "code_lines": 435,
+      "physical_lines": 456
+    },
+    "crates/plenora-storage-cli/src/output.rs": {
+      "area": "plenora-storage-cli",
+      "code_lines": 86,
+      "physical_lines": 94
+    },
+    "crates/plenora-storage-core/src/capability.rs": {
+      "area": "plenora-storage-core",
+      "code_lines": 187,
+      "physical_lines": 206
+    },
+    "crates/plenora-storage-core/src/control.rs": {
+      "area": "plenora-storage-core",
+      "code_lines": 77,
+      "physical_lines": 89
+    },
+    "crates/plenora-storage-core/src/credentials.rs": {
+      "area": "plenora-storage-core",
+      "code_lines": 61,
+      "physical_lines": 73
+    },
+    "crates/plenora-storage-core/src/engine.rs": {
+      "area": "plenora-storage-core",
+      "code_lines": 392,
+      "physical_lines": 499
+    },
+    "crates/plenora-storage-core/src/error.rs": {
+      "area": "plenora-storage-core",
+      "code_lines": 211,
+      "physical_lines": 252
+    },
+    "crates/plenora-storage-core/src/lib.rs": {
+      "area": "plenora-storage-core",
+      "code_lines": 41,
+      "physical_lines": 45
+    },
+    "crates/plenora-storage-core/src/model.rs": {
+      "area": "plenora-storage-core",
+      "code_lines": 477,
+      "physical_lines": 577
+    },
+    "crates/plenora-storage-core/src/network.rs": {
+      "area": "plenora-storage-core",
+      "code_lines": 89,
+      "physical_lines": 104
+    },
+    "crates/plenora-storage-core/src/provider.rs": {
+      "area": "plenora-storage-core",
+      "code_lines": 67,
+      "physical_lines": 93
+    },
+    "crates/plenora-storage-core/src/runtime.rs": {
+      "area": "plenora-storage-core",
+      "code_lines": 631,
+      "physical_lines": 695
+    },
+    "crates/plenora-storage-engine/src/files.rs": {
+      "area": "plenora-storage-engine",
+      "code_lines": 192,
+      "physical_lines": 222
+    },
+    "crates/plenora-storage-engine/src/lib.rs": {
+      "area": "plenora-storage-engine",
+      "code_lines": 53,
+      "physical_lines": 59
+    },
+    "crates/plenora-storage-ftp/src/lib.rs": {
+      "area": "plenora-storage-ftp",
+      "code_lines": 1285,
+      "physical_lines": 1413
+    },
+    "crates/plenora-storage-providers/src/azure_listing.rs": {
+      "area": "plenora-storage-providers",
+      "code_lines": 87,
+      "physical_lines": 94
+    },
+    "crates/plenora-storage-providers/src/cloud.rs": {
+      "area": "plenora-storage-providers",
+      "code_lines": 222,
+      "physical_lines": 228
+    },
+    "crates/plenora-storage-providers/src/common.rs": {
+      "area": "plenora-storage-providers",
+      "code_lines": 570,
+      "physical_lines": 597
+    },
+    "crates/plenora-storage-providers/src/gcs.rs": {
+      "area": "plenora-storage-providers",
+      "code_lines": 308,
+      "physical_lines": 311
+    },
+    "crates/plenora-storage-providers/src/http.rs": {
+      "area": "plenora-storage-providers",
+      "code_lines": 72,
+      "physical_lines": 74
+    },
+    "crates/plenora-storage-providers/src/keys.rs": {
+      "area": "plenora-storage-providers",
+      "code_lines": 44,
+      "physical_lines": 45
+    },
+    "crates/plenora-storage-providers/src/lib.rs": {
+      "area": "plenora-storage-providers",
+      "code_lines": 51,
+      "physical_lines": 63
+    },
+    "crates/plenora-storage-providers/src/local.rs": {
+      "area": "plenora-storage-providers",
+      "code_lines": 273,
+      "physical_lines": 276
+    },
+    "crates/plenora-storage-providers/src/smb.rs": {
+      "area": "plenora-storage-providers",
+      "code_lines": 308,
+      "physical_lines": 311
+    },
+    "crates/plenora-storage-providers/src/smb_listing.rs": {
+      "area": "plenora-storage-providers",
+      "code_lines": 170,
+      "physical_lines": 175
+    },
+    "crates/plenora-storage-providers/src/webdav.rs": {
+      "area": "plenora-storage-providers",
+      "code_lines": 428,
+      "physical_lines": 440
+    },
+    "crates/plenora-storage-py/python/plenora_storage/__init__.py": {
+      "area": "python-package",
+      "code_lines": 237,
+      "physical_lines": 333
+    },
+    "crates/plenora-storage-py/python/plenora_storage/__init__.pyi": {
+      "area": "python-package",
+      "code_lines": 67,
+      "physical_lines": 75
+    },
+    "crates/plenora-storage-py/python/plenora_storage/_native.pyi": {
+      "area": "python-package",
+      "code_lines": 15,
+      "physical_lines": 18
+    },
+    "crates/plenora-storage-py/python/plenora_storage/types.py": {
+      "area": "python-package",
+      "code_lines": 33,
+      "physical_lines": 55
+    },
+    "crates/plenora-storage-py/src/lib.rs": {
+      "area": "plenora-storage-py",
+      "code_lines": 247,
+      "physical_lines": 263
+    },
+    "crates/plenora-storage-s3/src/lib.rs": {
+      "area": "plenora-storage-s3",
+      "code_lines": 1047,
+      "physical_lines": 1163
+    },
+    "crates/plenora-storage-s3/src/list_validation.rs": {
+      "area": "plenora-storage-s3",
+      "code_lines": 101,
+      "physical_lines": 118
+    },
+    "crates/plenora-storage-sftp/src/lib.rs": {
+      "area": "plenora-storage-sftp",
+      "code_lines": 1371,
+      "physical_lines": 1497
+    }
+  },
+  "owned_total": {
+    "code_lines": 10043,
+    "physical_lines": 11129
+  },
+  "schema_version": 1,
+  "third_party_forks": [
+    "plenora-smb2"
+  ]
+}

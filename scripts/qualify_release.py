@@ -92,6 +92,10 @@ def main():
             assert python_report['version'] == manifest['version']
             assert python_report['wheel_sha256'] == digest(folder / python_report['wheel'])
             subjects[target] = {'binary_sha256': digest(binary), 'wheel_sha256': python_report['wheel_sha256']}
+            if parse_version(manifest['version']).requires((2, 0, 0)):
+                suffix = '.zip' if 'windows' in target else '.tar.gz'
+                archive = folder / f'plenora-storage-{manifest["version"]}-{target}{suffix}'
+                subjects[target]['cli_archive_sha256'] = digest(archive)
             assert {r['provider'] for r in python_report['results']} == {'local', 's3', 'sftp', 'ftp', 'ftps', 'azure', 'gcs', 'smb', 'webdav'}
             assert all(r['status'] == 'PASS' and r['operations'] == 7 and r['async_stat'] == 'PASS'
                        for r in python_report['results'])

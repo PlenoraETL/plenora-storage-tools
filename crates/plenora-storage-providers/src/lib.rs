@@ -9,12 +9,15 @@
 
 // Entry points exist only in instrumented fuzz builds, never in product builds.
 #[cfg(fuzzing)]
+/// Parser entry points available only in instrumented builds.
 pub mod parser_fuzz {
     #[cfg(feature = "azure")]
+    /// Validate an Azure listing response without contacting a server.
     pub fn azure(data: &[u8]) {
         crate::azure_listing::fuzz_listing(data);
     }
     #[cfg(feature = "webdav")]
+    /// Parse a DAV property response without contacting a server.
     pub fn webdav(data: &[u8]) {
         crate::webdav::fuzz_properties(data);
     }
@@ -52,12 +55,17 @@ pub use smb::{Smb, SmbConnectionConfig};
 pub use webdav::{WebDav, WebDavConnectionConfig};
 
 #[cfg(feature = "local")]
+/// Shared operation wrapper for the local filesystem backend.
 pub type LocalProvider = Provider<Local>;
 #[cfg(feature = "azure")]
+/// Shared operation wrapper for the Azure Blob backend.
 pub type AzureProvider = Provider<Azure>;
 #[cfg(feature = "gcs")]
+/// Shared operation wrapper for the GCS backend.
 pub type GcsProvider = Provider<Gcs>;
 #[cfg(feature = "smb")]
+/// Shared operation wrapper for the encrypted SMB3 backend.
 pub type SmbProvider = Provider<Smb>;
 #[cfg(feature = "webdav")]
+/// Shared operation wrapper for the qualified `WebDAV` backend.
 pub type WebDavProvider = Provider<WebDav>;

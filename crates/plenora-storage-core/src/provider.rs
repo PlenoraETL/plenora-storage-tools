@@ -9,7 +9,9 @@ use crate::{
 
 /// Borrowed host policy and controls for one operation; adapters must honor both.
 pub struct OperationContext<'a> {
+    /// Borrowed engine admission policy and resource limits for this operation.
     pub policy: &'a EngineConfig,
+    /// Borrowed cancellation token and deadline to enforce across all phases.
     pub control: &'a ExecutionControl,
 }
 
@@ -21,12 +23,18 @@ pub struct OperationContext<'a> {
 /// adapter may infer rollback merely because a commit response was lost.
 #[async_trait]
 pub trait StorageProvider: Send + Sync {
+    /// Return the stable identifier used to select this adapter.
     fn id(&self) -> &'static str;
+    /// Return the connection contract accepted by this adapter.
     fn config_contract(&self) -> &'static str;
+    /// Describe only supported operations and enforceable backend guarantees.
     fn capabilities(&self) -> ProviderCapabilities;
 
     /// Performs local provider admission before a caller opens an artifact sink.
     /// Implementations must not resolve credentials or perform network I/O here.
+    ///
+    /// # Errors
+    /// Returns a configuration or policy error before credential resolution, network I/O or artifact opening.
     fn validate_connection(
         &self,
         connection: &ProviderConnection,
@@ -35,12 +43,20 @@ pub trait StorageProvider: Send + Sync {
         connection.validate()
     }
 
+    /// Probe the admitted connection without writing an object.
+    ///
+    /// # Errors
+    /// Returns connection, authentication, probe or execution-control failures.
     async fn test(
         &self,
         connection: &ProviderConnection,
         context: &OperationContext<'_>,
     ) -> StorageResult<TestResult>;
 
+    /// Enumerate a bounded page in normalized key order.
+    ///
+    /// # Errors
+    /// Returns validation, connection, listing or budget errors; invalid remote names fail closed.
     async fn list(
         &self,
         connection: &ProviderConnection,
@@ -48,6 +64,10 @@ pub trait StorageProvider: Send + Sync {
         context: &OperationContext<'_>,
     ) -> StorageResult<ProviderListResult>;
 
+    /// Read metadata without treating `ETag` or version as a content digest.
+    ///
+    /// # Errors
+    /// Returns validation, connection, not-found or metadata read errors.
     async fn stat(
         &self,
         connection: &ProviderConnection,
@@ -69,6 +89,10 @@ pub trait StorageProvider: Send + Sync {
         context: &OperationContext<'_>,
     ) -> StorageResult<TransferResult>;
 
+    /// Consume a source under the admitted publication and size policies.
+    ///
+    /// # Errors
+    /// Source, write, commit and cleanup errors preserve their provable external effect; lost replies do not imply rollback.
     async fn put(
         &self,
         connection: &ProviderConnection,
@@ -77,6 +101,10 @@ pub trait StorageProvider: Send + Sync {
         context: &OperationContext<'_>,
     ) -> StorageResult<TransferResult>;
 
+    /// Delete the selected key, honoring the explicit missing-object policy.
+    ///
+    /// # Errors
+    /// Returns admission, connection or deletion failures; an interrupted deletion can have unknown effect.
     async fn delete(
         &self,
         connection: &ProviderConnection,
@@ -84,6 +112,10 @@ pub trait StorageProvider: Send + Sync {
         context: &OperationContext<'_>,
     ) -> StorageResult<DeleteResult>;
 
+    /// Copy within the same connection under the destination publication policy.
+    ///
+    /// # Errors
+    /// Unsupported guarantees fail before mutation; later failures preserve commit and recovery state.
     async fn copy(
         &self,
         connection: &ProviderConnection,

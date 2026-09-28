@@ -30,6 +30,9 @@ jobs:
       - run: python3 scripts/check_docs.py
       - run: python3 scripts/check_test_layout.py
       - run: python3 scripts/check_comments.py
+      - run: python3 scripts/check_dependencies.py
+      - run: python3 scripts/code_size.py --check --output target/code-size.json
+      - run: python3 scripts/check_rust_docs.py
       - run: python3 scripts/package_source.py
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

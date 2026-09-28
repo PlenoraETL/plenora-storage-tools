@@ -1,3 +1,6 @@
+mod operations;
+mod publication;
+
 use crate::common::{
     Backend, ProviderFactory, Reader, failure, invalid, io_error, limit_error, metadata, page,
     parse, select,
@@ -17,9 +20,13 @@ use tokio::io::AsyncReadExt;
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+/// Filesystem root accessed with process credentials through a directory capability.
 pub struct LocalConnectionConfig {
+    /// Absolute root, at most 4096 bytes without NUL; opened using process credentials.
+    /// The connection must use `credential_ref = "local:process"`.
     pub root: String,
 }
+/// Local filesystem backend factory using process credentials.
 pub struct Local;
 #[async_trait]
 impl ProviderFactory for Local {
@@ -68,203 +75,6 @@ impl Reader for LocalReader {
             .map_err(|error| io_error(&error, ErrorPhase::Read, false))?;
         data.truncate(count);
         Ok((count > 0).then(|| data.into()))
-    }
-}
-#[async_trait]
-impl Backend for LocalBackend {
-    async fn test(&mut self) -> StorageResult<()> {
-        let dir = self.dir.clone();
-        blocking(move || {
-            dir.entries()
-                .map_err(|error| io_error(&error, ErrorPhase::Probe, false))?;
-            Ok(())
-        })
-        .await
-    }
-    async fn list(
-        &mut self,
-        request: &ProviderListRequest,
-        limit: usize,
-    ) -> StorageResult<ProviderListResult> {
-        let dir = self.dir.clone();
-        let request = request.clone();
-        blocking(move || {
-            let mut stack = vec![String::new()];
-            let mut selected = BTreeMap::new();
-            let mut scanned = 0_usize;
-            while let Some(prefix) = stack.pop() {
-                let current = if prefix.is_empty() {
-                    dir.try_clone()
-                } else {
-                    dir.open_dir(&prefix)
-                }
-                .map_err(|error| io_error(&error, ErrorPhase::Read, false))?;
-                for entry in current
-                    .entries()
-                    .map_err(|error| io_error(&error, ErrorPhase::Read, false))?
-                {
-                    scanned += 1;
-                    if scanned > 1_000_000 {
-                        return Err(limit_error());
-                    }
-                    let entry = entry.map_err(|error| io_error(&error, ErrorPhase::Read, false))?;
-                    let name = entry
-                        .file_name()
-                        .into_string()
-                        .map_err(|_| invalid("LOCAL_NAME_NOT_UTF8"))?;
-                    if name.starts_with(".plenora-stage-") {
-                        continue;
-                    }
-                    let key = if prefix.is_empty() {
-                        name
-                    } else {
-                        format!("{prefix}/{name}")
-                    };
-                    portable_key(&key)?;
-                    let ty = entry
-                        .file_type()
-                        .map_err(|error| io_error(&error, ErrorPhase::Read, false))?;
-                    if ty.is_symlink() {
-                        return Err(invalid("LOCAL_SYMLINK_FORBIDDEN"));
-                    }
-                    if ty.is_dir() {
-                        if directory_may_contain(
-                            &key,
-                            request.prefix.as_deref().unwrap_or_default(),
-                        ) {
-                            stack.push(key);
-                        }
-                    } else if ty.is_file() {
-                        let size = entry
-                            .metadata()
-                            .map_err(|error| io_error(&error, ErrorPhase::Read, false))?
-                            .len();
-                        select(&mut selected, metadata(&key, size), &request, limit)?;
-                    }
-                }
-            }
-            Ok(page(selected, limit))
-        })
-        .await
-    }
-    async fn stat(&mut self, key: &str) -> StorageResult<ObjectMetadata> {
-        portable_key(key)?;
-        let key = key.to_owned();
-        let dir = self.dir.clone();
-        blocking(move || {
-            let meta = dir
-                .metadata(&key)
-                .map_err(|error| io_error(&error, ErrorPhase::Read, false))?;
-            if !meta.is_file() {
-                return Err(invalid("LOCAL_REGULAR_FILE_REQUIRED"));
-            }
-            Ok(metadata(&key, meta.len()))
-        })
-        .await
-    }
-    async fn get(&mut self, key: &str) -> StorageResult<(ObjectMetadata, Box<dyn Reader>)> {
-        portable_key(key)?;
-        let key = key.to_owned();
-        let dir = self.dir.clone();
-        let (meta, file) = blocking(move || {
-            let file = dir
-                .open(&key)
-                .map_err(|error| io_error(&error, ErrorPhase::Read, false))?;
-            let meta = file
-                .metadata()
-                .map_err(|error| io_error(&error, ErrorPhase::Read, false))?;
-            if !meta.is_file() {
-                return Err(invalid("LOCAL_REGULAR_FILE_REQUIRED"));
-            }
-            Ok((metadata(&key, meta.len()), file.into_std()))
-        })
-        .await?;
-        Ok((
-            meta,
-            Box::new(LocalReader {
-                file: tokio::fs::File::from_std(file),
-            }),
-        ))
-    }
-    async fn put(&mut self, request: &PutRequest, data: Bytes) -> StorageResult<()> {
-        portable_key(&request.key)?;
-        let key = request.key.clone();
-        let overwrite = request.overwrite;
-        let dir = self.dir.clone();
-        blocking(move || {
-            let (parent, name) = key.rsplit_once('/').unwrap_or(("", key.as_str()));
-            let mut prepared = false;
-            if !parent.is_empty() && dir.open_dir(parent).is_err() {
-                prepared = true;
-                dir.create_dir_all(parent).map_err(|error| {
-                    io_error(&error, ErrorPhase::Prepare, true).with_preparation_effect(true)
-                })?;
-            }
-            // Keep an open parent capability throughout staging and publication.
-            let parent = if parent.is_empty() {
-                dir.try_clone()
-            } else {
-                dir.open_dir(parent)
-            }
-            .map_err(|error| {
-                io_error(&error, ErrorPhase::Prepare, false).with_preparation_effect(prepared)
-            })?;
-            let stage = stage_name();
-            let mut options = OpenOptions::new();
-            options.write(true).create_new(true);
-            let mut owned = false;
-            let result: StorageResult<()> = (|| {
-                let mut file = parent
-                    .open_with(&stage, &options)
-                    .map_err(|error| io_error(&error, ErrorPhase::Prepare, true))?;
-                owned = true;
-                file.write_all(&data)
-                    .map_err(|error| io_error(&error, ErrorPhase::Write, true))?;
-                file.sync_all()
-                    .map_err(|error| io_error(&error, ErrorPhase::Write, true))?;
-                drop(file);
-                if overwrite {
-                    parent
-                        .rename(&stage, &parent, name)
-                        .map_err(|error| io_error(&error, ErrorPhase::Commit, true))?;
-                } else {
-                    parent
-                        .hard_link(&stage, &parent, name)
-                        .map_err(|error| io_error(&error, ErrorPhase::Commit, true))?;
-                    parent.remove_file(&stage).map_err(|error| {
-                        io_error(&error, ErrorPhase::Cleanup, true).with_outcome(
-                            RemoteEffect::Committed,
-                            RetryDisposition::RequiresRecovery,
-                        )
-                    })?;
-                }
-                Ok(())
-            })();
-            if let Err(error) = result {
-                // Only the unique staging name belongs to this operation.
-                let cleaned = owned && parent.remove_file(&stage).is_ok();
-                return Err(
-                    if cleaned && error.remote_effect != RemoteEffect::Committed {
-                        error.rolled_back()
-                    } else {
-                        error
-                    }
-                    .with_preparation_effect(prepared),
-                );
-            }
-            Ok(())
-        })
-        .await
-    }
-    async fn delete(&mut self, key: &str) -> StorageResult<()> {
-        portable_key(key)?;
-        let dir = self.dir.clone();
-        let key = key.to_owned();
-        blocking(move || {
-            dir.remove_file(key)
-                .map_err(|error| io_error(&error, ErrorPhase::Commit, true))
-        })
-        .await
     }
 }
 async fn blocking<T: Send + 'static>(

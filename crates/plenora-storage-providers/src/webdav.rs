@@ -1,3 +1,6 @@
+mod operations;
+mod publication;
+
 use crate::{
     common::{
         Backend, ProviderFactory, Reader, failure, invalid, limit_error, metadata, page, parse,
@@ -19,9 +22,13 @@ use url::Url;
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+/// `WebDAV` collection root; publication guarantees depend on the qualified server profile.
 pub struct WebDavConnectionConfig {
+    /// Collection URL ending in `/`, without credentials, query or fragment.
+    /// Plaintext HTTP requires engine opt-in; redirects and proxies are disabled.
     pub endpoint: String,
 }
+/// `WebDAV` backend factory using bearer or basic authentication over an admitted endpoint.
 pub struct WebDav;
 #[async_trait]
 impl ProviderFactory for WebDav {
@@ -271,146 +278,6 @@ fn strong_etag(value: &str) -> Option<String> {
         return None;
     }
     Some(format!("\"{opaque}\""))
-}
-#[async_trait]
-impl Backend for Dav {
-    async fn test(&mut self) -> StorageResult<()> {
-        let entries = self.properties("", "0").await?;
-        if !entries.iter().any(|e| e.key.is_empty() && e.directory) {
-            return Err(invalid("WEBDAV_COLLECTION_REQUIRED"));
-        }
-        Ok(())
-    }
-    async fn list(
-        &mut self,
-        r: &ProviderListRequest,
-        limit: usize,
-    ) -> StorageResult<ProviderListResult> {
-        let mut stack = vec![String::new()];
-        let mut seen = BTreeSet::new();
-        let mut selected = BTreeMap::new();
-        while let Some(dir) = stack.pop() {
-            if !seen.insert(dir.clone()) {
-                return Err(invalid("WEBDAV_COLLECTION_CYCLE"));
-            }
-            if seen.len() > 100_000 {
-                return Err(limit_error());
-            }
-            for entry in self.properties(&dir, "1").await? {
-                if entry.key == dir {
-                    continue;
-                }
-                // A Depth:1 response must contain direct children only.
-                if entry.key.rsplit_once('/').map_or("", |(parent, _)| parent) != dir {
-                    return Err(invalid("WEBDAV_DEPTH_VIOLATION"));
-                }
-                if entry.directory {
-                    if directory_may_contain(&entry.key, r.prefix.as_deref().unwrap_or_default()) {
-                        stack.push(entry.key);
-                    }
-                } else {
-                    select(&mut selected, metadata(&entry.key, entry.size), r, limit)?;
-                }
-            }
-        }
-        Ok(page(selected, limit))
-    }
-    async fn stat(&mut self, key: &str) -> StorageResult<ObjectMetadata> {
-        self.properties(key, "0")
-            .await?
-            .into_iter()
-            .find(|e| e.key == key && !e.directory)
-            .map(|e| {
-                let mut meta = metadata(key, e.size);
-                meta.etag = e.etag;
-                meta
-            })
-            .ok_or_else(|| failure(ErrorCategory::NotFound, ErrorPhase::Read, false))
-    }
-    async fn get(&mut self, key: &str) -> StorageResult<(ObjectMetadata, Box<dyn Reader>)> {
-        let meta = self.stat(key).await?;
-        let response = self
-            .request(Method::GET, self.url(key)?)
-            .send()
-            .await
-            .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Read, false))?;
-        Ok((
-            meta,
-            Box::new(DavReader {
-                response: checked(response, false)?,
-            }),
-        ))
-    }
-    async fn put(&mut self, r: &PutRequest, data: Bytes) -> StorageResult<()> {
-        let mut prepared = false;
-        let result = async {
-            if let Some((parent, _)) = r.key.rsplit_once('/') {
-                let mut current = String::new();
-                for segment in parent.split('/') {
-                    if !current.is_empty() {
-                        current.push('/');
-                    }
-                    current.push_str(segment);
-                    prepared = true;
-                    let response = self
-                        .request(
-                            Method::from_bytes(b"MKCOL").map_err(|_| invalid("METHOD_INVALID"))?,
-                            self.url(&current)?,
-                        )
-                        .send()
-                        .await
-                        .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Prepare, true))?;
-                    let status = response.status();
-                    if let Err(error) = checked(response, true) {
-                        // Servers can report 405, 409 or even 500 when MKCOL
-                        // loses a race. Reconcile with a read, never a retry of
-                        // the mutation, and require proof of the exact collection.
-                        if (status == StatusCode::METHOD_NOT_ALLOWED
-                            || status == StatusCode::CONFLICT
-                            || status.is_server_error())
-                            && let Ok(entries) = self.properties(&current, "0").await
-                            && entries
-                                .iter()
-                                .any(|entry| entry.key == current && entry.directory)
-                        {
-                            continue;
-                        }
-                        return Err(error);
-                    }
-                }
-            }
-            let mut request = self.request(Method::PUT, self.url(&r.key)?).body(data);
-            if !r.overwrite {
-                request = request.header("If-None-Match", "*");
-            }
-            let response = request
-                .send()
-                .await
-                .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Commit, true))?;
-            checked(response, true)?;
-            Ok(())
-        }
-        .await;
-        result.map_err(|e: StorageError| e.with_preparation_effect(prepared))
-    }
-    async fn delete(&mut self, key: &str) -> StorageResult<()> {
-        // Do not allow a file deletion request to recursively remove a collection.
-        let meta = self.stat(key).await?;
-        let etag = meta
-            .etag
-            .filter(|value| value.starts_with('"') && value.ends_with('"'))
-            .ok_or_else(|| {
-                StorageError::unsupported("WebDAV file deletion requires a strong ETag")
-            })?;
-        let response = self
-            .request(Method::DELETE, self.url(key)?)
-            .header("If-Match", etag)
-            .send()
-            .await
-            .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Commit, true))?;
-        checked(response, true)?;
-        Ok(())
-    }
 }
 fn checked(response: Response, mutating: bool) -> StorageResult<Response> {
     let status = response.status();

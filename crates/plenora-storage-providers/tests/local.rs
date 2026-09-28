@@ -1,3 +1,4 @@
+//! Integration conformance for local.
 #![cfg(feature = "full")]
 use plenora_storage_core::*;
 use plenora_storage_providers::{
@@ -73,6 +74,10 @@ fn put(key: &str, overwrite: bool) -> PutRequest {
     }
 }
 #[tokio::test]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Exercise the complete local object lifecycle and exclusive publication conflict"
+)]
 async fn local_seven_operations_pagination_and_atomic_conflict() {
     let f = Fixture::new(1024);
     let control = ExecutionControl::default();

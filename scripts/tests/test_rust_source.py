@@ -46,3 +46,4 @@ fn after() {}
             with self.assertRaises(ValueError):
                 mask_noncode(value)
         self.assertEqual(len(inline_test_modules('#[cfg(test)]\nmod tests { #[test] fn a() {} }')), 1)
+        self.assertEqual(len(inline_test_modules('#[cfg(test)]\npub(crate) mod tests { fn a() {} }')), 1)

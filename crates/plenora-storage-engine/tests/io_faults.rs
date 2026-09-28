@@ -123,6 +123,10 @@ fn redacted(error: &StorageError, provider: &str, phase: ErrorPhase) {
     );
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Apply the same source, sink and cleanup fault matrix to every provider"
+)]
 async fn exercise(provider: &str) {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)

@@ -1,3 +1,4 @@
+//! Integration conformance for protocol.
 use std::{
     collections::HashMap,
     process::{Command, Output},
@@ -150,6 +151,10 @@ fn mutation_policy_flags_are_explicit_values() {
 
 #[cfg(feature = "local")]
 #[tokio::test]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Compare Rust and CLI results for the same admission and file-fault matrix"
+)]
 async fn file_errors_match_rust_and_cli_without_publication() {
     use plenora_storage_core::{
         EngineConfig, EnvironmentCredentialResolver, ExecutionControl, ProviderConnection,

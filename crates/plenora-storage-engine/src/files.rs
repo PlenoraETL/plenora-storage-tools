@@ -6,6 +6,12 @@ use plenora_storage_core::{
 use std::path::{Path, PathBuf};
 use tokio::fs;
 
+/// Download to a unique sibling staging file, sync it, then publish the complete file.
+/// `overwrite = false` uses exclusive publication; an existing destination is preserved.
+///
+/// # Errors
+/// Returns admission, read, staging, sync or publication errors. Cleanup outcomes
+/// are preserved in the error axes; a failed cleanup requires host recovery.
 pub async fn get_to_file(
     engine: &Engine,
     connection: &ProviderConnection,
@@ -136,14 +142,26 @@ fn publish_error(error: &std::io::Error) -> StorageError {
     )
 }
 
+/// Source file and destination policy shared by CLI and Python uploads.
 pub struct PutFileOptions {
+    /// Normalized relative destination object key.
     pub key: String,
+    /// Local source file opened for reading after operation admission.
     pub input: PathBuf,
+    /// Whether the provider may replace an existing destination.
     pub overwrite: bool,
+    /// Required publication guarantee; unsupported guarantees fail before upload.
     pub publication_policy: PublicationPolicy,
+    /// Optional validated media type persisted only by capable providers.
     pub content_type: Option<String>,
 }
 
+/// Open a local source and stream it through the selected provider's upload path.
+/// The source's measured length is passed as the expected transfer size.
+///
+/// # Errors
+/// Returns source-open/metadata, admission, transfer, publication or cleanup errors.
+/// Backend buffer and transfer limits apply; inspect effect and retry before repeating.
 pub async fn put_from_file(
     engine: &Engine,
     connection: &ProviderConnection,

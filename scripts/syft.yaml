@@ -1,0 +1,8 @@
+check-for-app-update: false
+file:
+  metadata:
+    selection: all
+    digests: [sha256]
+python:
+  guess-unpinned-requirements: false
+  search-remote-licenses: false

@@ -45,6 +45,10 @@ pub fn value_result<T: serde::Serialize>(
         })
 }
 
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Terminal output consumes the result; callers cannot reuse it after emission"
+)]
 pub fn emit_success(command: &str, contract: &str, result: Value) -> ExitCode {
     let envelope = json!({
         "status": "ok",
@@ -59,6 +63,10 @@ pub fn emit_success(command: &str, contract: &str, result: Value) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Terminal output consumes the operational error"
+)]
 pub fn emit_error(command: &str, contract: &str, error: StorageError) -> ExitCode {
     let exit_code = error_exit_code(error.category);
     let envelope = json!({

@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "basis": "Reviewed 2.0 adapter separation; 10% component headroom rounded to 50 lines, 20% for physical documentation lines.",
+  "areas": {
+    "plenora-smb2": {
+      "code_lines": 21100,
+      "physical_lines": 39000,
+      "max_file_code_lines": 3350
+    },
+    "plenora-storage-cli": {
+      "code_lines": 750,
+      "physical_lines": 850,
+      "max_file_code_lines": 300
+    },
+    "plenora-storage-core": {
+      "code_lines": 2500,
+      "physical_lines": 3650,
+      "max_file_code_lines": 700
+    },
+    "plenora-storage-engine": {
+      "code_lines": 300,
+      "physical_lines": 400,
+      "max_file_code_lines": 250
+    },
+    "plenora-storage-ftp": {
+      "code_lines": 1500,
+      "physical_lines": 1850,
+      "max_file_code_lines": 400
+    },
+    "plenora-storage-providers": {
+      "code_lines": 2900,
+      "physical_lines": 3350,
+      "max_file_code_lines": 400
+    },
+    "plenora-storage-py": {
+      "code_lines": 300,
+      "physical_lines": 350,
+      "max_file_code_lines": 300
+    },
+    "plenora-storage-s3": {
+      "code_lines": 1400,
+      "physical_lines": 1700,
+      "max_file_code_lines": 400
+    },
+    "plenora-storage-sftp": {
+      "code_lines": 1600,
+      "physical_lines": 1900,
+      "max_file_code_lines": 400
+    },
+    "python-package": {
+      "code_lines": 400,
+      "physical_lines": 600,
+      "max_file_code_lines": 300
+    }
+  }
+}

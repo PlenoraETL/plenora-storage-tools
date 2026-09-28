@@ -1,4 +1,7 @@
 //! GCS JSON API. OAuth tokens are supplied/refreshed by the host resolver.
+mod operations;
+mod publication;
+
 use crate::{
     common::{
         Backend, ProviderFactory, Reader, failure, invalid, limit_error, page, parse, select,
@@ -18,10 +21,15 @@ use url::Url;
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+/// Non-secret GCS JSON API addressing; OAuth tokens come from the resolver.
 pub struct GcsConnectionConfig {
+    /// JSON API origin with path `/`, without credentials, query or fragment.
+    /// Plaintext HTTP requires engine opt-in; redirects and proxies are disabled.
     pub endpoint: String,
+    /// Bucket name within the configured endpoint; no embedded credentials.
     pub bucket: String,
 }
+/// GCS JSON API backend factory; the host supplies and refreshes bearer tokens.
 pub struct Gcs;
 #[async_trait]
 impl ProviderFactory for Gcs {
@@ -141,125 +149,6 @@ impl Reader for GcsReader {
             .chunk()
             .await
             .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Read, false))
-    }
-}
-#[async_trait]
-impl Backend for GcsBackend {
-    async fn test(&mut self) -> StorageResult<()> {
-        let mut url = self.url(None, false)?;
-        url.query_pairs_mut().append_pair("maxResults", "1");
-        let _: ObjectPage = json(send(self.request(Method::GET, url), false).await?).await?;
-        Ok(())
-    }
-    async fn list(
-        &mut self,
-        request: &ProviderListRequest,
-        limit: usize,
-    ) -> StorageResult<ProviderListResult> {
-        let mut token: Option<String> = None;
-        let mut seen = BTreeSet::new();
-        let mut selected = BTreeMap::new();
-        loop {
-            let mut url = self.url(None, false)?;
-            {
-                let mut query = url.query_pairs_mut();
-                query.append_pair("maxResults", "1000");
-                if let Some(prefix) = request.prefix.as_deref().filter(|p| !p.is_empty()) {
-                    query.append_pair("prefix", &format!("{}/", prefix.trim_end_matches('/')));
-                }
-                if let Some(after) = &request.start_after {
-                    query.append_pair("startOffset", after);
-                }
-                if let Some(token) = &token {
-                    query.append_pair("pageToken", token);
-                }
-            }
-            let page: ObjectPage = json(send(self.request(Method::GET, url), false).await?).await?;
-            for object in page.items {
-                select(&mut selected, object.metadata()?, request, limit)?;
-            }
-            token = page.next_page_token.filter(|t| !t.is_empty());
-            match &token {
-                None => break,
-                Some(t) if t.len() > 8192 || !seen.insert(t.clone()) || seen.len() > 100_000 => {
-                    return Err(invalid("GCS_PAGINATION_INVALID"));
-                }
-                Some(_) => {}
-            }
-        }
-        Ok(page(selected, limit))
-    }
-    async fn stat(&mut self, key: &str) -> StorageResult<ObjectMetadata> {
-        self.object(key).await?.metadata()
-    }
-    async fn get(&mut self, key: &str) -> StorageResult<(ObjectMetadata, Box<dyn Reader>)> {
-        let meta = self.object(key).await?.metadata()?;
-        let mut url = self.url(Some(key), false)?;
-        url.query_pairs_mut()
-            .append_pair("alt", "media")
-            .append_pair("generation", meta.version.as_deref().unwrap_or_default());
-        let response = send(self.request(Method::GET, url), false).await?;
-        Ok((meta, Box::new(GcsReader { response })))
-    }
-    async fn put(&mut self, request: &PutRequest, data: Bytes) -> StorageResult<()> {
-        let mut url = self.url(None, true)?;
-        url.query_pairs_mut().append_pair("uploadType", "multipart");
-        if !request.overwrite {
-            url.query_pairs_mut().append_pair("ifGenerationMatch", "0");
-        }
-        let boundary = loop {
-            let candidate = crate::keys::stage_name();
-            if !data
-                .windows(candidate.len())
-                .any(|window| window == candidate.as_bytes())
-            {
-                break candidate;
-            }
-        };
-        let expected_size = data.len() as u64;
-        let content_type = request
-            .content_type
-            .as_deref()
-            .unwrap_or("application/octet-stream");
-        let meta = serde_json::json!({"name":request.key,"contentType":content_type,"metadata":request.metadata});
-        let start = Bytes::from(format!(
-            "--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{meta}\r\n--{boundary}\r\nContent-Type: {content_type}\r\n\r\n"
-        ));
-        let end = Bytes::from(format!("\r\n--{boundary}--\r\n"));
-        let length = start.len() + data.len() + end.len();
-        let body = reqwest::Body::wrap_stream(futures_util::stream::iter([
-            Ok::<_, std::io::Error>(start),
-            Ok(data),
-            Ok(end),
-        ]));
-        let response = send(
-            self.request(Method::POST, url)
-                .header(
-                    "Content-Type",
-                    format!("multipart/related; boundary={boundary}"),
-                )
-                .header("Content-Length", length)
-                .body(body),
-            true,
-        )
-        .await?;
-        let object: Object = json(response)
-            .await
-            .map_err(|error| error.cleanup_unconfirmed("upload_response_invalid"))?;
-        if object.name != request.key || object.size.parse::<u64>().ok() != Some(expected_size) {
-            return Err(
-                invalid("GCS_OBJECT_NAME_MISMATCH").cleanup_unconfirmed("upload_response_invalid")
-            );
-        }
-        Ok(())
-    }
-    async fn delete(&mut self, key: &str) -> StorageResult<()> {
-        send(
-            self.request(Method::DELETE, self.url(Some(key), false)?),
-            true,
-        )
-        .await?;
-        Ok(())
     }
 }
 async fn send(request: RequestBuilder, mutating: bool) -> StorageResult<Response> {

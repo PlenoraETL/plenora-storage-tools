@@ -1,3 +1,4 @@
+//! Integration conformance for sftp.
 use std::{collections::BTreeMap, sync::Arc};
 
 use plenora_storage_core::{
@@ -238,6 +239,10 @@ async fn unverified_host_key_requires_explicit_policy() -> Result<(), Box<dyn st
 
 #[tokio::test]
 #[ignore = "requires the Docker storage fixtures"]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Exercise the operation contract over one isolated SFTP object lifecycle"
+)]
 async fn sftp_contract_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(
         std::env::var("PLENORA_SFTP_TEST").as_deref(),

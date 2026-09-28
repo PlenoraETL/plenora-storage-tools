@@ -16,6 +16,21 @@ plenora-storage-core <- Runtime Binding del consumer
 Il catalogo aggiornato dei provider e dei contratti è generato in [STATO.md](STATO.md).
 I trasferimenti su file di CLI e Python condividono staging e pubblicazione.
 
+## Responsabilità dei moduli
+
+| Componenti | Connessione e configurazione | Operazioni | Pubblicazione ed errori |
+| --- | --- | --- | --- |
+| S3, SFTP, FTP/FTPS | Tipi pubblici e autenticazione in `lib.rs`; precondizioni in `validation.rs` | Trait in `operations.rs`, primitive in `transfer.rs` | Upload/copia in `publication.rs`, traduzione redatta in `errors.rs` |
+| Local, Azure, GCS, SMB, WebDAV | Factory e stato della connessione nel modulo del provider | Backend nel figlio `operations.rs`; policy comuni in `common/operations.rs` | Scrittura nel figlio `publication.rs`; risposte/errori specifici nel modulo del protocollo |
+| CLI | Parser in `args.rs`, lifecycle nel punto di ingresso | Dispatch, input limitati e paginazione in `commands.rs` | Envelope e codici di uscita in `output.rs`; staging condiviso con Python nell'engine |
+| Python | Bridge PyO3 privato e resolver del consumer | Wrapper tipizzato sync/async; factory dell'engine condivisa | Trasferimenti su file e loro effetti gestiti nell'engine |
+
+La pubblicazione S3 separa il PUT condizionale buffered dal multipart streaming.
+SFTP conserva in sequenza proprietà dello staging, effetto delle directory e
+rename. FTP e FTPS condividono lo stesso controllo del completamento del canale
+dati. I backend buffered condividono soltanto admission, controlli e integrità;
+non ricevono garanzie di atomicità da un helper generico.
+
 
 ## Confine pubblico
 

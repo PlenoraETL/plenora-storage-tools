@@ -2,8 +2,10 @@
 
 Piano del 28 settembre 2026. Obiettivo approvato: completare i sei ambiti di
 allineamento rimasti aperti dopo la 1.0.0, su libreria Rust, CLI e SDK Python,
-per tutti i nove provider. Le attività sotto sono **pianificate**, non già
-implementate o qualificate. Non è fissata una data di rilascio.
+per tutti i nove provider. Il primo ciclo `2.0.0-alpha.1` implementa separazione,
+documentazione e nuovi controlli; la qualifica della release resta da completare.
+Le verifiche locali sono descritte in [Qualità 2.0](quality-2.0.md).
+Non è fissata una data di rilascio.
 
 ## Baseline e perimetro
 
@@ -47,19 +49,19 @@ I controlli API devono distinguere queste modifiche dalle regressioni
 accidentali: non basta rigenerare una baseline per rendere verde il gate.
 La baseline 1.0 resta consultabile.
 
-Questo piano non modifica i manifest 1.0.0. Il primo ciclo di implementazione
-aprirà la serie `2.0.0-alpha.1`, mantenendo coerenti versioni Rust, Python e
+Il primo ciclo di implementazione ha aperto la serie `2.0.0-alpha.1`, mantenendo
+coerenti versioni Rust, Python e
 inventari generati. Tag, ricevute e artefatti 1.0.0 restano immutati.
 
 ## Ordine di lavoro
 
 | Milestone | Ambiti | Dipendenze | Criterio di uscita | Stato |
 | --- | --- | --- | --- | --- |
-| M0 — Baseline | Inventario delle responsabilità, API e misure iniziali | Release 1.0.0 | Elenco dei moduli da intervenire, misura iniziale del prodotto e matrice dei contratti da preservare | Da fare |
-| M1 — Struttura e API | A1 e A2 | M0 | Nove adapter revisionati, documentazione pubblica completa e regressioni controllate sulle tre superfici | Da fare |
-| M2 — Manutenibilità | A3 e A4 | Baseline M0; soglie consolidate dopo M1 | Controlli di dimensione e commenti attivi in CI, con prove dei casi rifiutati | Da fare |
-| M3 — Dipendenze e inventari | A5 | M0; prima di congelare gli artefatti | Policy applicata, scansioni degli artefatti dei due target e verifica integrata nella qualifica | Da fare |
-| M4 — Documentazione corrente | A6, aggiornata durante M1–M3 | Chiusura M1–M3 | Guide coerenti con codice, evidenze collegate e migrazione esplicita | Da fare |
+| M0 — Baseline | Inventario delle responsabilità, API e misure iniziali | Release 1.0.0 | Elenco dei moduli da intervenire, misura iniziale del prodotto e matrice dei contratti da preservare | Raccolta; inventario e architettura versionati |
+| M1 — Struttura e API | A1 e A2 | M0 | Nove adapter revisionati, documentazione pubblica completa e regressioni controllate sulle tre superfici | Implementato; Clippy, rustdoc, feature isolate e API Rust Windows verificati localmente; qualifica candidata da completare |
+| M2 — Manutenibilità | A3 e A4 | Baseline M0; soglie consolidate dopo M1 | Controlli di dimensione e commenti attivi in CI, con prove dei casi rifiutati | Implementato e testato localmente; workflow collegato |
+| M3 — Dipendenze e inventari | A5 | M0; prima di congelare gli artefatti | Policy applicata, scansioni degli artefatti dei due target e verifica integrata nella qualifica | Implementato; scanner provato sui byte 1.0 come sviluppo, non qualifica 2.0 |
+| M4 — Documentazione corrente | A6, aggiornata durante M1–M3 | Chiusura M1–M3 | Guide coerenti con codice, evidenze collegate e migrazione esplicita | Guide aggiornate; esiti finali da collegare |
 | M5 — Qualifica e rilascio | Tutti gli ambiti | M1–M4 | Nuovi artefatti 2.0 qualificati, pubblicati e verificati dopo download | Da fare |
 
 M1 procede per adapter, con modifiche revisionabili e prove del comportamento
@@ -194,4 +196,5 @@ finale supera la procedura aggiornata di [qualifica](release.md):
 
 Per ogni milestone completata si aggiorna questo piano con commit e link alle
 prove. Le attività implementate ma non ancora qualificate restano distinte da
-quelle completate. Il primo intervento operativo è M0, seguito da A1 e A2.
+quelle completate. Il prossimo controllo è la CI del candidato e la verifica
+dei provider sulla VM dedicata, prima di congelare i byte finali.

@@ -1,3 +1,4 @@
+//! Integration conformance for preflight.
 #![cfg(all(feature = "s3", feature = "sftp", feature = "ftp"))]
 use std::{collections::BTreeMap, sync::Arc};
 

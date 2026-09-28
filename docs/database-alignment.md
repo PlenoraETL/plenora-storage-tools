@@ -32,6 +32,11 @@ ricostruiti e confrontati dal gate finale; la SBOM di prodotto lega anche gli
 artefatti ai loro digest. Lo schema di riferimento è quello
 [ufficiale CycloneDX 1.6](https://github.com/CycloneDX/specification/blob/1.6/schema/bom-1.6.schema.json).
 
+La serie 2.0 aggiunge una [scansione separata degli artefatti](quality-2.0.md)
+con Syft: CLI e wheel dei due target, import nativi, dati originali e digest.
+Non estende retroattivamente l'ambito delle due SBOM dichiarative né promette
+di rilevare ogni libreria incorporata o installata nell'ambiente di build.
+
 Lo SDK Python espone le sette operazioni tramite file e conserva risultati
 dizionario a runtime. Gli stub pubblici descrivono risultati `TypedDict`, policy
 ammesse e controlli delle operazioni. La matrice della wheel installata esegue

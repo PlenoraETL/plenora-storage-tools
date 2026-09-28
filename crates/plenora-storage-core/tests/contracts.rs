@@ -1,3 +1,4 @@
+//! Contract conformance of serialized public storage DTOs.
 use std::{
     collections::HashMap,
     error::Error,
@@ -217,6 +218,10 @@ fn sample_object() -> ObjectMetadata {
 /// This drives every public contract from the Rust types the surfaces actually
 /// serialize, so a DTO can never drift away from the schema that describes it.
 #[test]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the complete DTO schema matrix in one conformance test"
+)]
 fn serialized_rust_dtos_match_their_component_owned_schemas() {
     let (schemas, documents) = load_schemas();
     let connection = sample_connection();

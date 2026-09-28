@@ -18,8 +18,11 @@ use crate::{
     validate_object_key, validate_object_prefix,
 };
 
+/// Lifetime of engine-local continuation cursors, in seconds.
 pub const LIST_CURSOR_TTL_SECONDS: u64 = 900;
+/// Maximum encoded continuation cursor length in bytes.
 pub const LIST_CURSOR_MAX_BYTES: usize = 512;
+/// Maximum retained continuation tokens per live engine.
 pub const LIST_CURSOR_MAX_ACTIVE: usize = 1_024;
 const CURSOR_TTL: Duration = Duration::from_secs(LIST_CURSOR_TTL_SECONDS);
 
@@ -128,11 +131,13 @@ impl Engine {
     }
 
     #[must_use]
+    /// Discover operations through the Rust surface for the registered providers.
     pub fn capabilities(&self) -> CapabilityDocument {
         self.capabilities_for(Surface::Rust)
     }
 
     #[must_use]
+    /// Discover operations through the requested consumer surface.
     pub fn capabilities_for(&self, surface: Surface) -> CapabilityDocument {
         let providers = self
             .providers
@@ -152,6 +157,7 @@ impl Engine {
     }
 
     #[must_use]
+    /// Return whether new operations have been disabled by close.
     pub fn is_closed(&self) -> bool {
         self.closed.load(Ordering::Acquire)
     }
@@ -196,7 +202,7 @@ impl Engine {
         Ok(provider.as_ref())
     }
 
-    fn context<'a>(&'a self, control: &'a ExecutionControl) -> OperationContext<'a> {
+    const fn context<'a>(&'a self, control: &'a ExecutionControl) -> OperationContext<'a> {
         OperationContext {
             policy: &self.config,
             control,

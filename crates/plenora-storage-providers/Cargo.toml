@@ -22,11 +22,11 @@ webdav = ["dep:reqwest", "dep:rustls", "dep:quick-xml", "dep:url", "dep:percent-
 hex.workspace = true
 async-trait.workspace = true
 bytes.workspace = true
-percent-encoding = { version = "2.3.2", optional = true }
+percent-encoding = { version = "=2.3.2", optional = true }
 cap-std = { workspace = true, optional = true }
 futures-util.workspace = true
-object_store = { version = "0.14.2", default-features = false, features = ["azure"], optional = true }
-plenora-storage-core = { path = "../plenora-storage-core", version = "1.0.0" }
+object_store = { version = "=0.14.2", default-features = false, features = ["azure"], optional = true }
+plenora-storage-core = { path = "../plenora-storage-core", version = "2.0.0-alpha.1" }
 quick-xml = { workspace = true, optional = true }
 reqwest = { workspace = true, features = ["rustls"], optional = true }
 rustls = { workspace = true, optional = true }

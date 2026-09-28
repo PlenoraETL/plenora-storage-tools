@@ -10,10 +10,19 @@ pub struct CredentialMaterial {
 
 impl CredentialMaterial {
     #[must_use]
+    /// Take ownership of secret fields without logging or serializing them.
+    #[allow(
+        clippy::missing_const_for_fn,
+        reason = "Secret storage construction is not a public const contract"
+    )]
     pub fn new(fields: BTreeMap<String, String>) -> Self {
         Self { fields }
     }
 
+    ///
+    /// # Errors
+    /// Returns `CREDENTIAL_FIELD_MISSING` when the field is absent. Values are never included in the message.
+    /// Borrow a required credential field without copying the secret.
     pub fn required(&self, name: &str) -> StorageResult<&str> {
         self.fields.get(name).map(String::as_str).ok_or_else(|| {
             StorageError::invalid_configuration(
@@ -24,12 +33,18 @@ impl CredentialMaterial {
     }
 
     #[must_use]
+    /// Borrow an optional credential field; absence is distinct from an empty value.
     pub fn optional(&self, name: &str) -> Option<&str> {
         self.fields.get(name).map(String::as_str)
     }
 }
 
+/// Host-owned resolution of protected references to in-process credential material.
 pub trait CredentialResolver: Send + Sync {
+    ///
+    /// # Errors
+    /// Returns a redacted lookup, authorization or material-format error from the host resolver.
+    /// Resolve an opaque host reference; failures must not contain secret material.
     fn resolve(&self, reference: &str) -> StorageResult<CredentialMaterial>;
 }
 

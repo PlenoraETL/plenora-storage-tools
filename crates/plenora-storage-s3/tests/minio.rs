@@ -1,3 +1,4 @@
+//! Integration conformance for minio.
 use std::{collections::BTreeMap, sync::Arc};
 
 use plenora_storage_core::{
@@ -117,6 +118,10 @@ async fn https_verifies_the_server_certificate_and_hostname()
 
 #[tokio::test]
 #[ignore = "requires the Docker storage fixtures"]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Exercise the operation contract over one isolated MinIO object lifecycle"
+)]
 async fn s3_contract_roundtrip_against_minio() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(
         std::env::var("PLENORA_MINIO_TEST").as_deref(),

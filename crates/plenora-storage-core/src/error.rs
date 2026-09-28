@@ -8,33 +8,57 @@ pub type StorageResult<T> = Result<T, StorageError>;
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+/// Failure cause; interpret together with phase, external effect and retry.
 pub enum ErrorCategory {
+    /// Invalid request, connection or engine policy.
     InvalidConfiguration,
+    /// Requested guarantee or operation cannot be provided.
     Unsupported,
+    /// Requested object does not exist.
     NotFound,
+    /// Destination or precondition conflicts with current state.
     Conflict,
+    /// Credentials or peer identity could not be authenticated.
     Authentication,
+    /// Authenticated principal lacks permission for the operation.
     Authorization,
+    /// The operation exceeded its deadline.
     Timeout,
+    /// The caller requested cancellation.
     Cancelled,
+    /// A declared size, buffer or enumeration budget was exceeded.
     ResourceLimit,
+    /// Transport, source, sink or filesystem I/O failed.
     Io,
+    /// The peer returned an invalid or unexpected protocol response.
     Protocol,
+    /// Potentially temporary service failure; still inspect effect and retry.
     Transient,
+    /// Operation failed outside a more specific category.
     Execution,
+    /// An internal invariant could not be satisfied.
     Internal,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+/// Phase reached when an operation failed.
 pub enum ErrorPhase {
+    /// Local request and policy admission before effects.
     Validate,
+    /// Address validation, authentication or connection setup.
     Connect,
+    /// Backend reachability probe.
     Probe,
+    /// Preparing handles, directories or staging resources.
     Prepare,
+    /// Reading source bytes or provider metadata.
     Read,
+    /// Writing bytes before publication completes.
     Write,
+    /// Publishing or deleting the destination.
     Commit,
+    /// Final verification or cleanup after transfer/publication.
     Cleanup,
 }
 
@@ -43,22 +67,37 @@ pub enum ErrorPhase {
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum RemoteEffect {
+    /// No external effect has occurred.
     None,
+    /// All effects covered by this result were confirmed undone.
     RolledBack,
+    /// Some effects are known to remain without full completion.
     Partial,
+    /// Publication is confirmed, even if later verification or cleanup failed.
     Committed,
+    /// The remote outcome cannot be proved; do not infer rollback from lost responses.
     Unknown,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
+/// Action a host may take before repeating a failed operation.
 pub enum RetryDisposition {
+    /// Repeating without changing the request cannot resolve the failure.
     Never,
+    /// Isolate the failing input or resource for host review.
     Quarantine,
+    /// The operation may be retried under the same request semantics.
     Safe,
+    /// Retry only with a supported idempotency mechanism.
     RequiresIdempotencyKey,
+    /// Reconcile the external state before deciding whether to retry.
     RequiresRecovery,
-    After { delay_ms: u64 },
+    /// Retry after the indicated delay, subject to the stated external effect.
+    After {
+        /// Minimum delay before retry, in milliseconds.
+        delay_ms: u64,
+    },
 }
 
 /// Public operational failure. Custom providers are responsible for redacting
@@ -66,21 +105,29 @@ pub enum RetryDisposition {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct StorageError {
+    /// Cause classification, independent of whether an effect was committed.
     pub category: ErrorCategory,
+    /// Operation phase in which failure was observed.
     pub phase: ErrorPhase,
+    /// Provable external effect; unknown requires reconciliation before retry.
     pub remote_effect: RemoteEffect,
+    /// Retry policy derived from both cause and external effect.
     pub retry: RetryDisposition,
+    /// Stable machine-readable diagnostic code without secret or payload data.
     pub code: String,
     /// Public operational context only: never payload bytes, credentials,
     /// connection strings or untrusted server/callback exception text.
     pub message: String,
+    /// Stable provider identifier used for dispatch and capability discovery.
     pub provider: Option<String>,
     #[serde(default)]
+    /// Redacted structured diagnostics; callers constructing errors must sanitize values.
     pub details: BTreeMap<String, Value>,
 }
 
 impl StorageError {
     #[must_use]
+    /// Construct a public error; callers must redact code and message before passing them.
     pub fn new(
         category: ErrorCategory,
         phase: ErrorPhase,
@@ -102,6 +149,7 @@ impl StorageError {
     }
 
     #[must_use]
+    /// Attach a public provider identifier, never an endpoint or credential reference.
     pub fn with_provider(mut self, provider: impl Into<String>) -> Self {
         self.provider = Some(provider.into());
         self
@@ -110,6 +158,10 @@ impl StorageError {
     /// Restates the remote outcome of an error whose publication state became
     /// known only after the error was produced.
     #[must_use]
+    #[allow(
+        clippy::missing_const_for_fn,
+        reason = "Error enrichment may evolve independently of const evaluation"
+    )]
     pub fn with_outcome(mut self, remote_effect: RemoteEffect, retry: RetryDisposition) -> Self {
         self.remote_effect = remote_effect;
         self.retry = retry;
@@ -167,6 +219,7 @@ impl StorageError {
     }
 
     #[must_use]
+    /// Construct a non-retryable validation error with no external effect.
     pub fn invalid_configuration(code: impl Into<String>, message: impl Into<String>) -> Self {
         Self::new(
             ErrorCategory::InvalidConfiguration,
@@ -179,6 +232,7 @@ impl StorageError {
     }
 
     #[must_use]
+    /// Reject an unsupported guarantee before effects, with retry disabled.
     pub fn unsupported(message: impl Into<String>) -> Self {
         Self::new(
             ErrorCategory::Unsupported,
@@ -191,6 +245,7 @@ impl StorageError {
     }
 
     #[must_use]
+    /// Report a closed engine without external effects; retry requires a new engine.
     pub fn engine_closed() -> Self {
         Self::new(
             ErrorCategory::Execution,
@@ -203,6 +258,7 @@ impl StorageError {
     }
 
     #[must_use]
+    /// Classify cancellation; an interrupted mutation has unknown effect and requires recovery.
     pub fn cancelled(phase: ErrorPhase, mutating: bool) -> Self {
         Self::new(
             ErrorCategory::Cancelled,
@@ -223,6 +279,7 @@ impl StorageError {
     }
 
     #[must_use]
+    /// Classify deadline expiry; an interrupted mutation has unknown effect and requires recovery.
     pub fn timeout(phase: ErrorPhase, mutating: bool) -> Self {
         Self::new(
             ErrorCategory::Timeout,
