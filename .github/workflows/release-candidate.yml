@@ -175,6 +175,7 @@ jobs:
           $env:PLENORA_CLI_BIN = (Resolve-Path "dist/$version/x86_64-pc-windows-msvc/plenora-storage.exe").Path
           python scripts/audit_release_readiness.py
           python scripts/qualify_extended_faults.py
+          python scripts/qualify_extended_faults.py --spool-uploads --output dist/$version/x86_64-pc-windows-msvc/spooled-regressions.json
           Copy-Item target/release-readiness/extended-regressions.json dist/$version/x86_64-pc-windows-msvc/
           Copy-Item target/release-readiness/results.json dist/$version/x86_64-pc-windows-msvc/cli-regressions.json
           python scripts/verify_release.py dist/$version

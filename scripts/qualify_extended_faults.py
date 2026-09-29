@@ -1,5 +1,6 @@
 """Deterministic protocol-failure checks; only disposable localhost servers."""
 import datetime
+import argparse
 import hashlib
 import http.server
 import json
@@ -58,6 +59,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--spool-uploads', action='store_true')
+    parser.add_argument('--output', type=Path, default=ROOT / 'target/release-readiness/extended-regressions.json')
+    options = parser.parse_args()
     results = []
     with tempfile.TemporaryDirectory(prefix='storage-faults-') as temporary, \
             http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler) as server, \
@@ -85,6 +90,7 @@ def main():
             connection.write_text(json.dumps({'provider': provider, 'config_contract': f'plenora-storage-{provider}-connection-v1',
                                               'credential_ref': 'env:PLENORA_FAULT_CREDENTIALS', 'config': config}))
             command = [str(BINARY), '--format', 'json', '--allow-private-network', '--allow-insecure-http', *flags,
+                       *(['--spool-uploads'] if options.spool_uploads else []),
                        operation, '--connection', str(connection), *args]
             process = subprocess.run(command, capture_output=True, text=True, env=ENV, timeout=15)
             assert not process.stderr and len(process.stdout.splitlines()) == 1, process
@@ -164,9 +170,10 @@ def main():
         passed('webdav_parent_not_directory_rejected')
         server.shutdown()
         redirect_target.shutdown()
-    report = {'binary_sha256': hashlib.sha256(BINARY.read_bytes()).hexdigest(), 'results': results}
+    report = {'binary_sha256': hashlib.sha256(BINARY.read_bytes()).hexdigest(), 'results': results,
+              'spool_uploads': options.spool_uploads}
     assert {result['name'] for result in results} == EXPECTED_TESTS
-    output = ROOT / 'target/release-readiness/extended-regressions.json'
+    output = options.output
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))

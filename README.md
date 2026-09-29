@@ -7,6 +7,10 @@ Azure Blob / ADLS Gen2, SMB, Google Cloud Storage e WebDAV.
 La [release 2.0.0](https://github.com/PlenoraETL/plenora-storage-tools/releases/tag/v2.0.0)
 è pubblicata; il [resoconto di qualifica](docs/release-2.0.0.md) riporta prove e limiti.
 
+Questo ramo prepara la [2.1](docs/roadmap-2.1.0.md): trasferimenti grandi su
+cinque provider tramite [preparazione privata su disco](docs/large-transfers.md).
+La nuova modalità è un'opzione esplicita e non è ancora qualificata per il rilascio.
+
 Il [perimetro di compatibilità](docs/compatibility-1.0.md), mantenuto nella serie 2.0,
 riguarda le fixture dichiarate, tra cui MinIO, Azurite e fake-gcs-server.
 Le prove su AWS S3, Azure Blob e GCS reali sono rinviate: i tre adapter restano

@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+from versioning import parse_version
 import shutil
 import subprocess
 import sys
@@ -20,6 +21,7 @@ def qualify(folder, host=None, ca=None, pin=None):
     folder = folder.resolve()
     manifest = json.loads((folder / 'release-manifest.json').read_text(encoding='utf-8'))
     windows = sys.platform == 'win32'
+    spooled = parse_version(manifest['version']).requires((2, 1, 0))
     target = 'x86_64-pc-windows-msvc' if windows else 'x86_64-unknown-linux-gnu'
     if manifest['target'] != target:
         raise ValueError('qualify the artifact on its declared target platform')
@@ -58,10 +60,17 @@ def qualify(folder, host=None, ca=None, pin=None):
     ]:
         run(name)
         shutil.copyfile(ROOT / 'target/release-readiness' / report, folder / destination)
+    if spooled:
+        for script, name in [('qualify_extended', 'spooled-qualification'), ('qualify_extended_faults', 'spooled-regressions')]:
+            subprocess.run([sys.executable, str(ROOT / 'scripts' / (script + '.py')), '--spool-uploads',
+                            '--output', str(folder / (name + '.json'))], cwd=ROOT, env=env, check=True)
     if not windows:
         run('qualify_commit_faults', 'commit-faults.json')
         run('qualify_local_faults')
         shutil.copyfile(ROOT / 'target/release-readiness/local-faults.json', folder / 'local-faults.json')
+        if spooled:
+            subprocess.run([sys.executable, str(ROOT / 'scripts/qualify_local_faults.py'), '--spool-uploads',
+                            '--output', str(folder / 'spooled-local-faults.json')], cwd=ROOT, env=env, check=True)
     wheels = [folder / p['name'] for p in manifest['artifacts'] if p['name'].endswith('.whl')]
     if len(wheels) != 1:
         raise ValueError('expected one manifested wheel for the target')
@@ -73,6 +82,10 @@ def qualify(folder, host=None, ca=None, pin=None):
         subprocess.run([str(python), str(ROOT / 'scripts/qualify_python.py'),
                         '--wheel', str(wheels[0]), '--output', str(folder / 'python-qualification.json')],
                        cwd=environment, env=env, check=True)
+        if spooled:
+            subprocess.run([str(python), str(ROOT / 'scripts/qualify_python.py'), '--spool-uploads',
+                            '--wheel', str(wheels[0]), '--output', str(folder / 'spooled-python-qualification.json')],
+                           cwd=environment, env=env, check=True)
     subprocess.run([sys.executable, str(ROOT / 'scripts/verify_release.py'), str(folder.parent)], check=True)
 
 

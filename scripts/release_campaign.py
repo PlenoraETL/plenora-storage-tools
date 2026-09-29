@@ -18,7 +18,7 @@ import tarfile
 import time
 
 from campaign_state import Campaign, digest, exclusive, logged, write_json
-from versioning import workspace_version
+from versioning import parse_version, workspace_version
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS = {'linux': 'x86_64-unknown-linux-gnu', 'windows': 'x86_64-pc-windows-msvc'}
@@ -270,7 +270,10 @@ def run(config_path, output, retries, reason, vm_retries):
                 shutil.copytree(assembled / 'dist' / version, release)
                 evidence = path / 'evidence'
                 shutil.copytree(assembled / 'evidence', evidence)
-                for name in ('performance', 'transfers', 'soak'):
+                gates = ['performance', 'transfers', 'soak']
+                if parse_version(version).requires((2, 1, 0)):
+                    gates.append('transfers-spooled')
+                for name in gates:
                     shutil.copytree(vm_result / 'selected/gates' / name, evidence / 'gates' / name)
                 for source, target in [(windows_result / 'dist' / version / TARGETS['windows'], TARGETS['windows']),
                                        (vm_result / 'selected/linux-qualification', TARGETS['linux'])]:

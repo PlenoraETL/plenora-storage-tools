@@ -6,6 +6,31 @@ use super::{
 };
 
 pub async fn put(provider: &Dav, r: &PutRequest, data: Bytes) -> StorageResult<()> {
+    let size = data.len() as u64;
+    publish(provider, r, data.into(), size).await
+}
+
+pub async fn put_file(
+    provider: &Dav,
+    r: &PutRequest,
+    file: tokio::fs::File,
+    size: u64,
+) -> StorageResult<()> {
+    publish(
+        provider,
+        r,
+        reqwest::Body::wrap_stream(tokio_util::io::ReaderStream::new(file)),
+        size,
+    )
+    .await
+}
+
+async fn publish(
+    provider: &Dav,
+    r: &PutRequest,
+    body: reqwest::Body,
+    size: u64,
+) -> StorageResult<()> {
     let mut prepared = false;
     let result = async {
         if let Some((parent, _)) = r.key.rsplit_once('/') {
@@ -45,7 +70,8 @@ pub async fn put(provider: &Dav, r: &PutRequest, data: Bytes) -> StorageResult<(
         }
         let mut request = provider
             .request(Method::PUT, provider.url(&r.key)?)
-            .body(data);
+            .header("Content-Length", size)
+            .body(body);
         if !r.overwrite {
             request = request.header("If-None-Match", "*");
         }

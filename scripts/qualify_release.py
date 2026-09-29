@@ -15,6 +15,7 @@ from release_evidence import validate_bundle
 from versioning import parse_version
 from render_sbom import verify as verify_sbom, verify_qualification as verify_qualification_sbom
 from check_webdav_fixture import validate_report as validate_webdav_fixture
+from spooled_evidence import validate_reports as validate_spooled_reports
 
 
 def main():
@@ -89,6 +90,7 @@ def main():
         if parse_version(manifest['version']).requires((0, 2, 1)):
             python_path = folder / 'python-qualification.json'
             python_report = json.loads(python_path.read_text())
+            assert python_report.get('spool_uploads', False) is False, 'default SDK qualification strategy differs'
             assert python_report['version'] == manifest['version']
             assert python_report['wheel_sha256'] == digest(folder / python_report['wheel'])
             subjects[target] = {'binary_sha256': digest(binary), 'wheel_sha256': python_report['wheel_sha256']}
@@ -108,23 +110,32 @@ def main():
             evidence.append(upstream_audit_path)
             extended_path = folder / 'extended-qualification.json'
             extended = json.loads(extended_path.read_text())
+            assert extended.get('spool_uploads', False) is False, 'default CLI qualification strategy differs'
             assert extended['binary_sha256'] == digest(binary)
             assert {r['provider'] for r in extended['results']} == {'local', 'ftps', 'azure', 'gcs', 'smb', 'webdav'}
             assert all(r['status'] == 'PASS' and r['operations'] == 7 for r in extended['results'])
             faults_extended_path = folder / 'extended-regressions.json'
             extended_faults = json.loads(faults_extended_path.read_text())
+            assert extended_faults.get('spool_uploads', False) is False, 'default fault qualification strategy differs'
             assert extended_faults['binary_sha256'] == digest(binary)
             expected = EXPECTED_TESTS if parse_version(manifest['version']).requires((1, 0, 0)) else LEGACY_TESTS
             assert {r['name'] for r in extended_faults['results']} == expected
             assert all(r['status'] == 'PASS' for r in extended_faults['results'])
             qualification['results'].extend(extended['results'])
             evidence.extend([extended_path, faults_extended_path])
+        if parse_version(manifest['version']).requires((2, 1, 0)):
+            evidence.extend(validate_spooled_reports(
+                folder, manifest['version'], digest(binary), python_report['wheel'], python_report['wheel_sha256']))
         if 'linux' in target:
             evidence.append(faults_path)
             if parse_version(manifest['version']).requires((1, 0, 0)):
                 local_faults_path = folder / 'local-faults.json'
                 validate_local_faults(json.loads(local_faults_path.read_text()), digest(binary))
                 evidence.append(local_faults_path)
+                if parse_version(manifest['version']).requires((2, 1, 0)):
+                    prepared_faults = folder / 'spooled-local-faults.json'
+                    validate_local_faults(json.loads(prepared_faults.read_text()), digest(binary), spool_uploads=True)
+                    evidence.append(prepared_faults)
         for source in [suite_path, audit_path, deny_path]:
             shutil.copyfile(source, archive_evidence / source.name)
         records.append({'target': target, 'binary_sha256': digest(binary),

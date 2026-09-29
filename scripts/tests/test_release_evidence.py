@@ -176,6 +176,42 @@ class ReleaseEvidenceTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     validate_soak(report, WHEEL, version)
 
+    def test_private_file_transfers_cannot_reuse_default_or_partial_evidence(self):
+        report = transfer(1024**3, 1, 2)
+        with self.assertRaises(ValueError):
+            validate_transfers(report, BINARY, size=1024**3, workers=1, rounds=2, spool_uploads=True)
+        report['spool_uploads'] = True
+        # Merely relabeling the old rejection campaign must still fail.
+        with self.assertRaises(ValueError):
+            validate_transfers(report, BINARY, size=1024**3, workers=1, rounds=2, spool_uploads=True)
+        for row in report['results']:
+            if row['provider'] in BUFFERED:
+                row['mode'] = 'private_file_roundtrip'
+                row['measurements'].extend(dict(operation=op, status='PASS', peak_rss_bytes=1000,
+                                                elapsed_seconds=1.0) for op in ('stat', 'copy'))
+        validate_transfers(report, BINARY, size=1024**3, workers=1, rounds=2, spool_uploads=True)
+        with self.assertRaises(ValueError):
+            validate_transfers(report, BINARY, size=1024**3, workers=1, rounds=2)
+        report['results'].pop()
+        with self.assertRaises(ValueError):
+            validate_transfers(report, BINARY, size=1024**3, workers=1, rounds=2, spool_uploads=True)
+
+    def test_combined_soak_requires_both_modes_for_every_complete_cycle(self):
+        report = soak()
+        with self.assertRaises(ValueError):
+            validate_soak(report, WHEEL, report['version'], both_upload_modes=True)
+        report.update(upload_modes=['buffered', 'private_file'],
+                      completed_cycles_by_mode={'buffered': 1, 'private_file': 1},
+                      after_mode_provider={mode: deepcopy(report['after_provider']) for mode in ('buffered', 'private_file')})
+        validate_soak(report, WHEEL, report['version'], both_upload_modes=True)
+        for change in (lambda r: r['completed_cycles_by_mode'].update(private_file=0),
+                       lambda r: r['after_mode_provider']['private_file'].pop('azure'),
+                       lambda r: r.update(duration_seconds=7199, elapsed_seconds=7199)):
+            bad = deepcopy(report)
+            change(bad)
+            with self.assertRaises(ValueError):
+                validate_soak(bad, WHEEL, bad['version'], both_upload_modes=True)
+
     def test_performance_rejects_environment_changes_and_detects_regression(self):
         policy = json.loads((ROOT / 'scripts/performance-policy.json').read_text())
         candidate = transfer()

@@ -27,6 +27,10 @@ struct Fixture {
 }
 impl Fixture {
     fn new(limit: u64) -> Self {
+        Self::with_strategy(limit, false)
+    }
+
+    fn with_strategy(limit: u64, spooled: bool) -> Self {
         static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
         let root = std::env::temp_dir().join(format!(
             "plenora-local-{}-{}-{}",
@@ -42,9 +46,12 @@ impl Fixture {
             max_buffered_put_bytes: limit,
             ..EngineConfig::default()
         });
-        engine
-            .register_provider(Arc::new(LocalProvider::new(Arc::new(NoCredentials))))
-            .unwrap();
+        let provider = if spooled {
+            LocalProvider::with_spooled_uploads(Arc::new(NoCredentials)).unwrap()
+        } else {
+            LocalProvider::new(Arc::new(NoCredentials))
+        };
+        engine.register_provider(Arc::new(provider)).unwrap();
         let connection = ProviderConnection {
             provider: "local".to_owned(),
             config_contract: "plenora-storage-local-connection-v1".to_owned(),
@@ -57,6 +64,80 @@ impl Fixture {
             connection,
         }
     }
+}
+#[tokio::test]
+async fn prepared_transfer_exceeds_buffer_bound_and_preserves_exclusive_copy() {
+    use tokio::io::AsyncReadExt;
+    let f = Fixture::with_strategy(4, true);
+    let control = ExecutionControl::default();
+    let size = 1024 * 1024;
+    let mut source = tokio::io::repeat(0x5a).take(size);
+    let mut request = put("source", false);
+    request.content_length = Some(size);
+    let result = f
+        .engine
+        .put(&f.connection, &request, &mut source, &control)
+        .await
+        .unwrap();
+    assert_eq!(result.bytes_transferred, size);
+    let copy = CopyRequest {
+        source_key: "source".to_owned(),
+        destination_key: "copy".to_owned(),
+        overwrite: false,
+        publication_policy: PublicationPolicy::AtomicRequired,
+    };
+    assert_eq!(
+        f.engine
+            .copy(&f.connection, &copy, &control)
+            .await
+            .unwrap()
+            .size,
+        size
+    );
+    let error = f
+        .engine
+        .copy(&f.connection, &copy, &control)
+        .await
+        .unwrap_err();
+    assert_eq!(error.category, ErrorCategory::Conflict);
+    let mut downloaded = Vec::new();
+    let got = f
+        .engine
+        .get(
+            &f.connection,
+            &GetRequest {
+                key: "copy".to_owned(),
+            },
+            &mut downloaded,
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(got.checksum.value, result.checksum.value);
+    assert!(downloaded.iter().all(|byte| *byte == 0x5a));
+    assert_eq!(std::fs::read_dir(&f.root).unwrap().count(), 2);
+}
+
+#[tokio::test]
+async fn prepared_length_error_preserves_existing_destination() {
+    let f = Fixture::with_strategy(4, true);
+    std::fs::write(f.root.join("object"), b"old").unwrap();
+    let mut request = put("object", true);
+    request.content_length = Some(8);
+    let error = f
+        .engine
+        .put(
+            &f.connection,
+            &request,
+            &mut b"bad".as_slice(),
+            &ExecutionControl::default(),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(error.code, "CONTENT_LENGTH_MISMATCH");
+    assert_eq!(error.remote_effect, RemoteEffect::None);
+    assert_eq!(std::fs::read(f.root.join("object")).unwrap(), b"old");
+    assert_eq!(std::fs::read_dir(&f.root).unwrap().count(), 1);
 }
 impl Drop for Fixture {
     fn drop(&mut self) {

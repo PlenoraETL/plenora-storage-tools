@@ -16,19 +16,27 @@ EXPECTED_AXES = {
     'output_permission_denied': ('authorization', 'prepare', 'none'),
 }
 EXPECTED_CASES = set(EXPECTED_AXES)
+PREPARATION_AXES = {
+    f'{operation}_preparation_{fault}': (category, 'prepare', 'none')
+    for operation in ('upload', 'copy')
+    for fault, category in [('disk_full', 'resource_limit'), ('permission_denied', 'authorization')]
+}
 
 
-def validate_report(report, binary_sha256):
+def validate_report(report, binary_sha256, *, spool_uploads=False):
     if report['schema_version'] != 1 or report['status'] != 'PASS':
         raise ValueError('local filesystem fault qualification failed')
     if report['binary_sha256'] != binary_sha256:
         raise ValueError('local filesystem fault binary differs')
+    if report.get('spool_uploads', False) is not spool_uploads:
+        raise ValueError('local filesystem fault upload strategy differs')
+    expected = EXPECTED_AXES | PREPARATION_AXES if spool_uploads else EXPECTED_AXES
     results = report['results']
-    if len(results) != len(EXPECTED_CASES) or {item['name'] for item in results} != EXPECTED_CASES:
+    if len(results) != len(expected) or {item['name'] for item in results} != set(expected):
         raise ValueError('incomplete local filesystem fault qualification')
     for item in results:
         axes = (item['category'], item['phase'], item['remote_effect'])
-        if item['status'] != 'PASS' or axes != EXPECTED_AXES[item['name']] or item['retry'] != {'kind': 'never'}:
+        if item['status'] != 'PASS' or axes != expected[item['name']] or item['retry'] != {'kind': 'never'}:
             raise ValueError('unexpected local filesystem fault result')
 
 
@@ -36,6 +44,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--binary', type=Path, default=Path(os.environ.get('PLENORA_CLI_BIN', ROOT / 'target/debug/plenora-storage')))
     parser.add_argument('--tmpfs', type=Path, default=Path('/storage-faults'))
+    parser.add_argument('--spool-uploads', action='store_true')
     parser.add_argument('--output', type=Path, default=ROOT / 'target/release-readiness/local-faults.json')
     args = parser.parse_args()
     if sys.platform != 'linux' or os.geteuid() != 0:
@@ -49,7 +58,8 @@ def main():
         parser.error('tmpfs must be at most 4 MiB')
     binary = args.binary.resolve()
     report = {'schema_version': 1, 'status': 'RUNNING', 'scope': 'Linux local filesystem, CLI and shared Rust engine',
-              'binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(), 'results': []}
+              'binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(), 'results': [],
+              'spool_uploads': args.spool_uploads}
     args.output.parent.mkdir(parents=True, exist_ok=True)
 
     def save():
@@ -79,10 +89,11 @@ def main():
 
             normal, constrained = connection(storage, 'normal.json'), connection(full, 'constrained.json')
 
-            def check(name, connection_file, operation, arguments, category, phase, effect='none'):
-                command = [str(binary), '--format', 'json', operation, '--connection', str(connection_file), *map(str, arguments)]
+            def check(name, connection_file, operation, arguments, category, phase, effect='none', environment=None):
+                command = [str(binary), '--format', 'json', *(['--spool-uploads'] if args.spool_uploads else []),
+                           operation, '--connection', str(connection_file), *map(str, arguments)]
                 process = subprocess.run(command, capture_output=True, text=True, timeout=30,
-                                         user=65534, group=65534, extra_groups=[], cwd=root)
+                                         user=65534, group=65534, extra_groups=[], cwd=root, env=environment)
                 if process.returncode == 0 or process.stderr or len(process.stdout.splitlines()) != 1:
                     raise ValueError(f'{name}: expected one redacted error envelope')
                 document = json.loads(process.stdout)
@@ -129,10 +140,30 @@ def main():
                 protected.chmod(0o755)
             if set(storage.iterdir()) != {storage / 'source'}:
                 raise ValueError('denied upload produced remote effects')
-        if {item['name'] for item in report['results']} != EXPECTED_CASES:
-            raise ValueError('incomplete local fault qualification')
+            if args.spool_uploads:
+                preserved = storage / 'existing'
+                preserved.write_bytes(sentinel)
+                preserved.chmod(0o666)
+                environment = dict(os.environ, TMPDIR=str(full))
+                free_before = os.statvfs(full).f_bavail
+                for fault, category in [('disk_full', 'resource_limit'), ('permission_denied', 'authorization')]:
+                    full.chmod(0o555 if fault == 'permission_denied' else 0o777)
+                    try:
+                        for operation, arguments in [
+                            ('upload', ['--key', 'existing', '--input', source]),
+                            ('copy', ['--source-key', 'source', '--destination-key', 'existing']),
+                        ]:
+                            check(f'{operation}_preparation_{fault}', normal, 'put' if operation == 'upload' else 'copy',
+                                  [*arguments, '--overwrite', 'true', '--publication-policy', 'atomic-required'],
+                                  category, 'prepare', environment=environment)
+                            if preserved.read_bytes() != sentinel or set(storage.iterdir()) != {preserved, storage / 'source'}:
+                                raise ValueError('preparation failure changed destination or left staging files')
+                            if set(full.iterdir()) != {destination} or os.statvfs(full).f_bavail != free_before:
+                                raise ValueError('preparation failure leaked private temporary storage')
+                    finally:
+                        full.chmod(0o777)
         report['status'] = 'PASS'
-        validate_report(report, report['binary_sha256'])
+        validate_report(report, report['binary_sha256'], spool_uploads=args.spool_uploads)
     except BaseException as error:
         report.update(status='FAIL', failure_type=type(error).__name__)
         raise

@@ -1,5 +1,6 @@
 """Black-box qualification of the six additional providers; requires live fixtures."""
 import concurrent.futures
+import argparse
 import hashlib
 import json
 import os
@@ -16,6 +17,10 @@ AZURE_KEY = 'Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZ
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--spool-uploads', action='store_true')
+    parser.add_argument('--output', type=Path, default=ROOT / 'target/release-readiness/extended-qualification.json')
+    options = parser.parse_args()
     results = []
     with tempfile.TemporaryDirectory(prefix='plenora-extended-') as temporary:
         directory = Path(temporary)
@@ -59,6 +64,7 @@ def main():
 
             def invoke(operation, *arguments, success=True, flags=()):
                 command = [str(BINARY), '--format', 'json', '--allow-private-network', '--allow-insecure-http', *flags,
+                           *(['--spool-uploads'] if options.spool_uploads else []),
                            operation, '--connection', str(connection), *map(str, arguments)]
                 result = subprocess.run(command, env=provider_env, capture_output=True, text=True, timeout=90)
                 assert not result.stderr, (provider, operation, result.stderr)
@@ -113,6 +119,7 @@ def main():
                     race_key = prefix + '/race'
                     def race(input_path):
                         command = [str(BINARY), '--format', 'json', '--allow-private-network', '--allow-insecure-http',
+                                   *(['--spool-uploads'] if options.spool_uploads else []),
                                    'put', '--connection', str(connection), '--key', race_key, '--input', str(input_path),
                                    '--overwrite', 'false', '--publication-policy', policy]
                         process = subprocess.run(command, env=provider_env, capture_output=True, text=True, timeout=90)
@@ -136,8 +143,9 @@ def main():
                 results.append({'provider': provider, 'status': 'FAIL', 'error': str(error)})
             print(json.dumps(results[-1]), flush=True)
         report = {'binary_sha256': hashlib.sha256(BINARY.read_bytes()).hexdigest(), 'results': results,
+                  'spool_uploads': options.spool_uploads,
                   'scope': 'local filesystem and isolated protocol fixtures/emulators; no live cloud qualification'}
-        output = ROOT / 'target/release-readiness/extended-qualification.json'
+        output = options.output
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(json.dumps(report, indent=2) + '\n')
         assert results and all(result['status'] == 'PASS' for result in results), 'extended provider qualification failed'

@@ -4,10 +4,26 @@ from pathlib import Path
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from qualify_local_faults import EXPECTED_AXES, validate_report
+from qualify_local_faults import EXPECTED_AXES, PREPARATION_AXES, validate_report
 
 
 class LocalFaultEvidenceTests(unittest.TestCase):
+    def test_private_preparation_requires_none_effect_and_its_own_complete_report(self):
+        report = {'schema_version': 1, 'status': 'PASS', 'binary_sha256': 'a' * 64, 'spool_uploads': True,
+                  'results': [{'name': name, 'status': 'PASS', 'category': axes[0],
+                               'phase': axes[1], 'remote_effect': axes[2], 'retry': {'kind': 'never'}}
+                              for name, axes in (EXPECTED_AXES | PREPARATION_AXES).items()]}
+        validate_report(report, 'a' * 64, spool_uploads=True)
+        with self.assertRaises(ValueError):
+            validate_report(report, 'a' * 64)
+        for change in (lambda r: r.update(spool_uploads=False), lambda r: r['results'].pop(),
+                       lambda r: r['results'][-1].update(remote_effect='unknown'),
+                       lambda r: r.update(binary_sha256='b' * 64)):
+            bad = copy.deepcopy(report)
+            change(bad)
+            with self.assertRaises(ValueError):
+                validate_report(bad, 'a' * 64, spool_uploads=True)
+
     def test_rejects_failed_incomplete_rebound_or_incorrect_evidence(self):
         report = {'schema_version': 1, 'status': 'PASS', 'binary_sha256': 'a' * 64,
                   'results': [{'name': name, 'status': 'PASS', 'category': axes[0],

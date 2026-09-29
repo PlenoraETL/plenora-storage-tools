@@ -149,7 +149,9 @@ class Engine:
     """
 
     def __init__(self, config: EngineConfig | None = None, *,
-                 credential_resolver: CredentialResolver | None = None):
+                 credential_resolver: CredentialResolver | None = None, spool_uploads: bool = False):
+        if not isinstance(spool_uploads, bool):
+            raise _invalid("SDK_CONFIG_INVALID", "spool_uploads must be a boolean")
         if credential_resolver is not None and not callable(credential_resolver):
             raise _invalid("SDK_RESOLVER_INVALID", "credential_resolver must be callable")
         if config is not None and not isinstance(config, EngineConfig):
@@ -168,7 +170,7 @@ class Engine:
                 document = {field.name: getattr(config, field.name) for field in fields(EngineConfig)}
             except Exception:
                 raise _invalid("SDK_INPUT_INVALID", "engine configuration could not be read") from None
-            self._native = _native.Engine(_encode(document), resolver)
+            self._native = _native.Engine(_encode(document), resolver, spool_uploads)
         except ValueError as error:
             raise _translate(error) from None
 
@@ -254,8 +256,8 @@ class AsyncEngine:
     """
 
     def __init__(self, config: EngineConfig | None = None, *,
-                 credential_resolver: CredentialResolver | None = None):
-        self._engine = Engine(config, credential_resolver=credential_resolver)
+                 credential_resolver: CredentialResolver | None = None, spool_uploads: bool = False):
+        self._engine = Engine(config, credential_resolver=credential_resolver, spool_uploads=spool_uploads)
 
     @property
     def is_closed(self) -> bool:

@@ -5,6 +5,17 @@ use plenora_storage_core::{
 };
 use std::sync::Arc;
 
+/// Upload/copy preparation for local, Azure, GCS, SMB and `WebDAV` adapters.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum UploadStrategy {
+    /// Preserve existing in-memory payload bounds and default behavior.
+    #[default]
+    Buffered,
+    /// Validate the full input in a private temporary file, then send bounded chunks.
+    /// Requires local temporary disk space up to the admitted transfer size.
+    PrivateFile,
+}
+
 /// Build a reusable engine using only the providers compiled into this artifact.
 /// No credentials are resolved and no connection is opened during construction.
 ///
@@ -14,19 +25,51 @@ pub fn build_engine(
     config: EngineConfig,
     credentials: Arc<dyn CredentialResolver>,
 ) -> StorageResult<Engine> {
+    build_engine_with_upload_strategy(config, credentials, UploadStrategy::Buffered)
+}
+
+/// Build an engine with explicit preparation for the five additional providers.
+///
+/// S3, SFTP, FTP and FTPS retain their existing transfer implementations and limits.
+/// Construction does not resolve credentials or open connections.
+///
+/// # Errors
+/// Returns provider registration or unsupported-strategy errors.
+pub fn build_engine_with_upload_strategy(
+    config: EngineConfig,
+    credentials: Arc<dyn CredentialResolver>,
+    strategy: UploadStrategy,
+) -> StorageResult<Engine> {
     let mut engine = Engine::new(config);
-    for provider in providers(credentials) {
+    for provider in providers(credentials, strategy)? {
         engine.register_provider(provider)?;
     }
     Ok(engine)
 }
 
-fn providers(credentials: Arc<dyn CredentialResolver>) -> Vec<Arc<dyn StorageProvider>> {
+#[cfg_attr(
+    not(any(
+        feature = "local",
+        feature = "azure",
+        feature = "gcs",
+        feature = "smb",
+        feature = "webdav"
+    )),
+    allow(
+        clippy::unnecessary_wraps,
+        reason = "Other feature selections use fallible private-file provider construction"
+    )
+)]
+fn providers(
+    credentials: Arc<dyn CredentialResolver>,
+    strategy: UploadStrategy,
+) -> StorageResult<Vec<Arc<dyn StorageProvider>>> {
     let providers: Vec<Arc<dyn StorageProvider>> = vec![
         #[cfg(feature = "local")]
-        Arc::new(plenora_storage_providers::LocalProvider::new(
+        Arc::new(extended::<plenora_storage_providers::Local>(
             credentials.clone(),
-        )),
+            strategy,
+        )?),
         #[cfg(feature = "s3")]
         Arc::new(plenora_storage_s3::S3Provider::new(credentials.clone())),
         #[cfg(feature = "sftp")]
@@ -38,24 +81,48 @@ fn providers(credentials: Arc<dyn CredentialResolver>) -> Vec<Arc<dyn StoragePro
             credentials.clone(),
         )),
         #[cfg(feature = "azure")]
-        Arc::new(plenora_storage_providers::AzureProvider::new(
+        Arc::new(extended::<plenora_storage_providers::Azure>(
             credentials.clone(),
-        )),
+            strategy,
+        )?),
         #[cfg(feature = "gcs")]
-        Arc::new(plenora_storage_providers::GcsProvider::new(
+        Arc::new(extended::<plenora_storage_providers::Gcs>(
             credentials.clone(),
-        )),
+            strategy,
+        )?),
         #[cfg(feature = "smb")]
-        Arc::new(plenora_storage_providers::SmbProvider::new(
+        Arc::new(extended::<plenora_storage_providers::Smb>(
             credentials.clone(),
-        )),
+            strategy,
+        )?),
         #[cfg(feature = "webdav")]
-        Arc::new(plenora_storage_providers::WebDavProvider::new(
+        Arc::new(extended::<plenora_storage_providers::WebDav>(
             credentials.clone(),
-        )),
+            strategy,
+        )?),
     ];
     drop(credentials);
-    providers
+    let _ = strategy;
+    Ok(providers)
+}
+
+#[cfg(any(
+    feature = "local",
+    feature = "azure",
+    feature = "gcs",
+    feature = "smb",
+    feature = "webdav"
+))]
+fn extended<F: plenora_storage_providers::ProviderFactory>(
+    credentials: Arc<dyn CredentialResolver>,
+    strategy: UploadStrategy,
+) -> StorageResult<plenora_storage_providers::Provider<F>> {
+    match strategy {
+        UploadStrategy::Buffered => Ok(plenora_storage_providers::Provider::new(credentials)),
+        UploadStrategy::PrivateFile => {
+            plenora_storage_providers::Provider::with_spooled_uploads(credentials)
+        }
+    }
 }
 
 mod files;

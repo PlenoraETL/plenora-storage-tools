@@ -15,7 +15,7 @@ use plenora_storage_core::{
     RetryDisposition, StorageResult, directory_may_contain,
 };
 use serde::Deserialize;
-use std::{collections::BTreeMap, io::Write, path::Path, sync::Arc};
+use std::{collections::BTreeMap, path::Path, sync::Arc};
 use tokio::io::AsyncReadExt;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -33,6 +33,7 @@ impl ProviderFactory for Local {
     const ID: &'static str = "local";
     const CONTRACT: &'static str = "plenora-storage-local-connection-v1";
     const ATOMIC: bool = true;
+    const SPOOLED_PUT: bool = true;
     fn validate(connection: &ProviderConnection, _: &EngineConfig) -> StorageResult<()> {
         let cfg: LocalConnectionConfig = parse(connection)?;
         if !Path::new(&cfg.root).is_absolute()

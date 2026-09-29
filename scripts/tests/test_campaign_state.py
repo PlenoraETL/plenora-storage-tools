@@ -65,6 +65,9 @@ class CampaignStateTests(unittest.TestCase):
             self.assertEqual(inspect({'backend': Path('.')}, GIB, 1)['status'], 'FAIL')
         with patch('check_disk_space.shutil.disk_usage', return_value=Usage(100 * GIB, 86 * GIB, 14 * GIB)):
             self.assertEqual(inspect({'backend': Path('.')}, GIB, 1)['status'], 'PASS')
+            self.assertEqual(inspect({'backend': Path('.')}, GIB, 1, spool_uploads=True)['status'], 'FAIL')
+        with patch('check_disk_space.shutil.disk_usage', return_value=Usage(100 * GIB, 85 * GIB, 15 * GIB)):
+            self.assertEqual(inspect({'backend': Path('.')}, GIB, 1, spool_uploads=True)['status'], 'PASS')
         for values in [(0, 1, 1), (1, 0, 1), (1, 1, 0)]:
             with self.assertRaises(ValueError):
                 requirement(*values)

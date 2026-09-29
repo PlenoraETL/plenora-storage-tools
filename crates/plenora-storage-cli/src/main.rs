@@ -74,7 +74,7 @@ async fn main() -> ExitCode {
 }
 
 async fn run() -> ExitCode {
-    let cli = match Cli::try_parse() {
+    let mut cli = match Cli::try_parse() {
         Ok(cli) => cli,
         Err(error) if matches!(error.kind(), ErrorKind::DisplayHelp) => {
             let _ = error.print();
@@ -124,7 +124,7 @@ async fn run() -> ExitCode {
         );
     }
 
-    let Some(command) = cli.command else {
+    let Some(command) = cli.command.take() else {
         return emit_error(
             "cli-parse",
             "plenora-cli-error-v1",
@@ -132,19 +132,7 @@ async fn run() -> ExitCode {
         );
     };
 
-    let engine = match plenora_storage_engine::build_engine(
-        EngineConfig {
-            allow_experimental_contracts: cli.allow_experimental_contracts,
-            allow_insecure_http: cli.allow_insecure_http,
-            allow_insecure_ftp: cli.allow_insecure_ftp,
-            allow_private_network: cli.allow_private_network,
-            allow_unverified_ssh: cli.allow_unverified_ssh,
-            max_transfer_bytes: cli.max_transfer_bytes,
-            max_list_items: cli.max_list_items,
-            max_buffered_put_bytes: cli.max_buffered_put_bytes,
-        },
-        Arc::new(EnvironmentCredentialResolver),
-    ) {
+    let engine = match build_engine(&cli) {
         Ok(engine) => engine,
         Err(error) => return emit_error("engine-init", "plenora-cli-error-v1", error),
     };
@@ -177,6 +165,27 @@ async fn run() -> ExitCode {
         Ok((command, contract, result)) => emit_success(command, contract, result),
         Err((command, contract, error)) => emit_error(command, contract, *error),
     }
+}
+
+fn build_engine(cli: &Cli) -> StorageResult<Engine> {
+    plenora_storage_engine::build_engine_with_upload_strategy(
+        EngineConfig {
+            allow_experimental_contracts: cli.allow_experimental_contracts,
+            allow_insecure_http: cli.allow_insecure_http,
+            allow_insecure_ftp: cli.allow_insecure_ftp,
+            allow_private_network: cli.allow_private_network,
+            allow_unverified_ssh: cli.allow_unverified_ssh,
+            max_transfer_bytes: cli.max_transfer_bytes,
+            max_list_items: cli.max_list_items,
+            max_buffered_put_bytes: cli.max_buffered_put_bytes,
+        },
+        Arc::new(EnvironmentCredentialResolver),
+        if cli.spool_uploads {
+            plenora_storage_engine::UploadStrategy::PrivateFile
+        } else {
+            plenora_storage_engine::UploadStrategy::Buffered
+        },
+    )
 }
 
 fn execution_control(deadline: Option<&str>) -> StorageResult<ExecutionControl> {

@@ -1,3 +1,4 @@
+mod file_upload;
 mod operations;
 mod publication;
 
@@ -51,6 +52,8 @@ impl ProviderFactory for Azure {
     const ID: &'static str = "azure";
     const CONTRACT: &'static str = "plenora-storage-azure-connection-v1";
     const ATOMIC: bool = true;
+    const SPOOLED_PUT: bool = true;
+    const SPOOLED_MAX_BYTES: u64 = 5_000 * 1024 * 1024;
     const METADATA: bool = true;
     fn validate(connection: &ProviderConnection, policy: &EngineConfig) -> StorageResult<()> {
         let config: AzureConnectionConfig = parse(connection)?;
@@ -67,6 +70,7 @@ impl ProviderFactory for Azure {
         let url = http::endpoint(&cfg.endpoint, context.policy)?;
         let connector = http::Connector::new(&url, context).await?;
         let material = credentials.resolve(&connection.credential_ref)?;
+        let file_upload = file_upload::FileUpload::new(&cfg, &connector, &material)?;
         let builder = MicrosoftAzureBuilder::new()
             .with_account(cfg.account)
             .with_container_name(cfg.container)
@@ -84,11 +88,13 @@ impl ProviderFactory for Azure {
         };
         Ok(Box::new(Cloud {
             store: Arc::new(builder.build().map_err(|error| store_error(error, false))?),
+            file_upload,
         }))
     }
 }
 struct Cloud {
     store: Arc<dyn ObjectStore>,
+    file_upload: file_upload::FileUpload,
 }
 struct CloudReader {
     stream: Pin<Box<dyn Stream<Item = object_store::Result<Bytes>> + Send>>,

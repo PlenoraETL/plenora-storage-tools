@@ -35,6 +35,7 @@ impl ProviderFactory for WebDav {
     const ID: &'static str = "webdav";
     const CONTRACT: &'static str = "plenora-storage-webdav-connection-v1";
     const ATOMIC: bool = false;
+    const SPOOLED_PUT: bool = true;
     fn validate(c: &ProviderConnection, p: &EngineConfig) -> StorageResult<()> {
         let cfg: WebDavConnectionConfig = parse(c)?;
         let url = http::endpoint(&cfg.endpoint, p)?;

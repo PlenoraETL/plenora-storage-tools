@@ -108,6 +108,43 @@ fn machine_version_is_one_json_line() {
 }
 
 #[test]
+fn prepared_upload_discovery_is_explicit_and_keeps_public_contracts() {
+    for (arguments, streaming) in [
+        (vec!["--format", "json", "capabilities"], "false"),
+        (
+            vec!["--format", "json", "--spool-uploads", "capabilities"],
+            "true",
+        ),
+    ] {
+        let output = run(&arguments);
+        assert!(output.status.success());
+        let envelope = single_json_line(&output);
+        validate_common("capabilities-v2.schema.json", &envelope["result"]);
+        for operation in envelope["result"]["operations"].as_array().unwrap() {
+            for provider in operation["attributes"]["providers"].as_array().unwrap() {
+                if ["local", "azure", "gcs", "smb", "webdav"]
+                    .contains(&provider["provider"].as_str().unwrap())
+                {
+                    assert_eq!(provider["attributes"]["streaming_put"], streaming);
+                    if streaming == "true" {
+                        assert_eq!(
+                            provider["attributes"]["upload_preparation"],
+                            "private_temporary_file"
+                        );
+                        if provider["provider"] == "azure" {
+                            assert_eq!(
+                                provider["attributes"]["prepared_protocol_max_bytes"],
+                                "5242880000"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn mutation_policy_flags_are_explicit_values() {
     let output = run(&[
         "--format",

@@ -10,6 +10,25 @@ pub async fn put(
     request: &PutRequest,
     data: Bytes,
 ) -> StorageResult<()> {
+    publish(provider, request, data.as_ref(), data.len() as u64).await
+}
+
+pub async fn put_file(
+    provider: &mut SmbBackend,
+    request: &PutRequest,
+    file: tokio::fs::File,
+    size: u64,
+) -> StorageResult<()> {
+    publish(provider, request, file, size).await
+}
+
+async fn publish(
+    provider: &mut SmbBackend,
+    request: &PutRequest,
+    mut source: impl tokio::io::AsyncRead + Send + Unpin,
+    expected: u64,
+) -> StorageResult<()> {
+    use tokio::io::AsyncReadExt;
     let path = provider.path(&request.key)?;
     let mut prepared = false;
     let result = async {
@@ -51,15 +70,26 @@ pub async fn put(
                 .await
         }
         .map_err(|error| smb_error(&error, true))?;
-        for chunk in data.chunks(64 * 1024) {
-            writer.write_chunk(chunk).await.map_err(|error| {
-                smb_error(&error, true).cleanup_unconfirmed("destination_may_be_partial")
+        let mut buffer = vec![0; 64 * 1024];
+        loop {
+            let count = source.read(&mut buffer).await.map_err(|error| {
+                crate::common::io_error(&error, ErrorPhase::Write, true)
+                    .cleanup_unconfirmed("destination_may_be_partial")
             })?;
+            if count == 0 {
+                break;
+            }
+            writer
+                .write_chunk(&buffer[..count])
+                .await
+                .map_err(|error| {
+                    smb_error(&error, true).cleanup_unconfirmed("destination_may_be_partial")
+                })?;
         }
         let size = writer.finish().await.map_err(|error| {
             smb_error(&error, true).cleanup_unconfirmed("destination_may_be_partial")
         })?;
-        if size != data.len() as u64 {
+        if size != expected {
             return Err(failure(ErrorCategory::Protocol, ErrorPhase::Commit, true));
         }
         Ok(())

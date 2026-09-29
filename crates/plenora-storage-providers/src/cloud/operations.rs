@@ -63,6 +63,14 @@ impl Backend for Cloud {
     async fn put(&mut self, request: &PutRequest, data: Bytes) -> StorageResult<()> {
         super::publication::put(self, request, data).await
     }
+    async fn put_file(
+        &mut self,
+        request: &PutRequest,
+        file: tokio::fs::File,
+        size: u64,
+    ) -> StorageResult<()> {
+        self.file_upload.put(request, file, size).await
+    }
     async fn delete(&mut self, key: &str) -> StorageResult<()> {
         // Some object stores return success for an absent key. Probe preserves
         // the v1 ignore_missing=false behavior (concurrent deletion is allowed).

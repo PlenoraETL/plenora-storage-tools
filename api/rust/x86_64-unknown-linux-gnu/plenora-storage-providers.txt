@@ -5,6 +5,8 @@ pub const plenora_storage_providers::Azure::ATOMIC: bool
 pub const plenora_storage_providers::Azure::CONTRACT: &'static str
 pub const plenora_storage_providers::Azure::ID: &'static str
 pub const plenora_storage_providers::Azure::METADATA: bool
+pub const plenora_storage_providers::Azure::SPOOLED_MAX_BYTES: u64
+pub const plenora_storage_providers::Azure::SPOOLED_PUT: bool
 pub fn plenora_storage_providers::Azure::connect<'life0, 'life1, 'life2, 'life3, 'async_trait>(connection: &'life0 plenora_storage_core::model::ProviderConnection, credentials: &'life1 dyn plenora_storage_core::credentials::CredentialResolver, context: &'life2 plenora_storage_core::provider::OperationContext<'life3>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<alloc::boxed::Box<dyn plenora_storage_providers::common::Backend>>> + core::marker::Send + 'async_trait)>> where 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 pub fn plenora_storage_providers::Azure::validate(connection: &plenora_storage_core::model::ProviderConnection, policy: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
 impl core::marker::Freeze for plenora_storage_providers::Azure
@@ -198,6 +200,8 @@ pub const plenora_storage_providers::Gcs::ATOMIC: bool
 pub const plenora_storage_providers::Gcs::CONTRACT: &'static str
 pub const plenora_storage_providers::Gcs::ID: &'static str
 pub const plenora_storage_providers::Gcs::METADATA: bool
+pub const plenora_storage_providers::Gcs::SPOOLED_MAX_BYTES: u64
+pub const plenora_storage_providers::Gcs::SPOOLED_PUT: bool
 pub fn plenora_storage_providers::Gcs::connect<'life0, 'life1, 'life2, 'life3, 'async_trait>(connection: &'life0 plenora_storage_core::model::ProviderConnection, credentials: &'life1 dyn plenora_storage_core::credentials::CredentialResolver, context: &'life2 plenora_storage_core::provider::OperationContext<'life3>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<alloc::boxed::Box<dyn plenora_storage_providers::common::Backend>>> + core::marker::Send + 'async_trait)>> where 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 pub fn plenora_storage_providers::Gcs::validate(connection: &plenora_storage_core::model::ProviderConnection, policy: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
 impl core::marker::Freeze for plenora_storage_providers::Gcs
@@ -390,6 +394,8 @@ pub const plenora_storage_providers::Local::ATOMIC: bool
 pub const plenora_storage_providers::Local::CONTRACT: &'static str
 pub const plenora_storage_providers::Local::ID: &'static str
 pub const plenora_storage_providers::Local::METADATA: bool
+pub const plenora_storage_providers::Local::SPOOLED_MAX_BYTES: u64
+pub const plenora_storage_providers::Local::SPOOLED_PUT: bool
 pub fn plenora_storage_providers::Local::connect<'life0, 'life1, 'life2, 'life3, 'async_trait>(connection: &'life0 plenora_storage_core::model::ProviderConnection, _: &'life1 dyn plenora_storage_core::credentials::CredentialResolver, _: &'life2 plenora_storage_core::provider::OperationContext<'life3>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<alloc::boxed::Box<dyn plenora_storage_providers::common::Backend>>> + core::marker::Send + 'async_trait)>> where 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 pub fn plenora_storage_providers::Local::validate(connection: &plenora_storage_core::model::ProviderConnection, _: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
 impl core::marker::Freeze for plenora_storage_providers::Local
@@ -578,6 +584,7 @@ pub type plenora_storage_providers::LocalConnectionConfig::Output = T
 pub struct plenora_storage_providers::Provider<F: plenora_storage_providers::ProviderFactory>
 impl<F: plenora_storage_providers::ProviderFactory> plenora_storage_providers::Provider<F>
 pub fn plenora_storage_providers::Provider<F>::new(credentials: alloc::sync::Arc<dyn plenora_storage_core::credentials::CredentialResolver>) -> Self
+pub fn plenora_storage_providers::Provider<F>::with_spooled_uploads(credentials: alloc::sync::Arc<dyn plenora_storage_core::credentials::CredentialResolver>) -> plenora_storage_core::error::StorageResult<Self>
 impl<F: plenora_storage_providers::ProviderFactory> plenora_storage_core::provider::StorageProvider for plenora_storage_providers::Provider<F>
 pub fn plenora_storage_providers::Provider<F>::capabilities(&self) -> plenora_storage_core::capability::ProviderCapabilities
 pub fn plenora_storage_providers::Provider<F>::config_contract(&self) -> &'static str
@@ -680,6 +687,8 @@ pub const plenora_storage_providers::Smb::ATOMIC: bool
 pub const plenora_storage_providers::Smb::CONTRACT: &'static str
 pub const plenora_storage_providers::Smb::ID: &'static str
 pub const plenora_storage_providers::Smb::METADATA: bool
+pub const plenora_storage_providers::Smb::SPOOLED_MAX_BYTES: u64
+pub const plenora_storage_providers::Smb::SPOOLED_PUT: bool
 pub fn plenora_storage_providers::Smb::connect<'life0, 'life1, 'life2, 'life3, 'async_trait>(connection: &'life0 plenora_storage_core::model::ProviderConnection, credentials: &'life1 dyn plenora_storage_core::credentials::CredentialResolver, context: &'life2 plenora_storage_core::provider::OperationContext<'life3>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<alloc::boxed::Box<dyn plenora_storage_providers::common::Backend>>> + core::marker::Send + 'async_trait)>> where 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 pub fn plenora_storage_providers::Smb::validate(connection: &plenora_storage_core::model::ProviderConnection, _: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
 impl core::marker::Freeze for plenora_storage_providers::Smb
@@ -874,6 +883,8 @@ pub const plenora_storage_providers::WebDav::ATOMIC: bool
 pub const plenora_storage_providers::WebDav::CONTRACT: &'static str
 pub const plenora_storage_providers::WebDav::ID: &'static str
 pub const plenora_storage_providers::WebDav::METADATA: bool
+pub const plenora_storage_providers::WebDav::SPOOLED_MAX_BYTES: u64
+pub const plenora_storage_providers::WebDav::SPOOLED_PUT: bool
 pub fn plenora_storage_providers::WebDav::connect<'life0, 'life1, 'life2, 'life3, 'async_trait>(c: &'life0 plenora_storage_core::model::ProviderConnection, credentials: &'life1 dyn plenora_storage_core::credentials::CredentialResolver, x: &'life2 plenora_storage_core::provider::OperationContext<'life3>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<alloc::boxed::Box<dyn plenora_storage_providers::common::Backend>>> + core::marker::Send + 'async_trait)>> where 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 pub fn plenora_storage_providers::WebDav::validate(c: &plenora_storage_core::model::ProviderConnection, p: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
 impl core::marker::Freeze for plenora_storage_providers::WebDav
@@ -1064,6 +1075,8 @@ pub const plenora_storage_providers::ProviderFactory::ATOMIC: bool
 pub const plenora_storage_providers::ProviderFactory::CONTRACT: &'static str
 pub const plenora_storage_providers::ProviderFactory::ID: &'static str
 pub const plenora_storage_providers::ProviderFactory::METADATA: bool
+pub const plenora_storage_providers::ProviderFactory::SPOOLED_MAX_BYTES: u64
+pub const plenora_storage_providers::ProviderFactory::SPOOLED_PUT: bool
 pub fn plenora_storage_providers::ProviderFactory::connect<'life0, 'life1, 'life2, 'life3, 'async_trait>(connection: &'life0 plenora_storage_core::model::ProviderConnection, credentials: &'life1 dyn plenora_storage_core::credentials::CredentialResolver, context: &'life2 plenora_storage_core::provider::OperationContext<'life3>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<alloc::boxed::Box<dyn plenora_storage_providers::common::Backend>>> + core::marker::Send + 'async_trait)>> where 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 pub fn plenora_storage_providers::ProviderFactory::validate(connection: &plenora_storage_core::model::ProviderConnection, policy: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
 impl plenora_storage_providers::ProviderFactory for plenora_storage_providers::Azure
@@ -1071,6 +1084,8 @@ pub const plenora_storage_providers::Azure::ATOMIC: bool
 pub const plenora_storage_providers::Azure::CONTRACT: &'static str
 pub const plenora_storage_providers::Azure::ID: &'static str
 pub const plenora_storage_providers::Azure::METADATA: bool
+pub const plenora_storage_providers::Azure::SPOOLED_MAX_BYTES: u64
+pub const plenora_storage_providers::Azure::SPOOLED_PUT: bool
 pub fn plenora_storage_providers::Azure::connect<'life0, 'life1, 'life2, 'life3, 'async_trait>(connection: &'life0 plenora_storage_core::model::ProviderConnection, credentials: &'life1 dyn plenora_storage_core::credentials::CredentialResolver, context: &'life2 plenora_storage_core::provider::OperationContext<'life3>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<alloc::boxed::Box<dyn plenora_storage_providers::common::Backend>>> + core::marker::Send + 'async_trait)>> where 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 pub fn plenora_storage_providers::Azure::validate(connection: &plenora_storage_core::model::ProviderConnection, policy: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
 impl plenora_storage_providers::ProviderFactory for plenora_storage_providers::Gcs
@@ -1078,6 +1093,8 @@ pub const plenora_storage_providers::Gcs::ATOMIC: bool
 pub const plenora_storage_providers::Gcs::CONTRACT: &'static str
 pub const plenora_storage_providers::Gcs::ID: &'static str
 pub const plenora_storage_providers::Gcs::METADATA: bool
+pub const plenora_storage_providers::Gcs::SPOOLED_MAX_BYTES: u64
+pub const plenora_storage_providers::Gcs::SPOOLED_PUT: bool
 pub fn plenora_storage_providers::Gcs::connect<'life0, 'life1, 'life2, 'life3, 'async_trait>(connection: &'life0 plenora_storage_core::model::ProviderConnection, credentials: &'life1 dyn plenora_storage_core::credentials::CredentialResolver, context: &'life2 plenora_storage_core::provider::OperationContext<'life3>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<alloc::boxed::Box<dyn plenora_storage_providers::common::Backend>>> + core::marker::Send + 'async_trait)>> where 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 pub fn plenora_storage_providers::Gcs::validate(connection: &plenora_storage_core::model::ProviderConnection, policy: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
 impl plenora_storage_providers::ProviderFactory for plenora_storage_providers::Local
@@ -1085,6 +1102,8 @@ pub const plenora_storage_providers::Local::ATOMIC: bool
 pub const plenora_storage_providers::Local::CONTRACT: &'static str
 pub const plenora_storage_providers::Local::ID: &'static str
 pub const plenora_storage_providers::Local::METADATA: bool
+pub const plenora_storage_providers::Local::SPOOLED_MAX_BYTES: u64
+pub const plenora_storage_providers::Local::SPOOLED_PUT: bool
 pub fn plenora_storage_providers::Local::connect<'life0, 'life1, 'life2, 'life3, 'async_trait>(connection: &'life0 plenora_storage_core::model::ProviderConnection, _: &'life1 dyn plenora_storage_core::credentials::CredentialResolver, _: &'life2 plenora_storage_core::provider::OperationContext<'life3>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<alloc::boxed::Box<dyn plenora_storage_providers::common::Backend>>> + core::marker::Send + 'async_trait)>> where 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 pub fn plenora_storage_providers::Local::validate(connection: &plenora_storage_core::model::ProviderConnection, _: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
 impl plenora_storage_providers::ProviderFactory for plenora_storage_providers::Smb
@@ -1092,6 +1111,8 @@ pub const plenora_storage_providers::Smb::ATOMIC: bool
 pub const plenora_storage_providers::Smb::CONTRACT: &'static str
 pub const plenora_storage_providers::Smb::ID: &'static str
 pub const plenora_storage_providers::Smb::METADATA: bool
+pub const plenora_storage_providers::Smb::SPOOLED_MAX_BYTES: u64
+pub const plenora_storage_providers::Smb::SPOOLED_PUT: bool
 pub fn plenora_storage_providers::Smb::connect<'life0, 'life1, 'life2, 'life3, 'async_trait>(connection: &'life0 plenora_storage_core::model::ProviderConnection, credentials: &'life1 dyn plenora_storage_core::credentials::CredentialResolver, context: &'life2 plenora_storage_core::provider::OperationContext<'life3>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<alloc::boxed::Box<dyn plenora_storage_providers::common::Backend>>> + core::marker::Send + 'async_trait)>> where 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 pub fn plenora_storage_providers::Smb::validate(connection: &plenora_storage_core::model::ProviderConnection, _: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
 impl plenora_storage_providers::ProviderFactory for plenora_storage_providers::WebDav
@@ -1099,6 +1120,8 @@ pub const plenora_storage_providers::WebDav::ATOMIC: bool
 pub const plenora_storage_providers::WebDav::CONTRACT: &'static str
 pub const plenora_storage_providers::WebDav::ID: &'static str
 pub const plenora_storage_providers::WebDav::METADATA: bool
+pub const plenora_storage_providers::WebDav::SPOOLED_MAX_BYTES: u64
+pub const plenora_storage_providers::WebDav::SPOOLED_PUT: bool
 pub fn plenora_storage_providers::WebDav::connect<'life0, 'life1, 'life2, 'life3, 'async_trait>(c: &'life0 plenora_storage_core::model::ProviderConnection, credentials: &'life1 dyn plenora_storage_core::credentials::CredentialResolver, x: &'life2 plenora_storage_core::provider::OperationContext<'life3>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = plenora_storage_core::error::StorageResult<alloc::boxed::Box<dyn plenora_storage_providers::common::Backend>>> + core::marker::Send + 'async_trait)>> where 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 pub fn plenora_storage_providers::WebDav::validate(c: &plenora_storage_core::model::ProviderConnection, p: &plenora_storage_core::engine::EngineConfig) -> plenora_storage_core::error::StorageResult<()>
 pub type plenora_storage_providers::AzureProvider = plenora_storage_providers::Provider<plenora_storage_providers::Azure>

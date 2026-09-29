@@ -171,7 +171,10 @@
           "dep:reqwest",
           "dep:rustls",
           "dep:quick-xml",
-          "dep:url"
+          "dep:url",
+          "dep:base64",
+          "dep:hmac",
+          "dep:time"
         ],
         "default": [
           "full"

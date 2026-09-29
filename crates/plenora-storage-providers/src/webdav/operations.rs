@@ -79,6 +79,14 @@ impl Backend for Dav {
     async fn put(&mut self, r: &PutRequest, data: Bytes) -> StorageResult<()> {
         super::publication::put(self, r, data).await
     }
+    async fn put_file(
+        &mut self,
+        request: &PutRequest,
+        file: tokio::fs::File,
+        size: u64,
+    ) -> StorageResult<()> {
+        super::publication::put_file(self, request, file, size).await
+    }
     async fn delete(&mut self, key: &str) -> StorageResult<()> {
         // Do not allow a file deletion request to recursively remove a collection.
         let meta = self.stat(key).await?;

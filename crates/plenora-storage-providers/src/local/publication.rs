@@ -2,10 +2,29 @@
 
 use super::{
     Bytes, ErrorPhase, LocalBackend, OpenOptions, PutRequest, RemoteEffect, RetryDisposition,
-    StorageResult, Write, blocking, io_error, portable_key, stage_name,
+    StorageResult, blocking, io_error, portable_key, stage_name,
 };
 
 pub async fn put(provider: &LocalBackend, request: &PutRequest, data: Bytes) -> StorageResult<()> {
+    let size = data.len() as u64;
+    publish(provider, request, std::io::Cursor::new(data), size).await
+}
+
+pub async fn put_file(
+    provider: &LocalBackend,
+    request: &PutRequest,
+    file: tokio::fs::File,
+    size: u64,
+) -> StorageResult<()> {
+    publish(provider, request, file.into_std().await, size).await
+}
+
+async fn publish<R: std::io::Read + Send + 'static>(
+    provider: &LocalBackend,
+    request: &PutRequest,
+    mut source: R,
+    size: u64,
+) -> StorageResult<()> {
     portable_key(&request.key)?;
     let key = request.key.clone();
     let overwrite = request.overwrite;
@@ -37,8 +56,11 @@ pub async fn put(provider: &LocalBackend, request: &PutRequest, data: Bytes) -> 
                 .open_with(&stage, &options)
                 .map_err(|error| io_error(&error, ErrorPhase::Prepare, true))?;
             owned = true;
-            file.write_all(&data)
+            let written = std::io::copy(&mut source, &mut file)
                 .map_err(|error| io_error(&error, ErrorPhase::Write, true))?;
+            if written != size {
+                return Err(crate::common::invalid("CONTENT_LENGTH_MISMATCH"));
+            }
             file.sync_all()
                 .map_err(|error| io_error(&error, ErrorPhase::Write, true))?;
             drop(file);

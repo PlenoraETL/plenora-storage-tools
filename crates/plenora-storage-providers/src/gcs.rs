@@ -36,6 +36,7 @@ impl ProviderFactory for Gcs {
     const ID: &'static str = "gcs";
     const CONTRACT: &'static str = "plenora-storage-gcs-connection-v1";
     const ATOMIC: bool = true;
+    const SPOOLED_PUT: bool = true;
     const METADATA: bool = true;
     fn validate(connection: &ProviderConnection, policy: &EngineConfig) -> StorageResult<()> {
         let cfg: GcsConnectionConfig = parse(connection)?;

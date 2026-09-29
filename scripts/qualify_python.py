@@ -19,6 +19,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--wheel', required=True, type=Path)
     parser.add_argument('--output', required=True, type=Path)
+    parser.add_argument('--spool-uploads', action='store_true')
     args = parser.parse_args()
     # Bind the evidence to the actual installed module and Python wrappers.
     installed = Path(plenora_storage.__file__).parent
@@ -61,7 +62,8 @@ def main():
         payload = bytes(range(251)) * 33423 + b'python-sdk'
         source = work / 'input'
         source.write_bytes(payload)
-        with Engine(policy, credential_resolver=resolver) as engine:
+        options = {'spool_uploads': True} if args.spool_uploads else {}
+        with Engine(policy, credential_resolver=resolver, **options) as engine:
             for provider, config in configs.items():
                 connection = Connection(provider, f'plenora-storage-{provider}-connection-v1', config,
                                         'local:process' if provider == 'local' else f'fixture:{provider}')
@@ -84,7 +86,7 @@ def main():
                         objects.extend(page['objects'])
                     assert {item['key'] for item in objects} == {key, copied}
                     async def async_stat():
-                        async with AsyncEngine(policy, credential_resolver=resolver) as asynchronous:
+                        async with AsyncEngine(policy, credential_resolver=resolver, **options) as asynchronous:
                             assert (await asynchronous.stat(connection, key))['size'] == len(payload)
                     asyncio.run(async_stat())
                 finally:
@@ -99,6 +101,7 @@ def main():
                 results.append({'provider': provider, 'operations': 7, 'status': 'PASS', 'async_stat': 'PASS'})
                 print(f'PASS installed Python SDK: {provider}', flush=True)
     report = {'version': engine.capabilities()['component_version'], 'package_version': __version__, 'wheel': args.wheel.name,
+              'spool_uploads': args.spool_uploads,
               'wheel_sha256': hashlib.sha256(args.wheel.read_bytes()).hexdigest(), 'results': results}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')

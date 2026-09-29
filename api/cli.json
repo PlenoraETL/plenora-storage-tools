@@ -205,6 +205,26 @@
         "values": null
       },
       {
+        "action": "SetTrue",
+        "aliases": null,
+        "defaults": [
+          "false"
+        ],
+        "global": true,
+        "id": "spool_uploads",
+        "index": null,
+        "long": "spool-uploads",
+        "max_values": 0,
+        "min_values": 0,
+        "parser": "ValueParser::bool",
+        "required": false,
+        "short": null,
+        "values": [
+          "true",
+          "false"
+        ]
+      },
+      {
         "action": "Help",
         "aliases": null,
         "defaults": [],
@@ -426,6 +446,26 @@
             "required": false,
             "short": null,
             "values": null
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "spool_uploads",
+            "index": null,
+            "long": "spool-uploads",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
           },
           {
             "action": "Help",
@@ -665,6 +705,26 @@
             "required": false,
             "short": null,
             "values": null
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "spool_uploads",
+            "index": null,
+            "long": "spool-uploads",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
           },
           {
             "action": "Help",
@@ -971,6 +1031,26 @@
             "values": null
           },
           {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "spool_uploads",
+            "index": null,
+            "long": "spool-uploads",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
             "action": "Help",
             "aliases": null,
             "defaults": [],
@@ -1223,6 +1303,26 @@
             "required": false,
             "short": null,
             "values": null
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "spool_uploads",
+            "index": null,
+            "long": "spool-uploads",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
           },
           {
             "action": "Help",
@@ -1510,6 +1610,26 @@
             "required": false,
             "short": null,
             "values": null
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "spool_uploads",
+            "index": null,
+            "long": "spool-uploads",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
           },
           {
             "action": "Help",
@@ -1832,6 +1952,26 @@
             "values": null
           },
           {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "spool_uploads",
+            "index": null,
+            "long": "spool-uploads",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
             "action": "Help",
             "aliases": null,
             "defaults": [],
@@ -2137,6 +2277,26 @@
             "values": null
           },
           {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "spool_uploads",
+            "index": null,
+            "long": "spool-uploads",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
+          },
+          {
             "action": "Help",
             "aliases": null,
             "defaults": [],
@@ -2407,6 +2567,26 @@
             "required": false,
             "short": null,
             "values": null
+          },
+          {
+            "action": "SetTrue",
+            "aliases": null,
+            "defaults": [
+              "false"
+            ],
+            "global": true,
+            "id": "spool_uploads",
+            "index": null,
+            "long": "spool-uploads",
+            "max_values": 0,
+            "min_values": 0,
+            "parser": "ValueParser::bool",
+            "required": false,
+            "short": null,
+            "values": [
+              "true",
+              "false"
+            ]
           },
           {
             "action": "Help",

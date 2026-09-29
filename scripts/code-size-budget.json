@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "basis": "Reviewed 2.0 adapter separation; 10% component headroom rounded to 50 lines, 20% for physical documentation lines.",
+  "basis": "Reviewed 2.0 adapter separation; provider budget reviewed for 2.1 private-file preparation and publication (docs/roadmap-2.1.0.md). Other budgets unchanged.",
   "areas": {
     "plenora-smb2": {
       "code_lines": 21100,
@@ -28,8 +28,8 @@
       "max_file_code_lines": 400
     },
     "plenora-storage-providers": {
-      "code_lines": 2900,
-      "physical_lines": 3350,
+      "code_lines": 3600,
+      "physical_lines": 4200,
       "max_file_code_lines": 400
     },
     "plenora-storage-py": {

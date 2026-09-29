@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 2.1.0-alpha.1 — in development, not qualified
+
+- Add explicit private-file upload preparation for local, Azure, GCS, SMB and WebDAV through Rust, CLI and Python, preserving default buffered limits.
+- Validate length, transfer bounds and checksum before publication; retain provider-specific conditional writes and error effects.
+- Require separate private-file CLI/SDK, large-transfer and concurrency evidence, and exercise both upload strategies during the same two-hour soak.
+
 ## 2.0.1 — in qualification
 
 - Reproduce MinIO disk pressure and recovery in a bounded disposable filesystem, preserving public error axes and requiring evidence for final Linux CLI bytes.

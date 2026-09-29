@@ -72,6 +72,13 @@
               "kind": "KEYWORD_ONLY",
               "name": "credential_resolver",
               "required": false
+            },
+            {
+              "annotation": "bool",
+              "default": false,
+              "kind": "KEYWORD_ONLY",
+              "name": "spool_uploads",
+              "required": false
             }
           ],
           "returns": null
@@ -711,6 +718,13 @@
               "default": null,
               "kind": "KEYWORD_ONLY",
               "name": "credential_resolver",
+              "required": false
+            },
+            {
+              "annotation": "bool",
+              "default": false,
+              "kind": "KEYWORD_ONLY",
+              "name": "spool_uploads",
               "required": false
             }
           ],
@@ -2223,6 +2237,10 @@
                 "kw_defaults": [
                   {
                     "node": "Constant"
+                  },
+                  {
+                    "node": "Constant",
+                    "value": false
                   }
                 ],
                 "kwonlyargs": [
@@ -2244,6 +2262,17 @@
                       }
                     },
                     "arg": "credential_resolver",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "bool",
+                      "node": "Name"
+                    },
+                    "arg": "spool_uploads",
                     "node": "arg"
                   }
                 ],
@@ -3451,6 +3480,10 @@
                 "kw_defaults": [
                   {
                     "node": "Constant"
+                  },
+                  {
+                    "node": "Constant",
+                    "value": false
                   }
                 ],
                 "kwonlyargs": [
@@ -3472,6 +3505,17 @@
                       }
                     },
                     "arg": "credential_resolver",
+                    "node": "arg"
+                  },
+                  {
+                    "annotation": {
+                      "ctx": {
+                        "node": "Load"
+                      },
+                      "id": "bool",
+                      "node": "Name"
+                    },
+                    "arg": "spool_uploads",
                     "node": "arg"
                   }
                 ],

@@ -22,6 +22,7 @@ cargo test --workspace --all-targets --locked -- --include-ignored
 cargo build --quiet --locked -p plenora-storage-cli
 python3 scripts/release_publication.py smoke-cli --binary target/debug/plenora-storage
 python3 scripts/qualify_local_faults.py
+python3 scripts/qualify_local_faults.py --spool-uploads --output target/release-readiness/spooled-local-faults.json
 
 cli_tmp="$(mktemp -d)"
 cli_key="conformance/cli-${RANDOM}-${RANDOM}.txt"
@@ -91,11 +92,16 @@ python3 scripts/qualify_cli.py
 python3 scripts/qualify_commit_faults.py
 
 python3 scripts/qualify_extended_faults.py
+python3 scripts/qualify_extended_faults.py --spool-uploads --output target/release-readiness/spooled-regressions.json
 if [ "${PLENORA_EXTENDED_TEST:-0}" = "1" ]; then
   python3 scripts/qualify_extended.py
+  python3 scripts/qualify_extended.py --spool-uploads --output target/release-readiness/spooled-qualification.json
   python3 scripts/build_python.py --debug
   version="$(python3 scripts/release_version.py --python)"
   target/python-sdk-test/bin/python scripts/qualify_python.py \
     --wheel target/python-wheels/plenora_storage-"${version}"-*.whl \
     --output target/release-readiness/python-qualification.json
+  target/python-sdk-test/bin/python scripts/qualify_python.py --spool-uploads \
+    --wheel target/python-wheels/plenora_storage-"${version}"-*.whl \
+    --output target/release-readiness/spooled-python-qualification.json
 fi

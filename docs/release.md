@@ -1,5 +1,16 @@
 # Qualifica e distribuzione
 
+La serie 2.1 in sviluppo aggiunge report separati per la modalità preparata su
+disco: `spooled-qualification.json`, `spooled-regressions.json` e
+`spooled-python-qualification.json` su entrambi i target, più
+`spooled-local-faults.json` su Linux. Quest'ultimo verifica anche ENOSPC e
+permessi negati durante la preparazione di put e copy, senza modifiche alla
+destinazione o residui temporanei. Il validatore finale richiede inoltre
+`transfers-spooled/{large,workers4,workers16}.json` e un soak che eserciti
+entrambe le modalità nelle stesse due ore. I workflow CI e candidato eseguono
+i nuovi test per target; la campagna VM e il workflow reliability eseguono
+i trasferimenti e il soak. Questi gate sono requisiti, non prove già superate.
+
 Dalla 2.0.1 la [campagna VM versionata](release-campaign.md) coordina download,
 fixture, prove dei due target e raccolta dei report con checkpoint verificati.
 Il bundle richiede inoltre `disk-pressure/report.json`, prodotto dal job

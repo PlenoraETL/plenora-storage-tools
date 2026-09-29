@@ -56,7 +56,8 @@ def clean_source(report, revision, revision_key='source_revision', dirty_key='di
             'evidence must describe the final clean source revision')
 
 
-def validate_transfers(report, binary, *, size, workers, rounds):
+def validate_transfers(report, binary, *, size, workers, rounds, spool_uploads=False):
+    require(report.get('spool_uploads', False) is spool_uploads, 'transfer upload strategy differs')
     require(report['status'] == 'PASS' and report['binary_sha256'] == binary,
             'transfer evidence failed or describes another binary')
     require(report['platform'] == 'linux' and report['payload_bytes'] == size
@@ -67,9 +68,11 @@ def validate_transfers(report, binary, *, size, workers, rounds):
     actual = Counter((row['provider'], row['round']) for row in report['results'])
     require(actual == expected, 'transfer campaign omitted or duplicated provider rounds')
     for row in report['results']:
-        bounded = row['provider'] in BUFFERED and size > 64 * 1024**2
+        bounded = not spool_uploads and row['provider'] in BUFFERED and size > 64 * 1024**2
         mode = ('documented_limit_preserves_destination' if bounded else
                 'buffered_roundtrip' if row['provider'] in BUFFERED else 'streaming_roundtrip')
+        if spool_uploads and row['provider'] in BUFFERED:
+            mode = 'private_file_roundtrip'
         require(row['status'] == 'PASS' and row['payload_bytes'] == size and row['mode'] == mode,
                 'transfer outcome differs from the declared provider guarantee')
         operations = Counter(m['operation'] for m in row['measurements'])
@@ -85,7 +88,7 @@ def validate_transfers(report, binary, *, size, workers, rounds):
                     and measure['elapsed_seconds'] > 0, 'invalid transfer measurement')
 
 
-def validate_soak(report, wheel, version, minimum_seconds=SOAK_DURATION_SECONDS):
+def validate_soak(report, wheel, version, minimum_seconds=SOAK_DURATION_SECONDS, *, both_upload_modes=False):
     require(report['status'] == 'PASS' and report['wheel_sha256'] == wheel
             and report['version'] == version, 'soak failed or describes another wheel')
     require(report['duration_seconds'] >= minimum_seconds
@@ -94,6 +97,15 @@ def validate_soak(report, wheel, version, minimum_seconds=SOAK_DURATION_SECONDS)
             'soak is incomplete')
     require(len(report['providers']) == len(PROVIDERS) and set(report['providers']) == set(PROVIDERS)
             and set(report['after_provider']) == set(PROVIDERS), 'soak provider matrix is incomplete')
+    if both_upload_modes:
+        modes = {'buffered', 'private_file'}
+        require(report.get('upload_modes') == ['buffered', 'private_file']
+                and set(report.get('completed_cycles_by_mode', {})) == modes
+                and set(report.get('after_mode_provider', {})) == modes, 'soak upload strategy matrix is incomplete')
+        for mode in modes:
+            require(report['completed_cycles_by_mode'][mode] == report['completed_cycles']
+                    and set(report['after_mode_provider'][mode]) == set(PROVIDERS),
+                    'soak omitted cycles or providers in one upload strategy')
     for key, allowance in [('rss_bytes', 128 * 1024**2), ('threads', 16), ('file_descriptors', 16)]:
         baseline, peak, latest = (report[name][key] for name in ('baseline', 'peak', 'latest'))
         require(0 < baseline <= peak <= baseline + allowance and 0 < latest <= peak,
@@ -205,7 +217,13 @@ already checked by verify_release.py. No caller-supplied waiver is accepted.
                                        ('workers16', 1024**2, 16, 1)]:
         validate_transfers(evidence.json(f'transfers/{name}.json'), linux['binary_sha256'],
                            size=size, workers=workers, rounds=rounds)
-    validate_soak(evidence.json('soak/report.json'), linux['wheel_sha256'], python_version, minimum_soak_seconds)
+        if version_core >= (2, 1, 0):
+            report = evidence.json(f'transfers-spooled/{name}.json')
+            clean_source(report, revision)
+            validate_transfers(report, linux['binary_sha256'], size=size, workers=workers,
+                               rounds=max(rounds, 2) if name == 'large' else rounds, spool_uploads=True)
+    validate_soak(evidence.json('soak/report.json'), linux['wheel_sha256'], python_version, minimum_soak_seconds,
+                  both_upload_modes=version_core >= (2, 1, 0))
     performance = evidence.json('performance/report.json')
     baseline = evidence.json('performance/baseline.json')
     candidate = evidence.json('performance/candidate.json')

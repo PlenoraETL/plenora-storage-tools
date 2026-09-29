@@ -29,7 +29,7 @@ impl<F: ProviderFactory> StorageProvider for Provider<F> {
         F::validate(connection, policy).map_err(|error| error.with_provider(F::ID))
     }
     fn capabilities(&self) -> ProviderCapabilities {
-        ProviderCapabilities {
+        let mut result = ProviderCapabilities {
             provider: F::ID.to_owned(),
             config_contract: F::CONTRACT.to_owned(),
             operations: ["test", "list", "stat", "get", "put", "copy", "delete"]
@@ -38,21 +38,42 @@ impl<F: ProviderFactory> StorageProvider for Provider<F> {
             attributes: BTreeMap::from([
                 ("api".to_owned(), F::ID.to_owned()),
                 ("streaming_get".to_owned(), "true".to_owned()),
-                ("streaming_put".to_owned(), "false".to_owned()),
+                ("streaming_put".to_owned(), self.spooled_uploads.to_string()),
                 (
                     "put_buffer_limit".to_owned(),
-                    "max_buffered_put_bytes".to_owned(),
+                    if self.spooled_uploads {
+                        "max_transfer_bytes"
+                    } else {
+                        "max_buffered_put_bytes"
+                    }
+                    .to_owned(),
                 ),
                 (
                     "copy_buffer_limit".to_owned(),
-                    "max_buffered_put_bytes".to_owned(),
+                    if self.spooled_uploads {
+                        "max_transfer_bytes"
+                    } else {
+                        "max_buffered_put_bytes"
+                    }
+                    .to_owned(),
                 ),
                 ("atomic_publication".to_owned(), F::ATOMIC.to_string()),
                 ("put_create_if_absent_atomic".to_owned(), "true".to_owned()),
                 ("copy_create_if_absent_atomic".to_owned(), "true".to_owned()),
                 ("list_order".to_owned(), "lexicographic".to_owned()),
             ]),
+        };
+        if self.spooled_uploads {
+            result.attributes.insert(
+                "upload_preparation".to_owned(),
+                "private_temporary_file".to_owned(),
+            );
+            result.attributes.insert(
+                "prepared_protocol_max_bytes".to_owned(),
+                F::SPOOLED_MAX_BYTES.to_string(),
+            );
         }
+        result
     }
     async fn test(
         &self,
@@ -202,8 +223,13 @@ impl<F: ProviderFactory> StorageProvider for Provider<F> {
         context: &OperationContext<'_>,
     ) -> StorageResult<TransferResult> {
         let outcome = async {
-            Self::validate_put(request, context)?;
+            self.validate_put(request, context)?;
             self.validate_connection(connection, context.policy)?;
+            if self.spooled_uploads {
+                return self
+                    .put_prepared(connection, request, source, context)
+                    .await;
+            }
             let mut data = Vec::new();
             let mut buffer = vec![0; 64 * 1024];
             loop {
@@ -298,9 +324,12 @@ impl<F: ProviderFactory> StorageProvider for Provider<F> {
                 content_length: None,
                 metadata: BTreeMap::new(),
             };
-            Self::validate_put(&put, context)?;
+            self.validate_put(&put, context)?;
             if request.source_key == request.destination_key {
                 return Err(invalid("COPY_TARGET_EQUALS_SOURCE"));
+            }
+            if self.spooled_uploads {
+                return self.copy_prepared(connection, request, &put, context).await;
             }
             let mut backend = self.connect(connection, context).await?;
             let (meta, mut reader) = context

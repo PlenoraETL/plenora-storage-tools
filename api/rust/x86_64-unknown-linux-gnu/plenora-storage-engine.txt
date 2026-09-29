@@ -1,4 +1,118 @@
 pub mod plenora_storage_engine
+pub enum plenora_storage_engine::UploadStrategy
+pub plenora_storage_engine::UploadStrategy::Buffered
+pub plenora_storage_engine::UploadStrategy::PrivateFile
+impl core::clone::Clone for plenora_storage_engine::UploadStrategy
+pub fn plenora_storage_engine::UploadStrategy::clone(&self) -> plenora_storage_engine::UploadStrategy
+impl core::cmp::Eq for plenora_storage_engine::UploadStrategy
+pub fn plenora_storage_engine::UploadStrategy::assert_receiver_is_total_eq(&self)
+impl core::cmp::PartialEq for plenora_storage_engine::UploadStrategy
+pub fn plenora_storage_engine::UploadStrategy::eq(&self, other: &plenora_storage_engine::UploadStrategy) -> bool
+impl core::default::Default for plenora_storage_engine::UploadStrategy
+pub fn plenora_storage_engine::UploadStrategy::default() -> plenora_storage_engine::UploadStrategy
+impl core::fmt::Debug for plenora_storage_engine::UploadStrategy
+pub fn plenora_storage_engine::UploadStrategy::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for plenora_storage_engine::UploadStrategy
+impl core::marker::StructuralPartialEq for plenora_storage_engine::UploadStrategy
+impl core::marker::Freeze for plenora_storage_engine::UploadStrategy
+impl core::marker::Send for plenora_storage_engine::UploadStrategy
+impl core::marker::Sync for plenora_storage_engine::UploadStrategy
+impl core::marker::Unpin for plenora_storage_engine::UploadStrategy
+impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_engine::UploadStrategy
+impl core::panic::unwind_safe::UnwindSafe for plenora_storage_engine::UploadStrategy
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_engine::UploadStrategy
+pub type plenora_storage_engine::UploadStrategy::Output = typenum::bit::B1
+pub fn plenora_storage_engine::UploadStrategy::is_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Greater> for plenora_storage_engine::UploadStrategy
+pub type plenora_storage_engine::UploadStrategy::Output = typenum::bit::B0
+pub fn plenora_storage_engine::UploadStrategy::is_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Less> for plenora_storage_engine::UploadStrategy
+pub type plenora_storage_engine::UploadStrategy::Output = typenum::bit::B0
+pub fn plenora_storage_engine::UploadStrategy::is_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal> for plenora_storage_engine::UploadStrategy
+pub type plenora_storage_engine::UploadStrategy::Output = typenum::bit::B1
+pub fn plenora_storage_engine::UploadStrategy::is_greater_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater> for plenora_storage_engine::UploadStrategy
+pub type plenora_storage_engine::UploadStrategy::Output = typenum::bit::B1
+pub fn plenora_storage_engine::UploadStrategy::is_greater_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less> for plenora_storage_engine::UploadStrategy
+pub type plenora_storage_engine::UploadStrategy::Output = typenum::bit::B0
+pub fn plenora_storage_engine::UploadStrategy::is_greater_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Equal> for plenora_storage_engine::UploadStrategy
+pub type plenora_storage_engine::UploadStrategy::Output = typenum::bit::B0
+pub fn plenora_storage_engine::UploadStrategy::is_greater_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Greater> for plenora_storage_engine::UploadStrategy
+pub type plenora_storage_engine::UploadStrategy::Output = typenum::bit::B1
+pub fn plenora_storage_engine::UploadStrategy::is_greater_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Less> for plenora_storage_engine::UploadStrategy
+pub type plenora_storage_engine::UploadStrategy::Output = typenum::bit::B0
+pub fn plenora_storage_engine::UploadStrategy::is_greater_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Equal> for plenora_storage_engine::UploadStrategy
+pub type plenora_storage_engine::UploadStrategy::Output = typenum::bit::B1
+pub fn plenora_storage_engine::UploadStrategy::is_less_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Greater> for plenora_storage_engine::UploadStrategy
+pub type plenora_storage_engine::UploadStrategy::Output = typenum::bit::B0
+pub fn plenora_storage_engine::UploadStrategy::is_less_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Less> for plenora_storage_engine::UploadStrategy
+pub type plenora_storage_engine::UploadStrategy::Output = typenum::bit::B1
+pub fn plenora_storage_engine::UploadStrategy::is_less_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Equal> for plenora_storage_engine::UploadStrategy
+pub type plenora_storage_engine::UploadStrategy::Output = typenum::bit::B0
+pub fn plenora_storage_engine::UploadStrategy::is_less_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Greater> for plenora_storage_engine::UploadStrategy
+pub type plenora_storage_engine::UploadStrategy::Output = typenum::bit::B0
+pub fn plenora_storage_engine::UploadStrategy::is_less_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Less> for plenora_storage_engine::UploadStrategy
+pub type plenora_storage_engine::UploadStrategy::Output = typenum::bit::B1
+pub fn plenora_storage_engine::UploadStrategy::is_less_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Equal> for plenora_storage_engine::UploadStrategy
+pub type plenora_storage_engine::UploadStrategy::Output = typenum::bit::B0
+pub fn plenora_storage_engine::UploadStrategy::is_not_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Greater> for plenora_storage_engine::UploadStrategy
+pub type plenora_storage_engine::UploadStrategy::Output = typenum::bit::B1
+pub fn plenora_storage_engine::UploadStrategy::is_not_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Less> for plenora_storage_engine::UploadStrategy
+pub type plenora_storage_engine::UploadStrategy::Output = typenum::bit::B1
+pub fn plenora_storage_engine::UploadStrategy::is_not_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Less>>::Output
+impl<Q, K> equivalent::Equivalent<K> for plenora_storage_engine::UploadStrategy where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn plenora_storage_engine::UploadStrategy::equivalent(&self, key: &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for plenora_storage_engine::UploadStrategy where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+impl<Q, K> hashbrown::Equivalent<K> for plenora_storage_engine::UploadStrategy where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn plenora_storage_engine::UploadStrategy::equivalent(&self, key: &K) -> bool
+pub fn plenora_storage_engine::UploadStrategy::equivalent(&self, key: &K) -> bool
+impl<T, U> core::convert::Into<U> for plenora_storage_engine::UploadStrategy where U: core::convert::From<T>
+pub fn plenora_storage_engine::UploadStrategy::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for plenora_storage_engine::UploadStrategy where U: core::convert::Into<T>
+pub type plenora_storage_engine::UploadStrategy::Error = core::convert::Infallible
+pub fn plenora_storage_engine::UploadStrategy::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for plenora_storage_engine::UploadStrategy where U: core::convert::TryFrom<T>
+pub type plenora_storage_engine::UploadStrategy::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn plenora_storage_engine::UploadStrategy::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for plenora_storage_engine::UploadStrategy where T: core::clone::Clone
+pub type plenora_storage_engine::UploadStrategy::Owned = T
+pub fn plenora_storage_engine::UploadStrategy::clone_into(&self, target: &mut T)
+pub fn plenora_storage_engine::UploadStrategy::to_owned(&self) -> T
+impl<T> core::any::Any for plenora_storage_engine::UploadStrategy where T: 'static + ?core::marker::Sized
+pub fn plenora_storage_engine::UploadStrategy::type_id(&self) -> core::any::TypeId
+impl<T> core::asserting::Printable for plenora_storage_engine::UploadStrategy where T: core::marker::Copy + core::fmt::Debug
+impl<T> core::borrow::Borrow<T> for plenora_storage_engine::UploadStrategy where T: ?core::marker::Sized
+pub fn plenora_storage_engine::UploadStrategy::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for plenora_storage_engine::UploadStrategy where T: ?core::marker::Sized
+pub fn plenora_storage_engine::UploadStrategy::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for plenora_storage_engine::UploadStrategy where T: core::clone::Clone
+pub unsafe fn plenora_storage_engine::UploadStrategy::clone_to_uninit(&self, dest: *mut u8)
+impl<T> core::convert::From<T> for plenora_storage_engine::UploadStrategy
+pub fn plenora_storage_engine::UploadStrategy::from(t: T) -> T
+impl<T> core::mem::SizedTypeProperties for plenora_storage_engine::UploadStrategy
+impl<T> either::into_either::IntoEither for plenora_storage_engine::UploadStrategy
+impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_engine::UploadStrategy where T: ?core::marker::Sized
+pub fn plenora_storage_engine::UploadStrategy::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_engine::UploadStrategy::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+impl<T> tracing::instrument::Instrument for plenora_storage_engine::UploadStrategy
+impl<T> tracing::instrument::WithSubscriber for plenora_storage_engine::UploadStrategy
+impl<T> typenum::type_operators::Same for plenora_storage_engine::UploadStrategy
+pub type plenora_storage_engine::UploadStrategy::Output = T
+impl<T> windows_core::imp::can_into::CanInto<T> for plenora_storage_engine::UploadStrategy where T: core::clone::Clone
 pub struct plenora_storage_engine::PutFileOptions
 pub plenora_storage_engine::PutFileOptions::content_type: core::option::Option<alloc::string::String>
 pub plenora_storage_engine::PutFileOptions::input: std::path::PathBuf
@@ -91,5 +205,6 @@ impl<T> tracing::instrument::WithSubscriber for plenora_storage_engine::PutFileO
 impl<T> typenum::type_operators::Same for plenora_storage_engine::PutFileOptions
 pub type plenora_storage_engine::PutFileOptions::Output = T
 pub fn plenora_storage_engine::build_engine(config: plenora_storage_core::engine::EngineConfig, credentials: alloc::sync::Arc<dyn plenora_storage_core::credentials::CredentialResolver>) -> plenora_storage_core::error::StorageResult<plenora_storage_core::engine::Engine>
+pub fn plenora_storage_engine::build_engine_with_upload_strategy(config: plenora_storage_core::engine::EngineConfig, credentials: alloc::sync::Arc<dyn plenora_storage_core::credentials::CredentialResolver>, strategy: plenora_storage_engine::UploadStrategy) -> plenora_storage_core::error::StorageResult<plenora_storage_core::engine::Engine>
 pub async fn plenora_storage_engine::get_to_file(engine: &plenora_storage_core::engine::Engine, connection: &plenora_storage_core::model::ProviderConnection, key: alloc::string::String, output: &std::path::Path, overwrite: bool, control: &plenora_storage_core::control::ExecutionControl) -> plenora_storage_core::error::StorageResult<plenora_storage_core::model::TransferResult>
 pub async fn plenora_storage_engine::put_from_file(engine: &plenora_storage_core::engine::Engine, connection: &plenora_storage_core::model::ProviderConnection, options: plenora_storage_engine::PutFileOptions, control: &plenora_storage_core::control::ExecutionControl) -> plenora_storage_core::error::StorageResult<plenora_storage_core::model::TransferResult>

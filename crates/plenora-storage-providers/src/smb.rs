@@ -41,6 +41,7 @@ impl ProviderFactory for Smb {
     const ID: &'static str = "smb";
     const CONTRACT: &'static str = "plenora-storage-smb-connection-v1";
     const ATOMIC: bool = false;
+    const SPOOLED_PUT: bool = true;
     fn validate(connection: &ProviderConnection, _: &EngineConfig) -> StorageResult<()> {
         let cfg: SmbConnectionConfig = parse(connection)?;
         if cfg.host.is_empty()

@@ -74,6 +74,14 @@ impl Backend for SmbBackend {
     async fn put(&mut self, request: &PutRequest, data: Bytes) -> StorageResult<()> {
         super::publication::put(self, request, data).await
     }
+    async fn put_file(
+        &mut self,
+        request: &PutRequest,
+        file: tokio::fs::File,
+        size: u64,
+    ) -> StorageResult<()> {
+        super::publication::put_file(self, request, file, size).await
+    }
     async fn delete(&mut self, key: &str) -> StorageResult<()> {
         let path = self.path(key)?;
         self.stat(key).await?;

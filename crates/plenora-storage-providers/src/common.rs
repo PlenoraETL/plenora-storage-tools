@@ -1,4 +1,6 @@
 mod operations;
+mod spool;
+mod spooled;
 
 use std::{collections::BTreeMap, marker::PhantomData, sync::Arc};
 
@@ -31,6 +33,10 @@ pub trait ProviderFactory: Send + Sync + 'static {
     const ATOMIC: bool;
     /// Whether content type and custom metadata can be persisted.
     const METADATA: bool = false;
+    /// Whether this adapter implements publication from a private prepared file.
+    const SPOOLED_PUT: bool = false;
+    /// Maximum prepared upload/copy size admitted by this backend's protocol path.
+    const SPOOLED_MAX_BYTES: u64 = u64::MAX;
     /// Checks configuration and engine policy without opening a connection.
     ///
     /// # Errors
@@ -65,17 +71,24 @@ pub trait Backend: Send {
     async fn stat(&mut self, key: &str) -> StorageResult<ObjectMetadata>;
     async fn get(&mut self, key: &str) -> StorageResult<(ObjectMetadata, Box<dyn Reader>)>;
     async fn put(&mut self, request: &PutRequest, data: Bytes) -> StorageResult<()>;
+    async fn put_file(&mut self, _: &PutRequest, _: tokio::fs::File, _: u64) -> StorageResult<()> {
+        Err(StorageError::unsupported(
+            "provider does not support prepared uploads",
+        ))
+    }
     async fn delete(&mut self, key: &str) -> StorageResult<()>;
 }
 
 /// Provider with streaming downloads and bounded, fully validated uploads.
 ///
-/// Upload and copy buffers are limited by `max_buffered_put_bytes`.
+/// Upload and copy buffers are limited by `max_buffered_put_bytes` by default.
+/// Explicit private-file preparation uses `max_transfer_bytes` and protocol limits.
 /// The limit is per operation; callers must also bound aggregate concurrency.
 /// Backend connection, commit and read failures retain their error effect axes.
 pub struct Provider<F: ProviderFactory> {
     credentials: Arc<dyn CredentialResolver>,
     factory: PhantomData<F>,
+    spooled_uploads: bool,
 }
 
 impl<F: ProviderFactory> Provider<F> {
@@ -85,7 +98,26 @@ impl<F: ProviderFactory> Provider<F> {
         Self {
             credentials,
             factory: PhantomData,
+            spooled_uploads: false,
         }
+    }
+
+    /// Opt into private disk preparation instead of retaining upload/copy payloads in memory.
+    /// Total bytes remain bounded by `EngineConfig::max_transfer_bytes`.
+    ///
+    /// # Errors
+    /// Returns unsupported when the backend has no prepared-file publication path.
+    pub fn with_spooled_uploads(credentials: Arc<dyn CredentialResolver>) -> StorageResult<Self> {
+        if !F::SPOOLED_PUT {
+            return Err(StorageError::unsupported(
+                "provider does not support prepared uploads",
+            ));
+        }
+        Ok(Self {
+            credentials,
+            factory: PhantomData,
+            spooled_uploads: true,
+        })
     }
 
     async fn connect(
@@ -105,7 +137,11 @@ impl<F: ProviderFactory> Provider<F> {
             .map_err(|error| error.with_provider(F::ID))
     }
 
-    fn validate_put(request: &PutRequest, context: &OperationContext<'_>) -> StorageResult<()> {
+    fn validate_put(
+        &self,
+        request: &PutRequest,
+        context: &OperationContext<'_>,
+    ) -> StorageResult<()> {
         validate_object_key(&request.key)?;
         if request.publication_policy == PublicationPolicy::AtomicRequired && !F::ATOMIC {
             return Err(StorageError::unsupported(
@@ -133,10 +169,14 @@ impl<F: ProviderFactory> Provider<F> {
         {
             return Err(invalid("PUT_METADATA_INVALID"));
         }
-        if request
-            .content_length
-            .is_some_and(|count| count > buffer_limit(context))
-        {
+        if request.content_length.is_some_and(|count| {
+            count
+                > if self.spooled_uploads {
+                    context.policy.max_transfer_bytes.min(F::SPOOLED_MAX_BYTES)
+                } else {
+                    buffer_limit(context)
+                }
+        }) {
             return Err(limit_error());
         }
         Ok(())

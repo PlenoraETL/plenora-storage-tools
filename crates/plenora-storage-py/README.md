@@ -8,8 +8,9 @@ contains local, S3, SFTP, FTP, explicit FTPS, Azure Blob, GCS, SMB and WebDAV.
 Distribution is through [GitHub Releases](https://github.com/PlenoraETL/plenora-storage-tools/releases).
 When a qualified release is published, download the wheel for your platform,
 verify its SHA-256 against the release checksums and install the downloaded file
-with `python -m pip install <wheel-file>`. The first 1.0 is still a candidate;
-availability of source code does not imply that a production release is published.
+with `python -m pip install <wheel-file>`. The
+[2.0.0 release](https://github.com/PlenoraETL/plenora-storage-tools/releases/tag/v2.0.0)
+is published; the 2.1 source tree is a development preview requiring its own qualification.
 The supported targets and fixture-only compatibility scope are listed in the
 [compatibility matrix](../../docs/compatibility-1.0.md).
 
@@ -33,6 +34,12 @@ Other providers resolve `env:NAME` from a JSON object in the environment, or use
 reference and returns a mapping of provider-specific secret fields. Callbacks
 must be thread-safe and bounded; Python callbacks cannot be forcibly interrupted.
 Callback exception text is never exposed in storage errors.
+
+The 2.1 preview adds `Engine(spool_uploads=True)` and
+`AsyncEngine(spool_uploads=True)` for private temporary-file preparation on local,
+Azure, GCS, SMB and WebDAV. Existing calls retain their buffered limits. See the
+[large-transfer guide](../../docs/large-transfers.md) for total-size limits,
+temporary disk requirements and publication guarantees.
 
 `test`, `list`, `stat`, `get`, `put`, `copy`, `delete` accept `timeout_ms` and
 `cancellation=CancellationToken()`. `get` and `put` stream files; no entire-object

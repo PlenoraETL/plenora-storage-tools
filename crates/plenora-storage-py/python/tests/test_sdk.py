@@ -16,6 +16,38 @@ from plenora_storage import AsyncEngine, CancellationToken, Connection, Engine, 
 
 
 class SDKTests(unittest.TestCase):
+    def test_private_file_uploads_are_explicit_and_preserve_existing_default_limit(self):
+        policy = EngineConfig(max_buffered_put_bytes=4)
+        with Engine(policy) as engine:
+            with self.assertRaises(StorageError) as rejected:
+                engine.put(self.connection, 'buffered', self.source, overwrite=False,
+                           publication_policy='atomic_required')
+            self.assertEqual(rejected.exception.remote_effect, 'none')
+        with Engine(policy, spool_uploads=True) as engine:
+            uploaded = engine.put(self.connection, 'prepared', self.source, overwrite=False,
+                                  publication_policy='atomic_required')
+            engine.copy(self.connection, 'prepared', 'prepared-copy', overwrite=False,
+                        publication_policy='atomic_required')
+            with self.assertRaises(StorageError):
+                engine.copy(self.connection, 'prepared', 'prepared-copy', overwrite=False,
+                            publication_policy='atomic_required')
+            downloaded = self.root / 'prepared-download'
+            received = engine.get(self.connection, 'prepared-copy', downloaded, overwrite=False)
+            self.assertEqual(received['checksum'], uploaded['checksum'])
+            self.assertEqual(downloaded.read_bytes(), self.source.read_bytes())
+
+    def test_async_private_file_option_and_invalid_values(self):
+        for invalid in (None, 1, 'true', []):
+            for constructor in (Engine, AsyncEngine):
+                with self.assertRaises(StorageError):
+                    constructor(spool_uploads=invalid)
+        async def exercise():
+            async with AsyncEngine(EngineConfig(max_buffered_put_bytes=4), spool_uploads=True) as engine:
+                result = await engine.put(self.connection, 'async-prepared', self.source,
+                                          overwrite=False, publication_policy='atomic_required')
+                self.assertEqual(result['bytes_transferred'], self.source.stat().st_size)
+        asyncio.run(exercise())
+
     def test_public_result_types_match_contract_keys_and_nullable_metadata(self):
         import json
         from typing import get_type_hints

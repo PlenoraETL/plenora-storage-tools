@@ -127,6 +127,7 @@ jobs:
       - run: python scripts/release_publication.py smoke-cli --binary target/debug/plenora-storage.exe
       - run: python scripts/audit_release_readiness.py
       - run: python scripts/qualify_extended_faults.py
+      - run: python scripts/qualify_extended_faults.py --spool-uploads --output target/release-readiness/spooled-regressions.json
       - run: python -m pip install maturin==1.15.0
       - run: python scripts/build_python.py --debug
       - run: python scripts/package_source.py

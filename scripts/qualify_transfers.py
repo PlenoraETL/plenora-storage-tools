@@ -56,10 +56,11 @@ def payload(path, size):
     return result.hexdigest()
 
 
-def invoke(binary, connection, env, operation, arguments, max_bytes, timeout, rss_limit, expected='ok'):
+def invoke(binary, connection, env, operation, arguments, max_bytes, timeout, rss_limit, expected='ok', spool_uploads=False):
     command = [str(binary), '--format', 'json', '--allow-private-network', '--allow-insecure-http',
                '--allow-insecure-ftp', '--max-transfer-bytes', str(max_bytes),
                '--deadline', (datetime.now(timezone.utc) + timedelta(seconds=timeout)).isoformat(),
+               *(['--spool-uploads'] if spool_uploads else []),
                operation, '--connection', str(connection),
                *map(str, arguments)]
     with tempfile.TemporaryDirectory(prefix='storage-process-measure-') as temporary:
@@ -88,7 +89,7 @@ def invoke(binary, connection, env, operation, arguments, max_bytes, timeout, rs
     return response, dict(measure, operation=operation, status='PASS')
 
 
-def roundtrip(binary, provider, source, source_hash, size, root, timeout, rss_limit, buffered_limit, shared_parent):
+def roundtrip(binary, provider, source, source_hash, size, root, timeout, rss_limit, buffered_limit, shared_parent, spool_uploads=False):
     work = root / (provider + '-' + uuid.uuid4().hex)
     work.mkdir()
     local = root / 'storage'
@@ -102,7 +103,7 @@ def roundtrip(binary, provider, source, source_hash, size, root, timeout, rss_li
     measures = []
 
     def call(operation, *arguments, expected='ok'):
-        response, measure = invoke(binary, path, env, operation, arguments, max(size, 1024), timeout, rss_limit, expected)
+        response, measure = invoke(binary, path, env, operation, arguments, max(size, 1024), timeout, rss_limit, expected, spool_uploads)
         measures.append(measure)
         return response
 
@@ -112,7 +113,7 @@ def roundtrip(binary, provider, source, source_hash, size, root, timeout, rss_li
 
     try:
         call('test')
-        if provider in BUFFERED and size > buffered_limit:
+        if not spool_uploads and provider in BUFFERED and size > buffered_limit:
             sentinel = work / 'sentinel'
             sentinel.write_bytes(b'previous-object-must-survive')
             upload(sentinel)
@@ -139,6 +140,8 @@ def roundtrip(binary, provider, source, source_hash, size, root, timeout, rss_li
                 assert error['category'] == 'resource_limit' and error['remote_effect'] == 'none'
                 assert call('stat', '--key', key)['result']['size'] == size
             mode = 'streaming_roundtrip' if provider not in BUFFERED else 'buffered_roundtrip'
+            if spool_uploads and provider in BUFFERED:
+                mode = 'private_file_roundtrip'
     finally:
         # Only the unpredictable names owned by this test are eligible for cleanup.
         # A failed cleanup fails the gate; it must never erase a transfer failure.
@@ -159,6 +162,7 @@ def main():
     parser.add_argument('--providers', default=','.join(PROVIDERS))
     parser.add_argument('--workers', type=int, default=1)
     parser.add_argument('--rounds', type=int, default=1)
+    parser.add_argument('--spool-uploads', action='store_true')
     parser.add_argument('--timeout', type=float, default=600)
     parser.add_argument('--rss-limit-mib', type=int, default=256)
     parser.add_argument('--output', type=Path, default=ROOT / 'target/release-readiness/large-transfers.json')
@@ -174,6 +178,7 @@ def main():
               'dirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()),
               'memory_measurement': 'Linux RUSAGE_CHILDREN per fresh wrapper; includes process startup',
               'payload_bytes': args.bytes, 'workers': args.workers, 'rounds': args.rounds,
+              'spool_uploads': args.spool_uploads,
               'rss_limit_bytes': args.rss_limit_mib * 1024**2, 'status': 'RUNNING', 'results': []}
     args.output.parent.mkdir(parents=True, exist_ok=True)
 
@@ -195,7 +200,7 @@ def main():
                         # across concurrent writers, even on reused fixtures.
                         shared_parent = 'qualification/large-' + uuid.uuid4().hex
                         tasks = [pool.submit(roundtrip, binary, provider, source, source_hash, args.bytes,
-                                             root, args.timeout, report['rss_limit_bytes'], 64 * 1024**2, shared_parent)
+                                             root, args.timeout, report['rss_limit_bytes'], 64 * 1024**2, shared_parent, args.spool_uploads)
                                  for _ in range(args.workers)]
                         for task in tasks:
                             result = task.result()

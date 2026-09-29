@@ -11,6 +11,7 @@ import venv
 from campaign_state import Campaign, digest, exclusive, logged, write_json
 from check_disk_space import GIB, inspect
 from soak_policy import SOAK_DURATION_SECONDS
+from versioning import parse_version
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = 'x86_64-unknown-linux-gnu'
@@ -35,6 +36,7 @@ def run(folder, baseline, output, retries, reason, backend_data):
         raise ValueError('VM campaign requires Linux')
     folder, baseline, output = folder.resolve(), baseline.resolve(), output.resolve()
     subject = identity(folder, baseline)
+    spooled = parse_version(subject['version']).requires((2, 1, 0))
     binary = folder / 'plenora-storage'
     wheels = list(folder.glob('*.whl'))
     if len(wheels) != 1:
@@ -55,13 +57,13 @@ def run(folder, baseline, output, retries, reason, backend_data):
             logged([str(python), str(ROOT / 'scripts' / script), *map(str, arguments)],
                    path, cwd=ROOT, env=environment)
 
-        def transfers(path, *, size, workers, rounds, environment=env):
-            space = inspect(spaces, size, workers)
+        def transfers(path, *, size, workers, rounds, environment=env, spool_uploads=False):
+            space = inspect(spaces, size, workers, spool_uploads=spool_uploads)
             write_json(path / 'disk-space.json', space)
             if space['status'] != 'PASS':
                 raise ValueError('insufficient transfer headroom; no transfer started')
             command(path, 'qualify_transfers.py', '--bytes', size, '--workers', workers, '--rounds', rounds,
-                    '--output', path / 'report.json', environment=environment)
+                    '--output', path / 'report.json', *(['--spool-uploads'] if spool_uploads else []), environment=environment)
 
         def qualify(path):
             copy = path / 'dist' / subject['version'] / TARGET
@@ -85,13 +87,21 @@ def run(folder, baseline, output, retries, reason, backend_data):
         large = phase('transfers-large', lambda path: transfers(path, size=GIB, workers=1, rounds=2))
         four = phase('transfers-workers4', lambda path: transfers(path, size=1024**2, workers=4, rounds=2))
         sixteen = phase('transfers-workers16', lambda path: transfers(path, size=1024**2, workers=16, rounds=1))
+        prepared = {}
+        if spooled:
+            for name, size, workers, rounds in [('large', GIB, 1, 2), ('workers4', 1024**2, 4, 2),
+                                               ('workers16', 1024**2, 16, 1)]:
+                result = phase('spooled-' + name, lambda path: transfers(
+                    path, size=size, workers=workers, rounds=rounds, spool_uploads=True))
+                prepared[f'transfers-spooled/{name}.json'] = result / 'report.json'
         soak = phase('soak', lambda path: command(path, 'stress_python.py', '--wheel', wheel, '--workers', 4,
                      '--interval-seconds', 30, '--duration-seconds', SOAK_DURATION_SECONDS,
+                     *(['--both-upload-modes'] if spooled else []),
                      '--output', path / 'report.json', python=installed / 'sdk/bin/python'))
         selected = {'performance/baseline.json': old / 'report.json',
                     'performance/candidate.json': new / 'report.json', 'performance/report.json': comparison / 'report.json',
                     'transfers/large.json': large / 'report.json', 'transfers/workers4.json': four / 'report.json',
-                    'transfers/workers16.json': sixteen / 'report.json', 'soak/report.json': soak / 'report.json'}
+                    'transfers/workers16.json': sixteen / 'report.json', 'soak/report.json': soak / 'report.json', **prepared}
         for name, source in selected.items():
             destination = output / 'selected/gates' / name
             destination.parent.mkdir(parents=True, exist_ok=True)

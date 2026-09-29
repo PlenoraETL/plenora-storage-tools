@@ -10,6 +10,8 @@ artefatti attestano una qualifica.
 | [Architettura](architecture.md) | Responsabilità e confini dei componenti |
 | [API 1.0](api-1.0.md) e [inventario API](API-INVENTORY.md) | Contratti pubblici e baseline di compatibilità |
 | [SDK Python](../crates/plenora-storage-py/README.md) | Utilizzo sync/async e lifecycle |
+| [Trasferimenti grandi](large-transfers.md) | Anteprima 2.1: opzione esplicita, limiti e preparazione privata su disco |
+| [Piano 2.1](roadmap-2.1.0.md) | Implementazione e prove richieste per i cinque provider aggiuntivi |
 | [Compatibilità 1.0](compatibility-1.0.md) | Sistemi e limiti del supporto dichiarato |
 | [Provider](provider-expansion.md) | Configurazione e garanzie dei sei adapter aggiunti dalla 0.2.0 |
 | [Distribuzione](release.md) | Packaging e procedura di qualifica |

@@ -5,6 +5,13 @@ from plenora_storage import AsyncEngine, CancellationToken, Connection, Engine
 from plenora_storage.types import DeleteResult, ListResult, ObjectInfo, TestResult, TransferResult
 
 
+def upload_strategy() -> None:
+    assert_type(Engine(spool_uploads=True), Engine)
+    assert_type(AsyncEngine(spool_uploads=True), AsyncEngine)
+    Engine(spool_uploads='true')  # type: ignore[arg-type]
+    AsyncEngine(spool_uploads=1)  # type: ignore[arg-type]
+
+
 def sync(engine: Engine, connection: Connection) -> None:
     assert_type(engine.test(connection), TestResult)
     page = engine.list(connection, max_items=10, timeout_ms=1000)

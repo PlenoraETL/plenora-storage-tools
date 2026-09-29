@@ -2304,7 +2304,7 @@ checksum = "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
 
 [[package]]
 name = "plenora-smb2"
-version = "2.0.1"
+version = "2.1.0-alpha.1"
 dependencies = [
  "aes",
  "aes-gcm",
@@ -2333,7 +2333,7 @@ dependencies = [
 
 [[package]]
 name = "plenora-storage-cli"
-version = "2.0.1"
+version = "2.1.0-alpha.1"
 dependencies = [
  "clap",
  "futures-util",
@@ -2348,7 +2348,7 @@ dependencies = [
 
 [[package]]
 name = "plenora-storage-core"
-version = "2.0.1"
+version = "2.1.0-alpha.1"
 dependencies = [
  "async-trait",
  "hex",
@@ -2363,7 +2363,7 @@ dependencies = [
 
 [[package]]
 name = "plenora-storage-engine"
-version = "2.0.1"
+version = "2.1.0-alpha.1"
 dependencies = [
  "plenora-storage-core",
  "plenora-storage-ftp",
@@ -2376,7 +2376,7 @@ dependencies = [
 
 [[package]]
 name = "plenora-storage-ftp"
-version = "2.0.1"
+version = "2.1.0-alpha.1"
 dependencies = [
  "async-trait",
  "hex",
@@ -2394,13 +2394,15 @@ dependencies = [
 
 [[package]]
 name = "plenora-storage-providers"
-version = "2.0.1"
+version = "2.1.0-alpha.1"
 dependencies = [
  "async-trait",
+ "base64 0.22.1",
  "bytes",
  "cap-std",
  "futures-util",
  "hex",
+ "hmac",
  "object_store",
  "percent-encoding",
  "plenora-smb2",
@@ -2411,13 +2413,16 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "tempfile",
+ "time",
  "tokio",
+ "tokio-util",
  "url",
 ]
 
 [[package]]
 name = "plenora-storage-py"
-version = "2.0.1"
+version = "2.1.0-alpha.1"
 dependencies = [
  "plenora-storage-core",
  "plenora-storage-engine",
@@ -2429,7 +2434,7 @@ dependencies = [
 
 [[package]]
 name = "plenora-storage-s3"
-version = "2.0.1"
+version = "2.1.0-alpha.1"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -2448,7 +2453,7 @@ dependencies = [
 
 [[package]]
 name = "plenora-storage-sftp"
-version = "2.0.1"
+version = "2.1.0-alpha.1"
 dependencies = [
  "async-trait",
  "aws-lc-rs",

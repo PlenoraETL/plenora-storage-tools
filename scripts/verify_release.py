@@ -92,7 +92,8 @@ def main():
             qualification = json.loads(qualification_path.read_text())
             binary = 'plenora-storage.exe' if 'windows' in manifest['target'] else 'plenora-storage'
             assert qualification['binary_sha256'] == sums[binary], 'qualification binary differs'
-        for name in ['extended-qualification.json', 'extended-regressions.json', 'cli-regressions.json', 'commit-faults.json']:
+        for name in ['extended-qualification.json', 'extended-regressions.json', 'cli-regressions.json',
+                     'commit-faults.json', 'spooled-qualification.json', 'spooled-regressions.json']:
             report_path = folder / name
             if report_path.exists():
                 report = json.loads(report_path.read_text())
@@ -102,6 +103,10 @@ def main():
         if local_faults_path.exists():
             binary = 'plenora-storage.exe' if 'windows' in manifest['target'] else 'plenora-storage'
             validate_local_faults(json.loads(local_faults_path.read_text()), sums[binary])
+        spooled_faults_path = folder / 'spooled-local-faults.json'
+        if spooled_faults_path.exists():
+            binary = 'plenora-storage.exe' if 'windows' in manifest['target'] else 'plenora-storage'
+            validate_local_faults(json.loads(spooled_faults_path.read_text()), sums[binary], spool_uploads=True)
         results.append({'target': manifest['target'], 'artifacts': len(manifest['artifacts']),
                         'qualification_present': qualification_path.exists(), 'status': 'PASS'})
     assert len(sources) == 1, 'source snapshots differ across targets'

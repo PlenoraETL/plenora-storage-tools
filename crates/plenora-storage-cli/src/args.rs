@@ -36,6 +36,9 @@ pub struct Cli {
     pub max_list_items: usize,
     #[arg(long, global = true, default_value_t = plenora_storage_core::DEFAULT_MAX_BUFFERED_PUT_BYTES)]
     pub max_buffered_put_bytes: u64,
+    /// Prepare local/Azure/GCS/SMB/`WebDAV` uploads on private temporary disk.
+    #[arg(long, global = true)]
+    pub spool_uploads: bool,
     #[command(subcommand)]
     pub command: Option<Command>,
 }

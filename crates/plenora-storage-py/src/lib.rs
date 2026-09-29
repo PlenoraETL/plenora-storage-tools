@@ -6,7 +6,9 @@ use plenora_storage_core::{
     EnvironmentCredentialResolver, ExecutionControl, ProviderConnection, StorageError,
     StorageResult, Surface,
 };
-use plenora_storage_engine::{PutFileOptions, build_engine, get_to_file, put_from_file};
+use plenora_storage_engine::{
+    PutFileOptions, UploadStrategy, build_engine_with_upload_strategy, get_to_file, put_from_file,
+};
 use pyo3::{exceptions::PyValueError, prelude::*};
 use serde::{Deserialize, de::DeserializeOwned};
 use std::{
@@ -59,15 +61,24 @@ struct NativeEngine {
 #[pymethods]
 impl NativeEngine {
     #[new]
-    #[pyo3(signature = (config, resolver=None))]
-    fn new(config: &str, resolver: Option<Py<PyAny>>) -> PyResult<Self> {
+    #[pyo3(signature = (config, resolver=None, spool_uploads=false))]
+    fn new(config: &str, resolver: Option<Py<PyAny>>, spool_uploads: bool) -> PyResult<Self> {
         let config: EngineConfig = decode(config).map_err(python_error)?;
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
             .enable_all()
             .build()
             .map_err(|_| PyValueError::new_err("storage runtime creation failed"))?;
-        let engine = build_engine(config, Arc::new(Credentials(resolver))).map_err(python_error)?;
+        let engine = build_engine_with_upload_strategy(
+            config,
+            Arc::new(Credentials(resolver)),
+            if spool_uploads {
+                UploadStrategy::PrivateFile
+            } else {
+                UploadStrategy::Buffered
+            },
+        )
+        .map_err(python_error)?;
         Ok(Self {
             engine,
             runtime: Mutex::new(Some(Arc::new(runtime))),

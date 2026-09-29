@@ -1,6 +1,7 @@
 """Soak the installed SDK with persistent engines against isolated Linux fixtures."""
 import argparse
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import ExitStack
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -32,6 +33,8 @@ def main():
                         help='Soak duration (default: 2 hours for every version; provisional policy)')
     parser.add_argument('--workers', type=int, default=4)
     parser.add_argument('--interval-seconds', type=float, default=30)
+    parser.add_argument('--both-upload-modes', action='store_true',
+                        help='Exercise persistent default and private-file engines within the same soak duration')
     args = parser.parse_args()
     if sys.platform != 'linux' or args.duration_seconds <= 0 or args.workers <= 0 or args.interval_seconds < 0:
         parser.error('requires Linux and positive duration/workers, with a nonnegative interval')
@@ -46,6 +49,9 @@ def main():
               'started_utc': datetime.now(timezone.utc).isoformat(),
               'workers': args.workers, 'payload_bytes': 65536, 'completed_cycles': 0,
               'providers': list(PROVIDERS), 'scope': 'persistent synchronous SDK, fixture servers, Linux'}
+    modes = ['buffered', 'private_file'] if args.both_upload_modes else ['buffered']
+    report.update(upload_modes=modes, completed_cycles_by_mode={mode: 0 for mode in modes},
+                  after_mode_provider={mode: {} for mode in modes})
     args.output.parent.mkdir(parents=True, exist_ok=True)
     started = time.monotonic()
 
@@ -73,13 +79,18 @@ def main():
                 credentials[f'fixture:{provider}'] = material
             prefix = 'qualification/soak-' + uuid.uuid4().hex
             policy = EngineConfig(allow_insecure_http=True, allow_insecure_ftp=True, allow_private_network=True)
-            with Engine(policy, credential_resolver=lambda reference: credentials[reference]) as engine, \
+            with ExitStack() as engines_stack, \
                     ThreadPoolExecutor(max_workers=args.workers) as pool:
-                def cycle(provider, worker):
+                engines = {mode: engines_stack.enter_context(Engine(
+                    policy, credential_resolver=lambda reference: credentials[reference],
+                    **({'spool_uploads': True} if mode == 'private_file' else {}))) for mode in modes}
+
+                def cycle(provider, worker, mode):
+                    engine = engines[mode]
                     connection = connections[provider]
-                    key = f'{prefix}/{provider}/{worker}/source'
-                    copied = f'{prefix}/{provider}/{worker}/copy'
-                    output = root / f'download-{provider}-{worker}'
+                    key = f'{prefix}/{mode}/{provider}/{worker}/source'
+                    copied = f'{prefix}/{mode}/{provider}/{worker}/copy'
+                    output = root / f'download-{mode}-{provider}-{worker}'
                     publication = 'atomic_required' if provider in ATOMIC else 'best_effort'
                     try:
                         engine.put(connection, key, source, overwrite=True, publication_policy=publication, timeout_ms=60000)
@@ -97,11 +108,15 @@ def main():
                             raise errors[0]
 
                 while True:
-                    for provider in PROVIDERS:
-                        tasks = [pool.submit(cycle, provider, worker) for worker in range(args.workers)]
-                        for task in tasks:
-                            task.result()
-                        report.setdefault('after_provider', {})[provider] = resources()
+                    for mode in modes:
+                        for provider in PROVIDERS:
+                            tasks = [pool.submit(cycle, provider, worker, mode) for worker in range(args.workers)]
+                            for task in tasks:
+                                task.result()
+                            current = resources()
+                            report.setdefault('after_provider', {})[provider] = current
+                            report['after_mode_provider'][mode][provider] = current
+                        report['completed_cycles_by_mode'][mode] += 1
                     current = resources()
                     if 'baseline' not in report:
                         report['baseline'] = current
