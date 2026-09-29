@@ -2,11 +2,12 @@
 
 ## Unreleased
 
-## 2.0.1 — in qualification
+## 2.0.1 — 2026-09-29
 
 - Reproduce MinIO disk pressure and recovery in a bounded disposable filesystem, preserving public error axes and requiring evidence for final Linux CLI bytes.
 - Reserve filesystem headroom before transfer campaigns and check again on retries.
 - Version the resumable Windows/VM qualification coordinator and publication controller; preserve failed attempts and verify source, configuration and artifact identity before resuming.
+- Publish through GitHub Releases after final Linux/Windows qualification, a complete two-hour soak following a VM reboot, and downloaded-asset verification. See `docs/release-2.0.1.md` for artifact identities and the preserved interrupted attempt.
 
 ## 2.0.0 — 2026-09-28
 

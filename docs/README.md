@@ -15,6 +15,7 @@ artefatti attestano una qualifica.
 | [Distribuzione](release.md) | Packaging e procedura di qualifica |
 | [Campagna VM](release-campaign.md) | Coordinamento riprendibile, pressione disco, riserva di spazio e pubblicazione |
 | [Release 2.0.0](release-2.0.0.md) | Chiusura del piano, prove finali, pubblicazione e limiti |
+| [Release 2.0.1](release-2.0.1.md) | Pressione disco, campagna ripresa dopo riavvio e prove della distribuzione pubblicata |
 | [Evidenze finali](release-evidence-bundle.md) | Bundle dei gate 1.0, benchmark e workflow di pubblicazione |
 | [Affidabilità](reliability.md) | Trasferimenti, coverage, fuzz e stress; identità delle misure riportate |
 | [Adozione dei contratti](contract-adoption.md) | Profilo e prove di conformità |
