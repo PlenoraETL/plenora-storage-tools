@@ -112,7 +112,6 @@ impl<T> tracing::instrument::Instrument for plenora_storage_engine::UploadStrate
 impl<T> tracing::instrument::WithSubscriber for plenora_storage_engine::UploadStrategy
 impl<T> typenum::type_operators::Same for plenora_storage_engine::UploadStrategy
 pub type plenora_storage_engine::UploadStrategy::Output = T
-impl<T> windows_core::imp::can_into::CanInto<T> for plenora_storage_engine::UploadStrategy where T: core::clone::Clone
 pub struct plenora_storage_engine::PutFileOptions
 pub plenora_storage_engine::PutFileOptions::content_type: core::option::Option<alloc::string::String>
 pub plenora_storage_engine::PutFileOptions::input: std::path::PathBuf

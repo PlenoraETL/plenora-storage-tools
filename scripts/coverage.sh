@@ -32,8 +32,15 @@ python3 scripts/run_logged.py .fixtures/evidence/coverage-spooled.log python3 sc
   --spool-uploads --output .fixtures/evidence/coverage-spooled.json
 python3 scripts/run_logged.py .fixtures/evidence/coverage-spooled-faults.log python3 scripts/qualify_extended_faults.py \
   --spool-uploads --output .fixtures/evidence/coverage-spooled-faults.json
+# The fault CLI runs as nobody. Give only its instrumentation files a writable
+# directory; the build tree and the tested destination permissions stay intact.
+fault_profiles="$(mktemp -d "$CARGO_TARGET_DIR/fault-profiles.XXXXXX")"
+chmod 1777 "$fault_profiles"
+LLVM_PROFILE_FILE="$fault_profiles/$(basename "$LLVM_PROFILE_FILE")" \
 python3 scripts/run_logged.py .fixtures/evidence/coverage-spooled-local-faults.log python3 scripts/qualify_local_faults.py \
   --spool-uploads --output .fixtures/evidence/coverage-spooled-local-faults.json
+find "$fault_profiles" -type f -name '*.profraw' -exec mv -t "$CARGO_TARGET_DIR" -- {} +
+rmdir "$fault_profiles"
 python3 scripts/run_logged.py .fixtures/evidence/coverage-python-build.log python3 scripts/build_python.py \
   --debug --environment .fixtures/coverage-sdk-env
 version="$(python3 scripts/release_version.py --python)"
