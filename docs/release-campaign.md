@@ -79,9 +79,19 @@ un retry: il lock Linux impedisce campagne sovrapposte, ma non interrompe da
 solo un processo remoto. I report selezionati per il bundle devono passare
 nuovamente i validatori finali.
 
+Dalla 2.1, se cambia soltanto l'indirizzo della stessa VM dopo un riavvio,
+`--connect-host <nuovo-indirizzo>` consente la ripresa senza modificare la
+configurazione già registrata. Richiede `--retry-reason` e le fasi precedenti
+alla VM già superate, compresa la qualifica Windows. Il collegamento continua
+a verificare la chiave SSH dell'host originale; una macchina con chiave diversa
+viene respinta. Il nuovo tentativo registra indirizzo di trasporto e digest
+della chiave. Se occorre preparare nuove fixture o rifare la qualifica Windows,
+creare invece una nuova campagna con la configurazione corretta.
+
 Prima di ogni nuova fase di trasferimento si controllano workspace, directory
 temporanea e filesystem dei dati delle fixture. La riserva è il maggiore tra
-8 GiB e il 10% del filesystem, più quattro payload per worker. È una policy
+8 GiB e il 10% del filesystem, più quattro payload per worker, oppure cinque
+quando si qualifica la preparazione privata su disco della 2.1. È una policy
 del laboratorio, non una soglia dichiarata del protocollo. Lo spazio viene
 ricontrollato anche nei retry. Nessun comando cancella automaticamente dati,
 evidenze o cache per aggirare il controllo.

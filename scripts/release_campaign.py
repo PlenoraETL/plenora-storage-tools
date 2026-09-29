@@ -12,6 +12,7 @@ from pathlib import Path, PurePosixPath
 import re
 import shlex
 import shutil
+import socket
 import subprocess
 import sys
 import tarfile
@@ -32,16 +33,24 @@ def one(folder, name):
 
 
 class Remote:
-    def __init__(self, config):
+    def __init__(self, config, connect_host=None):
         import paramiko
         self.client = paramiko.SSHClient()
         self.client.load_system_host_keys()
         self.client.load_host_keys(str(Path(config.get('known_hosts', '~/.ssh/known_hosts')).expanduser()))
         key = config.get('ssh_key')
         password = None if key else getpass.getpass('Dedicated VM password: ')
-        self.client.connect(config['host'], port=config.get('port', 22), username=config['user'],
-                            key_filename=str(Path(key).expanduser()) if key else None, password=password,
-                            allow_agent=False, look_for_keys=False, timeout=15)
+        transport = socket.create_connection((connect_host, config.get('port', 22)), timeout=15) if connect_host else None
+        try:
+            # The logical host remains the known_hosts lookup identity when a
+            # reboot changes only its network address. Never trust a new key.
+            self.client.connect(config['host'], port=config.get('port', 22), username=config['user'],
+                                key_filename=str(Path(key).expanduser()) if key else None, password=password,
+                                sock=transport, allow_agent=False, look_for_keys=False, timeout=15)
+        except BaseException:
+            if transport:
+                transport.close()
+            raise
         self.client.get_transport().set_keepalive(30)
 
     def run(self, command):
@@ -82,7 +91,20 @@ def configuration(path):
     return config
 
 
-def run(config_path, output, retries, reason, vm_retries):
+def validate_transport_resume(state, connect_host, reason):
+    """Address changes can resume a verified VM; fresh fixture preparation needs a new configuration."""
+    if not connect_host:
+        return
+    if not reason:
+        raise ValueError('transport address change requires a recorded reason')
+    phases = state.get('phases', {})
+    for name in ('workflows', 'download', 'assemble', 'prepare-vm', 'qualify-windows'):
+        attempts = phases.get(name, [])
+        if not attempts or attempts[-1]['status'] != 'PASS':
+            raise ValueError('transport address change requires completed pre-VM qualification')
+
+
+def run(config_path, output, retries, reason, vm_retries, connect_host=None):
     if sys.platform != 'win32':
         raise ValueError('orchestrator qualifies the Windows distribution locally; use a Windows host')
     config = configuration(config_path)
@@ -100,6 +122,7 @@ def run(config_path, output, retries, reason, vm_retries):
     remote = None
     with exclusive(output):
         campaign = Campaign(output, identity)
+        validate_transport_resume(campaign.state, connect_host, reason)
 
         def phase(name, action):
             print('Phase:', name, flush=True)
@@ -163,7 +186,7 @@ def run(config_path, output, retries, reason, vm_retries):
             logged([sys.executable, str(ROOT / 'scripts/verify_release.py'), str(path / 'dist' / version)], path, cwd=ROOT)
 
         assembled = phase('assemble', assemble)
-        remote = Remote(config)
+        remote = Remote(config, connect_host=connect_host)
         try:
             compose = (f'cd {q(remote_root)} && docker compose -p {q(project)} -f docker-compose.yml '
                        '-f compose.extended.yml -f .fixtures/compose.campaign.json')
@@ -224,6 +247,11 @@ def run(config_path, output, retries, reason, vm_retries):
             windows_result = phase('qualify-windows', windows)
 
             def vm(path):
+                if connect_host:
+                    import hashlib
+                    host_key = remote.client.get_transport().get_remote_server_key()
+                    write_json(path / 'transport.json', {'logical_host': config['host'], 'connect_host': connect_host,
+                               'host_key_sha256': hashlib.sha256(host_key.asbytes()).hexdigest(), 'reason': reason})
                 archive = path / 'linux-input.tar.gz'
                 with tarfile.open(archive, 'w:gz') as stream:
                     stream.add(assembled / 'dist' / version / TARGETS['linux'], arcname='dist/' + version + '/' + TARGETS['linux'])
@@ -295,5 +323,6 @@ if __name__ == '__main__':
     parser.add_argument('--retry-phase', action='append', default=[])
     parser.add_argument('--vm-retry-phase', action='append', default=[])
     parser.add_argument('--retry-reason')
+    parser.add_argument('--connect-host', help='New TCP address of the same known SSH host, only after Windows qualification passed')
     args = parser.parse_args()
-    run(args.config, args.output, args.retry_phase, args.retry_reason, args.vm_retry_phase)
+    run(args.config, args.output, args.retry_phase, args.retry_reason, args.vm_retry_phase, args.connect_host)
