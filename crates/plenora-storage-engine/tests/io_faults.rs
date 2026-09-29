@@ -6,6 +6,7 @@ use plenora_storage_core::{
     ErrorCategory, ErrorPhase, ExecutionControl, GetRequest, ListRequest, ProviderConnection,
     PublicationPolicy, PutRequest, RemoteEffect, RetryDisposition, StorageError, StorageResult,
 };
+use plenora_storage_engine::UploadStrategy;
 use std::{
     collections::BTreeMap,
     io,
@@ -127,7 +128,7 @@ fn redacted(error: &StorageError, provider: &str, phase: ErrorPhase) {
     clippy::too_many_lines,
     reason = "Apply the same source, sink and cleanup fault matrix to every provider"
 )]
-async fn exercise(provider: &str) {
+async fn exercise(provider: &str, strategy: UploadStrategy) {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
@@ -137,7 +138,7 @@ async fn exercise(provider: &str) {
     let local = std::env::temp_dir().join(&prefix);
     std::fs::create_dir(&local).unwrap();
     let (connection, resolver) = fixture(provider, &local);
-    let engine = plenora_storage_engine::build_engine(
+    let engine = plenora_storage_engine::build_engine_with_upload_strategy(
         EngineConfig {
             allow_private_network: true,
             allow_insecure_http: true,
@@ -145,6 +146,7 @@ async fn exercise(provider: &str) {
             ..EngineConfig::default()
         },
         Arc::new(resolver),
+        strategy,
     )
     .unwrap();
     let atomic = !matches!(provider, "ftp" | "ftps" | "smb" | "webdav");
@@ -291,7 +293,12 @@ async fn exercise(provider: &str) {
 
 #[tokio::test]
 async fn local_consumer_failures_preserve_the_published_object() {
-    exercise("local").await;
+    exercise("local", UploadStrategy::Buffered).await;
+}
+
+#[tokio::test]
+async fn local_prepared_consumer_failures_preserve_the_published_object() {
+    exercise("local", UploadStrategy::PrivateFile).await;
 }
 
 #[tokio::test]
@@ -300,6 +307,14 @@ async fn every_provider_preserves_consumer_io_failure_contracts() {
     for provider in [
         "local", "s3", "sftp", "ftp", "ftps", "azure", "gcs", "smb", "webdav",
     ] {
-        exercise(provider).await;
+        exercise(provider, UploadStrategy::Buffered).await;
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires five Linux storage fixtures and Python fixture discovery"]
+async fn prepared_providers_preserve_consumer_io_failure_contracts() {
+    for provider in ["local", "azure", "gcs", "smb", "webdav"] {
+        exercise(provider, UploadStrategy::PrivateFile).await;
     }
 }

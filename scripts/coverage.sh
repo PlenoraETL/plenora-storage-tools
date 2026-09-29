@@ -28,6 +28,12 @@ python3 scripts/run_logged.py .fixtures/evidence/coverage-cli.log python3 script
 python3 scripts/run_logged.py .fixtures/evidence/coverage-extended.log python3 scripts/qualify_extended.py
 python3 scripts/run_logged.py .fixtures/evidence/coverage-regressions.log python3 scripts/audit_release_readiness.py
 python3 scripts/run_logged.py .fixtures/evidence/coverage-extended-faults.log python3 scripts/qualify_extended_faults.py
+python3 scripts/run_logged.py .fixtures/evidence/coverage-spooled.log python3 scripts/qualify_extended.py \
+  --spool-uploads --output .fixtures/evidence/coverage-spooled.json
+python3 scripts/run_logged.py .fixtures/evidence/coverage-spooled-faults.log python3 scripts/qualify_extended_faults.py \
+  --spool-uploads --output .fixtures/evidence/coverage-spooled-faults.json
+python3 scripts/run_logged.py .fixtures/evidence/coverage-spooled-local-faults.log python3 scripts/qualify_local_faults.py \
+  --spool-uploads --output .fixtures/evidence/coverage-spooled-local-faults.json
 python3 scripts/run_logged.py .fixtures/evidence/coverage-python-build.log python3 scripts/build_python.py \
   --debug --environment .fixtures/coverage-sdk-env
 version="$(python3 scripts/release_version.py --python)"
@@ -35,6 +41,10 @@ python3 scripts/run_logged.py .fixtures/evidence/coverage-python-live.log \
   .fixtures/coverage-sdk-env/bin/python scripts/qualify_python.py \
     --wheel target/python-wheels/plenora_storage-"${version}"-*.whl \
     --output .fixtures/evidence/coverage-python-qualification.json
+python3 scripts/run_logged.py .fixtures/evidence/coverage-python-spooled.log \
+  .fixtures/coverage-sdk-env/bin/python scripts/qualify_python.py --spool-uploads \
+    --wheel target/python-wheels/plenora_storage-"${version}"-*.whl \
+    --output .fixtures/evidence/coverage-python-spooled.json
 cargo llvm-cov report --json --output-path .fixtures/evidence/rust-coverage.json
 python3 scripts/summarize_coverage.py .fixtures/evidence/rust-coverage.json \
   .fixtures/evidence/coverage-summary.json --policy scripts/coverage-policy.json
