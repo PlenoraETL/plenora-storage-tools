@@ -20,7 +20,8 @@ LEGACY_TESTS = {
     'webdav_partial_multistatus_not_success', 'webdav_commit_deadline_unknown',
 }
 EXPECTED_TESTS = LEGACY_TESTS | {'webdav_parent_race_reconciled', 'webdav_parent_not_directory_rejected'} | {
-    provider + '_mutation_not_retried' for provider in ['s3', 'azure', 'gcs', 'webdav']}
+    provider + suffix for provider in ['s3', 'azure', 'gcs', 'webdav']
+    for suffix in ('_mutation_not_retried', '_disk_pressure_redacted')}
 ENV = dict(os.environ, PLENORA_FAULT_CREDENTIALS=json.dumps({
     'bearer_token': SECRET, 'access_key_id': 'fixture', 'secret_access_key': SECRET}))
 
@@ -88,6 +89,7 @@ def main():
             process = subprocess.run(command, capture_output=True, text=True, env=ENV, timeout=15)
             assert not process.stderr and len(process.stdout.splitlines()) == 1, process
             assert SECRET not in process.stdout, 'credentials leaked'
+            assert endpoint not in process.stdout and 'untrusted-backend-diagnostic' not in process.stdout, 'backend details leaked'
             value = json.loads(process.stdout)
             assert (process.returncode == 0) == success, value
             return value
@@ -96,8 +98,10 @@ def main():
             results.append({'name': name, 'status': 'PASS'})
 
         for provider in ['s3', 'azure', 'gcs', 'webdav']:
-            for status in [500, 503, 429]:
+            for status in [500, 503, 429, 507]:
                 server.status = status
+                server.body = (b'<Error><Code>XMinioStorageFull</Code><Message>untrusted-backend-diagnostic '
+                               + SECRET.encode() + b'</Message></Error>') if status == 507 else b''
                 before = server.calls
                 policy = 'best-effort' if provider == 'webdav' else 'atomic-required'
                 result = invoke(provider, 'put', ('--key', 'payload', '--input', str(source),
@@ -105,8 +109,11 @@ def main():
                 assert server.calls == before + 1, 'mutation was automatically retried'
                 assert result['error']['remote_effect'] == 'unknown', result
                 assert result['error']['retry']['kind'] == 'requires_recovery', result
+                if status == 507:
+                    passed(provider + '_disk_pressure_redacted')
             passed(provider + '_mutation_not_retried')
 
+        server.body = b''
         server.status = 307
         server.redirect = f'http://127.0.0.1:{redirect_target.server_port}/stolen'
         for provider in ['azure', 'gcs', 'webdav']:

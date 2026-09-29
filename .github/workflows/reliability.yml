@@ -54,6 +54,8 @@ jobs:
               set -euo pipefail
               cargo build --release --locked -p plenora-storage-cli
               python3 scripts/fuzz_cli_inputs.py --output .fixtures/evidence/fuzz-cli.json
+              python3 scripts/check_disk_space.py --bytes "$PAYLOAD_BYTES" --workers "$WORKERS" \
+                --output .fixtures/evidence/disk-space.json
               python3 scripts/qualify_transfers.py --bytes "$PAYLOAD_BYTES" --workers "$WORKERS" --rounds "$ROUNDS" \
                 --output .fixtures/evidence/large-transfers.json
             '

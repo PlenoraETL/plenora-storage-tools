@@ -7,6 +7,7 @@ never trust a summary's PASS alone or substitute another build of the same SHA.
 from collections import Counter
 import hashlib
 import json
+import re
 from pathlib import Path
 
 from check_installed_sdk import enforce_coverage, test_count
@@ -18,6 +19,7 @@ from fixture_connections import BUFFERED, PROVIDERS
 from fuzz_parsers import TARGETS as FUZZ_TARGETS, stats
 from summarize_coverage import apply_thresholds, summarize
 from scan_artifacts import validate as validate_native_inventory
+from qualify_s3_disk_pressure import validate as validate_disk_pressure
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS = ('x86_64-unknown-linux-gnu', 'x86_64-pc-windows-msvc')
@@ -105,6 +107,9 @@ subjects maps target triples to binary_sha256 and wheel_sha256 from manifests
 already checked by verify_release.py. No caller-supplied waiver is accepted.
 """
     evidence = Evidence(root)
+    version_core = tuple(map(int, re.match(r'(\d+)\.(\d+)\.(\d+)', python_version).groups()))
+    if version_core >= (2, 0, 1):
+        validate_disk_pressure(evidence.json('disk-pressure/report.json'), revision, subjects[TARGETS[0]]['binary_sha256'])
     if int(python_version.split('.', 1)[0]) >= 2:
         for target in TARGETS:
             validate_native_inventory(evidence, 'native-components/' + target, revision, subjects[target])

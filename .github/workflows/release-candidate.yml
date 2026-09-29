@@ -7,6 +7,30 @@ permissions:
   contents: read
 
 jobs:
+  disk-pressure:
+    needs: linux
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: storage-candidate-linux
+          path: target/disk-pressure-input
+      - run: docker compose build minio
+      - name: Exercise the candidate under isolated backend disk pressure
+        run: |
+          binary="$(find target/disk-pressure-input -type f -name plenora-storage)"
+          test -f "$binary"
+          chmod +x "$binary"
+          python3 scripts/qualify_s3_disk_pressure.py --binary "$binary" --output target/disk-pressure/report.json
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-disk-pressure
+          path: target/disk-pressure/
+          if-no-files-found: error
+
   native-components:
     needs: [linux, windows]
     runs-on: ubuntu-24.04

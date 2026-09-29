@@ -1,0 +1,125 @@
+"""Qualify exact Linux distributions with resumable, separately recorded attempts."""
+import argparse
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import venv
+
+from campaign_state import Campaign, digest, exclusive, logged, write_json
+from check_disk_space import GIB, inspect
+from soak_policy import SOAK_DURATION_SECONDS
+
+ROOT = Path(__file__).resolve().parents[1]
+TARGET = 'x86_64-unknown-linux-gnu'
+
+
+def identity(folder, baseline):
+    manifest = json.loads((folder / 'release-manifest.json').read_text())
+    revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+    if (manifest['target'] != TARGET or manifest['source_revision'] != revision or not manifest['source_committed']
+            or subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()):
+        raise ValueError('campaign requires matching committed Linux artifacts and clean source')
+    subjects = {row['name']: digest(folder / row['name']) for row in manifest['artifacts']}
+    if any(subjects[row['name']] != row['sha256'] for row in manifest['artifacts']):
+        raise ValueError('campaign distribution bytes differ from manifest')
+    return {'source_revision': revision, 'version': manifest['version'], 'artifacts': subjects,
+            'baseline_binary_sha256': digest(baseline), 'soak_seconds': SOAK_DURATION_SECONDS,
+            'performance_rounds': 30, 'large_transfer_rounds': 2}
+
+
+def run(folder, baseline, output, retries, reason, backend_data):
+    if sys.platform != 'linux':
+        raise ValueError('VM campaign requires Linux')
+    folder, baseline, output = folder.resolve(), baseline.resolve(), output.resolve()
+    subject = identity(folder, baseline)
+    binary = folder / 'plenora-storage'
+    wheels = list(folder.glob('*.whl'))
+    if len(wheels) != 1:
+        raise ValueError('campaign requires exactly one wheel')
+    wheel = wheels[0]
+    # Later imports must not mutate an already inventoried SDK installation.
+    env = dict(os.environ, PLENORA_CLI_BIN=str(binary), PYTHONDONTWRITEBYTECODE='1')
+    spaces = {'workspace': ROOT, 'temporary': Path('/tmp'),
+              **{f'backend-{index}': path for index, path in enumerate(backend_data)}}
+    subject['space_locations'] = {label: str(path.resolve()) for label, path in spaces.items()}
+    with exclusive(output):
+        campaign = Campaign(output, subject)
+
+        def phase(name, action):
+            return campaign.phase(name, action, retry=name in retries, reason=reason)
+
+        def command(path, script, *arguments, environment=env, python=sys.executable):
+            logged([str(python), str(ROOT / 'scripts' / script), *map(str, arguments)],
+                   path, cwd=ROOT, env=environment)
+
+        def transfers(path, *, size, workers, rounds, environment=env):
+            space = inspect(spaces, size, workers)
+            write_json(path / 'disk-space.json', space)
+            if space['status'] != 'PASS':
+                raise ValueError('insufficient transfer headroom; no transfer started')
+            command(path, 'qualify_transfers.py', '--bytes', size, '--workers', workers, '--rounds', rounds,
+                    '--output', path / 'report.json', environment=environment)
+
+        def qualify(path):
+            copy = path / 'dist' / subject['version'] / TARGET
+            shutil.copytree(folder, copy)
+            command(path, 'qualify_target.py', copy)
+
+        qualified = phase('qualify-linux', qualify)
+
+        def sdk(path):
+            venv.EnvBuilder(with_pip=True).create(path / 'sdk')
+            python = path / 'sdk/bin/python'
+            logged([str(python), '-m', 'pip', 'install', '--no-index', str(wheel)], path, cwd=ROOT)
+            write_json(path / 'wheel.json', {'sha256': digest(wheel)})
+
+        installed = phase('install-sdk', sdk)
+        old = phase('performance-baseline', lambda path: transfers(path, size=1024**2, workers=4, rounds=30,
+                      environment=dict(env, PLENORA_CLI_BIN=str(baseline))))
+        new = phase('performance-candidate', lambda path: transfers(path, size=1024**2, workers=4, rounds=30))
+        comparison = phase('performance-compare', lambda path: command(path, 'check_performance.py',
+                           old / 'report.json', new / 'report.json', '--output', path / 'report.json'))
+        large = phase('transfers-large', lambda path: transfers(path, size=GIB, workers=1, rounds=2))
+        four = phase('transfers-workers4', lambda path: transfers(path, size=1024**2, workers=4, rounds=2))
+        sixteen = phase('transfers-workers16', lambda path: transfers(path, size=1024**2, workers=16, rounds=1))
+        soak = phase('soak', lambda path: command(path, 'stress_python.py', '--wheel', wheel, '--workers', 4,
+                     '--interval-seconds', 30, '--duration-seconds', SOAK_DURATION_SECONDS,
+                     '--output', path / 'report.json', python=installed / 'sdk/bin/python'))
+        selected = {'performance/baseline.json': old / 'report.json',
+                    'performance/candidate.json': new / 'report.json', 'performance/report.json': comparison / 'report.json',
+                    'transfers/large.json': large / 'report.json', 'transfers/workers4.json': four / 'report.json',
+                    'transfers/workers16.json': sixteen / 'report.json', 'soak/report.json': soak / 'report.json'}
+        for name, source in selected.items():
+            destination = output / 'selected/gates' / name
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            if destination.exists() and digest(destination) != digest(source):
+                raise ValueError('selected evidence differs; use a new collection directory')
+            if not destination.exists():
+                shutil.copyfile(source, destination)
+        qualified_target = qualified / 'dist' / subject['version'] / TARGET
+        reports = output / 'selected/linux-qualification'
+        reports.mkdir(parents=True, exist_ok=True)
+        for source in qualified_target.glob('*.json'):
+            destination = reports / source.name
+            if destination.exists() and digest(destination) != digest(source):
+                raise ValueError('selected qualification differs')
+            if not destination.exists():
+                shutil.copyfile(source, destination)
+        write_json(output / 'selected/report.json', {'status': 'PASS', 'identity': subject,
+                   'files': {name: digest(path) for name, path in selected.items()}})
+        print('PASS complete VM campaign; selected evidence is ready for final validation')
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('distribution', type=Path)
+    parser.add_argument('--baseline-binary', required=True, type=Path)
+    parser.add_argument('--output', required=True, type=Path)
+    parser.add_argument('--backend-data', type=Path, action='append', default=[])
+    parser.add_argument('--retry-phase', action='append', default=[])
+    parser.add_argument('--retry-reason')
+    args = parser.parse_args()
+    run(args.distribution, args.baseline_binary, args.output, args.retry_phase, args.retry_reason, args.backend_data)

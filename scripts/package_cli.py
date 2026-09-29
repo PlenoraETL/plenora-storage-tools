@@ -14,6 +14,7 @@ DOCUMENTS = [
     'docs/quality-alignment-progress.md',
     'docs/roadmap-2.0.0.md', 'docs/quality-2.0.md', 'docs/migration-2.0.md',
     'docs/code-size-baseline-1.0.0.json',
+    'docs/release-campaign.md', 'docs/release-notes-2.0.1.md',
     'docs/migration-1.0.md', 'docs/reliability.md', 'docs/compatibility-1.0.md',
     'docs/webdav-compatibility.md',
     'docs/performance-calibration.md',

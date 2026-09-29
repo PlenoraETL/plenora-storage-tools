@@ -1,5 +1,10 @@
 # Qualifica e distribuzione
 
+Dalla 2.0.1 la [campagna VM versionata](release-campaign.md) coordina download,
+fixture, prove dei due target e raccolta dei report con checkpoint verificati.
+Il bundle richiede inoltre `disk-pressure/report.json`, prodotto dal job
+`disk-pressure` del candidato sui byte finali Linux.
+
 Per la serie 2.0 si aggiunge l'[inventario degli artefatti nativi](quality-2.0.md):
 il bundle dei gate deve includere `native-components/<target>/` per entrambi i
 target. `release-candidate.yml` lo produce con lo scanner fissato dalla policy;
