@@ -13,7 +13,10 @@ use std::{
     path::Path,
     pin::Pin,
     process::Command,
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
     task::{Context, Poll},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -21,6 +24,7 @@ use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 const PRIVATE_ERROR: &str = "private-callback-content-never-expose";
 const PAYLOAD: &[u8] = b"previous-object-content-must-survive";
+static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 
 struct Resolver(BTreeMap<String, String>);
 impl CredentialResolver for Resolver {
@@ -133,7 +137,10 @@ async fn exercise(provider: &str, strategy: UploadStrategy) {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    let prefix = format!("io-fault-{}-{nonce}", std::process::id());
+    // Windows clock resolution can give concurrent strategies the same timestamp.
+    // Allocate a distinct namespace for each exercise, including fixture providers.
+    let sequence = NEXT_FIXTURE.fetch_add(1, Ordering::Relaxed);
+    let prefix = format!("io-fault-{}-{nonce}-{sequence}", std::process::id());
     let key = format!("{prefix}/object");
     let local = std::env::temp_dir().join(&prefix);
     std::fs::create_dir(&local).unwrap();
