@@ -2,32 +2,21 @@
 import hashlib
 from pathlib import Path
 import stat
+import subprocess
 import tarfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCUMENTS = [
-    'README.md', 'LICENSE-MIT', 'LICENSE-APACHE', 'docs/release.md',
-    'docs/contract-adoption.md', 'docs/release-readiness.md', 'docs/provider-expansion.md',
-    'docs/STATO.md', 'docs/database-alignment.md', 'docs/architecture.md',
-    'docs/README.md', 'docs/database-reference-review.md', 'docs/release-evidence-bundle.md',
-    'docs/quality-alignment-progress.md',
-    'docs/roadmap-2.0.0.md', 'docs/quality-2.0.md', 'docs/migration-2.0.md',
-    'docs/code-size-baseline-1.0.0.json',
-    'docs/release-campaign.md', 'docs/release-notes-2.0.1.md',
-    'docs/large-transfers.md', 'docs/roadmap-2.1.0.md',
-    'docs/migration-1.0.md', 'docs/reliability.md', 'docs/compatibility-1.0.md',
-    'docs/webdav-compatibility.md',
-    'docs/performance-calibration.md',
-    'docs/evidence/performance-2026-09-27/baseline.json.gz',
-    'docs/evidence/performance-2026-09-27/candidate.json.gz',
-    'docs/evidence/performance-2026-09-27/original-comparison.json',
-    'docs/evidence/performance-2026-09-27/calibrated-comparison.json',
+    'README.md', 'LICENSE-MIT', 'LICENSE-APACHE',
     'crates/plenora-storage-py/README.md',
     'crates/plenora-storage-py/examples/local_roundtrip.py',
     'crates/plenora-smb2/PROVENANCE.md', 'crates/plenora-smb2/LICENSE-MIT',
     'crates/plenora-smb2/LICENSE-APACHE',
 ]
+# Ship the complete committed documentation tree, including the release reports
+# linked by its index. Untracked working notes must never enter a distribution.
+DOCUMENTS += sorted(subprocess.check_output(['git', 'ls-files', '--', 'docs'], cwd=ROOT, text=True).splitlines())
 
 
 def verify_archive(archive, binary):

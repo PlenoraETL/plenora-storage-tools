@@ -53,6 +53,10 @@ La directory VM include versione e commit; non riutilizza altri progetti Compose
 Le porte delle fixture devono essere disponibili. Al termine produce un bundle
 `qualification-input.tar.gz` solo dopo la validazione completa delle evidenze.
 
+Il certificato FTPS contiene l'host della configurazione come SAN, senza IP
+del laboratorio incorporati nello script. Per preparazioni manuali impostare
+`PLENORA_FIXTURE_HOST`; il default aggiunge `127.0.0.1` al nome Docker `ftps`.
+
 `scripts/run_vm_campaign.py` è il runner Linux interno. Usa gli artefatti
 immutabili come input e scrive i report in tentativi distinti. Qualifica della
 CLI, installazione SDK, baseline/candidato prestazionale, confronto, trasferimenti

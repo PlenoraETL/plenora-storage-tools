@@ -218,6 +218,7 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
                 script = ('#!/usr/bin/env bash\nset -euo pipefail\ncd ' + q(remote_root) + '\n'
                           + f"exec >{attempt}.log 2>&1\ntrap 'printf \"%s\\n\" \"$?\" >{attempt}.exit' EXIT\n"
                           + 'export COMPOSE_PROJECT_NAME=' + q(project) + '\n'
+                          + 'export PLENORA_FIXTURE_HOST=' + q(config['host']) + '\n'
                           + 'bash scripts/prepare-fixtures.sh\nbash scripts/prepare-extended-fixtures.sh\n')
                 remote.write(remote_root + '/.fixtures/prepare.sh', script)
                 remote.run(f'cd {q(remote_root)} && (nohup bash .fixtures/prepare.sh >/dev/null 2>&1 </dev/null & echo started)')

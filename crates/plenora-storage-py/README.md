@@ -9,7 +9,7 @@ Distribution is through [GitHub Releases](https://github.com/PlenoraETL/plenora-
 When a qualified release is published, download the wheel for your platform,
 verify its SHA-256 against the release checksums and install the downloaded file
 with `python -m pip install <wheel-file>`. The
-[2.0.0 release](https://github.com/PlenoraETL/plenora-storage-tools/releases/tag/v2.0.0)
+[2.0.1 release](https://github.com/PlenoraETL/plenora-storage-tools/releases/tag/v2.0.1)
 is published; the 2.1 source tree is a development preview requiring its own qualification.
 The supported targets and fixture-only compatibility scope are listed in the
 [compatibility matrix](../../docs/compatibility-1.0.md).

@@ -14,7 +14,7 @@ default-members = ["crates/plenora-storage-core", "crates/plenora-storage-engine
 resolver = "3"
 
 [workspace.package]
-version = "2.1.0-alpha.1"
+version = "2.1.0"
 edition = "2024"
 rust-version = "1.92"
 license = "MIT OR Apache-2.0"
@@ -44,7 +44,7 @@ suppaftp = { version = "=12.0.1", default-features = false, features = ["tokio-r
 tokio-rustls = { version = "=0.26.5", default-features = false, features = ["aws_lc_rs", "tls12"] }
 rustls-native-certs = "=0.8.4"
 cap-std = "=4.0.3"
-smb2 = { package = "plenora-smb2", path = "crates/plenora-smb2", version = "2.1.0-alpha.1" }
+smb2 = { package = "plenora-smb2", path = "crates/plenora-smb2", version = "2.1.0" }
 thiserror = "=2.0.20"
 time = { version = "=0.3.55", features = ["formatting", "parsing"] }
 tokio = { version = "1.53.1", features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
