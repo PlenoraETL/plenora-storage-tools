@@ -16,7 +16,7 @@ use url::Url;
 const MAX_SINGLE_PUT: u64 = 5_000 * 1024 * 1024;
 
 pub(super) struct FileUpload {
-    client: reqwest::Client,
+    connector: http::Connector,
     root: Url,
     account: String,
     container: String,
@@ -37,9 +37,7 @@ impl FileUpload {
             None
         };
         Ok(Self {
-            client: connector
-                .client()
-                .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Connect, false))?,
+            connector: connector.clone(),
             root: Url::parse(&config.endpoint).map_err(|_| invalid("ENDPOINT_INVALID"))?,
             account: config.account.clone(),
             container: config.container.clone(),
@@ -57,6 +55,12 @@ impl FileUpload {
         if size > MAX_SINGLE_PUT {
             return Err(crate::common::limit_error());
         }
+        // Buffered and read-only operations use object_store's client. Build this
+        // separate transport only for a prepared upload, retaining the pinned DNS.
+        let client = self
+            .connector
+            .client()
+            .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Connect, false))?;
         let mut url = self.root.clone();
         {
             let mut path = url
@@ -109,8 +113,7 @@ impl FileUpload {
             HeaderValue::from_str(&authorization).map_err(|_| invalid("AZURE_SIGNING_FAILED"))?;
         authorization.set_sensitive(true);
         headers.insert("authorization", authorization);
-        let response = self
-            .client
+        let response = client
             .put(url)
             .headers(headers)
             .body(reqwest::Body::wrap_stream(

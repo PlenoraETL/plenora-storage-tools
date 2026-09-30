@@ -24,7 +24,7 @@ pub fn endpoint(value: &str, policy: &EngineConfig) -> StorageResult<Url> {
     Ok(url)
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Connector {
     host: String,
     addresses: Vec<SocketAddr>,

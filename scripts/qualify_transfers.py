@@ -21,6 +21,14 @@ import uuid
 from fixture_connections import ATOMIC, BUFFERED, PROVIDERS, ROOT, fixture
 
 
+class OperationFailure(AssertionError):
+    """Retain only public error axes when a qualification operation fails."""
+
+    def __init__(self, operation, axes):
+        self.axes = axes
+        super().__init__(f'{operation}: unexpected result: {axes}')
+
+
 def measurement_environment():
     """Identify the test platform without recording host names or endpoints."""
     fixture_files = subprocess.check_output(['git', 'ls-files', '--', 'docker'], cwd=ROOT, text=True).splitlines()
@@ -80,7 +88,7 @@ def invoke(binary, connection, env, operation, arguments, max_bytes, timeout, rs
     if response['status'] != expected or (expected == 'ok' and process.returncode != 0):
         error = response.get('error', {})
         axes = {name: error.get(name) for name in ('code', 'category', 'phase', 'remote_effect', 'retry')}
-        raise AssertionError(f'{operation}: unexpected result: {axes}')
+        raise OperationFailure(operation, axes)
     peak = measure['peak_rss_bytes']
     if not peak:
         raise AssertionError(f'{operation}: process memory was not measured')
@@ -149,10 +157,11 @@ def roundtrip(binary, provider, source, source_hash, size, root, timeout, rss_li
         for name in [key, copied]:
             try:
                 call('delete', '--key', name, '--ignore-missing', 'true')
-            except Exception:
-                failures.append(name)
+            except Exception as error:
+                failures.append({'key': name, 'failure_type': type(error).__name__,
+                                 'axes': error.axes if isinstance(error, OperationFailure) else {}})
         if failures and sys.exc_info()[0] is None:
-            raise RuntimeError('fixture cleanup failed for operation-owned objects')
+            raise RuntimeError('fixture cleanup failed for operation-owned objects: ' + json.dumps(failures))
     return {'provider': provider, 'mode': mode, 'payload_bytes': size, 'status': 'PASS', 'measurements': measures}
 
 
