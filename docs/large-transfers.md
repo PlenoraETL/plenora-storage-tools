@@ -1,7 +1,7 @@
 # Trasferimenti preparati su disco: 2.1
 
-Questa funzionalità è implementata e richiede ancora la qualifica sugli
-artefatti finali. Si abilita esplicitamente per put e copy su local,
+La [release 2.1.0](release-2.1.0.md) include questa funzionalità con prove
+vincolate agli artefatti finali. Si abilita esplicitamente per put e copy su local,
 Azure, GCS, SMB e WebDAV. Le chiamate esistenti conservano la preparazione in
 memoria e il limite `max_buffered_put_bytes`.
 

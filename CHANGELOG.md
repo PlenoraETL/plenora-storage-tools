@@ -2,12 +2,13 @@
 
 ## Unreleased
 
-## 2.1.0 — in qualification
+## 2.1.0 — 2026-09-30
 
 - Add explicit private-file upload preparation for local, Azure, GCS, SMB and WebDAV through Rust, CLI and Python, preserving default buffered limits.
 - Validate length, transfer bounds and checksum before publication; retain provider-specific conditional writes and error effects.
 - Require separate private-file CLI/SDK, large-transfer and concurrency evidence, and exercise both upload strategies during the same two-hour soak.
 - Bind fixture TLS certificates to the configured VM host and include the complete tracked documentation tree in CLI archives.
+- Publish qualified Linux/Windows distributions after a complete two-hour soak, exact-artifact performance comparison on an isolated runner and downloaded-asset verification. Preserve earlier failed measurements in `docs/release-2.1.0.md`.
 
 ## 2.0.1 — 2026-09-29
 

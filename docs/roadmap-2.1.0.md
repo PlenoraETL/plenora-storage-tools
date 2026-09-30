@@ -1,7 +1,8 @@
 # Piano 2.1.0: trasferimenti grandi sui provider aggiuntivi
 
-Stato: implementazione completata, 2.1.0 in qualifica. La 2.0.1 è pubblicata;
-le prove di sviluppo seguenti non qualificano gli artefatti finali della 2.1.0.
+Stato: completato; la [2.1.0 è pubblicata](release-2.1.0.md) con qualifica e
+verifica degli asset scaricati. Le prove di sviluppo seguenti conservano il
+proprio ambito e non vengono riutilizzate come evidenze degli artefatti finali.
 
 ## Obiettivo e compatibilità
 
@@ -67,7 +68,7 @@ I test dei vecchi limiti restano attivi nella modalità predefinita; le prove
 della nuova modalità devono essere distinte e vincolate ai digest finali.
 Nessun account cloud reale o server commerciale è qualificato per inferenza.
 
-## Avanzamento e prove ancora necessarie
+## Prove di sviluppo precedenti alla qualifica
 
 Le tre superfici espongono l'opzione descritta nella
 [guida ai trasferimenti grandi](large-transfers.md). I test locali Windows
@@ -80,8 +81,10 @@ due round da 1 GiB su tutti e nove i provider, 72 trasferimenti con 4 worker
 e 144 con 16 worker. Nei cinque nuovi percorsi il picco RSS rilevato è
 21.241.856 byte. Lo SDK installato ha completato una prova diagnostica di
 121,266 secondi, con tre cicli per ciascuna modalità: non è il soak di rilascio.
-Restano obbligatorie tutte le prove sui nuovi artefatti finali, incluso il soak
-di due ore. I report di sviluppo non vengono riutilizzati come ricevuta finale.
+All'epoca restavano obbligatorie tutte le prove sui nuovi artefatti finali,
+incluso il soak di due ore. I report di sviluppo non sono stati riutilizzati
+come ricevuta finale; il [resoconto della release](release-2.1.0.md) descrive
+le campagne complete e i tentativi falliti conservati.
 
 La qualifica per target produce tre report separati `spooled-*.json`.
 Il validatore della release li richiede dalla 2.1, insieme ai trasferimenti

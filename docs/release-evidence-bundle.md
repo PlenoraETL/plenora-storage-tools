@@ -63,6 +63,19 @@ Un fallimento va indagato e le revisioni della policy richiedono dati conservati
 Il workflow [reliability](../.github/workflows/reliability.yml) espone l'opzione
 `performance` per eseguire due campagne e il confronto sullo stesso runner.
 
+Per misurare distribuzioni già costruite, lo stesso workflow accetta
+`candidate_run`, `baseline_tag` e `baseline_sha256`. Il primo identifica una
+esecuzione riuscita di `release-candidate`; gli altri identificano una release
+stabile pubblicata e il digest atteso della sua CLI Linux. Il job scarica gli
+artefatti, verifica i digest e usa il checkout pulito del candidato. Esegue
+trenta round da 1 MiB con quattro worker per ciascun binario, sulle stesse
+fixture, senza ricompilare i binari misurati. Pubblica i tre report originali,
+le identità e le verifiche di spazio nell'artefatto
+`qualified-performance-evidence`. Questa modalità esegue solo il confronto
+prestazionale; qualifica per target, trasferimenti grandi e soak hanno le
+proprie prove obbligatorie. La [2.1.0](release-2.1.0.md) ne conserva un'esecuzione
+completa riferita ai propri artefatti.
+
 ## Pubblicazione
 
 Il workflow [release](../.github/workflows/release.yml) parte da un tag già

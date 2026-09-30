@@ -4,14 +4,14 @@ Libreria Rust, CLI e SDK Python per accedere a nove sistemi di storage con gli s
 contratti pubblici: S3-compatible, SFTP, FTP, filesystem locale, FTPS,
 Azure Blob / ADLS Gen2, SMB, Google Cloud Storage e WebDAV.
 
-La [release 2.0.1](https://github.com/PlenoraETL/plenora-storage-tools/releases/tag/v2.0.1)
-è pubblicata; il [resoconto di qualifica](docs/release-2.0.1.md) riporta prove e limiti.
+La [release 2.1.0](https://github.com/PlenoraETL/plenora-storage-tools/releases/tag/v2.1.0)
+è pubblicata; il [resoconto di qualifica](docs/release-2.1.0.md) riporta prove e limiti.
 
-Questo ramo prepara la [2.1](docs/roadmap-2.1.0.md): trasferimenti grandi su
-cinque provider tramite [preparazione privata su disco](docs/large-transfers.md).
-La nuova modalità è un'opzione esplicita e non è ancora qualificata per il rilascio.
+La [2.1](docs/roadmap-2.1.0.md) aggiunge trasferimenti grandi su cinque provider
+tramite [preparazione privata su disco](docs/large-transfers.md), disponibile
+come opzione esplicita in Rust, CLI e SDK Python.
 
-Il [perimetro di compatibilità](docs/compatibility-1.0.md), mantenuto nella serie 2.0,
+Il [perimetro di compatibilità](docs/compatibility-1.0.md), mantenuto nella serie 2.x,
 riguarda le fixture dichiarate, tra cui MinIO, Azurite e fake-gcs-server.
 Le prove su AWS S3, Azure Blob e GCS reali sono rinviate: i tre adapter restano
 disponibili, ma i servizi cloud gestiti non sono ancora qualificati.
@@ -21,7 +21,7 @@ separa i resoconti storici. L'inventario deriva dal codice in
 [docs/STATO.md](docs/STATO.md). Il [modello di qualità](docs/database-alignment.md)
 segue Database Tools. Il [confronto storico](docs/database-reference-review.md)
 descrive la situazione della RC1; [Qualità 2.0](docs/quality-2.0.md) e il
-[piano corrente](docs/roadmap-2.0.0.md) registrano gli interventi e la qualifica.
+[piano 2.0](docs/roadmap-2.0.0.md) registrano gli interventi e la qualifica.
 Configurazione, credenziali, garanzie e sistemi effettivamente verificati sono
 nella [guida ai nuovi provider](docs/provider-expansion.md).
 La qualifica della release è separata dalla build:
@@ -89,9 +89,10 @@ processi. La libreria Rust conserva la paginazione per Engine.
   di probe e nessun file non creato da questo comando viene mai sostituito o
   rimosso. Richiede un filesystem che supporti gli hard link.
 - Le upload condizionali (`overwrite=false` su S3) devono essere bufferizzate in
-  memoria. Anche local, Azure, GCS, SMB e WebDAV bufferizzano put/copy. Il limite
-  è `--max-buffered-put-bytes`, distinto da
-  `--max-transfer-bytes`, che riguarda i trasferimenti in streaming.
+  memoria. Nella modalità predefinita anche local, Azure, GCS, SMB e WebDAV
+  bufferizzano put/copy, con limite `--max-buffered-put-bytes`. Per questi cinque
+  provider `--spool-uploads` abilita la preparazione su disco e usa il limite
+  totale `--max-transfer-bytes`, conservando i vincoli di pubblicazione del provider.
 - `copy` rifiuta sorgente e destinazione uguali prima di qualunque mutazione.
 
 ## Sviluppo Docker

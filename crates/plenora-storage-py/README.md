@@ -9,8 +9,9 @@ Distribution is through [GitHub Releases](https://github.com/PlenoraETL/plenora-
 When a qualified release is published, download the wheel for your platform,
 verify its SHA-256 against the release checksums and install the downloaded file
 with `python -m pip install <wheel-file>`. The
-[2.0.1 release](https://github.com/PlenoraETL/plenora-storage-tools/releases/tag/v2.0.1)
-is published; the 2.1 source tree is a development preview requiring its own qualification.
+[2.1.0 release](https://github.com/PlenoraETL/plenora-storage-tools/releases/tag/v2.1.0)
+is published; its [qualification report](../../docs/release-2.1.0.md) identifies
+the tested artifacts and their limits.
 The supported targets and fixture-only compatibility scope are listed in the
 [compatibility matrix](../../docs/compatibility-1.0.md).
 
@@ -35,7 +36,7 @@ reference and returns a mapping of provider-specific secret fields. Callbacks
 must be thread-safe and bounded; Python callbacks cannot be forcibly interrupted.
 Callback exception text is never exposed in storage errors.
 
-The 2.1 preview adds `Engine(spool_uploads=True)` and
+Version 2.1 adds `Engine(spool_uploads=True)` and
 `AsyncEngine(spool_uploads=True)` for private temporary-file preparation on local,
 Azure, GCS, SMB and WebDAV. Existing calls retain their buffered limits. See the
 [large-transfer guide](../../docs/large-transfers.md) for total-size limits,

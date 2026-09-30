@@ -10,7 +10,7 @@ artefatti attestano una qualifica.
 | [Architettura](architecture.md) | Responsabilità e confini dei componenti |
 | [API 1.0](api-1.0.md) e [inventario API](API-INVENTORY.md) | Contratti pubblici e baseline di compatibilità |
 | [SDK Python](../crates/plenora-storage-py/README.md) | Utilizzo sync/async e lifecycle |
-| [Trasferimenti grandi](large-transfers.md) | Anteprima 2.1: opzione esplicita, limiti e preparazione privata su disco |
+| [Trasferimenti grandi](large-transfers.md) | Opzione esplicita, limiti e preparazione privata su disco dalla 2.1 |
 | [Piano 2.1](roadmap-2.1.0.md) | Implementazione e prove richieste per i cinque provider aggiuntivi |
 | [Compatibilità 1.0](compatibility-1.0.md) | Sistemi e limiti del supporto dichiarato |
 | [Provider](provider-expansion.md) | Configurazione e garanzie dei sei adapter aggiunti dalla 0.2.0 |
@@ -18,6 +18,7 @@ artefatti attestano una qualifica.
 | [Campagna VM](release-campaign.md) | Coordinamento riprendibile, pressione disco, riserva di spazio e pubblicazione |
 | [Release 2.0.0](release-2.0.0.md) | Chiusura del piano, prove finali, pubblicazione e limiti |
 | [Release 2.0.1](release-2.0.1.md) | Pressione disco, campagna ripresa dopo riavvio e prove della distribuzione pubblicata |
+| [Release 2.1.0](release-2.1.0.md) | Trasferimenti grandi, entrambe le modalità, confronto isolato e prove finali pubblicate |
 | [Evidenze finali](release-evidence-bundle.md) | Bundle dei gate 1.0, benchmark e workflow di pubblicazione |
 | [Affidabilità](reliability.md) | Trasferimenti, coverage, fuzz e stress; identità delle misure riportate |
 | [Adozione dei contratti](contract-adoption.md) | Profilo e prove di conformità |
