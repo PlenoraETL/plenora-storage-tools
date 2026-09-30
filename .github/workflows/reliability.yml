@@ -29,12 +29,22 @@ on:
         type: choice
         options: ['0', '10', '60', '120']
         default: '120'
+      candidate_run:
+        description: Successful release-candidate run to compare exact Linux artifacts (empty uses development mode)
+        default: ''
+      baseline_tag:
+        description: Published stable baseline tag for exact-artifact comparison
+        default: ''
+      baseline_sha256:
+        description: Qualified baseline Linux CLI SHA-256
+        default: ''
 
 permissions:
   contents: read
 
 jobs:
   transfers:
+    if: ${{ inputs.candidate_run == '' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     env:
@@ -101,5 +111,132 @@ jobs:
             .fixtures/certificate-generation.log
             .fixtures/extended/certificate-generation.log
           include-hidden-files: true
+      - if: always()
+        run: docker compose -f docker-compose.yml -f compose.extended.yml down
+
+  qualified-performance:
+    if: ${{ inputs.candidate_run != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      actions: read
+    env:
+      CANDIDATE_RUN: ${{ inputs.candidate_run }}
+      BASELINE_TAG: ${{ inputs.baseline_tag }}
+      BASELINE_SHA256: ${{ inputs.baseline_sha256 }}
+    steps:
+      - name: Identify the successful candidate source
+        id: subject
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$CANDIDATE_RUN" =~ ^[0-9]+$ ]]
+          [[ "$BASELINE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$BASELINE_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          gh run view "$CANDIDATE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --json headSha,status,conclusion,workflowName > "$RUNNER_TEMP/candidate-run.json"
+          python3 - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          report = json.loads((Path(os.environ['RUNNER_TEMP']) / 'candidate-run.json').read_text())
+          assert report['status'] == 'completed' and report['conclusion'] == 'success'
+          assert report['workflowName'] == 'release-candidate'
+          assert re.fullmatch('[0-9a-f]{40}', report['headSha'])
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('revision=' + report['headSha'] + '\n')
+          PY
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ steps.subject.outputs.revision }}
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: storage-candidate-linux
+          path: .fixtures/performance-input/candidate
+          run-id: ${{ inputs.candidate_run }}
+          github-token: ${{ github.token }}
+      - name: Download the published baseline and verify both binaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p .fixtures/performance-input/baseline .fixtures/evidence/performance
+          gh release view "$BASELINE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json isDraft,isPrerelease,tagName > .fixtures/performance-input/baseline-release.json
+          gh release download "$BASELINE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern "plenora-storage-${BASELINE_TAG#v}-x86_64-unknown-linux-gnu.tar.gz" \
+            --dir .fixtures/performance-input/baseline
+          python3 - <<'PY'
+          import hashlib, json, os, shutil, subprocess, tarfile
+          from pathlib import Path
+          root = Path('.fixtures/performance-input')
+          release = json.loads((root / 'baseline-release.json').read_text())
+          assert not release['isDraft'] and not release['isPrerelease']
+          assert release['tagName'] == os.environ['BASELINE_TAG']
+          archive, = (root / 'baseline').glob('*.tar.gz')
+          with tarfile.open(archive) as stream:
+              member = stream.getmember('plenora-storage')
+              assert member.isfile()
+              baseline = stream.extractfile(member).read()
+          assert hashlib.sha256(baseline).hexdigest() == os.environ['BASELINE_SHA256']
+          (root / 'baseline/plenora-storage').write_bytes(baseline)
+          manifest_path, = (root / 'candidate').rglob('release-manifest.json')
+          manifest = json.loads(manifest_path.read_text())
+          revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          assert manifest['source_revision'] == revision and manifest['source_committed']
+          assert manifest['target'] == 'x86_64-unknown-linux-gnu'
+          binary = manifest_path.parent / 'plenora-storage'
+          entry, = [row for row in manifest['artifacts'] if row['name'] == binary.name]
+          candidate_sha = hashlib.sha256(binary.read_bytes()).hexdigest()
+          assert candidate_sha == entry['sha256']
+          shutil.copyfile(binary, root / 'candidate/plenora-storage')
+          for name in ('baseline', 'candidate'):
+              (root / name / 'plenora-storage').chmod(0o755)
+          subjects = dict(source_revision=revision, candidate_run=os.environ['CANDIDATE_RUN'],
+                          candidate_binary_sha256=candidate_sha, baseline_tag=os.environ['BASELINE_TAG'],
+                          baseline_binary_sha256=os.environ['BASELINE_SHA256'], rounds=30, workers=4)
+          Path('.fixtures/evidence/performance/subjects.json').write_text(json.dumps(subjects, indent=2) + '\n')
+          assert not subprocess.check_output(['git', 'status', '--porcelain'], text=True).strip()
+          PY
+      - name: Prepare a runtime without rebuilding the measured binaries
+        run: |
+          mkdir -p .fixtures/performance-runtime
+          cat > .fixtures/performance-runtime/Dockerfile <<'EOF'
+          FROM rust:1.92-bookworm@sha256:e90e846de4124376164ddfbaab4b0774c7bdeef5e738866295e5a90a34a307a2
+          RUN apt-get update && apt-get install -y --no-install-recommends python3 ca-certificates \
+              && git config --global --add safe.directory /workspace
+          WORKDIR /workspace
+          EOF
+          docker build -t plenora-storage-performance-runtime .fixtures/performance-runtime
+          printf '%s\n' '{"services":{"storage-rust":{"image":"plenora-storage-performance-runtime"}}}' \
+            > .fixtures/compose.performance.json
+      - run: bash scripts/prepare-fixtures.sh
+      - run: bash scripts/prepare-extended-fixtures.sh
+      - name: Compare thirty complete rounds of the exact baseline and candidate
+        run: |
+          docker compose -f docker-compose.yml -f compose.extended.yml -f .fixtures/compose.performance.json \
+            run --rm --no-deps --no-build storage-rust bash -c '
+              set -euo pipefail
+              cp .fixtures/ca.crt /usr/local/share/ca-certificates/plenora-storage-fixture.crt
+              update-ca-certificates
+              for subject in baseline candidate; do
+                python3 scripts/check_disk_space.py --bytes 1048576 --workers 4 \
+                  --output ".fixtures/evidence/performance/disk-space-$subject.json"
+                PLENORA_CLI_BIN="/workspace/.fixtures/performance-input/$subject/plenora-storage" \
+                  python3 scripts/qualify_transfers.py --bytes 1048576 --workers 4 --rounds 30 \
+                  --output ".fixtures/evidence/performance/$subject.json"
+              done
+              python3 scripts/check_performance.py .fixtures/evidence/performance/baseline.json \
+                .fixtures/evidence/performance/candidate.json --output .fixtures/evidence/performance/report.json
+            '
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: qualified-performance-evidence
+          path: .fixtures/evidence/performance/
+          include-hidden-files: true
+          if-no-files-found: error
       - if: always()
         run: docker compose -f docker-compose.yml -f compose.extended.yml down
