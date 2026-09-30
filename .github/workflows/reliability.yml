@@ -217,7 +217,7 @@ jobs:
       - name: Compare thirty complete rounds of the exact baseline and candidate
         run: |
           docker compose -f docker-compose.yml -f compose.extended.yml -f .fixtures/compose.performance.json \
-            run --rm --no-deps --no-build storage-rust bash -c '
+            run --rm --no-deps storage-rust bash -c '
               set -euo pipefail
               cp .fixtures/ca.crt /usr/local/share/ca-certificates/plenora-storage-fixture.crt
               update-ca-certificates
