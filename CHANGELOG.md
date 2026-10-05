@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Reject `null` for optional runtime metadata (`plenora.execution.deadline`, `plenora.idempotency.key`, `plenora.message.causation_id`) instead of reading it as absent; a null deadline previously started the operation without a deadline. Absent values are no longer serialized as `null`.
+- Require the `content_type`, `size` and `sha256` keys of artifact metadata (nullable but present, as in `plenora-storage-common-v1`) and the nullable keys of object, list and transfer results when deserializing.
+- Reject `tls_ca_pem: null` in FTP/FTPS connections; the schema types the key as a string.
+
 ## 2.1.0 — 2026-09-30
 
 - Add explicit private-file upload preparation for local, Azure, GCS, SMB and WebDAV through Rust, CLI and Python, preserving default buffered limits.

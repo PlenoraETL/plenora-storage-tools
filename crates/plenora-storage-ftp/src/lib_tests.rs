@@ -1,5 +1,8 @@
 use super::transfer::{parse_listing_entry, read_listing_line};
-use super::{MAX_MLSD_LINE_BYTES, ensure_parent_directories, scan_directory, validate_key};
+use super::{
+    FtpConnectionConfig, MAX_MLSD_LINE_BYTES, ensure_parent_directories, scan_directory,
+    validate_key,
+};
 use plenora_storage_core::{EngineConfig, ExecutionControl, OperationContext};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
@@ -233,4 +236,24 @@ async fn listing_stops_at_scan_limit_without_waiting_for_directory_eof() {
     server.abort();
     assert_eq!(error.code, "LIST_SCAN_LIMIT_EXCEEDED");
     assert_eq!(visited, ["a", "b"]);
+}
+
+/// The FTPS schema types `tls_ca_pem` as a string. A `null` must not be read as
+/// an omitted key, which would silently keep only the default trust anchors.
+#[test]
+fn tls_ca_pem_may_be_omitted_but_not_null() {
+    let omitted: FtpConnectionConfig =
+        serde_json::from_value(serde_json::json!({"host": "ftp.example.invalid"})).unwrap();
+    assert_eq!(omitted.tls_ca_pem, None);
+    let present: FtpConnectionConfig = serde_json::from_value(
+        serde_json::json!({"host": "ftp.example.invalid", "tls_ca_pem": "pem"}),
+    )
+    .unwrap();
+    assert_eq!(present.tls_ca_pem.as_deref(), Some("pem"));
+    assert!(
+        serde_json::from_value::<FtpConnectionConfig>(
+            serde_json::json!({"host": "ftp.example.invalid", "tls_ca_pem": null})
+        )
+        .is_err()
+    );
 }

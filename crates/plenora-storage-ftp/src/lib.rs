@@ -91,9 +91,18 @@ pub struct FtpConnectionConfig {
     #[serde(default)]
     /// Passive data-channel mode; defaults to Passive and pins the control peer address.
     pub mode: FtpMode,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "present_string")]
     /// Additional PEM trust anchors for FTPS; rejected for plaintext FTP.
+    /// The key may be omitted, but `null` is rejected rather than read as absent.
     pub tls_ca_pem: Option<String>,
+}
+
+/// The connection schema types `tls_ca_pem` as a string: Serde would read
+/// `null` as an omitted key and silently keep only the default trust anchors.
+fn present_string<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<String>, D::Error> {
+    String::deserialize(deserializer).map(Some)
 }
 
 const fn default_port() -> u16 {
