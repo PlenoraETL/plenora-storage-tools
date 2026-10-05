@@ -12,6 +12,7 @@
 - Run the dependency audit (`cargo audit` on the three lockfiles, `cargo deny`, SMB upstream name audit) and a 300-second-per-target parser fuzz campaign every Monday through the `scheduled` workflow; the per-push jobs are unchanged and the audit job now lives in the reusable `dependencies` workflow.
 - Fuzz the SMB2 framing and message decoders, DER/SPNEGO, the NTLM CHALLENGE_MESSAGE and Kerberos KDC/AP replies and credential caches with four new cargo-fuzz targets and versioned seeds.
 - Attest SLSA build provenance and the CycloneDX SBOM of CLI archives, wheels and sources from the release-candidate jobs that build them; the release workflow refuses to publish files without both attestations and publishes each target's SBOM and contract adoption manifest as release assets.
+- Refuse a Kerberos credential cache whose principal claims more components than its bytes can hold, and address or authorization-data lengths past the end of the file, instead of reserving memory for the claimed count (the process aborted) or skipping beyond the data; found by the new `kerberos_messages` fuzz target.
 
 ## 2.1.0 — 2026-09-30
 
