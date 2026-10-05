@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Replace the yanked `yoke-derive` 0.8.3 with 0.8.4 in the workspace and fuzz lockfiles; `cargo deny` now rejects yanked crates like `cargo audit --deny warnings`.
+
 ## 2.1.0 — 2026-09-30
 
 - Add explicit private-file upload preparation for local, Azure, GCS, SMB and WebDAV through Rust, CLI and Python, preserving default buffered limits.
