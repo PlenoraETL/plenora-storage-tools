@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 3.0.0 — in preparation (not published)
+
+Major release: rejects inputs accepted by 2.1 and changes public Rust signatures; see `docs/migration-3.0.md`.
 
 - Replace the yanked `yoke-derive` 0.8.3 with 0.8.4 in the workspace and fuzz lockfiles; `cargo deny` now rejects yanked crates like `cargo audit --deny warnings`.
 - Reject `null` for optional runtime metadata (`plenora.execution.deadline`, `plenora.idempotency.key`, `plenora.message.causation_id`) instead of reading it as absent; a null deadline previously started the operation without a deadline. Absent values are no longer serialized as `null`.
