@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Pin the SDK build backend to `maturin==1.15.0` and list the transitive dependencies of the quality and campaign requirement files with exact versions; `check_dependencies.py` now rejects unpinned Python requirements.
+
 ## 2.1.0 — 2026-09-30
 
 - Add explicit private-file upload preparation for local, Azure, GCS, SMB and WebDAV through Rust, CLI and Python, preserving default buffered limits.
