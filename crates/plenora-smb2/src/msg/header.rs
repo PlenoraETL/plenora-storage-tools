@@ -8,12 +8,12 @@
 //!
 //! Reference: MS-SMB2 sections 2.2.1, 2.2.1.1, 2.2.1.2, 2.2.2.
 
+use crate::Error;
 use crate::error::Result;
 use crate::pack::{Pack, ReadCursor, Unpack, WriteCursor};
 use crate::types::flags::HeaderFlags;
 use crate::types::status::NtStatus;
 use crate::types::{Command, CreditCharge, MessageId, SessionId, TreeId};
-use crate::Error;
 
 /// The 4-byte protocol identifier at the start of every SMB2 message.
 pub const PROTOCOL_ID: [u8; 4] = [0xFE, b'S', b'M', b'B'];
@@ -241,16 +241,17 @@ impl ErrorResponse {
             if pos + 8 > self.error_data.len() {
                 return false;
             }
-            let data_len = u32::from_le_bytes(
-                self.error_data[pos..pos + 4]
-                    .try_into()
-                    .expect("4 bytes, just bounds-checked"),
-            ) as usize;
-            let error_id = u32::from_le_bytes(
-                self.error_data[pos + 4..pos + 8]
-                    .try_into()
-                    .expect("4 bytes, just bounds-checked"),
-            );
+            let le_u32 = |at: usize| {
+                self.error_data
+                    .get(at..at + 4)
+                    .and_then(|b| <[u8; 4]>::try_from(b).ok())
+                    .map(u32::from_le_bytes)
+            };
+            // Bounds-checked just above, so both reads succeed.
+            let (Some(data_len), Some(error_id)) = (le_u32(pos), le_u32(pos + 4)) else {
+                return false;
+            };
+            let data_len = data_len as usize;
             if error_id == Self::ERROR_ID_SHARE_REDIRECT {
                 return true;
             }

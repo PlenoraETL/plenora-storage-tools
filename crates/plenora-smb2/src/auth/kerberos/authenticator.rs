@@ -14,16 +14,16 @@ use log::{debug, trace};
 use std::time::Duration;
 
 use crate::auth::kerberos::crypto::{
-    compute_checksum, etype_from_i32, kerberos_decrypt, kerberos_encrypt, string_to_key_aes,
-    string_to_key_rc4, EncryptionType,
+    EncryptionType, compute_checksum, etype_from_i32, kerberos_decrypt, kerberos_encrypt,
+    string_to_key_aes, string_to_key_rc4,
 };
-use crate::auth::kerberos::kdc::{send_to_kdc, KdcConfig};
+use crate::auth::kerberos::kdc::{KdcConfig, send_to_kdc};
 use crate::auth::kerberos::messages::{
-    encode_ap_req, encode_as_req, encode_authenticator, encode_pa_enc_timestamp, encode_tgs_req,
-    encode_tgs_req_body, parse_enc_kdc_rep_part, parse_kdc_rep, parse_krb_error, EncryptedData,
-    PaData, PrincipalName, Ticket,
+    EncryptedData, PaData, PrincipalName, Ticket, encode_ap_req, encode_as_req,
+    encode_authenticator, encode_pa_enc_timestamp, encode_tgs_req, encode_tgs_req_body,
+    parse_enc_kdc_rep_part, parse_kdc_rep, parse_krb_error,
 };
-use crate::auth::spnego::{wrap_neg_token_init, OID_KERBEROS, OID_MS_KERBEROS};
+use crate::auth::spnego::{OID_KERBEROS, OID_MS_KERBEROS, wrap_neg_token_init};
 use crate::error::{Error, Result};
 
 // ---------------------------------------------------------------------------
@@ -287,7 +287,7 @@ impl KerberosAuthenticator {
         };
 
         // Generate a random nonce.
-        let nonce = generate_nonce();
+        let nonce = generate_nonce()?;
 
         // Requested etypes: prefer AES-256, then AES-128, then RC4.
         let etypes = [
@@ -321,17 +321,17 @@ impl KerberosAuthenticator {
                 self.etype = chosen_etype;
 
                 // Derive the user's long-term key from the password.
-                let user_key = self.derive_user_key();
+                let user_key = self.derive_user_key()?;
 
                 // Build PA-ENC-TIMESTAMP.
-                let (ctime, cusec) = current_kerberos_time();
+                let (ctime, cusec) = current_kerberos_time()?;
                 let timestamp_plaintext = encode_pa_enc_timestamp(&ctime, cusec);
                 let encrypted_timestamp = kerberos_encrypt(
                     &user_key,
                     KEY_USAGE_PA_ENC_TIMESTAMP,
                     &timestamp_plaintext,
                     self.etype,
-                );
+                )?;
 
                 let enc_timestamp_data = EncryptedData {
                     etype: self.etype as i32,
@@ -404,7 +404,7 @@ impl KerberosAuthenticator {
 
         // Derive the user's long-term key (may have been derived already,
         // but etype might have changed based on the KDC response).
-        let user_key = self.derive_user_key();
+        let user_key = self.derive_user_key()?;
         trace!(
             "kerberos: user_key len={}, etype={:?}, salt={}{}, key_prefix={:02x?}",
             user_key.len(),
@@ -472,7 +472,7 @@ impl KerberosAuthenticator {
             name_string: vec![username.clone()],
         };
 
-        let nonce = generate_nonce();
+        let nonce = generate_nonce()?;
         // Request etypes in preference order. The KDC picks the session key
         // type from this list. AES-256 preferred, with AES-128 and RC4 fallback.
         let etypes = [
@@ -487,14 +487,14 @@ impl KerberosAuthenticator {
 
         // Compute checksum over KDC-REQ-BODY using key usage 6
         // (PA-TGS-REQ padata AP-REQ Authenticator cksum).
-        let body_checksum = compute_checksum(&as_session_key, 6, &req_body, self.etype);
+        let body_checksum = compute_checksum(&as_session_key, 6, &req_body, self.etype)?;
         let checksum_type: i32 = match self.etype {
             EncryptionType::Aes256CtsHmacSha196 => 16, // hmac-sha1-96-aes256
             EncryptionType::Aes128CtsHmacSha196 => 15, // hmac-sha1-96-aes128
             EncryptionType::Rc4Hmac => -138,           // HMAC_MD5 (KERB_CHECKSUM_HMAC_MD5)
         };
 
-        let (ctime, cusec) = current_kerberos_time();
+        let (ctime, cusec) = current_kerberos_time()?;
         let authenticator_plain = encode_authenticator(
             realm,
             &cname,
@@ -516,7 +516,7 @@ impl KerberosAuthenticator {
             KEY_USAGE_AP_REQ_AUTHENTICATOR,
             &authenticator_plain,
             self.etype,
-        );
+        )?;
 
         let authenticator_enc_data = EncryptedData {
             etype: self.etype as i32,
@@ -551,8 +551,7 @@ impl KerberosAuthenticator {
         );
         trace!(
             "kerberos: TGS-REP enc-part etype={}, kvno={:?}",
-            tgs_rep.enc_part.etype,
-            tgs_rep.enc_part.kvno
+            tgs_rep.enc_part.etype, tgs_rep.enc_part.kvno
         );
         if tgs_rep.msg_type != 13 {
             return Err(Error::invalid_data(format!(
@@ -646,7 +645,7 @@ impl KerberosAuthenticator {
         };
 
         // Build and encrypt the Authenticator.
-        let (ctime, cusec) = current_kerberos_time();
+        let (ctime, cusec) = current_kerberos_time()?;
 
         // Minimal Authenticator: no subkey, no seq-number, no checksum.
         // This matches impacket's working implementation. Windows accepts
@@ -662,7 +661,7 @@ impl KerberosAuthenticator {
             KEY_USAGE_AP_REQ_AUTHENTICATOR_SPNEGO,
             &authenticator_plain,
             self.etype,
-        );
+        )?;
 
         let authenticator_enc_data = EncryptedData {
             etype: self.etype as i32,
@@ -757,7 +756,7 @@ impl KerberosAuthenticator {
                     other => {
                         return Err(Error::Auth {
                             message: format!("AP-REP: unsupported etype {other}"),
-                        })
+                        });
                     }
                 };
 
@@ -788,7 +787,10 @@ impl KerberosAuthenticator {
                     Ok(err) => {
                         debug!(
                             "kerberos: mutual auth KRB-ERROR code={}, realm={}, sname={:?}, e_text={:?}, e_data={:02x?}",
-                            err.error_code, err.realm, err.sname, err.e_text,
+                            err.error_code,
+                            err.realm,
+                            err.sname,
+                            err.e_text,
                             err.e_data.as_deref().unwrap_or(&[])
                         );
                     }
@@ -813,7 +815,7 @@ impl KerberosAuthenticator {
     // =====================================================================
 
     /// Derive the user's long-term key from the password.
-    fn derive_user_key(&self) -> Vec<u8> {
+    fn derive_user_key(&self) -> Result<Vec<u8>> {
         let salt = format!("{}{}", self.credentials.realm, self.credentials.username);
         match self.etype {
             EncryptionType::Aes256CtsHmacSha196 => {
@@ -822,7 +824,7 @@ impl KerberosAuthenticator {
             EncryptionType::Aes128CtsHmacSha196 => {
                 string_to_key_aes(&self.credentials.password, &salt, 16)
             }
-            EncryptionType::Rc4Hmac => string_to_key_rc4(&self.credentials.password),
+            EncryptionType::Rc4Hmac => Ok(string_to_key_rc4(&self.credentials.password)),
         }
     }
 
@@ -946,25 +948,22 @@ fn parse_etype_info2_best(data: &[u8]) -> Option<EncryptionType> {
         if entry_tag == 0x30 {
             let fields = parse_sequence_fields_local(entry_data).ok()?;
             for (ftag, fvalue) in &fields {
-                if *ftag == 0xa0 {
-                    if let Ok(etype_val) = parse_der_integer_local(fvalue) {
-                        if let Ok(et) = etype_from_i32(etype_val) {
-                            match (&best, et) {
-                                (None, _) => best = Some(et),
-                                (Some(EncryptionType::Rc4Hmac), _)
-                                    if et != EncryptionType::Rc4Hmac =>
-                                {
-                                    best = Some(et);
-                                }
-                                (
-                                    Some(EncryptionType::Aes128CtsHmacSha196),
-                                    EncryptionType::Aes256CtsHmacSha196,
-                                ) => {
-                                    best = Some(et);
-                                }
-                                _ => {}
-                            }
+                if *ftag == 0xa0
+                    && let Ok(etype_val) = parse_der_integer_local(fvalue)
+                    && let Ok(et) = etype_from_i32(etype_val)
+                {
+                    match (&best, et) {
+                        (None, _) => best = Some(et),
+                        (Some(EncryptionType::Rc4Hmac), _) if et != EncryptionType::Rc4Hmac => {
+                            best = Some(et);
                         }
+                        (
+                            Some(EncryptionType::Aes128CtsHmacSha196),
+                            EncryptionType::Aes256CtsHmacSha196,
+                        ) => {
+                            best = Some(et);
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -1130,12 +1129,17 @@ fn der_sequence(items: &[&[u8]]) -> Vec<u8> {
 /// Get the current time in Kerberos GeneralizedTime format and microseconds.
 ///
 /// Format: "YYYYMMDDHHmmssZ" (UTC).
-fn current_kerberos_time() -> (String, u32) {
+///
+/// A clock set before 1970 cannot be expressed and is reported rather than
+/// sent as a timestamp the KDC would reject anyway.
+fn current_kerberos_time() -> Result<(String, u32)> {
     use std::time::SystemTime;
 
     let now = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
-        .expect("system clock before epoch");
+        .map_err(|_| Error::Internal {
+            what: "system clock reads before 1970",
+        })?;
 
     let total_secs = now.as_secs();
     let usec = now.subsec_micros();
@@ -1150,7 +1154,7 @@ fn current_kerberos_time() -> (String, u32) {
         year, month, day, hour, minute, second
     );
 
-    (time_str, usec)
+    Ok((time_str, usec))
 }
 
 /// Convert seconds since Unix epoch to (year, month, day, hour, minute, second).
@@ -1191,10 +1195,10 @@ fn etype_from_code(code: i32) -> Result<EncryptionType> {
 }
 
 /// Generate a random 32-bit nonce.
-fn generate_nonce() -> u32 {
+fn generate_nonce() -> Result<u32> {
     let mut buf = [0u8; 4];
-    getrandom::fill(&mut buf).expect("CSPRNG failed");
-    u32::from_ne_bytes(buf) & 0x7FFF_FFFF // Ensure positive (Kerberos nonce is UInt32 but some KDCs treat it as signed)
+    crate::sync::fill_random(&mut buf)?;
+    Ok(u32::from_ne_bytes(buf) & 0x7FFF_FFFF) // Ensure positive (Kerberos nonce is UInt32 but some KDCs treat it as signed)
 }
 
 // =========================================================================
@@ -1208,8 +1212,8 @@ mod tests {
         generate_random_key, kerberos_decrypt, kerberos_encrypt, string_to_key_aes,
     };
     use crate::auth::kerberos::messages::{
-        encode_ap_req, encode_as_req, encode_authenticator, encode_pa_enc_timestamp, EncryptedData,
-        PrincipalName, Ticket,
+        EncryptedData, PrincipalName, Ticket, encode_ap_req, encode_as_req, encode_authenticator,
+        encode_pa_enc_timestamp,
     };
     use crate::auth::spnego::OID_NTLMSSP;
 
@@ -1239,7 +1243,7 @@ mod tests {
 
     #[test]
     fn current_kerberos_time_format() {
-        let (time_str, _cusec) = current_kerberos_time();
+        let (time_str, _cusec) = current_kerberos_time().unwrap();
         assert_eq!(
             time_str.len(),
             15,
@@ -1255,19 +1259,19 @@ mod tests {
     #[test]
     fn generate_nonce_is_positive() {
         for _ in 0..100 {
-            let n = generate_nonce();
+            let n = generate_nonce().unwrap();
             assert!(n <= 0x7FFF_FFFF, "nonce should be positive: {n}");
         }
     }
 
     #[test]
     fn generate_nonce_not_constant() {
-        let n1 = generate_nonce();
-        let n2 = generate_nonce();
+        let n1 = generate_nonce().unwrap();
+        let n2 = generate_nonce().unwrap();
         // With 31 bits, collision probability is ~2^-31, negligible.
         // But allow it just in case.
         if n1 == n2 {
-            let n3 = generate_nonce();
+            let n3 = generate_nonce().unwrap();
             assert!(
                 n1 != n3 || n2 != n3,
                 "three consecutive identical nonces is suspicious"
@@ -1282,7 +1286,7 @@ mod tests {
         let encoded = encode_pa_pac_request(true);
         // SEQUENCE { [0] BOOLEAN TRUE }
         assert_eq!(encoded[0], 0x30); // SEQUENCE
-                                      // Should contain 0xff for TRUE
+        // Should contain 0xff for TRUE
         assert!(encoded.windows(3).any(|w| w == [0x01, 0x01, 0xff]));
     }
 
@@ -1297,7 +1301,7 @@ mod tests {
 
     #[test]
     fn pa_enc_timestamp_produces_valid_encrypted_data() {
-        let key = string_to_key_aes("password", "EXAMPLE.COMuser", 32);
+        let key = string_to_key_aes("password", "EXAMPLE.COMuser", 32).unwrap();
         let timestamp_plain = encode_pa_enc_timestamp("20260408120000Z", 123456);
 
         let ciphertext = kerberos_encrypt(
@@ -1305,7 +1309,8 @@ mod tests {
             KEY_USAGE_PA_ENC_TIMESTAMP,
             &timestamp_plain,
             EncryptionType::Aes256CtsHmacSha196,
-        );
+        )
+        .unwrap();
 
         // Should be non-empty and longer than just the HMAC.
         assert!(
@@ -1351,7 +1356,8 @@ mod tests {
             KEY_USAGE_AP_REQ_AUTHENTICATOR,
             &authenticator_plain,
             EncryptionType::Aes256CtsHmacSha196,
-        );
+        )
+        .unwrap();
 
         let decrypted = kerberos_decrypt(
             &key,
@@ -1406,7 +1412,8 @@ mod tests {
             KEY_USAGE_AP_REQ_AUTHENTICATOR,
             &authenticator_plain,
             EncryptionType::Aes256CtsHmacSha196,
-        );
+        )
+        .unwrap();
 
         let auth_enc_data = EncryptedData {
             etype: 18,
@@ -1600,11 +1607,11 @@ mod tests {
             etype: EncryptionType::Aes256CtsHmacSha196,
         };
 
-        let key = auth.derive_user_key();
+        let key = auth.derive_user_key().unwrap();
         assert_eq!(key.len(), 32, "AES-256 key should be 32 bytes");
 
         // Should match direct call.
-        let expected = string_to_key_aes("password", "EXAMPLE.COMuser", 32);
+        let expected = string_to_key_aes("password", "EXAMPLE.COMuser", 32).unwrap();
         assert_eq!(key, expected);
     }
 
@@ -1618,7 +1625,7 @@ mod tests {
         });
         auth.etype = EncryptionType::Aes128CtsHmacSha196;
 
-        let key = auth.derive_user_key();
+        let key = auth.derive_user_key().unwrap();
         assert_eq!(key.len(), 16, "AES-128 key should be 16 bytes");
     }
 
@@ -1632,7 +1639,7 @@ mod tests {
         });
         auth.etype = EncryptionType::Rc4Hmac;
 
-        let key = auth.derive_user_key();
+        let key = auth.derive_user_key().unwrap();
         assert_eq!(key.len(), 16, "RC4 key (NT hash) should be 16 bytes");
     }
 }

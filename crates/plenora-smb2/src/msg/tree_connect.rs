@@ -5,11 +5,11 @@
 //! `\\server\share`), and the response contains share metadata such as
 //! the share type, flags, capabilities, and maximal access rights.
 
+use crate::Error;
 use crate::error::Result;
 use crate::msg::header::Header;
 use crate::pack::{Pack, ReadCursor, Unpack, WriteCursor};
 use crate::types::flags::{ShareCapabilities, ShareFlags};
-use crate::Error;
 
 // ── Share type ─────────────────────────────────────────────────────────
 
@@ -346,9 +346,11 @@ mod tests {
 
         assert_eq!(decoded.share_type, ShareType::Print);
         assert!(decoded.share_flags.contains(ShareFlags::ENCRYPT_DATA));
-        assert!(decoded
-            .capabilities
-            .contains(ShareCapabilities::CONTINUOUS_AVAILABILITY));
+        assert!(
+            decoded
+                .capabilities
+                .contains(ShareCapabilities::CONTINUOUS_AVAILABILITY)
+        );
         assert!(decoded.capabilities.contains(ShareCapabilities::CLUSTER));
     }
 
@@ -414,9 +416,11 @@ mod tests {
         let decoded = TreeConnectResponse::unpack(&mut r).unwrap();
 
         assert_eq!(decoded.share_type, ShareType::Disk);
-        assert!(decoded
-            .share_flags
-            .contains(ShareFlags::ACCESS_BASED_DIRECTORY_ENUM));
+        assert!(
+            decoded
+                .share_flags
+                .contains(ShareFlags::ACCESS_BASED_DIRECTORY_ENUM)
+        );
         assert_eq!(decoded.maximal_access, 0x001F_01FF);
     }
 }

@@ -1,6 +1,3 @@
-#![forbid(unsafe_code)]
-#![warn(missing_docs)]
-
 //! Pure-Rust SMB2/3 client library with pipelined I/O.
 //!
 //! No C dependencies, no FFI. Pipelined reads/writes fill the credit window
@@ -49,7 +46,81 @@
 //! - [`rpc`] -- Named pipe RPC for share enumeration (advanced/internal use).
 //! - [`types`] -- Protocol newtypes and flag types (advanced/internal use).
 
+#![forbid(unsafe_code)]
+// This vendored fork inherits the workspace lints (`[lints] workspace = true`):
+// `unsafe_code`, `missing_docs`, every `clippy::all` lint, and the CI
+// anti-panic gate (no `unwrap`, `expect`, `panic!`, `unreachable!`, `todo!`
+// or `unimplemented!` in library code) apply in full.
+//
+// The pedantic and nursery lints below are the ones upstream code violates
+// today; each stays enforced everywhere else in the workspace, and any lint
+// not listed here is enforced on this crate too. They are documentation,
+// naming and style rules over ~3,000 upstream sites, and rewriting them would
+// turn every upstream merge into a rewrite with no behavioural gain.
+//
+// The `cast_*` lints are the exception to "style": a silent truncation in a
+// wire-format conversion is a correctness bug. They are allowed here only
+// pending a dedicated review of each conversion, tracked as a follow-up.
+#![allow(
+    clippy::assigning_clones,
+    clippy::branches_sharing_code,
+    clippy::cast_lossless,
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::doc_markdown,
+    clippy::equatable_if_let,
+    clippy::format_push_string,
+    clippy::if_not_else,
+    clippy::ignored_unit_patterns,
+    clippy::items_after_statements,
+    clippy::manual_let_else,
+    clippy::map_unwrap_or,
+    clippy::match_same_arms,
+    clippy::missing_const_for_fn,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::must_use_candidate,
+    clippy::needless_collect,
+    clippy::needless_continue,
+    clippy::needless_pass_by_ref_mut,
+    clippy::needless_pass_by_value,
+    clippy::option_if_let_else,
+    clippy::or_fun_call,
+    clippy::redundant_clone,
+    clippy::redundant_closure_for_method_calls,
+    clippy::redundant_pub_crate,
+    clippy::semicolon_if_nothing_returned,
+    clippy::significant_drop_in_scrutinee,
+    clippy::significant_drop_tightening,
+    clippy::similar_names,
+    clippy::single_match_else,
+    clippy::too_long_first_doc_paragraph,
+    clippy::too_many_lines,
+    clippy::trivially_copy_pass_by_ref,
+    clippy::uninlined_format_args,
+    clippy::unnested_or_patterns,
+    clippy::unreadable_literal,
+    clippy::unused_async,
+    clippy::unused_self,
+    clippy::use_self
+)]
+// Additionally violated by upstream tests only.
+#![cfg_attr(
+    test,
+    allow(
+        clippy::bool_to_int_with_if,
+        clippy::float_cmp,
+        clippy::manual_assert,
+        clippy::many_single_char_names,
+        clippy::range_plus_one,
+        clippy::unchecked_time_subtraction
+    )
+)]
+
 pub mod auth;
+mod bytes;
 pub mod client;
 pub mod crypto;
 pub mod error;
@@ -57,6 +128,7 @@ pub mod msg;
 pub mod name;
 pub mod pack;
 pub mod rpc;
+mod sync;
 #[cfg(feature = "testing")]
 pub mod testing;
 pub mod transport;
@@ -74,7 +146,7 @@ pub use error::{Error, ErrorKind, Result};
 pub use name::{decode_name, decode_path, encode_name, encode_path};
 
 // High-level client
-pub use client::{connect, ClientConfig, SmbClient};
+pub use client::{ClientConfig, SmbClient, connect};
 
 // Streaming I/O
 pub use client::stream::{FileDownload, FileReader, FileUpload, FileWriter, Progress};

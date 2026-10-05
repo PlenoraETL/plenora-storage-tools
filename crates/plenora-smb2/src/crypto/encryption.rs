@@ -6,14 +6,14 @@
 //! per-session counter to prevent catastrophic nonce reuse in AES-GCM.
 
 use aes::{Aes128, Aes256};
-use aes_gcm::aead::{array::Array, inout::InOutBuf, AeadInOut};
 use aes_gcm::KeyInit;
+use aes_gcm::aead::{AeadInOut, array::Array, inout::InOutBuf};
 use ccm::consts::{U11, U16};
 
-use crate::msg::transform::{TransformHeader, SMB2_TRANSFORM_HEADER_FLAG_ENCRYPTED};
+use crate::Error;
+use crate::msg::transform::{SMB2_TRANSFORM_HEADER_FLAG_ENCRYPTED, TransformHeader};
 use crate::pack::{Pack, WriteCursor};
 use crate::types::SessionId;
-use crate::Error;
 
 /// Offset in the serialized TRANSFORM_HEADER where the AAD begins.
 ///
@@ -92,16 +92,19 @@ impl NonceGenerator {
     /// - GCM: 8-byte LE counter in bytes 0..8, zeros in bytes 8..16
     ///   (the cipher uses the first 12 bytes as the nonce).
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if the counter overflows `u64::MAX`. In practice this
-    /// can never happen (2^64 messages at line speed would take millennia).
-    pub fn next(&mut self, _cipher: Cipher) -> [u8; 16] {
+    /// [`Error::Internal`] once the counter is exhausted: a nonce is never
+    /// reused under the same key. In practice this cannot happen (2^64
+    /// messages at line speed would take millennia).
+    pub fn next(&mut self, _cipher: Cipher) -> Result<[u8; 16], Error> {
         let count = self.counter;
-        self.counter = self.counter.checked_add(1).expect("nonce counter overflow");
+        self.counter = self.counter.checked_add(1).ok_or(Error::Internal {
+            what: "encryption nonce counter exhausted",
+        })?;
         let mut nonce = [0u8; 16];
         nonce[..8].copy_from_slice(&count.to_le_bytes());
-        nonce
+        Ok(nonce)
     }
 }
 
@@ -218,6 +221,22 @@ fn tag_to_array<N: aes_gcm::aead::array::ArraySize>(tag: Array<u8, N>) -> [u8; 1
     arr
 }
 
+/// The key as the fixed-size array a cipher takes. [`encrypt_message`] and
+/// [`decrypt_message`] check the length first, so a mismatch here is a
+/// broken invariant, reported rather than panicking.
+fn key_array<'a, T: TryFrom<&'a [u8]>>(key: &'a [u8]) -> Result<T, Error> {
+    T::try_from(key).map_err(|_| Error::Internal {
+        what: "encryption key length does not match the cipher",
+    })
+}
+
+/// The nonce as the fixed-size array a cipher takes; see [`key_array`].
+fn nonce_array<'a, T: TryFrom<&'a [u8]>>(nonce: &'a [u8]) -> Result<T, Error> {
+    T::try_from(nonce).map_err(|_| Error::Internal {
+        what: "encryption nonce length does not match the cipher",
+    })
+}
+
 /// Encrypt `buffer` in place and return the 16-byte auth tag.
 fn encrypt_raw(
     cipher: Cipher,
@@ -231,29 +250,29 @@ fn encrypt_raw(
 
     let tag = match cipher {
         Cipher::Aes128Ccm => {
-            let c = Aes128Ccm::new(key.try_into().expect("key length validated"));
-            let n = nonce.try_into().expect("nonce length validated");
+            let c = Aes128Ccm::new(key_array(key)?);
+            let n = nonce_array(nonce)?;
             c.encrypt_inout_detached(n, aad, buf)
                 .map(tag_to_array)
                 .map_err(map_err)?
         }
         Cipher::Aes128Gcm => {
-            let c = aes_gcm::Aes128Gcm::new(key.try_into().expect("key length validated"));
-            let n = nonce.try_into().expect("nonce length validated");
+            let c = aes_gcm::Aes128Gcm::new(key_array(key)?);
+            let n = nonce_array(nonce)?;
             c.encrypt_inout_detached(n, aad, buf)
                 .map(tag_to_array)
                 .map_err(map_err)?
         }
         Cipher::Aes256Ccm => {
-            let c = Aes256Ccm::new(key.try_into().expect("key length validated"));
-            let n = nonce.try_into().expect("nonce length validated");
+            let c = Aes256Ccm::new(key_array(key)?);
+            let n = nonce_array(nonce)?;
             c.encrypt_inout_detached(n, aad, buf)
                 .map(tag_to_array)
                 .map_err(map_err)?
         }
         Cipher::Aes256Gcm => {
-            let c = aes_gcm::Aes256Gcm::new(key.try_into().expect("key length validated"));
-            let n = nonce.try_into().expect("nonce length validated");
+            let c = aes_gcm::Aes256Gcm::new(key_array(key)?);
+            let n = nonce_array(nonce)?;
             c.encrypt_inout_detached(n, aad, buf)
                 .map(tag_to_array)
                 .map_err(map_err)?
@@ -278,23 +297,23 @@ fn decrypt_raw(
 
     match cipher {
         Cipher::Aes128Ccm => {
-            let c = Aes128Ccm::new(key.try_into().expect("key length validated"));
-            let n = nonce.try_into().expect("nonce length validated");
+            let c = Aes128Ccm::new(key_array(key)?);
+            let n = nonce_array(nonce)?;
             c.decrypt_inout_detached(n, aad, buf, t).map_err(map_err)
         }
         Cipher::Aes128Gcm => {
-            let c = aes_gcm::Aes128Gcm::new(key.try_into().expect("key length validated"));
-            let n = nonce.try_into().expect("nonce length validated");
+            let c = aes_gcm::Aes128Gcm::new(key_array(key)?);
+            let n = nonce_array(nonce)?;
             c.decrypt_inout_detached(n, aad, buf, t).map_err(map_err)
         }
         Cipher::Aes256Ccm => {
-            let c = Aes256Ccm::new(key.try_into().expect("key length validated"));
-            let n = nonce.try_into().expect("nonce length validated");
+            let c = Aes256Ccm::new(key_array(key)?);
+            let n = nonce_array(nonce)?;
             c.decrypt_inout_detached(n, aad, buf, t).map_err(map_err)
         }
         Cipher::Aes256Gcm => {
-            let c = aes_gcm::Aes256Gcm::new(key.try_into().expect("key length validated"));
-            let n = nonce.try_into().expect("nonce length validated");
+            let c = aes_gcm::Aes256Gcm::new(key_array(key)?);
+            let n = nonce_array(nonce)?;
             c.decrypt_inout_detached(n, aad, buf, t).map_err(map_err)
         }
     }
@@ -304,6 +323,21 @@ fn decrypt_raw(
 mod tests {
     use super::*;
     use crate::msg::transform::TRANSFORM_PROTOCOL_ID;
+
+    /// An exhausted counter used to panic. It must refuse to produce a nonce
+    /// rather than wrap around and reuse one under the same key.
+    #[test]
+    fn an_exhausted_nonce_counter_is_refused_instead_of_wrapping() {
+        let mut r#gen = NonceGenerator { counter: u64::MAX };
+        assert!(matches!(
+            r#gen.next(Cipher::Aes128Gcm),
+            Err(Error::Internal { .. })
+        ));
+        assert!(matches!(
+            r#gen.next(Cipher::Aes128Gcm),
+            Err(Error::Internal { .. })
+        ));
+    }
 
     // ── Helper ────────────────────────────────────────────────────────
 
@@ -339,7 +373,7 @@ mod tests {
         let session_id = 0xDEAD_BEEF_CAFE_FACE;
 
         let mut nonce_gen = NonceGenerator::new();
-        let nonce = nonce_gen.next(cipher);
+        let nonce = nonce_gen.next(cipher).unwrap();
 
         let (header, ciphertext) =
             encrypt_message(plaintext, &key, cipher, &nonce, session_id).unwrap();
@@ -355,11 +389,11 @@ mod tests {
 
     #[test]
     fn nonce_generator_monotonic() {
-        let mut gen = NonceGenerator::new();
+        let mut r#gen = NonceGenerator::new();
         let mut prev = [0u8; 16]; // counter 0 hasn't been generated yet
 
         for i in 0u64..100 {
-            let nonce = gen.next(Cipher::Aes128Gcm);
+            let nonce = r#gen.next(Cipher::Aes128Gcm).unwrap();
             // Extract the 8-byte LE counter from the nonce.
             let counter = u64::from_le_bytes(nonce[..8].try_into().unwrap());
             assert_eq!(counter, i, "counter should equal {i}");
@@ -375,12 +409,12 @@ mod tests {
 
     #[test]
     fn nonce_format_gcm() {
-        let mut gen = NonceGenerator::new();
+        let mut r#gen = NonceGenerator::new();
         // Advance to counter = 7 to have a non-trivial value.
         for _ in 0..7 {
-            gen.next(Cipher::Aes128Gcm);
+            r#gen.next(Cipher::Aes128Gcm).unwrap();
         }
-        let nonce = gen.next(Cipher::Aes128Gcm); // counter = 7
+        let nonce = r#gen.next(Cipher::Aes128Gcm).unwrap(); // counter = 7
 
         // First 8 bytes: LE counter (7).
         assert_eq!(
@@ -398,12 +432,12 @@ mod tests {
 
     #[test]
     fn nonce_format_ccm() {
-        let mut gen = NonceGenerator::new();
+        let mut r#gen = NonceGenerator::new();
         // Advance to counter = 5.
         for _ in 0..5 {
-            gen.next(Cipher::Aes128Ccm);
+            r#gen.next(Cipher::Aes128Ccm).unwrap();
         }
-        let nonce = gen.next(Cipher::Aes128Ccm); // counter = 5
+        let nonce = r#gen.next(Cipher::Aes128Ccm).unwrap(); // counter = 5
 
         // First 8 bytes: LE counter (5).
         assert_eq!(
@@ -430,8 +464,8 @@ mod tests {
         let plaintext = b"Do not tamper with me!";
         let session_id = 42;
 
-        let mut gen = NonceGenerator::new();
-        let nonce = gen.next(cipher);
+        let mut r#gen = NonceGenerator::new();
+        let nonce = r#gen.next(cipher).unwrap();
 
         let (header, mut ciphertext) =
             encrypt_message(plaintext, &key, cipher, &nonce, session_id).unwrap();
@@ -458,8 +492,8 @@ mod tests {
         let plaintext = b"Secret message";
         let session_id = 100;
 
-        let mut gen = NonceGenerator::new();
-        let nonce = gen.next(cipher);
+        let mut r#gen = NonceGenerator::new();
+        let nonce = r#gen.next(cipher).unwrap();
 
         let (header, ciphertext) =
             encrypt_message(plaintext, &key, cipher, &nonce, session_id).unwrap();
@@ -539,8 +573,8 @@ mod tests {
         let plaintext = b"test";
         let session_id = 1;
 
-        let mut gen = NonceGenerator::new();
-        let nonce = gen.next(cipher);
+        let mut r#gen = NonceGenerator::new();
+        let nonce = r#gen.next(cipher).unwrap();
 
         let (header, _) = encrypt_message(plaintext, &key, cipher, &nonce, session_id).unwrap();
 
@@ -561,8 +595,8 @@ mod tests {
         let plaintext = b"Check signature position";
         let session_id = 99;
 
-        let mut gen = NonceGenerator::new();
-        let nonce = gen.next(cipher);
+        let mut r#gen = NonceGenerator::new();
+        let nonce = r#gen.next(cipher).unwrap();
 
         let (header, _) = encrypt_message(plaintext, &key, cipher, &nonce, session_id).unwrap();
 

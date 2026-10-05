@@ -7,7 +7,5 @@
     "serde_json": "Public connection and runtime DTOs expose Value.",
     "tokio": "Public source and sink interfaces use Tokio I/O traits.",
     "tokio-util": "Cancellation implementation must coexist with host Tokio consumers."
-  },
-  "excluded_manifest": "crates/plenora-smb2/Cargo.toml",
-  "exclusion_reason": "Maintained third-party fork: preserve upstream manifest constraints; exact resolutions remain locked and covered by audit_smb_upstream and cargo deny."
+  }
 }

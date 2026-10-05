@@ -55,8 +55,6 @@ def main():
                  ROOT / 'fuzz/Cargo.toml', ROOT / 'tools/api-inventory/Cargo.toml']
     failures = []
     for path in manifests:
-        if path.relative_to(ROOT).as_posix() == policy['excluded_manifest']:
-            continue
         failures.extend(f'{path.relative_to(ROOT)}: {error}' for error in check_manifest(
             tomllib.loads(path.read_text()), workspace=path == ROOT / 'Cargo.toml', exceptions=exceptions))
     for path in sorted((ROOT / 'scripts').glob('requirements-*.txt')):

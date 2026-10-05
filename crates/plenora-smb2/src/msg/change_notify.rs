@@ -4,10 +4,10 @@
 //! directory. The response returns FILE_NOTIFY_INFORMATION entries
 //! describing the changes that occurred.
 
+use crate::Error;
 use crate::error::Result;
 use crate::pack::{Pack, ReadCursor, Unpack, WriteCursor};
 use crate::types::FileId;
-use crate::Error;
 
 // ── Change Notify flags ────────────────────────────────────────────────
 

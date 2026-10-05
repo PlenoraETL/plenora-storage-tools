@@ -43,13 +43,14 @@ pub enum EncryptionType {
 ///
 /// Salt is typically `REALM` + `username` (concatenated, case-sensitive).
 /// `key_size` is 16 for AES-128 (etype 17) or 32 for AES-256 (etype 18).
-pub fn string_to_key_aes(password: &str, salt: &str, key_size: usize) -> Vec<u8> {
+///
+/// # Errors
+///
+/// [`Error::InvalidData`] for any other `key_size`.
+pub fn string_to_key_aes(password: &str, salt: &str, key_size: usize) -> Result<Vec<u8>, Error> {
     use sha1::Sha1;
 
-    assert!(
-        key_size == 16 || key_size == 32,
-        "key_size must be 16 or 32"
-    );
+    check_aes_key_len(key_size)?;
 
     // Step 1: PBKDF2-HMAC-SHA1 with 4096 iterations.
     let mut raw_key = vec![0u8; key_size];
@@ -88,7 +89,11 @@ pub fn string_to_key_rc4(password: &str) -> Vec<u8> {
 /// - For encryption: `[usage_be32, 0xAA]`
 /// - For checksum: `[usage_be32, 0x99]`
 /// - For key derivation: `[usage_be32, 0x55]`
-pub fn derive_key_aes(base_key: &[u8], usage: &[u8]) -> Vec<u8> {
+///
+/// # Errors
+///
+/// [`Error::InvalidData`] unless `base_key` is 16 or 32 bytes long.
+pub fn derive_key_aes(base_key: &[u8], usage: &[u8]) -> Result<Vec<u8>, Error> {
     dk_derive(base_key, usage)
 }
 
@@ -137,10 +142,15 @@ pub fn usage_chk(usage: u32) -> [u8; 5] {
 /// AES-CTS is AES-CBC with the last two ciphertext blocks swapped
 /// and the final block potentially truncated to the plaintext size.
 /// For a single block (16 bytes or fewer), uses AES-CBC with zero-padding.
-pub fn encrypt_aes_cts(key: &[u8], iv: &[u8], plaintext: &[u8]) -> Vec<u8> {
+///
+/// # Errors
+///
+/// [`Error::InvalidData`] unless `key` is 16 or 32 bytes and `iv` 16 bytes.
+pub fn encrypt_aes_cts(key: &[u8], iv: &[u8], plaintext: &[u8]) -> Result<Vec<u8>, Error> {
     if plaintext.is_empty() {
-        return Vec::new();
+        return Ok(Vec::new());
     }
+    let iv = aes_iv(iv)?;
 
     let block_size = 16;
 
@@ -154,8 +164,8 @@ pub fn encrypt_aes_cts(key: &[u8], iv: &[u8], plaintext: &[u8]) -> Vec<u8> {
         for i in 0..16 {
             padded[i] ^= iv[i];
         }
-        let ct = aes_ecb_encrypt(key, &padded);
-        return ct.to_vec();
+        let ct = aes_ecb_encrypt(key, &padded)?;
+        return Ok(ct.to_vec());
     }
 
     // Multi-block: encrypt with standard CBC, then apply CTS.
@@ -166,7 +176,7 @@ pub fn encrypt_aes_cts(key: &[u8], iv: &[u8], plaintext: &[u8]) -> Vec<u8> {
     padded[..plaintext.len()].copy_from_slice(plaintext);
 
     // Encrypt with AES-CBC (no padding -- we padded ourselves).
-    let cbc_out = aes_cbc_encrypt(key, iv, &padded);
+    let cbc_out = aes_cbc_encrypt(key, &iv, &padded)?;
 
     // CTS: swap the last two ciphertext blocks.
     let mut result = cbc_out;
@@ -183,7 +193,7 @@ pub fn encrypt_aes_cts(key: &[u8], iv: &[u8], plaintext: &[u8]) -> Vec<u8> {
 
     // Truncate the final block to the original plaintext length.
     result.truncate(plaintext.len());
-    result
+    Ok(result)
 }
 
 /// Decrypt data using AES-CTS mode.
@@ -194,6 +204,7 @@ pub fn decrypt_aes_cts(key: &[u8], iv: &[u8], ciphertext: &[u8]) -> Result<Vec<u
     if ciphertext.is_empty() {
         return Ok(Vec::new());
     }
+    let iv = aes_iv(iv)?;
 
     let block_size = 16;
 
@@ -206,7 +217,7 @@ pub fn decrypt_aes_cts(key: &[u8], iv: &[u8], ciphertext: &[u8]) -> Result<Vec<u
                 ciphertext.len()
             )));
         }
-        let mut pt = aes_ecb_decrypt(key, ciphertext);
+        let mut pt = aes_ecb_decrypt(key, ciphertext)?;
         for i in 0..16 {
             pt[i] ^= iv[i];
         }
@@ -233,7 +244,7 @@ pub fn decrypt_aes_cts(key: &[u8], iv: &[u8], ciphertext: &[u8]) -> Result<Vec<u
         c_n_minus_1.copy_from_slice(&padded_ct[second_last_start..second_last_start + block_size]);
 
         // Decrypt c_{n-1} with ECB to get intermediate.
-        let intermediate = aes_ecb_decrypt(key, &c_n_minus_1);
+        let intermediate = aes_ecb_decrypt(key, &c_n_minus_1)?;
 
         // c_n is the partial block (tail_len bytes at last_start).
         let mut reconstructed_last = [0u8; 16];
@@ -258,7 +269,7 @@ pub fn decrypt_aes_cts(key: &[u8], iv: &[u8], ciphertext: &[u8]) -> Result<Vec<u
     }
 
     // Decrypt with standard CBC.
-    let plaintext = aes_cbc_decrypt(key, iv, &padded_ct);
+    let plaintext = aes_cbc_decrypt(key, &iv, &padded_ct)?;
     Ok(plaintext[..orig_len].to_vec())
 }
 
@@ -274,20 +285,19 @@ pub fn decrypt_aes_cts(key: &[u8], iv: &[u8], ciphertext: &[u8]) -> Result<Vec<u
 /// 4. K3 = HMAC-MD5(K1, checksum)
 /// 5. RC4-encrypt (confounder + plaintext) using K3
 /// 6. Output = checksum (16 bytes) + encrypted_data
-pub fn encrypt_rc4_hmac(key: &[u8], usage: u32, plaintext: &[u8]) -> Vec<u8> {
-    use hmac::{Hmac, Mac};
-    type HmacMd5 = Hmac<md5::Md5>;
-
+///
+/// # Errors
+///
+/// [`Error::Internal`] if the operating system's random source fails.
+pub fn encrypt_rc4_hmac(key: &[u8], usage: u32, plaintext: &[u8]) -> Result<Vec<u8>, Error> {
     // K1 = HMAC-MD5(key, usage_le)
     // Note: RFC 4757 uses the usage as a signed 32-bit little-endian value.
     let usage_bytes = (usage as i32).to_le_bytes();
-    let mut mac = HmacMd5::new_from_slice(key).expect("HMAC accepts any key length");
-    mac.update(&usage_bytes);
-    let k1 = mac.finalize().into_bytes();
+    let k1 = hmac_md5(key, &usage_bytes)?;
 
     // Generate random 8-byte confounder.
     let mut confounder = [0u8; 8];
-    getrandom::fill(&mut confounder).expect("CSPRNG failed");
+    crate::sync::fill_random(&mut confounder)?;
 
     // Build confounder + plaintext.
     let mut payload = Vec::with_capacity(8 + plaintext.len());
@@ -295,14 +305,10 @@ pub fn encrypt_rc4_hmac(key: &[u8], usage: u32, plaintext: &[u8]) -> Vec<u8> {
     payload.extend_from_slice(plaintext);
 
     // Checksum = HMAC-MD5(K1, confounder + plaintext)
-    let mut mac = HmacMd5::new_from_slice(&k1).expect("HMAC accepts any key length");
-    mac.update(&payload);
-    let checksum = mac.finalize().into_bytes();
+    let checksum = hmac_md5(&k1, &payload)?;
 
     // K3 = HMAC-MD5(K1, checksum)
-    let mut mac = HmacMd5::new_from_slice(&k1).expect("HMAC accepts any key length");
-    mac.update(&checksum);
-    let k3 = mac.finalize().into_bytes();
+    let k3 = hmac_md5(&k1, &checksum)?;
 
     // Encrypt payload with RC4 using K3.
     let encrypted = rc4_transform(&k3, &payload);
@@ -311,16 +317,13 @@ pub fn encrypt_rc4_hmac(key: &[u8], usage: u32, plaintext: &[u8]) -> Vec<u8> {
     let mut output = Vec::with_capacity(16 + encrypted.len());
     output.extend_from_slice(&checksum);
     output.extend_from_slice(&encrypted);
-    output
+    Ok(output)
 }
 
 /// Decrypt data using RC4-HMAC (etype 23).
 ///
 /// Reverses the `encrypt_rc4_hmac` process and verifies the checksum.
 pub fn decrypt_rc4_hmac(key: &[u8], usage: u32, ciphertext: &[u8]) -> Result<Vec<u8>, Error> {
-    use hmac::{Hmac, Mac};
-    type HmacMd5 = Hmac<md5::Md5>;
-
     if ciphertext.len() < 24 {
         return Err(Error::invalid_data(
             "RC4-HMAC ciphertext too short (need at least 16-byte checksum + 8-byte confounder)",
@@ -332,22 +335,16 @@ pub fn decrypt_rc4_hmac(key: &[u8], usage: u32, ciphertext: &[u8]) -> Result<Vec
 
     // K1 = HMAC-MD5(key, usage_le)
     let usage_bytes = (usage as i32).to_le_bytes();
-    let mut mac = HmacMd5::new_from_slice(key).expect("HMAC accepts any key length");
-    mac.update(&usage_bytes);
-    let k1 = mac.finalize().into_bytes();
+    let k1 = hmac_md5(key, &usage_bytes)?;
 
     // K3 = HMAC-MD5(K1, checksum)
-    let mut mac = HmacMd5::new_from_slice(&k1).expect("HMAC accepts any key length");
-    mac.update(checksum);
-    let k3 = mac.finalize().into_bytes();
+    let k3 = hmac_md5(&k1, checksum)?;
 
     // Decrypt payload with RC4 using K3.
     let payload = rc4_transform(&k3, encrypted_data);
 
     // Verify: HMAC-MD5(K1, decrypted_payload) must equal the checksum.
-    let mut mac = HmacMd5::new_from_slice(&k1).expect("HMAC accepts any key length");
-    mac.update(&payload);
-    let computed_checksum = mac.finalize().into_bytes();
+    let computed_checksum = hmac_md5(&k1, &payload)?;
 
     if computed_checksum.as_slice() != checksum {
         return Err(Error::invalid_data("RC4-HMAC checksum verification failed"));
@@ -373,27 +370,29 @@ pub fn decrypt_rc4_hmac(key: &[u8], usage: u32, ciphertext: &[u8]) -> Result<Vec
 ///
 /// - For AES (etypes 17, 18): HMAC-SHA1 truncated to 12 bytes (96 bits).
 /// - For RC4 (etype 23): HMAC-MD5, producing 16 bytes.
-pub fn compute_checksum(key: &[u8], usage: u32, data: &[u8], etype: EncryptionType) -> Vec<u8> {
+///
+/// # Errors
+///
+/// [`Error::InvalidData`] for an AES etype whose key is not 16 or 32 bytes.
+pub fn compute_checksum(
+    key: &[u8],
+    usage: u32,
+    data: &[u8],
+    etype: EncryptionType,
+) -> Result<Vec<u8>, Error> {
     match etype {
         EncryptionType::Aes128CtsHmacSha196 | EncryptionType::Aes256CtsHmacSha196 => {
             // Derive the checksum key Kc for this usage.
-            let kc = derive_key_aes(key, &usage_chk(usage));
+            let kc = derive_key_aes(key, &usage_chk(usage))?;
             hmac_sha1_96(&kc, data)
         }
         EncryptionType::Rc4Hmac => {
-            use hmac::{Hmac, Mac};
-            type HmacMd5 = Hmac<md5::Md5>;
-
             // K1 = HMAC-MD5(key, usage_le)
             let usage_bytes = (usage as i32).to_le_bytes();
-            let mut mac = HmacMd5::new_from_slice(key).expect("HMAC accepts any key length");
-            mac.update(&usage_bytes);
-            let k1 = mac.finalize().into_bytes();
+            let k1 = hmac_md5(key, &usage_bytes)?;
 
             // Checksum = HMAC-MD5(K1, data)
-            let mut mac = HmacMd5::new_from_slice(&k1).expect("HMAC accepts any key length");
-            mac.update(data);
-            mac.finalize().into_bytes().to_vec()
+            Ok(hmac_md5(&k1, data)?.to_vec())
         }
     }
 }
@@ -402,16 +401,52 @@ pub fn compute_checksum(key: &[u8], usage: u32, data: &[u8], etype: EncryptionTy
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+/// The error for an HMAC that refused its key. HMAC is defined for keys of
+/// any length (longer keys are hashed first), so this marks a broken
+/// invariant of the primitive, not bad input.
+const HMAC_KEY_REFUSED: Error = Error::Internal {
+    what: "HMAC rejected a key although HMAC accepts any key length",
+};
+
 /// HMAC-SHA1 truncated to 12 bytes (96 bits), as used by AES Kerberos checksums.
-fn hmac_sha1_96(key: &[u8], data: &[u8]) -> Vec<u8> {
+fn hmac_sha1_96(key: &[u8], data: &[u8]) -> Result<Vec<u8>, Error> {
     use hmac::{Hmac, Mac};
     use sha1::Sha1;
     type HmacSha1 = Hmac<Sha1>;
 
-    let mut mac = HmacSha1::new_from_slice(key).expect("HMAC accepts any key length");
+    let mut mac = HmacSha1::new_from_slice(key).map_err(|_| HMAC_KEY_REFUSED)?;
     mac.update(data);
     let result = mac.finalize().into_bytes();
-    result[..12].to_vec()
+    Ok(result[..12].to_vec())
+}
+
+/// HMAC-MD5, as used by RC4-HMAC (RFC 4757).
+fn hmac_md5(key: &[u8], data: &[u8]) -> Result<[u8; 16], Error> {
+    use hmac::{Hmac, Mac};
+    type HmacMd5 = Hmac<md5::Md5>;
+
+    let mut mac = HmacMd5::new_from_slice(key).map_err(|_| HMAC_KEY_REFUSED)?;
+    mac.update(data);
+    Ok(mac.finalize().into_bytes().into())
+}
+
+/// AES keys are 16 (AES-128) or 32 (AES-256) bytes. Keys reach these
+/// functions from the KDC's replies, so another length is bad input to be
+/// reported, never a reason to panic.
+fn check_aes_key_len(len: usize) -> Result<(), Error> {
+    if len == 16 || len == 32 {
+        Ok(())
+    } else {
+        Err(Error::invalid_data(
+            "Kerberos AES key must be 16 or 32 bytes",
+        ))
+    }
+}
+
+/// The 16-byte AES initialization vector.
+fn aes_iv(iv: &[u8]) -> Result<[u8; 16], Error> {
+    iv.try_into()
+        .map_err(|_| Error::invalid_data("AES initialization vector must be 16 bytes"))
 }
 
 /// DK(base_key, constant) per RFC 3961 section 5.1.
@@ -420,9 +455,10 @@ fn hmac_sha1_96(key: &[u8], data: &[u8]) -> Vec<u8> {
 /// DR = k-truncate(E(base_key, n-fold(constant, block_size)))
 ///
 /// For AES, random-to-key is the identity function, so DK = DR.
-fn dk_derive(base_key: &[u8], constant: &[u8]) -> Vec<u8> {
+fn dk_derive(base_key: &[u8], constant: &[u8]) -> Result<Vec<u8>, Error> {
     let block_size = 16; // AES block size is always 16.
     let key_size = base_key.len();
+    check_aes_key_len(key_size)?;
 
     // n-fold the constant to the cipher's block size.
     let folded = nfold(constant, block_size);
@@ -434,13 +470,13 @@ fn dk_derive(base_key: &[u8], constant: &[u8]) -> Vec<u8> {
 
     while result.len() < key_size {
         // Encrypt the input block with AES-ECB (single block, no IV needed).
-        let encrypted = aes_ecb_encrypt(base_key, &input);
+        let encrypted = aes_ecb_encrypt(base_key, &input)?;
         result.extend_from_slice(&encrypted);
         input = encrypted;
     }
 
     result.truncate(key_size);
-    result
+    Ok(result)
 }
 
 /// N-fold operation per RFC 3961 section 5.1.
@@ -528,60 +564,77 @@ fn gcd(mut a: usize, mut b: usize) -> usize {
     a
 }
 
+/// A single AES block, rejected before any key schedule if it is not 16 bytes.
+fn aes_block(block: &[u8]) -> Result<[u8; 16], Error> {
+    block
+        .try_into()
+        .map_err(|_| Error::invalid_data("AES block must be 16 bytes"))
+}
+
+/// The error for an AES key schedule that refused a key whose length was
+/// already checked.
+const AES_KEY_REFUSED: Error = Error::Internal {
+    what: "AES rejected a key of a checked length",
+};
+
 /// AES-ECB encrypt a single 16-byte block.
-fn aes_ecb_encrypt(key: &[u8], block: &[u8]) -> [u8; 16] {
+fn aes_ecb_encrypt(key: &[u8], block: &[u8]) -> Result<[u8; 16], Error> {
     use aes::cipher::{BlockCipherEncrypt, KeyInit};
 
-    let mut output = [0u8; 16];
-    output.copy_from_slice(block);
-
+    let mut output = aes_block(block)?;
     match key.len() {
         16 => {
-            let cipher = aes::Aes128::new_from_slice(key).expect("valid key");
+            let cipher = aes::Aes128::new_from_slice(key).map_err(|_| AES_KEY_REFUSED)?;
             cipher.encrypt_block((&mut output).into());
         }
         32 => {
-            let cipher = aes::Aes256::new_from_slice(key).expect("valid key");
+            let cipher = aes::Aes256::new_from_slice(key).map_err(|_| AES_KEY_REFUSED)?;
             cipher.encrypt_block((&mut output).into());
         }
-        _ => panic!("AES key must be 16 or 32 bytes, got {}", key.len()),
+        len => check_aes_key_len(len)?,
     }
-    output
+    Ok(output)
 }
 
 /// AES-ECB decrypt a single 16-byte block.
-fn aes_ecb_decrypt(key: &[u8], block: &[u8]) -> [u8; 16] {
+fn aes_ecb_decrypt(key: &[u8], block: &[u8]) -> Result<[u8; 16], Error> {
     use aes::cipher::{BlockCipherDecrypt, KeyInit};
 
-    let mut output = [0u8; 16];
-    output.copy_from_slice(block);
-
+    let mut output = aes_block(block)?;
     match key.len() {
         16 => {
-            let cipher = aes::Aes128::new_from_slice(key).expect("valid key");
+            let cipher = aes::Aes128::new_from_slice(key).map_err(|_| AES_KEY_REFUSED)?;
             cipher.decrypt_block((&mut output).into());
         }
         32 => {
-            let cipher = aes::Aes256::new_from_slice(key).expect("valid key");
+            let cipher = aes::Aes256::new_from_slice(key).map_err(|_| AES_KEY_REFUSED)?;
             cipher.decrypt_block((&mut output).into());
         }
-        _ => panic!("AES key must be 16 or 32 bytes, got {}", key.len()),
+        len => check_aes_key_len(len)?,
     }
-    output
+    Ok(output)
+}
+
+/// Callers pad to whole blocks before CBC; anything else is a broken
+/// invariant of this module, reported instead of asserted.
+fn check_whole_blocks(data: &[u8]) -> Result<(), Error> {
+    if data.len().is_multiple_of(16) {
+        Ok(())
+    } else {
+        Err(Error::Internal {
+            what: "AES-CBC input is not a whole number of blocks",
+        })
+    }
 }
 
 /// AES-CBC encrypt (no padding -- input must be a multiple of 16 bytes).
 /// Implemented manually using AES-ECB to avoid cbc crate API complexity.
-fn aes_cbc_encrypt(key: &[u8], iv: &[u8], data: &[u8]) -> Vec<u8> {
-    assert!(
-        data.len().is_multiple_of(16),
-        "AES-CBC input must be a multiple of 16 bytes"
-    );
+fn aes_cbc_encrypt(key: &[u8], iv: &[u8; 16], data: &[u8]) -> Result<Vec<u8>, Error> {
+    check_whole_blocks(data)?;
 
     let n_blocks = data.len() / 16;
     let mut output = vec![0u8; data.len()];
-    let mut prev = [0u8; 16];
-    prev.copy_from_slice(iv);
+    let mut prev = *iv;
 
     for i in 0..n_blocks {
         let start = i * 16;
@@ -591,31 +644,27 @@ fn aes_cbc_encrypt(key: &[u8], iv: &[u8], data: &[u8]) -> Vec<u8> {
         for j in 0..16 {
             block[j] ^= prev[j];
         }
-        let encrypted = aes_ecb_encrypt(key, &block);
+        let encrypted = aes_ecb_encrypt(key, &block)?;
         output[start..start + 16].copy_from_slice(&encrypted);
         prev = encrypted;
     }
-    output
+    Ok(output)
 }
 
 /// AES-CBC decrypt (no padding -- input must be a multiple of 16 bytes).
 /// Implemented manually using AES-ECB to avoid cbc crate API complexity.
-fn aes_cbc_decrypt(key: &[u8], iv: &[u8], data: &[u8]) -> Vec<u8> {
-    assert!(
-        data.len().is_multiple_of(16),
-        "AES-CBC input must be a multiple of 16 bytes"
-    );
+fn aes_cbc_decrypt(key: &[u8], iv: &[u8; 16], data: &[u8]) -> Result<Vec<u8>, Error> {
+    check_whole_blocks(data)?;
 
     let n_blocks = data.len() / 16;
     let mut output = vec![0u8; data.len()];
-    let mut prev = [0u8; 16];
-    prev.copy_from_slice(iv);
+    let mut prev = *iv;
 
     for i in 0..n_blocks {
         let start = i * 16;
         let mut ct_block = [0u8; 16];
         ct_block.copy_from_slice(&data[start..start + 16]);
-        let mut decrypted = aes_ecb_decrypt(key, &ct_block);
+        let mut decrypted = aes_ecb_decrypt(key, &ct_block)?;
         // XOR with previous ciphertext block (or IV for first block).
         for j in 0..16 {
             decrypted[j] ^= prev[j];
@@ -623,7 +672,7 @@ fn aes_cbc_decrypt(key: &[u8], iv: &[u8], data: &[u8]) -> Vec<u8> {
         output[start..start + 16].copy_from_slice(&decrypted);
         prev = ct_block;
     }
-    output
+    Ok(output)
 }
 
 /// RC4 stream cipher (symmetric -- encrypt and decrypt are the same operation).
@@ -669,16 +718,16 @@ pub(crate) fn kerberos_encrypt(
     usage: u32,
     plaintext: &[u8],
     etype: EncryptionType,
-) -> Vec<u8> {
+) -> Result<Vec<u8>, Error> {
     match etype {
         EncryptionType::Aes128CtsHmacSha196 | EncryptionType::Aes256CtsHmacSha196 => {
             // Derive Ke (encryption key) and Ki (integrity key).
-            let ke = derive_key_aes(base_key, &usage_enc(usage));
-            let ki = derive_key_aes(base_key, &usage_int(usage));
+            let ke = derive_key_aes(base_key, &usage_enc(usage))?;
+            let ki = derive_key_aes(base_key, &usage_int(usage))?;
 
             // Generate 16-byte random confounder.
             let mut confounder = [0u8; 16];
-            getrandom::fill(&mut confounder).expect("CSPRNG failed");
+            crate::sync::fill_random(&mut confounder)?;
 
             // Build plaintext' = confounder || plaintext.
             let mut full_plain = Vec::with_capacity(16 + plaintext.len());
@@ -686,16 +735,16 @@ pub(crate) fn kerberos_encrypt(
             full_plain.extend_from_slice(plaintext);
 
             // Compute HMAC-SHA1-96 over plaintext' using Ki.
-            let hmac = hmac_sha1_96(&ki, &full_plain);
+            let hmac = hmac_sha1_96(&ki, &full_plain)?;
 
             // Encrypt plaintext' with AES-CTS using Ke and IV=0.
             let iv = [0u8; 16];
-            let ciphertext = encrypt_aes_cts(&ke, &iv, &full_plain);
+            let ciphertext = encrypt_aes_cts(&ke, &iv, &full_plain)?;
 
             // Output = ciphertext || HMAC (12 bytes).
             let mut output = ciphertext;
             output.extend_from_slice(&hmac);
-            output
+            Ok(output)
         }
         EncryptionType::Rc4Hmac => encrypt_rc4_hmac(base_key, usage, plaintext),
     }
@@ -722,15 +771,15 @@ pub(crate) fn kerberos_decrypt(
             let expected_hmac = &ciphertext[hmac_offset..];
 
             // Derive Ke (encryption key) and Ki (integrity key).
-            let ke = derive_key_aes(base_key, &usage_enc(usage));
-            let ki = derive_key_aes(base_key, &usage_int(usage));
+            let ke = derive_key_aes(base_key, &usage_enc(usage))?;
+            let ki = derive_key_aes(base_key, &usage_int(usage))?;
 
             // Decrypt with AES-CTS using Ke and IV=0.
             let iv = [0u8; 16];
             let full_plain = decrypt_aes_cts(&ke, &iv, enc_data)?;
 
             // Verify HMAC-SHA1-96 using Ki.
-            let computed_hmac = hmac_sha1_96(&ki, &full_plain);
+            let computed_hmac = hmac_sha1_96(&ki, &full_plain)?;
             if computed_hmac != expected_hmac {
                 return Err(Error::Auth {
                     message: "Kerberos AES HMAC verification failed".to_string(),
@@ -789,6 +838,27 @@ pub(crate) fn generate_random_key(etype: EncryptionType) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The session key's length comes from the KDC's reply. An AES etype with
+    /// a key that is neither 16 nor 32 bytes used to reach `panic!` inside the
+    /// AES helpers; it is malformed input and must be reported as such.
+    #[test]
+    fn an_aes_key_of_the_wrong_length_is_an_error_not_a_panic() {
+        let key = [0u8; 20];
+        let aes256 = EncryptionType::Aes256CtsHmacSha196;
+        let invalid = |r: Result<Vec<u8>, Error>| matches!(r, Err(Error::InvalidData { .. }));
+        assert!(invalid(derive_key_aes(&key, &usage_enc(1))));
+        assert!(invalid(kerberos_encrypt(&key, 1, b"data", aes256)));
+        assert!(invalid(kerberos_decrypt(&key, 1, &[0u8; 48], aes256)));
+        assert!(invalid(compute_checksum(&key, 6, b"body", aes256)));
+        assert!(invalid(string_to_key_aes(
+            "password",
+            "EXAMPLE.COMuser",
+            24
+        )));
+        assert!(invalid(encrypt_aes_cts(&[0u8; 16], &[0u8; 8], b"data")));
+        assert!(invalid(decrypt_aes_cts(&[0u8; 16], &[0u8; 8], &[0u8; 16])));
+    }
 
     // ── EncryptionType ────────────────────────────────────────────────
 
@@ -863,7 +933,7 @@ mod tests {
         // RFC 3962 Appendix B, Test Vector 4 (iterations = 4096):
         // password = "password", salt = "ATHENA.MIT.EDUraeburn"
         // Verified with Python hashlib.pbkdf2_hmac + AES-ECB DK derivation.
-        let key = string_to_key_aes("password", "ATHENA.MIT.EDUraeburn", 32);
+        let key = string_to_key_aes("password", "ATHENA.MIT.EDUraeburn", 32).unwrap();
         assert_eq!(
             key,
             hex("01b897121d933ab44b47eb5494db15e50eb74530dbdae9b634d65020ff5d88c1")
@@ -875,19 +945,19 @@ mod tests {
         // RFC 3962 Appendix B, Test Vector 4 (iterations = 4096):
         // password = "password", salt = "ATHENA.MIT.EDUraeburn"
         // Verified with Python hashlib.pbkdf2_hmac + AES-ECB DK derivation.
-        let key = string_to_key_aes("password", "ATHENA.MIT.EDUraeburn", 16);
+        let key = string_to_key_aes("password", "ATHENA.MIT.EDUraeburn", 16).unwrap();
         assert_eq!(key, hex("fca822951813fb252154c883f5ee1cf4"));
     }
 
     #[test]
     fn string_to_key_aes256_produces_32_bytes() {
-        let key = string_to_key_aes("test", "EXAMPLE.COMtest", 32);
+        let key = string_to_key_aes("test", "EXAMPLE.COMtest", 32).unwrap();
         assert_eq!(key.len(), 32);
     }
 
     #[test]
     fn string_to_key_aes128_produces_16_bytes() {
-        let key = string_to_key_aes("test", "EXAMPLE.COMtest", 16);
+        let key = string_to_key_aes("test", "EXAMPLE.COMtest", 16).unwrap();
         assert_eq!(key.len(), 16);
     }
 
@@ -897,16 +967,16 @@ mod tests {
     fn derive_key_aes_deterministic() {
         let base_key = [0xAA; 16];
         let usage = usage_enc(7);
-        let k1 = derive_key_aes(&base_key, &usage);
-        let k2 = derive_key_aes(&base_key, &usage);
+        let k1 = derive_key_aes(&base_key, &usage).unwrap();
+        let k2 = derive_key_aes(&base_key, &usage).unwrap();
         assert_eq!(k1, k2, "same inputs must produce same output");
     }
 
     #[test]
     fn derive_key_aes_different_usages_produce_different_keys() {
         let base_key = [0xBB; 16];
-        let k_enc = derive_key_aes(&base_key, &usage_enc(7));
-        let k_int = derive_key_aes(&base_key, &usage_int(7));
+        let k_enc = derive_key_aes(&base_key, &usage_enc(7)).unwrap();
+        let k_int = derive_key_aes(&base_key, &usage_int(7)).unwrap();
         assert_ne!(
             k_enc, k_int,
             "different usage types must produce different keys"
@@ -916,8 +986,8 @@ mod tests {
     #[test]
     fn derive_key_aes_different_usage_numbers_produce_different_keys() {
         let base_key = [0xCC; 32];
-        let k1 = derive_key_aes(&base_key, &usage_enc(1));
-        let k7 = derive_key_aes(&base_key, &usage_enc(7));
+        let k1 = derive_key_aes(&base_key, &usage_enc(1)).unwrap();
+        let k7 = derive_key_aes(&base_key, &usage_enc(7)).unwrap();
         assert_ne!(
             k1, k7,
             "different usage numbers must produce different keys"
@@ -927,14 +997,14 @@ mod tests {
     #[test]
     fn derive_key_aes128_preserves_key_length() {
         let base_key = [0xDD; 16];
-        let derived = derive_key_aes(&base_key, &usage_enc(1));
+        let derived = derive_key_aes(&base_key, &usage_enc(1)).unwrap();
         assert_eq!(derived.len(), 16);
     }
 
     #[test]
     fn derive_key_aes256_preserves_key_length() {
         let base_key = [0xEE; 32];
-        let derived = derive_key_aes(&base_key, &usage_enc(1));
+        let derived = derive_key_aes(&base_key, &usage_enc(1)).unwrap();
         assert_eq!(derived.len(), 32);
     }
 
@@ -944,7 +1014,7 @@ mod tests {
     fn aes_cts_empty_input() {
         let key = [0x11; 16];
         let iv = [0u8; 16];
-        let ct = encrypt_aes_cts(&key, &iv, &[]);
+        let ct = encrypt_aes_cts(&key, &iv, &[]).unwrap();
         assert!(ct.is_empty());
         let pt = decrypt_aes_cts(&key, &iv, &ct).unwrap();
         assert!(pt.is_empty());
@@ -957,7 +1027,7 @@ mod tests {
         let plaintext = b"sixteen bytes!!!";
         assert_eq!(plaintext.len(), 16);
 
-        let ct = encrypt_aes_cts(&key, &iv, plaintext);
+        let ct = encrypt_aes_cts(&key, &iv, plaintext).unwrap();
         assert_eq!(ct.len(), 16);
         let pt = decrypt_aes_cts(&key, &iv, &ct).unwrap();
         assert_eq!(pt, plaintext);
@@ -969,7 +1039,7 @@ mod tests {
         let iv = [0u8; 16];
         let plaintext = [0x42u8; 32]; // Exactly 2 blocks.
 
-        let ct = encrypt_aes_cts(&key, &iv, &plaintext);
+        let ct = encrypt_aes_cts(&key, &iv, &plaintext).unwrap();
         assert_eq!(ct.len(), 32);
         let pt = decrypt_aes_cts(&key, &iv, &ct).unwrap();
         assert_eq!(pt, plaintext);
@@ -981,7 +1051,7 @@ mod tests {
         let iv = [0u8; 16];
         let plaintext = [0x55u8; 30]; // Not a multiple of 16.
 
-        let ct = encrypt_aes_cts(&key, &iv, &plaintext);
+        let ct = encrypt_aes_cts(&key, &iv, &plaintext).unwrap();
         assert_eq!(
             ct.len(),
             30,
@@ -997,7 +1067,7 @@ mod tests {
         let iv = [0u8; 16];
         let plaintext = [0x66u8; 48]; // Exactly 3 blocks.
 
-        let ct = encrypt_aes_cts(&key, &iv, &plaintext);
+        let ct = encrypt_aes_cts(&key, &iv, &plaintext).unwrap();
         assert_eq!(ct.len(), 48);
         let pt = decrypt_aes_cts(&key, &iv, &ct).unwrap();
         assert_eq!(pt, plaintext);
@@ -1009,7 +1079,7 @@ mod tests {
         let iv = [0u8; 16];
         let plaintext: Vec<u8> = (0..50).collect(); // 50 bytes, not block-aligned.
 
-        let ct = encrypt_aes_cts(&key, &iv, &plaintext);
+        let ct = encrypt_aes_cts(&key, &iv, &plaintext).unwrap();
         assert_eq!(ct.len(), 50);
         let pt = decrypt_aes_cts(&key, &iv, &ct).unwrap();
         assert_eq!(pt, plaintext);
@@ -1024,7 +1094,7 @@ mod tests {
         let iv = [0u8; 16];
         let plaintext = b"short"; // Less than one block.
 
-        let ct = encrypt_aes_cts(&key, &iv, plaintext);
+        let ct = encrypt_aes_cts(&key, &iv, plaintext).unwrap();
         assert_eq!(ct.len(), 16, "single-block ciphertext is always 16 bytes");
 
         // Decrypting gives back the zero-padded 16-byte block.
@@ -1040,7 +1110,7 @@ mod tests {
         let iv = [0u8; 16];
         let plaintext = [0xAA; 32];
 
-        let ct = encrypt_aes_cts(&key, &iv, &plaintext);
+        let ct = encrypt_aes_cts(&key, &iv, &plaintext).unwrap();
         assert_ne!(ct, plaintext, "ciphertext must differ from plaintext");
     }
 
@@ -1052,7 +1122,7 @@ mod tests {
         let plaintext = b"Hello, Kerberos!";
         let usage = 7u32;
 
-        let ct = encrypt_rc4_hmac(&key, usage, plaintext);
+        let ct = encrypt_rc4_hmac(&key, usage, plaintext).unwrap();
         // Ciphertext should be 16-byte checksum + 8-byte confounder + plaintext.
         assert_eq!(ct.len(), 16 + 8 + plaintext.len());
 
@@ -1063,7 +1133,7 @@ mod tests {
     #[test]
     fn rc4_hmac_empty_plaintext_roundtrip() {
         let key = [0xBB; 16];
-        let ct = encrypt_rc4_hmac(&key, 1, &[]);
+        let ct = encrypt_rc4_hmac(&key, 1, &[]).unwrap();
         // 16-byte checksum + 8-byte confounder + 0-byte plaintext.
         assert_eq!(ct.len(), 24);
         let pt = decrypt_rc4_hmac(&key, 1, &ct).unwrap();
@@ -1073,21 +1143,23 @@ mod tests {
     #[test]
     fn rc4_hmac_wrong_key_fails() {
         let key = [0xCC; 16];
-        let ct = encrypt_rc4_hmac(&key, 1, b"secret data");
+        let ct = encrypt_rc4_hmac(&key, 1, b"secret data").unwrap();
 
         let wrong_key = [0xDD; 16];
         let result = decrypt_rc4_hmac(&wrong_key, 1, &ct);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("checksum verification failed"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("checksum verification failed")
+        );
     }
 
     #[test]
     fn rc4_hmac_wrong_usage_fails() {
         let key = [0xEE; 16];
-        let ct = encrypt_rc4_hmac(&key, 1, b"usage test");
+        let ct = encrypt_rc4_hmac(&key, 1, b"usage test").unwrap();
 
         let result = decrypt_rc4_hmac(&key, 2, &ct);
         assert!(result.is_err());
@@ -1104,7 +1176,7 @@ mod tests {
     #[test]
     fn rc4_hmac_tampered_ciphertext_fails() {
         let key = [0x11; 16];
-        let mut ct = encrypt_rc4_hmac(&key, 1, b"tamper test");
+        let mut ct = encrypt_rc4_hmac(&key, 1, b"tamper test").unwrap();
 
         // Flip a byte in the encrypted data (after the 16-byte checksum).
         let last = ct.len() - 1;
@@ -1120,7 +1192,8 @@ mod tests {
     fn checksum_aes_produces_12_bytes() {
         let key = [0x11; 16];
         let data = b"checksum test data";
-        let checksum = compute_checksum(&key, 7, data, EncryptionType::Aes128CtsHmacSha196);
+        let checksum =
+            compute_checksum(&key, 7, data, EncryptionType::Aes128CtsHmacSha196).unwrap();
         assert_eq!(checksum.len(), 12, "HMAC-SHA1-96 produces 12 bytes");
     }
 
@@ -1128,7 +1201,8 @@ mod tests {
     fn checksum_aes256_produces_12_bytes() {
         let key = [0x22; 32];
         let data = b"checksum test data";
-        let checksum = compute_checksum(&key, 7, data, EncryptionType::Aes256CtsHmacSha196);
+        let checksum =
+            compute_checksum(&key, 7, data, EncryptionType::Aes256CtsHmacSha196).unwrap();
         assert_eq!(checksum.len(), 12);
     }
 
@@ -1136,7 +1210,7 @@ mod tests {
     fn checksum_rc4_produces_16_bytes() {
         let key = [0x33; 16];
         let data = b"checksum test data";
-        let checksum = compute_checksum(&key, 7, data, EncryptionType::Rc4Hmac);
+        let checksum = compute_checksum(&key, 7, data, EncryptionType::Rc4Hmac).unwrap();
         assert_eq!(checksum.len(), 16, "HMAC-MD5 produces 16 bytes");
     }
 
@@ -1144,8 +1218,8 @@ mod tests {
     fn checksum_aes_deterministic() {
         let key = [0x44; 16];
         let data = b"determinism test";
-        let c1 = compute_checksum(&key, 7, data, EncryptionType::Aes128CtsHmacSha196);
-        let c2 = compute_checksum(&key, 7, data, EncryptionType::Aes128CtsHmacSha196);
+        let c1 = compute_checksum(&key, 7, data, EncryptionType::Aes128CtsHmacSha196).unwrap();
+        let c2 = compute_checksum(&key, 7, data, EncryptionType::Aes128CtsHmacSha196).unwrap();
         assert_eq!(c1, c2);
     }
 
@@ -1153,8 +1227,8 @@ mod tests {
     fn checksum_different_usage_produces_different_result() {
         let key = [0x55; 16];
         let data = b"usage test";
-        let c1 = compute_checksum(&key, 1, data, EncryptionType::Aes128CtsHmacSha196);
-        let c2 = compute_checksum(&key, 2, data, EncryptionType::Aes128CtsHmacSha196);
+        let c1 = compute_checksum(&key, 1, data, EncryptionType::Aes128CtsHmacSha196).unwrap();
+        let c2 = compute_checksum(&key, 2, data, EncryptionType::Aes128CtsHmacSha196).unwrap();
         assert_ne!(c1, c2);
     }
 
@@ -1162,8 +1236,8 @@ mod tests {
     fn checksum_rc4_deterministic() {
         let key = [0x66; 16];
         let data = b"rc4 checksum test";
-        let c1 = compute_checksum(&key, 7, data, EncryptionType::Rc4Hmac);
-        let c2 = compute_checksum(&key, 7, data, EncryptionType::Rc4Hmac);
+        let c1 = compute_checksum(&key, 7, data, EncryptionType::Rc4Hmac).unwrap();
+        let c2 = compute_checksum(&key, 7, data, EncryptionType::Rc4Hmac).unwrap();
         assert_eq!(c1, c2);
     }
 
@@ -1196,7 +1270,7 @@ mod tests {
     fn string_to_key_aes256_matches_mit_kdc_keytab() {
         // Key from MIT KDC keytab for testuser@TEST.LOCAL with password "testpass"
         // Salt = "TEST.LOCALtestuser"
-        let key = string_to_key_aes("testpass", "TEST.LOCALtestuser", 32);
+        let key = string_to_key_aes("testpass", "TEST.LOCALtestuser", 32).unwrap();
         let expected = hex("7964c7e6f475912def26f886f2683da03f58257a987bca47e461daddb18cb336");
         assert_eq!(key, expected, "key must match MIT KDC keytab");
     }
@@ -1210,7 +1284,7 @@ mod tests {
         let full_plain = b"I would like the General Gau's Chicken, please, and wonton soup.";
 
         // 17 bytes: verified against minikerberos (Python Kerberos reference).
-        let ct_17 = encrypt_aes_cts(&key, &iv, &full_plain[..17]);
+        let ct_17 = encrypt_aes_cts(&key, &iv, &full_plain[..17]).unwrap();
         assert_eq!(
             ct_17,
             hex("c6353568f2bf8cb4d8a580362da7ff7f97"),
@@ -1219,7 +1293,7 @@ mod tests {
 
         // All CTS vectors must roundtrip correctly.
         for len in [17, 31, 32, 47, 48, 64] {
-            let ct = encrypt_aes_cts(&key, &iv, &full_plain[..len]);
+            let ct = encrypt_aes_cts(&key, &iv, &full_plain[..len]).unwrap();
             assert_eq!(ct.len(), len, "CTS ciphertext length for {len} bytes");
             let pt = decrypt_aes_cts(&key, &iv, &ct).unwrap();
             assert_eq!(&pt[..], &full_plain[..len], "CTS roundtrip for {len} bytes");
@@ -1230,10 +1304,11 @@ mod tests {
 
     #[test]
     fn kerberos_encrypt_decrypt_aes256() {
-        let key = string_to_key_aes("password", "EXAMPLE.COMuser", 32);
+        let key = string_to_key_aes("password", "EXAMPLE.COMuser", 32).unwrap();
         let plaintext = b"Hello, Kerberos!";
 
-        let ciphertext = kerberos_encrypt(&key, 7, plaintext, EncryptionType::Aes256CtsHmacSha196);
+        let ciphertext =
+            kerberos_encrypt(&key, 7, plaintext, EncryptionType::Aes256CtsHmacSha196).unwrap();
         let decrypted =
             kerberos_decrypt(&key, 7, &ciphertext, EncryptionType::Aes256CtsHmacSha196).unwrap();
 
@@ -1242,10 +1317,11 @@ mod tests {
 
     #[test]
     fn kerberos_encrypt_decrypt_aes128() {
-        let key = string_to_key_aes("password", "EXAMPLE.COMuser", 16);
+        let key = string_to_key_aes("password", "EXAMPLE.COMuser", 16).unwrap();
         let plaintext = b"Hello, Kerberos AES-128!";
 
-        let ciphertext = kerberos_encrypt(&key, 3, plaintext, EncryptionType::Aes128CtsHmacSha196);
+        let ciphertext =
+            kerberos_encrypt(&key, 3, plaintext, EncryptionType::Aes128CtsHmacSha196).unwrap();
         let decrypted =
             kerberos_decrypt(&key, 3, &ciphertext, EncryptionType::Aes128CtsHmacSha196).unwrap();
 
@@ -1257,7 +1333,7 @@ mod tests {
         let key = string_to_key_rc4("password");
         let plaintext = b"Hello, RC4!";
 
-        let ciphertext = kerberos_encrypt(&key, 7, plaintext, EncryptionType::Rc4Hmac);
+        let ciphertext = kerberos_encrypt(&key, 7, plaintext, EncryptionType::Rc4Hmac).unwrap();
         let decrypted = kerberos_decrypt(&key, 7, &ciphertext, EncryptionType::Rc4Hmac).unwrap();
 
         assert_eq!(decrypted, plaintext);
@@ -1265,11 +1341,12 @@ mod tests {
 
     #[test]
     fn kerberos_decrypt_wrong_key_fails() {
-        let key = string_to_key_aes("password", "EXAMPLE.COMuser", 32);
-        let wrong_key = string_to_key_aes("wrong", "EXAMPLE.COMuser", 32);
+        let key = string_to_key_aes("password", "EXAMPLE.COMuser", 32).unwrap();
+        let wrong_key = string_to_key_aes("wrong", "EXAMPLE.COMuser", 32).unwrap();
         let plaintext = b"secret data";
 
-        let ciphertext = kerberos_encrypt(&key, 1, plaintext, EncryptionType::Aes256CtsHmacSha196);
+        let ciphertext =
+            kerberos_encrypt(&key, 1, plaintext, EncryptionType::Aes256CtsHmacSha196).unwrap();
         let result = kerberos_decrypt(
             &wrong_key,
             1,
@@ -1282,10 +1359,11 @@ mod tests {
 
     #[test]
     fn kerberos_decrypt_wrong_usage_fails() {
-        let key = string_to_key_aes("password", "EXAMPLE.COMuser", 32);
+        let key = string_to_key_aes("password", "EXAMPLE.COMuser", 32).unwrap();
         let plaintext = b"secret data";
 
-        let ciphertext = kerberos_encrypt(&key, 1, plaintext, EncryptionType::Aes256CtsHmacSha196);
+        let ciphertext =
+            kerberos_encrypt(&key, 1, plaintext, EncryptionType::Aes256CtsHmacSha196).unwrap();
         let result = kerberos_decrypt(&key, 7, &ciphertext, EncryptionType::Aes256CtsHmacSha196);
 
         assert!(result.is_err(), "decryption with wrong usage should fail");

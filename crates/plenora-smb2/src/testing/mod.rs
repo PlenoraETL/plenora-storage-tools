@@ -119,10 +119,14 @@ const DEFAULT_MAXREADSIZE_PORT: u16 = 10494;
 
 /// Resolve a port from an environment variable, falling back to a default.
 fn port(env_var: &str, default: u16) -> u16 {
-    std::env::var(env_var)
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(default)
+    port_from(std::env::var(env_var).ok().as_deref(), default)
+}
+
+/// The port an environment value names, or `default` when it is unset or not
+/// a port number. Split from [`port`] so it is tested without mutating the
+/// process environment, which edition 2024 makes `unsafe`.
+fn port_from(value: Option<&str>, default: u16) -> u16 {
+    value.and_then(|v| v.parse().ok()).unwrap_or(default)
 }
 
 /// Port for the guest-access container.
@@ -871,10 +875,10 @@ impl TestServers {
 
     /// Clean up the temp directory (best-effort).
     fn cleanup_dir(&self) {
-        if self.compose_dir.exists() {
-            if let Err(e) = fs::remove_dir_all(&self.compose_dir) {
-                debug!("failed to clean up {}: {e}", self.compose_dir.display());
-            }
+        if self.compose_dir.exists()
+            && let Err(e) = fs::remove_dir_all(&self.compose_dir)
+        {
+            debug!("failed to clean up {}: {e}", self.compose_dir.display());
         }
     }
 }
@@ -939,29 +943,17 @@ mod tests {
 
     #[test]
     fn port_returns_env_value_when_set() {
-        let key = "SMB2_TEST_PORT_OVERRIDE_CHECK";
-        std::env::set_var(key, "12345");
-        let val = port(key, 9999);
-        std::env::remove_var(key);
-        assert_eq!(val, 12345);
+        assert_eq!(port_from(Some("12345"), 9999), 12345);
     }
 
     #[test]
     fn port_returns_default_for_non_numeric_env() {
-        let key = "SMB2_TEST_PORT_BAD_VALUE";
-        std::env::set_var(key, "not_a_number");
-        let val = port(key, 7777);
-        std::env::remove_var(key);
-        assert_eq!(val, 7777);
+        assert_eq!(port_from(Some("not_a_number"), 7777), 7777);
     }
 
     #[test]
     fn port_returns_default_for_empty_env() {
-        let key = "SMB2_TEST_PORT_EMPTY";
-        std::env::set_var(key, "");
-        let val = port(key, 5555);
-        std::env::remove_var(key);
-        assert_eq!(val, 5555);
+        assert_eq!(port_from(Some(""), 5555), 5555);
     }
 
     // ── Default port values ─────────────────────────────────────────

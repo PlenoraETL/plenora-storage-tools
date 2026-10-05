@@ -99,7 +99,10 @@ impl ProviderFactory for Smb {
             .unwrap_or(smb2::crypto::encryption::Cipher::Aes128Ccm);
         match (session.encryption_key, session.decryption_key) {
             (Some(enc), Some(dec)) if session.should_sign => {
-                conn.activate_encryption(enc, dec, cipher);
+                conn.activate_encryption(enc, dec, cipher)
+                    .map_err(|error| {
+                        smb_error(&error, false).with_detail("operation", "activate_encryption")
+                    })?;
             }
             _ => {
                 return Err(StorageError::unsupported(
@@ -180,6 +183,7 @@ fn smb_error(error: &smb2::Error, mutating: bool) -> StorageError {
         ErrorKind::AlreadyExists => ErrorCategory::Conflict,
         ErrorKind::AccessDenied => ErrorCategory::Authorization,
         ErrorKind::AuthRequired => ErrorCategory::Authentication,
+        ErrorKind::Internal => ErrorCategory::Internal,
         _ => ErrorCategory::Io,
     };
     failure(
@@ -192,3 +196,7 @@ fn smb_error(error: &smb2::Error, mutating: bool) -> StorageError {
         mutating,
     )
 }
+
+#[cfg(test)]
+#[path = "smb_tests.rs"]
+mod tests;
