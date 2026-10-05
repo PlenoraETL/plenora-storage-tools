@@ -14,7 +14,7 @@ use crate::{
     ArtifactReference, ArtifactSinkReference, CAPABILITY_NAME, CancellationToken, CopyInput,
     DeleteInput, Engine, ErrorCategory, ErrorPhase, ExecutionControl, GetInput, ListInput,
     PutInput, RemoteEffect, RetryDisposition, SideEffect, StatInput, StorageError, StorageResult,
-    TestInput, TransferResult, validate_operation_schema_version,
+    TestInput, TransferResult, model::present_value, validate_operation_schema_version,
 };
 
 /// Supported transport-neutral runtime binding version.
@@ -177,9 +177,11 @@ pub struct RuntimeRequestMetadata {
     #[serde(
         rename = "plenora.message.causation_id",
         default,
+        deserialize_with = "present_value",
         skip_serializing_if = "Option::is_none"
     )]
-    /// Optional canonical UUID linking this message to its cause.
+    /// Optional canonical UUID linking this message to its cause; omitted when
+    /// absent, and `null` is rejected rather than read as absent.
     pub causation_id: Option<String>,
     #[serde(rename = "plenora.capability.name")]
     /// Storage capability selector; checked before opening artifacts.
@@ -196,11 +198,23 @@ pub struct RuntimeRequestMetadata {
     #[serde(rename = "plenora.input.contract")]
     /// Versioned request contract required for the selected operation.
     pub input_contract: String,
-    #[serde(rename = "plenora.execution.deadline", default)]
+    #[serde(
+        rename = "plenora.execution.deadline",
+        default,
+        deserialize_with = "present_value",
+        skip_serializing_if = "Option::is_none"
+    )]
     /// Optional RFC 3339 deadline, translated into execution control before dispatch.
+    /// `null` is rejected: reading it as absent would start without a deadline.
     pub deadline: Option<String>,
-    #[serde(rename = "plenora.idempotency.key", default)]
+    #[serde(
+        rename = "plenora.idempotency.key",
+        default,
+        deserialize_with = "present_value",
+        skip_serializing_if = "Option::is_none"
+    )]
     /// Optional host idempotency key; currently rejected because these operations do not support it.
+    /// `null` is rejected rather than read as absent.
     pub idempotency_key: Option<String>,
     #[serde(rename = "plenora.trace.correlation_id")]
     /// Canonical UUID retained across invocation and terminal result.
@@ -229,9 +243,11 @@ pub struct RuntimeResultMetadata {
     #[serde(
         rename = "plenora.message.causation_id",
         default,
+        deserialize_with = "present_value",
         skip_serializing_if = "Option::is_none"
     )]
-    /// Optional canonical UUID linking this message to its cause.
+    /// Optional canonical UUID linking this message to its cause; omitted when
+    /// absent, and `null` is rejected rather than read as absent.
     pub causation_id: Option<String>,
     #[serde(rename = "plenora.capability.operation")]
     /// Stable storage operation selector.
