@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Replace the yanked `yoke-derive` 0.8.3 with 0.8.4 in the workspace and fuzz lockfiles; `cargo deny` now rejects yanked crates like `cargo audit --deny warnings`.
+- Reject `null` for optional runtime metadata (`plenora.execution.deadline`, `plenora.idempotency.key`, `plenora.message.causation_id`) instead of reading it as absent; a null deadline previously started the operation without a deadline. Absent values are no longer serialized as `null`.
+- Require the `content_type`, `size` and `sha256` keys of artifact metadata (nullable but present, as in `plenora-storage-common-v1`) and the nullable keys of object, list and transfer results when deserializing.
+- Reject `tls_ca_pem: null` in FTP/FTPS connections; the schema types the key as a string.
+- Execute the storage fixtures of RUNTIME-VECTORS-1.0, copied byte for byte from the adopted contracts revision and pinned by SHA-256, through the runtime binding, including fail-closed routing mutations.
+- Reject non-canonical runtime version selectors such as `01` and `+1`, which were parsed as `1` and dispatched.
 - Pin the SDK build backend to `maturin==1.15.0` and list the transitive dependencies of the quality and campaign requirement files with exact versions; `check_dependencies.py` now rejects unpinned Python requirements.
 
 ## 2.1.0 — 2026-09-30

@@ -65,7 +65,8 @@ artefatto prodotto da un checkout modificato o privo delle evidenze richieste.
    server locali. `PLENORA_CLI_BIN` seleziona il binario release da verificare.
 5. `cargo audit --deny warnings` sul lockfile definitivo; usare cargo-audit
    0.22.2 e registrare la revisione del database insieme all'esito.
-   Eseguire anche `cargo deny --locked check` con cargo-deny 0.20.2 e
+   Eseguire anche `cargo deny --locked check` con cargo-deny 0.20.2, che con
+   `yanked = "deny"` rifiuta come cargo-audit le versioni ritirate dal registry, e
    `python scripts/audit_smb_upstream.py` per il nome originale della dipendenza SMB.
 6. `cargo fetch --locked`, poi `python scripts/build_release.py`: compila offline la CLI release, verifica tutti i
    pacchetti Cargo, esegue un consumer Rust dagli archivi estratti fuori dal

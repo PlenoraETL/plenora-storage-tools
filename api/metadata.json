@@ -29,7 +29,8 @@
     "contracts/upstream/adoption-manifest-v4.schema.json": "deee97c3cb682268d648ec9975cbb73a225de62d5b43b19573ddd19647e203a0",
     "contracts/upstream/capabilities-v2.schema.json": "c3982782dcf9afe1e1a21e87292e73cf17feac742d1cf0bcb9cbc38d9480c450",
     "contracts/upstream/cli-envelope-v2.schema.json": "e2210f179e24190ea85d1c82b5cacc2429ea7ba3505bbc47395e638236db19ea",
-    "contracts/upstream/error-v1.schema.json": "164a0c580080d93ee1a020e7e33b651fe46950a4133e9bd8c044daa64cb9b914"
+    "contracts/upstream/error-v1.schema.json": "164a0c580080d93ee1a020e7e33b651fe46950a4133e9bd8c044daa64cb9b914",
+    "contracts/upstream/runtime-vector-v1.schema.json": "b5e38f0bee134240bbecffcb9f79e9051d27dcdfe90c0af467ef571528521ef8"
   },
   "edition": "2024",
   "packages": {

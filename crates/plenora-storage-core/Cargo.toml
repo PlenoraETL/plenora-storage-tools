@@ -10,8 +10,12 @@ authors.workspace = true
 repository.workspace = true
 readme = "../../README.md"
 
-# Schema fixtures are shipped in the separate contracts archive.
-exclude = ["tests/contracts.rs", "examples/validate_adoption.rs"]
+# Schema fixtures and runtime vectors are shipped in the separate contracts archive.
+exclude = [
+    "tests/contracts.rs",
+    "tests/runtime_vectors.rs",
+    "examples/validate_adoption.rs",
+]
 
 [dependencies]
 hex.workspace = true
