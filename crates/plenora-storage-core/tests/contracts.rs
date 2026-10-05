@@ -746,3 +746,84 @@ fn public_security_and_ambiguous_error_invariants_fail_closed() {
     assert_eq!(cancelled.remote_effect, RemoteEffect::Unknown);
     assert_eq!(cancelled.retry, RetryDisposition::RequiresRecovery);
 }
+
+/// `plenora-storage-common-v1` requires every artifact metadata key and allows
+/// `null` as the unknown value. Deserialization must accept exactly the key
+/// shapes the schema accepts: an omitted key is not an implicit `null`.
+#[test]
+fn artifact_metadata_key_presence_agrees_with_common_v1() {
+    let (_, documents) = load_schemas();
+    let validator = common_definition_validator("artifactMetadata", documents);
+    let values = [
+        (
+            "content_type",
+            serde_json::json!("application/octet-stream"),
+        ),
+        ("size", serde_json::json!(17)),
+        (
+            "sha256",
+            serde_json::json!("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
+        ),
+    ];
+    let mut accepted = 0;
+    for shape in 0..27_u32 {
+        let mut object = serde_json::Map::new();
+        let mut code = shape;
+        for (key, value) in &values {
+            match code % 3 {
+                0 => {}
+                1 => {
+                    object.insert((*key).to_owned(), Value::Null);
+                }
+                _ => {
+                    object.insert((*key).to_owned(), value.clone());
+                }
+            }
+            code /= 3;
+        }
+        let candidate = Value::Object(object);
+        let rust = serde_json::from_value::<ArtifactMetadata>(candidate.clone()).is_ok();
+        assert_eq!(
+            rust,
+            validator.is_valid(&candidate),
+            "artifact metadata {candidate} disagrees with plenora-storage-common-v1"
+        );
+        accepted += usize::from(rust);
+    }
+    // Only the eight shapes with every key present, null or not, are valid.
+    assert_eq!(accepted, 8);
+}
+
+/// Output DTOs always serialize their nullable keys, and the output schemas
+/// require them. Deserializing an output with a key missing is therefore a
+/// contract violation, not an implicit `null`.
+#[test]
+fn nullable_output_keys_are_required_when_deserializing() {
+    fn check<T: serde::de::DeserializeOwned>(value: &Value, keys: &[&str]) {
+        assert!(serde_json::from_value::<T>(value.clone()).is_ok());
+        for key in keys {
+            let mut null = value.clone();
+            null[*key] = Value::Null;
+            assert!(serde_json::from_value::<T>(null).is_ok(), "{key}: null");
+            let mut missing = value.clone();
+            missing.as_object_mut().unwrap().remove(*key);
+            assert!(
+                serde_json::from_value::<T>(missing).is_err(),
+                "{key}: missing key accepted"
+            );
+        }
+    }
+    check::<ObjectMetadata>(
+        &to_contract_value(&sample_object()),
+        &["last_modified", "etag", "version"],
+    );
+    check::<TransferResult>(&to_contract_value(&sample_transfer()), &["etag", "version"]);
+    check::<ListResult>(
+        &to_contract_value(&ListResult {
+            objects: vec![sample_object()],
+            truncated: false,
+            next_cursor: None,
+        }),
+        &["next_cursor"],
+    );
+}

@@ -39,6 +39,15 @@ richieste con UUID nil e omette una causation invalida, evitando di riflettere
 testo arbitrario. Identità valide e causation vengono preservate. L'host è
 responsabile della generazione di message ID unici.
 
+Le chiavi opzionali `plenora.execution.deadline`, `plenora.idempotency.key` e
+`plenora.message.causation_id` si omettono quando assenti: un valore `null`
+non è una stringa del trasporto ed è rifiutato dalla deserializzazione di
+`RuntimeInvocation` e `RuntimeResultEnvelope`, invece di essere letto come
+assente (una deadline `null` farebbe partire l'operazione senza scadenza).
+Il rifiuto avviene nel DTO, prima del binding, che riceve un tipo già
+deserializzato: l'host lo riceve come errore di deserializzazione, non come
+envelope `protocol`/`validate`/`none`.
+
 ## Manifest ed evidenze immutabili
 
 `scripts/build_release.py` crea `adoption-manifest-v4.json`, lo valida contro

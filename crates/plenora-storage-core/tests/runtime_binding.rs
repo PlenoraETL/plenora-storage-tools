@@ -15,8 +15,9 @@ use plenora_storage_core::{
     ExecutionControl, GetRequest, IntegrityMetadata, JSON_CONTENT_TYPE, ListRequest,
     ObjectMetadata, OperationContext, ProviderCapabilities, ProviderConnection,
     ProviderListRequest, ProviderListResult, PutRequest, RUNTIME_OPERATIONS, RemoteEffect,
-    RetryDisposition, RuntimeBinding, RuntimeInvocation, RuntimeRequestMetadata, SecretResolver,
-    StatRequest, StorageError, StorageProvider, StorageResult, TestResult, TransferResult,
+    RetryDisposition, RuntimeBinding, RuntimeInvocation, RuntimeRequestMetadata,
+    RuntimeResultEnvelope, SecretResolver, StatRequest, StorageError, StorageProvider,
+    StorageResult, TestResult, TransferResult,
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -962,4 +963,75 @@ fn assert_error_effect(
     assert_error(result, code);
     assert_eq!(result.payload["remote_effect"], effect);
     assert_eq!(result.payload["retry"]["kind"], retry);
+}
+
+/// Optional runtime metadata may be omitted, but `null` is not a string in the
+/// runtime transport contract. Reading it as absent would, for the deadline,
+/// start an operation without any deadline at all.
+#[tokio::test]
+async fn runtime_metadata_null_is_rejected_not_read_as_absent() {
+    let engine = engine();
+    let artifacts = MemoryArtifacts::default();
+    let binding = RuntimeBinding::new(&engine, &artifacts, &TestSecrets);
+    let base = invocation(
+        "storage.test",
+        json!({"schema_version": 1, "connection": connection()}),
+    );
+    let omitted = serde_json::to_value(&base).unwrap();
+    for key in [
+        "plenora.execution.deadline",
+        "plenora.idempotency.key",
+        "plenora.message.causation_id",
+    ] {
+        // Absent fields are not serialized as null, so a serialized invocation
+        // deserializes back to itself.
+        assert!(omitted["metadata"].get(key).is_none(), "{key} serialized");
+        assert_eq!(
+            serde_json::from_value::<RuntimeInvocation>(omitted.clone()).unwrap(),
+            base
+        );
+
+        let mut null = omitted.clone();
+        null["metadata"][key] = Value::Null;
+        assert!(
+            serde_json::from_value::<RuntimeInvocation>(null).is_err(),
+            "{key}: null must be rejected, not read as absent"
+        );
+    }
+
+    let mut present = omitted.clone();
+    present["metadata"]["plenora.execution.deadline"] = json!("2999-01-01T00:00:00Z");
+    present["metadata"]["plenora.message.causation_id"] =
+        json!("33333333-3333-4333-8333-333333333333");
+    let present = serde_json::from_value::<RuntimeInvocation>(present).unwrap();
+    assert_eq!(
+        present.metadata.deadline.as_deref(),
+        Some("2999-01-01T00:00:00Z")
+    );
+    let result = binding.invoke(present, CancellationToken::new()).await;
+    assert_success(&result, "plenora-storage-test-output-v1");
+
+    let mut idempotent = omitted;
+    idempotent["metadata"]["plenora.idempotency.key"] = json!("key-1");
+    let idempotent = serde_json::from_value::<RuntimeInvocation>(idempotent).unwrap();
+    assert_eq!(
+        idempotent.metadata.idempotency_key.as_deref(),
+        Some("key-1")
+    );
+
+    let mut envelope = serde_json::to_value(&result).unwrap();
+    assert!(
+        envelope["metadata"]
+            .get("plenora.message.causation_id")
+            .is_some()
+    );
+    assert!(serde_json::from_value::<RuntimeResultEnvelope>(envelope.clone()).is_ok());
+    envelope["metadata"]["plenora.message.causation_id"] = Value::Null;
+    assert!(serde_json::from_value::<RuntimeResultEnvelope>(envelope.clone()).is_err());
+    envelope["metadata"]
+        .as_object_mut()
+        .unwrap()
+        .remove("plenora.message.causation_id");
+    let without = serde_json::from_value::<RuntimeResultEnvelope>(envelope).unwrap();
+    assert_eq!(without.metadata.causation_id, None);
 }

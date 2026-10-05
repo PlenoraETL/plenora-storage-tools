@@ -1,12 +1,33 @@
 use std::collections::BTreeMap;
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
 use crate::{StorageError, StorageResult};
 
 /// Accepted version of storage operation envelopes.
 pub const OPERATION_SCHEMA_VERSION: u32 = 1;
+
+/// Reads an optional field whose contract allows omission but not `null`.
+/// Serde would otherwise read `null` as absent, so a value that the contract
+/// rejects would silently select the default. Pair with `#[serde(default)]`.
+pub fn present_value<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    T::deserialize(deserializer).map(Some)
+}
+
+/// Reads a field whose contract requires the key but allows `null`. Without a
+/// custom deserializer Serde treats a missing `Option` key as `null`.
+fn required_nullable<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(deserializer)
+}
 
 /// Provider selection and non-secret connection configuration.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -260,11 +281,17 @@ pub enum PublicationPolicy {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 /// Optional content type, byte length and integrity declared by an artifact owner.
+///
+/// `plenora-storage-common-v1` requires all three keys and allows `null` for an
+/// unknown value; a missing key is rejected rather than read as `null`.
 pub struct ArtifactMetadata {
+    #[serde(deserialize_with = "required_nullable")]
     /// Optional media type without parameters, validated before transfer.
     pub content_type: Option<String>,
+    #[serde(deserialize_with = "required_nullable")]
     /// Object or artifact length in bytes.
     pub size: Option<u64>,
+    #[serde(deserialize_with = "required_nullable")]
     /// Optional lowercase hexadecimal SHA-256 digest, distinct from `ETag` and version ID.
     pub sha256: Option<String>,
 }
@@ -623,10 +650,13 @@ pub struct ObjectMetadata {
     pub key: String,
     /// Object or artifact length in bytes.
     pub size: u64,
+    #[serde(deserialize_with = "required_nullable")]
     /// Optional provider timestamp in RFC 3339 format; not synthesized when unavailable.
     pub last_modified: Option<String>,
+    #[serde(deserialize_with = "required_nullable")]
     /// Optional opaque provider entity tag; not a SHA-256 digest.
     pub etag: Option<String>,
+    #[serde(deserialize_with = "required_nullable")]
     /// Optional opaque provider object version identifier, distinct from a checksum.
     pub version: Option<String>,
 }
@@ -639,6 +669,7 @@ pub struct ListResult {
     pub objects: Vec<ObjectMetadata>,
     /// Whether further matching entries may be obtained with the continuation boundary.
     pub truncated: bool,
+    #[serde(deserialize_with = "required_nullable")]
     /// Opaque continuation token valid only in this live engine and original list scope.
     pub next_cursor: Option<String>,
 }
@@ -676,8 +707,10 @@ pub struct TransferResult {
     pub checksum: IntegrityMetadata,
     /// Metadata derived from the bytes traversed by this transfer.
     pub artifact: ArtifactMetadata,
+    #[serde(deserialize_with = "required_nullable")]
     /// Optional opaque provider entity tag; not a SHA-256 digest.
     pub etag: Option<String>,
+    #[serde(deserialize_with = "required_nullable")]
     /// Optional opaque provider object version identifier, distinct from a checksum.
     pub version: Option<String>,
 }
