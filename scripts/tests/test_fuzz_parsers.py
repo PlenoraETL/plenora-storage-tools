@@ -1,5 +1,6 @@
 import importlib.util
 from pathlib import Path
+import tempfile
 import unittest
 
 SPEC = importlib.util.spec_from_file_location('fuzz_parsers', Path(__file__).parents[1] / 'fuzz_parsers.py')
@@ -21,3 +22,18 @@ class FuzzEvidenceTests(unittest.TestCase):
                           ('stat::number_of_executed_units: 120', 0),
                           ('cov: 54\nstat::number_of_executed_units: 0', 0)]:
             self.assertEqual(MODULE.stats(log, code)['status'], 'FAIL')
+
+    def test_every_target_has_a_seed_directory_harness_and_boundary(self):
+        root = Path(__file__).parents[2]
+        manifest = (root / 'fuzz/Cargo.toml').read_text(encoding='utf-8')
+        for target in MODULE.TARGETS:
+            with self.subTest(target=target):
+                self.assertTrue(any((root / 'fuzz/seeds' / target).iterdir()))
+                self.assertIn(f'name = "{target}"', manifest)
+                self.assertTrue((root / 'fuzz/fuzz_targets' / f'{target}.rs').is_file())
+        with tempfile.TemporaryDirectory() as directory:
+            for target in MODULE.TARGETS:
+                corpus = Path(directory) / target
+                corpus.mkdir()
+                MODULE.boundary_seeds(target, corpus)
+                self.assertTrue(any(corpus.iterdir()), target)

@@ -2,6 +2,11 @@ name: parser-fuzz
 
 on:
   workflow_call:
+    inputs:
+      seconds:
+        description: Fuzzing seconds per parser (compilation excluded)
+        type: string
+        default: '60'
   workflow_dispatch:
     inputs:
       seconds:
@@ -15,7 +20,8 @@ permissions:
 jobs:
   parsers:
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    # Eight targets at 300 s each plus the instrumented build.
+    timeout-minutes: 90
     env:
       FUZZ_SECONDS: ${{ inputs.seconds || '60' }}
     steps:

@@ -1,0 +1,20 @@
+name: scheduled
+
+# Weekly, independent of pushes: advisories and yanked crates appear without a
+# commit, and the per-push parser fuzz budget (60 s per target) is a smoke test.
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependencies:
+    uses: ./.github/workflows/dependencies.yml
+
+  parser-fuzz:
+    uses: ./.github/workflows/parser-fuzz.yml
+    with:
+      seconds: '300'

@@ -137,14 +137,23 @@ assenza di credenziali nei messaggi ed effetti. Il report conserva seed e indice
 del caso fallito. È separata dalla campagna guidata dalla coverage descritta
 sotto e dalle prove di durata.
 
-## Fuzzing dei parser XML e FTP
+## Fuzzing dei parser XML, FTP e SMB
 
 Il workflow [parser-fuzz](../.github/workflows/parser-fuzz.yml), richiamato da CI
 e release-candidate, compila i parser effettivi di S3, Azure, WebDAV e FTP/FTPS con
 cargo-fuzz 0.13.2, libFuzzer 0.4.13 e AddressSanitizer. La toolchain nightly è
 fissata al 20 settembre 2026; non modifica la toolchain del prodotto.
 Gli ingressi `cfg(fuzzing)` esistono solo nelle build strumentate, senza feature
-o simboli aggiunti alla distribuzione. Vedere la [guida Rust Fuzz](https://rust-fuzz.github.io/book/cargo-fuzz/guide.html).
+o simboli aggiunti alla distribuzione.
+
+Quattro target coprono i decoder di `plenora-smb2` che leggono byte dal server:
+`smb2_messages` (transform header, split dei compound, header e corpo di ogni
+comando, contesti d'errore), `spnego_der` (TLV DER, `negTokenResp` SPNEGO,
+wrapper GSS-API), `ntlm_challenge` (CHALLENGE_MESSAGE e AV pair tramite
+l'autenticatore pubblico, con e senza NEGOTIATE) e `kerberos_messages` (risposte
+KDC, KRB-ERROR, AP-REP, parti decifrate, ticket e credential cache). Gli ingressi
+stanno in `smb2::fuzzing`, dietro la feature `fuzzing` che la distribuzione non
+abilita. Vedere la [guida Rust Fuzz](https://rust-fuzz.github.io/book/cargo-fuzz/guide.html).
 
 ```sh
 docker build -t storage-parser-fuzz -f fuzz/Dockerfile .
@@ -154,7 +163,11 @@ docker run --rm --network none -v "$PWD:/workspace" -v storage-fuzz-registry:/us
   storage-parser-fuzz python3 scripts/fuzz_parsers.py --seconds 300 --output target/parser-fuzz-manual
 ```
 
-Il budget CI è 60 secondi per parser, esclusa la compilazione. Ogni input ha
+Il budget CI è 60 secondi per parser, esclusa la compilazione. Il workflow
+[scheduled](../.github/workflows/scheduled.yml) ripete ogni lunedì la campagna con
+300 secondi per parser e l'audit delle dipendenze (cargo audit sui tre lockfile,
+cargo deny, audit del nome upstream SMB), così un advisory o un crate ritirato
+dopo l'ultimo push emerge entro una settimana. Ogni input ha
 limite di 64 KiB, timeout di 10 secondi e budget RSS del processo di 1 GiB.
 FTP esercita anche il limite applicativo di 32 KiB per riga. La campagna non
 qualifica i limiti delle risposte HTTP complete (8/32 MiB), i server reali o

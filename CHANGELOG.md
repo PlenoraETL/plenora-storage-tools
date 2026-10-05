@@ -9,6 +9,9 @@
 - Execute the storage fixtures of RUNTIME-VECTORS-1.0, copied byte for byte from the adopted contracts revision and pinned by SHA-256, through the runtime binding, including fail-closed routing mutations.
 - Reject non-canonical runtime version selectors such as `01` and `+1`, which were parsed as `1` and dispatched.
 - Pin the SDK build backend to `maturin==1.15.0` and list the transitive dependencies of the quality and campaign requirement files with exact versions; `check_dependencies.py` now rejects unpinned Python requirements.
+- Run the dependency audit (`cargo audit` on the three lockfiles, `cargo deny`, SMB upstream name audit) and a 300-second-per-target parser fuzz campaign every Monday through the `scheduled` workflow; the per-push jobs are unchanged and the audit job now lives in the reusable `dependencies` workflow.
+- Fuzz the SMB2 framing and message decoders, DER/SPNEGO, the NTLM CHALLENGE_MESSAGE and Kerberos KDC/AP replies and credential caches with four new cargo-fuzz targets and versioned seeds.
+- Attest SLSA build provenance and the CycloneDX SBOM of CLI archives, wheels and sources from the release-candidate jobs that build them; the release workflow refuses to publish files without both attestations and publishes each target's SBOM and contract adoption manifest as release assets.
 
 ## 2.1.0 — 2026-09-30
 
