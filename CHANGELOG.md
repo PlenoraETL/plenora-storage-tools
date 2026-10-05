@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Execute the storage fixtures of RUNTIME-VECTORS-1.0, copied byte for byte from the adopted contracts revision and pinned by SHA-256, through the runtime binding, including fail-closed routing mutations.
+- Reject non-canonical runtime version selectors such as `01` and `+1`, which were parsed as `1` and dispatched.
+
 ## 2.1.0 — 2026-09-30
 
 - Add explicit private-file upload preparation for local, Azure, GCS, SMB and WebDAV through Rust, CLI and Python, preserving default buffered limits.
