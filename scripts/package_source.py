@@ -72,7 +72,7 @@ def build(output, target_dir):
             with gzip.GzipFile(filename='', fileobj=output_file, mode='wb', mtime=0) as compressed:
                 shutil.copyfileobj(source, compressed)
         source = extract(archive, work / 'extracted', prefix)
-        for name in ['Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'LICENSE-MIT', 'LICENSE-APACHE',
+        for name in ['Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'LICENSE',
                      'contracts/upstream/source.json', 'crates/plenora-smb2/PROVENANCE.md']:
             if not (source / name).is_file():
                 raise ValueError('source bundle is incomplete')

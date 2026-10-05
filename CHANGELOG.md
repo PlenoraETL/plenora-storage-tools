@@ -9,6 +9,7 @@
 - Execute the storage fixtures of RUNTIME-VECTORS-1.0, copied byte for byte from the adopted contracts revision and pinned by SHA-256, through the runtime binding, including fail-closed routing mutations.
 - Reject non-canonical runtime version selectors such as `01` and `+1`, which were parsed as `1` and dispatched.
 - Pin the SDK build backend to `maturin==1.15.0` and list the transitive dependencies of the quality and campaign requirement files with exact versions; `check_dependencies.py` now rejects unpinned Python requirements.
+- Distribute the workspace crates, CLI archives, source bundle and Python SDK under the proprietary Plenora ETL license (`LICENSE`), replacing MIT OR Apache-2.0; `cargo deny` binds each workspace crate to the hash of that text. The `plenora-smb2` fork keeps its upstream MIT OR Apache-2.0 license and texts.
 
 ## 2.1.0 — 2026-09-30
 
