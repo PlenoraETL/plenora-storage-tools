@@ -11,8 +11,8 @@ mod operations;
 mod publication;
 mod transfer;
 use errors::{
-    committed_verification_error, configuration_error, list_name_error, list_parse_error,
-    list_scan_limit_error, map_ftp_auth_error, map_ftp_error, transfer_io_error,
+    committed_mismatch_error, committed_verification_error, configuration_error, list_name_error,
+    list_parse_error, list_scan_limit_error, map_ftp_auth_error, map_ftp_error, transfer_io_error,
     transfer_limit_error,
 };
 use transfer::{

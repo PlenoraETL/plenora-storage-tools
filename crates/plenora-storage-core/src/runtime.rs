@@ -2,19 +2,22 @@
 //! wrap this type in its runtime `CapabilityHandler`; this module deliberately
 //! does not depend on `runtime-tools`.
 
-use std::{pin::Pin, time::Instant};
+use std::pin::Pin;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
-use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
+use crate::runtime_admission::{
+    CountingSink, parse_version, result_identity, route_error, runtime_control,
+    sink_failure_outcome, validate_grammar, validate_runtime_route,
+};
 use crate::{
-    ArtifactReference, ArtifactSinkReference, CAPABILITY_NAME, CancellationToken, CopyInput,
-    DeleteInput, Engine, ErrorCategory, ErrorPhase, ExecutionControl, GetInput, ListInput,
-    PutInput, RemoteEffect, RetryDisposition, SideEffect, StatInput, StorageError, StorageResult,
-    TestInput, TransferResult, model::present_value, validate_operation_schema_version,
+    ArtifactReference, ArtifactSinkReference, CancellationToken, CopyInput, DeleteInput, Engine,
+    ErrorCategory, ErrorPhase, GetInput, ListInput, PutInput, RemoteEffect, RetryDisposition,
+    SideEffect, StatInput, StorageError, StorageResult, TestInput, TransferResult,
+    model::present_value, validate_operation_schema_version,
 };
 
 /// Supported transport-neutral runtime binding version.
@@ -168,8 +171,11 @@ pub struct RuntimeInvocation {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
 /// Identity, routing and execution controls from the host message.
+///
+/// Keys this binding version does not reserve are ignored, as Runtime Binding
+/// 1.0 §9 treats added optional metadata; a renamed reserved key is therefore
+/// not an alias of the reserved one.
 pub struct RuntimeRequestMetadata {
     #[serde(rename = "plenora.message.id")]
     /// Canonical UUID identifying the invocation or result message.
@@ -208,13 +214,14 @@ pub struct RuntimeRequestMetadata {
     /// `null` is rejected: reading it as absent would start without a deadline.
     pub deadline: Option<String>,
     #[serde(
-        rename = "plenora.idempotency.key",
+        rename = "plenora.execution.idempotency_key",
         default,
         deserialize_with = "present_value",
         skip_serializing_if = "Option::is_none"
     )]
-    /// Optional host idempotency key; currently rejected because these operations do not support it.
-    /// `null` is rejected rather than read as absent.
+    /// Optional host idempotency key (Runtime Binding 1.0 §4). No storage v1
+    /// operation supports it, so a present key is rejected as `unsupported`
+    /// (RT-006); `null` is rejected rather than read as absent.
     pub idempotency_key: Option<String>,
     #[serde(rename = "plenora.trace.correlation_id")]
     /// Canonical UUID retained across invocation and terminal result.
@@ -236,9 +243,16 @@ pub struct RuntimeResultEnvelope {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 /// Identity and contract of the terminal runtime result.
+///
+/// The message identity is always new and the causation is the request's
+/// message identity (RT-012). Operation, operation version and correlation are
+/// copied byte for byte from the request only when canonical, and omitted
+/// otherwise: a rejection never reflects, normalizes or invents a routing
+/// value (rule R2 of the common runtime matrix, pending ratification in
+/// `plenora-contracts`). A success always carries all three.
 pub struct RuntimeResultMetadata {
     #[serde(rename = "plenora.message.id")]
-    /// Canonical UUID identifying the invocation or result message.
+    /// New canonical UUID identifying this result message.
     pub message_id: String,
     #[serde(
         rename = "plenora.message.causation_id",
@@ -246,21 +260,36 @@ pub struct RuntimeResultMetadata {
         deserialize_with = "present_value",
         skip_serializing_if = "Option::is_none"
     )]
-    /// Optional canonical UUID linking this message to its cause; omitted when
-    /// absent, and `null` is rejected rather than read as absent.
+    /// The request's message identity when canonical; omitted otherwise, and
+    /// `null` is rejected rather than read as absent.
     pub causation_id: Option<String>,
-    #[serde(rename = "plenora.capability.operation")]
-    /// Stable storage operation selector.
-    pub operation: String,
-    #[serde(rename = "plenora.operation.version")]
-    /// Required version of the selected operation.
-    pub operation_version: String,
+    #[serde(
+        rename = "plenora.capability.operation",
+        default,
+        deserialize_with = "present_value",
+        skip_serializing_if = "Option::is_none"
+    )]
+    /// Stable storage operation selector; omitted when the request's is not canonical.
+    pub operation: Option<String>,
+    #[serde(
+        rename = "plenora.operation.version",
+        default,
+        deserialize_with = "present_value",
+        skip_serializing_if = "Option::is_none"
+    )]
+    /// Version of the selected operation; omitted when the request's is not canonical.
+    pub operation_version: Option<String>,
     #[serde(rename = "plenora.output.contract")]
     /// Versioned response contract, or the error contract on failure.
     pub output_contract: String,
-    #[serde(rename = "plenora.trace.correlation_id")]
-    /// Canonical UUID retained across invocation and terminal result.
-    pub correlation_id: String,
+    #[serde(
+        rename = "plenora.trace.correlation_id",
+        default,
+        deserialize_with = "present_value",
+        skip_serializing_if = "Option::is_none"
+    )]
+    /// The request's correlation UUID; omitted when it is not canonical.
+    pub correlation_id: Option<String>,
 }
 
 /// Host-owned asynchronous source stream for an artifact reference.
@@ -316,30 +345,58 @@ impl<'a> RuntimeBinding<'a> {
         }
     }
 
+    /// Validate and dispatch a serialized invocation exactly as a transport
+    /// received it. Unlike deserializing [`RuntimeInvocation`] first, every
+    /// request produces a result envelope: a missing reserved key, a value
+    /// that is not a JSON string or a `null` control is a `protocol` rejection
+    /// before invocation (RT-016, RT-017), whose metadata reflects only the
+    /// well-formed routing values the request carried (RT-019).
+    pub async fn invoke_json(
+        &self,
+        invocation: Value,
+        cancellation: CancellationToken,
+    ) -> RuntimeResultEnvelope {
+        let metadata = invocation.get("metadata");
+        let text = |key: &str| {
+            metadata
+                .and_then(|metadata| metadata.get(key))
+                .and_then(Value::as_str)
+        };
+        let identity = result_identity(
+            text("plenora.message.id"),
+            text("plenora.capability.operation"),
+            text("plenora.operation.version"),
+            text("plenora.trace.correlation_id"),
+        );
+        match serde_json::from_value::<RuntimeInvocation>(invocation) {
+            Ok(invocation) => self.invoke(invocation, cancellation).await,
+            Err(_) => error_envelope(
+                identity,
+                &StorageError::new(
+                    ErrorCategory::Protocol,
+                    ErrorPhase::Validate,
+                    RemoteEffect::None,
+                    RetryDisposition::Never,
+                    "RUNTIME_ENVELOPE_INVALID",
+                    "runtime envelope lacks a reserved key or carries a non-string value",
+                ),
+            ),
+        }
+    }
+
     /// Validate and dispatch an invocation, returning a correlated success or redacted error envelope.
     pub async fn invoke(
         &self,
         invocation: RuntimeInvocation,
         cancellation: CancellationToken,
     ) -> RuntimeResultEnvelope {
-        let identity = RuntimeResultMetadata {
-            message_id: public_uuid(&invocation.metadata.message_id),
-            causation_id: invocation
-                .metadata
-                .causation_id
-                .as_deref()
-                .filter(|value| canonical_uuid(value))
-                .map(str::to_owned),
-            operation: RUNTIME_OPERATIONS
-                .iter()
-                .find(|item| item.operation == invocation.metadata.operation)
-                .map_or("storage.unknown", |item| item.operation)
-                .to_owned(),
-            operation_version: parse_version(&invocation.metadata.operation_version)
-                .map_or_else(|_| "0".to_owned(), |version| version.to_string()),
-            output_contract: ERROR_CONTRACT.to_owned(),
-            correlation_id: public_uuid(&invocation.metadata.correlation_id),
-        };
+        let request = &invocation.metadata;
+        let identity = result_identity(
+            Some(&request.message_id),
+            Some(&request.operation),
+            Some(&request.operation_version),
+            Some(&request.correlation_id),
+        );
         match self.invoke_inner(&invocation, cancellation).await {
             Ok((descriptor, payload)) => RuntimeResultEnvelope {
                 content_type: descriptor.content_type.to_owned(),
@@ -349,22 +406,7 @@ impl<'a> RuntimeBinding<'a> {
                 },
                 payload,
             },
-            Err(error) => RuntimeResultEnvelope {
-                content_type: ERROR_CONTENT_TYPE.to_owned(),
-                metadata: identity,
-                payload: serde_json::to_value(error).unwrap_or_else(|_| {
-                    serde_json::json!({
-                        "category": "internal",
-                        "phase": "cleanup",
-                        "remote_effect": "none",
-                        "retry": {"kind": "never"},
-                        "code": "ERROR_SERIALIZATION_FAILED",
-                        "message": "terminal storage error serialization failed",
-                        "provider": null,
-                        "details": {}
-                    })
-                }),
-            },
+            Err(error) => error_envelope(identity, &error),
         }
     }
 
@@ -377,37 +419,24 @@ impl<'a> RuntimeBinding<'a> {
         invocation: &RuntimeInvocation,
         cancellation: CancellationToken,
     ) -> StorageResult<(&'static RuntimeOperationDescriptor, Value)> {
-        if !canonical_uuid(&invocation.metadata.message_id)
-            || !canonical_uuid(&invocation.metadata.correlation_id)
-            || invocation
-                .metadata
-                .causation_id
-                .as_deref()
-                .is_some_and(|value| !canonical_uuid(value))
-        {
-            return Err(StorageError::new(
-                ErrorCategory::Protocol,
-                ErrorPhase::Validate,
-                RemoteEffect::None,
-                RetryDisposition::Never,
-                "RUNTIME_IDENTITY_INVALID",
-                "runtime identities must be canonical lowercase hyphenated UUIDs",
-            ));
-        }
-        validate_payload_security(&invocation.payload)?;
-        let capability_version = parse_version(&invocation.metadata.capability_version)?;
-        let operation_version = parse_version(&invocation.metadata.operation_version)?;
+        // RT-018: `protocol` for any malformed reserved value, then
+        // `unsupported` for a well-formed one nothing advertises, then
+        // `timeout` for a deadline already elapsed; all before invocation.
+        validate_grammar(&invocation.metadata, &invocation.content_type)?;
         let descriptor = validate_runtime_route(RuntimeRoute {
             capability_name: &invocation.metadata.capability_name,
-            capability_version,
+            capability_version: parse_version(&invocation.metadata.capability_version)?,
             operation: &invocation.metadata.operation,
-            operation_version,
+            operation_version: parse_version(&invocation.metadata.operation_version)?,
             input_contract: &invocation.metadata.input_contract,
             content_type: &invocation.content_type,
             idempotency_key: invocation.metadata.idempotency_key.as_deref(),
         })?;
         let control = runtime_control(invocation.metadata.deadline.as_deref(), cancellation)?;
+        // An expired deadline is `timeout`/`validate`/`none`/`never` here:
+        // nothing has started, and the same message would expire again.
         control.check(ErrorPhase::Validate, false)?;
+        validate_payload_security(&invocation.payload)?;
 
         let result = match descriptor.operation {
             "storage.test" => {
@@ -450,24 +479,21 @@ impl<'a> RuntimeBinding<'a> {
                 // the open reports the ambiguous one the resolver may have
                 // produced.
                 control.check(ErrorPhase::Prepare, false)?;
-                let mut sink = control
-                    .run(
-                        self.artifacts.open_sink(&input.artifact_sink),
-                        ErrorPhase::Prepare,
-                        true,
-                    )
-                    .await?;
+                let mut sink = CountingSink {
+                    inner: control
+                        .run(
+                            self.artifacts.open_sink(&input.artifact_sink),
+                            ErrorPhase::Prepare,
+                            true,
+                        )
+                        .await?,
+                    delivered: 0,
+                };
                 let result = self
                     .engine
                     .get(&input.connection, &input.request, &mut sink, &control)
                     .await
-                    // The provider only knows about its own effects. Opening
-                    // the artifact may already have created or truncated it,
-                    // even if the provider fails before writing any bytes.
-                    .map_err(|error| {
-                        error
-                            .with_outcome(RemoteEffect::Unknown, RetryDisposition::RequiresRecovery)
-                    })?;
+                    .map_err(|error| sink_failure_outcome(error, sink.delivered))?;
                 // Integrity is checked before the sink is finalized: a sink that
                 // publishes on shutdown must not commit bytes that do not match
                 // the declared metadata. The sink already holds bytes, so the
@@ -569,46 +595,6 @@ fn serialize_result<T: Serialize>(result: T) -> StorageResult<Value> {
             "storage runtime result serialization failed",
         )
     })
-}
-
-/// Accepts only the canonical decimal form (`^[1-9][0-9]*$` in the runtime
-/// vector schema). `u32::from_str` alone also accepts `+1` and `01`, which
-/// would admit a selector that differs textually from the descriptor.
-fn parse_version(value: &str) -> StorageResult<u32> {
-    let canonical = value.bytes().all(|byte| byte.is_ascii_digit()) && !value.starts_with('0');
-    canonical
-        .then(|| value.parse().ok())
-        .flatten()
-        .ok_or_else(|| route_error("runtime version is invalid"))
-}
-
-fn runtime_control(
-    deadline: Option<&str>,
-    cancellation: CancellationToken,
-) -> StorageResult<ExecutionControl> {
-    let mut control = ExecutionControl::new(cancellation);
-    if let Some(deadline) = deadline {
-        let parsed = OffsetDateTime::parse(deadline, &Rfc3339).map_err(|_| {
-            StorageError::invalid_configuration(
-                "RUNTIME_DEADLINE_INVALID",
-                "runtime deadline must be an RFC 3339 timestamp",
-            )
-        })?;
-        let now = OffsetDateTime::now_utc();
-        let instant = if parsed <= now {
-            Instant::now()
-        } else {
-            Instant::now()
-                + std::time::Duration::try_from(parsed - now).map_err(|_| {
-                    StorageError::invalid_configuration(
-                        "RUNTIME_DEADLINE_INVALID",
-                        "runtime deadline is outside the supported range",
-                    )
-                })?
-        };
-        control = control.with_deadline(instant);
-    }
-    Ok(control)
 }
 
 fn validate_payload_security(payload: &Value) -> StorageResult<()> {
@@ -723,66 +709,22 @@ fn artifact_finalize_error() -> StorageError {
     )
 }
 
-/// Validates routing before a consumer-owned adapter resolves credentials or
-/// artifacts and before any storage operation can start.
-///
-/// # Errors
-/// Returns a validation error for unknown selectors, versions, input contract, content type or unsupported idempotency control.
-pub fn validate_runtime_route(
-    route: RuntimeRoute<'_>,
-) -> StorageResult<&'static RuntimeOperationDescriptor> {
-    if route.capability_name != CAPABILITY_NAME
-        || route.capability_version != RUNTIME_BINDING_VERSION
-    {
-        return Err(route_error("runtime capability identity is unsupported"));
-    }
-    let descriptor = RUNTIME_OPERATIONS
-        .iter()
-        .find(|candidate| candidate.operation == route.operation)
-        .ok_or_else(|| route_error("runtime storage operation is unsupported"))?;
-    let version_matches = route.operation_version == descriptor.version;
-    let contract_matches = route.input_contract == descriptor.input_contract;
-    let content_type_matches = route.content_type == descriptor.content_type;
-    if !(version_matches && contract_matches && content_type_matches) {
-        return Err(route_error(
-            "runtime operation version, input contract or content type is unsupported",
-        ));
-    }
-    if route.idempotency_key.is_some() {
-        return Err(route_error(
-            "storage v1 operations do not accept idempotency keys",
-        ));
-    }
-    Ok(descriptor)
-}
-
-fn route_error(message: &'static str) -> StorageError {
-    StorageError::new(
-        ErrorCategory::Protocol,
-        ErrorPhase::Validate,
-        RemoteEffect::None,
-        RetryDisposition::Never,
-        "RUNTIME_ROUTE_INVALID",
-        message,
-    )
-}
-
-fn canonical_uuid(value: &str) -> bool {
-    value.len() == 36
-        && value.bytes().enumerate().all(|(index, byte)| {
-            if matches!(index, 8 | 13 | 18 | 23) {
-                byte == b'-'
-            } else {
-                byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)
-            }
-        })
-}
-
-fn public_uuid(value: &str) -> String {
-    if canonical_uuid(value) {
-        value.to_owned()
-    } else {
-        "00000000-0000-0000-0000-000000000000".to_owned()
+fn error_envelope(metadata: RuntimeResultMetadata, error: &StorageError) -> RuntimeResultEnvelope {
+    RuntimeResultEnvelope {
+        content_type: ERROR_CONTENT_TYPE.to_owned(),
+        metadata,
+        payload: serde_json::to_value(error).unwrap_or_else(|_| {
+            serde_json::json!({
+                "category": "internal",
+                "phase": "cleanup",
+                "remote_effect": "none",
+                "retry": {"kind": "never"},
+                "code": "ERROR_SERIALIZATION_FAILED",
+                "message": "terminal storage error serialization failed",
+                "provider": null,
+                "details": {}
+            })
+        }),
     }
 }
 

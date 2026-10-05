@@ -591,42 +591,10 @@ async fn runtime_binding_executes_all_seven_operations_and_artifacts() {
 }
 
 #[tokio::test]
-async fn runtime_route_and_security_mismatches_fail_closed() {
+async fn runtime_payload_security_violations_fail_closed() {
     let engine = engine();
     let artifacts = MemoryArtifacts::default();
     let binding = RuntimeBinding::new(&engine, &artifacts, &TestSecrets);
-    let base = invocation(
-        "storage.test",
-        json!({"schema_version": 1, "connection": connection()}),
-    );
-    let mut invalid = Vec::new();
-    let mut route = base.clone();
-    route.metadata.capability_name = "other".to_owned();
-    invalid.push(route);
-    // `u32::from_str` accepts a sign and leading zeros; the selector must be
-    // the canonical decimal of the descriptor version.
-    for version in ["2", "01", "+1", "", "1.0"] {
-        let mut route = base.clone();
-        route.metadata.operation_version = version.to_owned();
-        invalid.push(route);
-        let mut route = base.clone();
-        route.metadata.capability_version = version.to_owned();
-        invalid.push(route);
-    }
-    let mut route = base.clone();
-    route.metadata.input_contract = "wrong".to_owned();
-    invalid.push(route);
-    let mut route = base.clone();
-    route.content_type = "text/plain".to_owned();
-    invalid.push(route);
-    let mut route = base.clone();
-    route.metadata.idempotency_key = Some("unsupported".to_owned());
-    invalid.push(route);
-    for item in invalid {
-        let result = binding.invoke(item, CancellationToken::new()).await;
-        assert_error(&result, "RUNTIME_ROUTE_INVALID");
-    }
-
     let inline = invocation(
         "storage.test",
         json!({"schema_version": 1, "connection": {"provider": "memory", "config_contract": "x", "config": {"Password": "inline"}, "credential_ref": "secret://storage/test"}}),
@@ -671,7 +639,15 @@ async fn runtime_uuids_are_canonical_and_causation_is_preserved() {
             assert_eq!(result.payload["code"], "RUNTIME_IDENTITY_INVALID");
             assert_eq!(result.payload["category"], "protocol");
             assert_eq!(result.payload["remote_effect"], "none");
+            assert_eq!(result.payload["retry"]["kind"], "never");
             assert!(!serde_json::to_string(&result).unwrap().contains(invalid));
+            // A non-canonical identity is omitted, never replaced by an invented one.
+            assert_eq!(result.metadata.correlation_id.is_none(), field == 1);
+            assert_eq!(result.metadata.causation_id.is_none(), field == 0);
+            assert_ne!(
+                result.metadata.message_id,
+                "00000000-0000-0000-0000-000000000000"
+            );
         }
     }
     let mut valid = base;
@@ -685,8 +661,22 @@ async fn runtime_uuids_are_canonical_and_causation_is_preserved() {
         .invoke(valid.clone(), CancellationToken::new())
         .await;
     assert_success(&result, "plenora-storage-test-output-v1");
-    assert_eq!(result.metadata.message_id, valid.metadata.message_id);
-    assert_eq!(result.metadata.causation_id, valid.metadata.causation_id);
+    // RT-012: the result is a new message caused by the request. The request's
+    // own causation is not copied: it is not the result's direct cause.
+    assert_ne!(result.metadata.message_id, valid.metadata.message_id);
+    assert_canonical_uuid(&result.metadata.message_id);
+    assert_eq!(
+        result.metadata.causation_id.as_deref(),
+        Some(valid.metadata.message_id.as_str())
+    );
+    let again = binding
+        .invoke(valid.clone(), CancellationToken::new())
+        .await;
+    assert_eq!(again.metadata.message_id, result.metadata.message_id);
+    let mut other = valid.clone();
+    other.metadata.message_id = "44444444-4444-4444-8444-444444444444".to_owned();
+    let other = binding.invoke(other, CancellationToken::new()).await;
+    assert_ne!(other.metadata.message_id, result.metadata.message_id);
     let mut alternate = serialized;
     let metadata = alternate["metadata"].as_object_mut().unwrap();
     let value = metadata.remove("plenora.message.id").unwrap();
@@ -730,10 +720,12 @@ async fn runtime_deadline_and_cancellation_preserve_ambiguous_remote_effect() {
     });
     assert_error_effect(&result, "CANCELLED", "unknown", "requires_recovery");
 
+    // Expired before invocation: the same message would expire again.
     let mut expired = slow();
     expired.metadata.deadline = Some("2000-01-01T00:00:00Z".to_owned());
     let result = binding.invoke(expired, CancellationToken::new()).await;
-    assert_error_effect(&result, "TIMEOUT", "none", "safe");
+    assert_error_effect(&result, "TIMEOUT", "none", "never");
+    assert_eq!(result.payload["phase"], "validate");
 
     let mut future = slow();
     future.metadata.deadline = Some(
@@ -946,8 +938,8 @@ fn assert_success(result: &plenora_storage_core::RuntimeResultEnvelope, contract
     assert_eq!(result.content_type, JSON_CONTENT_TYPE);
     assert_eq!(result.metadata.output_contract, contract);
     assert_eq!(
-        result.metadata.correlation_id,
-        "22222222-2222-4222-8222-222222222222"
+        result.metadata.correlation_id.as_deref(),
+        Some("22222222-2222-4222-8222-222222222222")
     );
 }
 
@@ -955,8 +947,8 @@ fn assert_error(result: &plenora_storage_core::RuntimeResultEnvelope, code: &str
     assert_eq!(result.content_type, ERROR_CONTENT_TYPE);
     assert_eq!(result.metadata.output_contract, ERROR_CONTRACT);
     assert_eq!(
-        result.metadata.correlation_id,
-        "22222222-2222-4222-8222-222222222222"
+        result.metadata.correlation_id.as_deref(),
+        Some("22222222-2222-4222-8222-222222222222")
     );
     assert_eq!(result.payload["code"], code);
 }
@@ -987,7 +979,7 @@ async fn runtime_metadata_null_is_rejected_not_read_as_absent() {
     let omitted = serde_json::to_value(&base).unwrap();
     for key in [
         "plenora.execution.deadline",
-        "plenora.idempotency.key",
+        "plenora.execution.idempotency_key",
         "plenora.message.causation_id",
     ] {
         // Absent fields are not serialized as null, so a serialized invocation
@@ -1019,7 +1011,7 @@ async fn runtime_metadata_null_is_rejected_not_read_as_absent() {
     assert_success(&result, "plenora-storage-test-output-v1");
 
     let mut idempotent = omitted;
-    idempotent["metadata"]["plenora.idempotency.key"] = json!("key-1");
+    idempotent["metadata"]["plenora.execution.idempotency_key"] = json!("key-1");
     let idempotent = serde_json::from_value::<RuntimeInvocation>(idempotent).unwrap();
     assert_eq!(
         idempotent.metadata.idempotency_key.as_deref(),
@@ -1041,4 +1033,187 @@ async fn runtime_metadata_null_is_rejected_not_read_as_absent() {
         .remove("plenora.message.causation_id");
     let without = serde_json::from_value::<RuntimeResultEnvelope>(envelope).unwrap();
     assert_eq!(without.metadata.causation_id, None);
+}
+
+fn assert_canonical_uuid(value: &str) {
+    assert_eq!(value.len(), 36, "{value}");
+    assert!(
+        value
+            .bytes()
+            .enumerate()
+            .all(|(index, byte)| if matches!(index, 8 | 13 | 18 | 23) {
+                byte == b'-'
+            } else {
+                byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)
+            }),
+        "{value}"
+    );
+}
+
+/// RT-021: the deadline is an absolute RFC 3339 UTC timestamp. Every RFC 3339
+/// spelling of UTC is accepted (the receiver choice is the common one pending
+/// ratification); a non-zero offset or `-00:00` is a `protocol` rejection
+/// before invocation, never reinterpreted.
+#[tokio::test]
+async fn runtime_deadline_accepts_utc_and_rejects_other_offsets() {
+    let engine = engine();
+    let artifacts = MemoryArtifacts::default();
+    let binding = RuntimeBinding::new(&engine, &artifacts, &TestSecrets);
+    let base = invocation(
+        "storage.test",
+        json!({"schema_version": 1, "connection": connection()}),
+    );
+    for accepted in [
+        "2999-01-01T00:00:00Z",
+        "2999-01-01T00:00:00z",
+        "2999-01-01t00:00:00Z",
+        "2999-01-01T00:00:00+00:00",
+        "2999-01-01T00:00:00.5Z",
+        "2999-01-01T00:00:00.123456789Z",
+    ] {
+        let mut request = base.clone();
+        request.metadata.deadline = Some(accepted.to_owned());
+        let result = binding.invoke(request, CancellationToken::new()).await;
+        assert_success(&result, "plenora-storage-test-output-v1");
+    }
+    for rejected in [
+        "2999-01-01T02:00:00+02:00",
+        "2999-01-01T00:00:00-00:00",
+        "2999-01-01T00:00:00-05:00",
+        "2999-01-01 00:00:00Z",
+        "2999-02-30T00:00:00Z",
+        "2999-01-01",
+        "",
+    ] {
+        let mut request = base.clone();
+        request.metadata.deadline = Some(rejected.to_owned());
+        let result = binding.invoke(request, CancellationToken::new()).await;
+        assert_eq!(result.payload["category"], "protocol", "{rejected}");
+        assert_error_effect(&result, "RUNTIME_ROUTE_INVALID", "none", "never");
+        assert_eq!(result.payload["phase"], "validate", "{rejected}");
+    }
+}
+
+/// Metadata keys Runtime Binding 1.0 does not reserve are ignored (§9), so a
+/// misspelled control such as `plenora.idempotency.key` is not an alias of
+/// `plenora.execution.idempotency_key`: it neither applies nor rejects.
+#[tokio::test]
+async fn runtime_unreserved_metadata_keys_are_ignored() {
+    let engine = engine();
+    let artifacts = MemoryArtifacts::default();
+    let binding = RuntimeBinding::new(&engine, &artifacts, &TestSecrets);
+    let base = invocation(
+        "storage.test",
+        json!({"schema_version": 1, "connection": connection()}),
+    );
+    let mut request = serde_json::to_value(&base).unwrap();
+    request["metadata"]["plenora.idempotency.key"] = json!("key-1");
+    request["metadata"]["plenora.future.option"] = json!("value");
+    let parsed = serde_json::from_value::<RuntimeInvocation>(request.clone()).unwrap();
+    assert_eq!(parsed, base);
+    let result = binding.invoke_json(request, CancellationToken::new()).await;
+    assert_success(&result, "plenora-storage-test-output-v1");
+}
+
+/// The storage payload contracts carry no deadline: a deadline in the payload
+/// is an input that does not satisfy the contract, refused before invocation
+/// even when it equals the metadata deadline.
+#[tokio::test]
+async fn runtime_deadline_in_the_payload_is_rejected() {
+    let engine = engine();
+    let artifacts = MemoryArtifacts::default();
+    let binding = RuntimeBinding::new(&engine, &artifacts, &TestSecrets);
+    let mut request = invocation(
+        "storage.stat",
+        json!({"schema_version": 1, "connection": connection(), "key": "a",
+               "deadline": "2999-01-01T00:00:00Z"}),
+    );
+    request.metadata.deadline = Some("2999-01-01T00:00:00Z".to_owned());
+    let result = binding.invoke(request, CancellationToken::new()).await;
+    assert_error_effect(&result, "RUNTIME_PAYLOAD_INVALID", "none", "never");
+    assert_eq!(result.payload["category"], "invalid_configuration");
+    assert_eq!(result.payload["phase"], "validate");
+}
+
+/// Rule R1 of the common runtime matrix (pending ratification): a well-formed
+/// but unannounced routing value is `unsupported`, a malformed or
+/// non-canonical one `protocol`; both before invocation and never retried.
+const ROUTE_CASES: [(&str, &str, &str); 20] = [
+    ("unsupported", "name", "plenora.rest-tools"),
+    ("protocol", "name", "other"),
+    ("unsupported", "capability_version", "2"),
+    ("protocol", "capability_version", "01"),
+    ("protocol", "capability_version", "0"),
+    ("unsupported", "operation", "storage.unknown"),
+    ("protocol", "operation", "Storage.Test"),
+    ("protocol", "operation", "storage"),
+    ("unsupported", "operation_version", "2"),
+    ("unsupported", "operation_version", "99999999999"),
+    ("protocol", "operation_version", "01"),
+    ("protocol", "operation_version", "+1"),
+    ("protocol", "operation_version", "1.0"),
+    ("protocol", "operation_version", ""),
+    (
+        "unsupported",
+        "input_contract",
+        "plenora-storage-test-input-v2",
+    ),
+    ("protocol", "input_contract", "wrong"),
+    ("unsupported", "content_type", "text/plain"),
+    ("protocol", "content_type", "TEXT"),
+    ("unsupported", "idempotency_key", "key-1"),
+    ("protocol", "idempotency_key", ""),
+];
+
+#[tokio::test]
+async fn runtime_routes_are_unsupported_or_protocol_before_invocation() {
+    let engine = engine();
+    let artifacts = MemoryArtifacts::default();
+    let binding = RuntimeBinding::new(&engine, &artifacts, &TestSecrets);
+    let base = invocation(
+        "storage.test",
+        json!({"schema_version": 1, "connection": connection()}),
+    );
+    for (category, field, value) in ROUTE_CASES {
+        let mut route = base.clone();
+        let metadata = &mut route.metadata;
+        match field {
+            "name" => metadata.capability_name = value.to_owned(),
+            "capability_version" => metadata.capability_version = value.to_owned(),
+            "operation" => metadata.operation = value.to_owned(),
+            "operation_version" => metadata.operation_version = value.to_owned(),
+            "input_contract" => metadata.input_contract = value.to_owned(),
+            "content_type" => route.content_type = value.to_owned(),
+            _ => metadata.idempotency_key = Some(value.to_owned()),
+        }
+        let result = binding
+            .invoke(route.clone(), CancellationToken::new())
+            .await;
+        let probe = format!("{field}={value:?}");
+        assert_eq!(result.payload["category"], category, "{probe}");
+        assert_eq!(result.payload["phase"], "validate", "{probe}");
+        assert_eq!(result.payload["remote_effect"], "none", "{probe}");
+        assert_eq!(result.payload["retry"]["kind"], "never", "{probe}");
+        let code = match (field, category) {
+            ("idempotency_key", "unsupported") => "RUNTIME_CONTROL_UNSUPPORTED",
+            (_, "unsupported") => "RUNTIME_ROUTE_UNSUPPORTED",
+            _ => "RUNTIME_ROUTE_INVALID",
+        };
+        assert_error(&result, code);
+        // Rule R2: routing values are copied byte for byte only when canonical.
+        let operation = route.metadata.operation.as_str();
+        let canonical_operation = !matches!(operation, "Storage.Test" | "storage");
+        assert_eq!(
+            result.metadata.operation.as_deref(),
+            canonical_operation.then_some(operation),
+            "{probe}"
+        );
+        let version = route.metadata.operation_version.as_str();
+        let canonical_version = matches!(version, "1" | "2" | "99999999999");
+        assert_eq!(
+            result.metadata.operation_version.as_deref(),
+            canonical_version.then_some(version),
+            "{probe}"
+        );
+    }
 }

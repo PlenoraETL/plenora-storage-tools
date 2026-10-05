@@ -174,16 +174,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                          'Common python-sdk-v1 binding map entrypoints resolved from the installed wheel']),
             ]
         ],
-        'deviations': [
-            {'rule': 'RUNTIME-VECTORS-1.0/storage-get-partial-error',
-             'artifact': 'plenora-storage-runtime-binding', 'surface': 'runtime',
-             'observed_behavior': 'storage.get failing after the host sink is opened reports remote_effect unknown '
-                                  'with retry requires_recovery instead of partial with never: the host-owned sink '
-                                  'may discard unfinalized bytes, so a partial effect cannot be proved. Other error '
-                                  'axes are preserved and the sink is not finalized.',
-             'tracking': 'docs/contract-adoption.md#deviazioni-dichiarate',
-             'detectable_before_invocation': True},
-        ],
+        'deviations': [],
     }
     assert not adoption_errors(adoption), adoption_errors(adoption)
     adoption_path = output / 'adoption-manifest-v4.json'

@@ -234,6 +234,8 @@ impl Calls {
 struct ScriptedS3 {
     calls: Arc<Calls>,
     failing: bool,
+    /// Error a put returns instead of the fixture outcomes, for proposed vectors.
+    put_error: Option<StorageError>,
 }
 
 fn scripted_object(key: &str) -> ObjectMetadata {
@@ -348,6 +350,9 @@ impl StorageProvider for ScriptedS3 {
         assert_eq!(bytes.len(), VECTOR_BYTES);
         assert_eq!(request.content_length, Some(VECTOR_BYTES as u64));
         assert!(!request.overwrite);
+        if let Some(error) = &self.put_error {
+            return Err(error.clone());
+        }
         if self.failing {
             return Err(fixture_error("storage-put-unknown-error.json"));
         }
@@ -475,12 +480,17 @@ fn failing_fixture() -> (Engine, Host) {
 }
 
 fn scripted(failing: bool) -> (Engine, Host) {
+    scripted_with(failing, None)
+}
+
+fn scripted_with(failing: bool, put_error: Option<StorageError>) -> (Engine, Host) {
     let calls = Arc::new(Calls::default());
     let mut engine = Engine::new(EngineConfig::default());
     engine
         .register_provider(Arc::new(ScriptedS3 {
             calls: calls.clone(),
             failing,
+            put_error,
         }))
         .expect("register provider");
     (
@@ -498,13 +508,24 @@ async fn invoke(engine: &Engine, host: &Host, request: RuntimeInvocation) -> Run
         .await
 }
 
-/// Result identity is the request identity; operation, version, output
-/// contract and content type are those of the expected fixture.
+/// RT-012: the result is a new message whose causation is the request and
+/// whose correlation is the request's; operation, version, output contract and
+/// content type are those of the expected fixture. The fixtures carry no
+/// causation (it is optional), so it is the only key added to theirs.
 fn assert_result_identity(result: &RuntimeResultEnvelope, request: &Value, expected: &Value) {
     let metadata = serde_json::to_value(&result.metadata).unwrap();
-    for key in ["plenora.message.id", "plenora.trace.correlation_id"] {
-        assert_eq!(metadata[key], request["metadata"][key], "{key}");
-    }
+    assert_ne!(
+        metadata["plenora.message.id"],
+        request["metadata"]["plenora.message.id"]
+    );
+    assert_eq!(
+        metadata["plenora.message.causation_id"],
+        request["metadata"]["plenora.message.id"]
+    );
+    assert_eq!(
+        metadata["plenora.trace.correlation_id"],
+        request["metadata"]["plenora.trace.correlation_id"]
+    );
     for key in [
         "plenora.capability.operation",
         "plenora.operation.version",
@@ -514,10 +535,12 @@ fn assert_result_identity(result: &RuntimeResultEnvelope, request: &Value, expec
     }
     assert_eq!(result.content_type, expected["content_type"]);
     let mut keys = metadata.as_object().unwrap().keys().collect::<Vec<_>>();
+    let causation = "plenora.message.causation_id".to_owned();
     let mut expected_keys = expected["metadata"]
         .as_object()
         .unwrap()
         .keys()
+        .chain([&causation])
         .collect::<Vec<_>>();
     keys.sort();
     expected_keys.sort();
@@ -672,25 +695,17 @@ async fn put_request_vector_maps_to_the_put_unknown_error_vector() {
     assert_eq!(host.calls.take(), ["authorize", "open_source", "put"]);
 }
 
-/// Declared deviation `RUNTIME-VECTORS-1.0/storage-get-partial-error`: after
-/// the host sink is opened, a failed get reports `unknown`/`requires_recovery`
-/// instead of the fixture's `partial`/`never`. The binding cannot prove what
-/// the host-owned sink retained (it may discard unfinalized bytes), so it
-/// restates the provider's outcome as ambiguous. Every other axis of the
-/// fixture is preserved, and the sink is not finalized.
+/// A get that fails after part of the transfer reached the host sink reports
+/// the fixture's `partial`/`never`: the remote object is not mutated by a get,
+/// and the sink holds a known, unfinalized prefix.
 #[tokio::test]
-async fn get_request_vector_maps_to_the_get_partial_error_vector_with_the_declared_deviation() {
+async fn get_request_vector_maps_to_the_get_partial_error_vector() {
     let (engine, host) = failing_fixture();
     let request = vector("storage-get-request.json");
     let expected = vector("storage-get-partial-error.json");
     let result = invoke(&engine, &host, invocation(&request)).await;
     assert_result_identity(&result, &request, &expected);
-    let mut payload = without_execution_id(&expected["payload"]);
-    assert_eq!(payload["remote_effect"], "partial");
-    assert_eq!(payload["retry"], json!({"kind": "never"}));
-    payload["remote_effect"] = json!("unknown");
-    payload["retry"] = json!({"kind": "requires_recovery"});
-    assert_eq!(result.payload, payload);
+    assert_eq!(result.payload, without_execution_id(&expected["payload"]));
     assert_valid(&validators(), "error-v1", &result.payload);
     assert_eq!(host.sink.lock().unwrap().len(), PARTIAL_BYTES);
     assert_eq!(host.calls.take(), ["authorize", "open_sink", "get"]);
@@ -784,6 +799,18 @@ async fn list_request_vector_refuses_a_foreign_cursor_and_produces_the_list_succ
     assert_eq!(host.calls.take(), ["authorize", "list"]);
 }
 
+/// An advertised operation other than the request's.
+fn other_operation(request: &Value) -> &'static str {
+    let operation = request["metadata"]["plenora.capability.operation"]
+        .as_str()
+        .unwrap();
+    RUNTIME_OPERATIONS
+        .iter()
+        .find(|descriptor| descriptor.operation != operation)
+        .unwrap()
+        .operation
+}
+
 /// The request fixtures, one per storage operation.
 const REQUEST_VECTORS: [&str; 7] = [
     "storage-copy-request.json",
@@ -875,18 +902,315 @@ async fn routing_mutations_of_every_request_vector_fail_closed() {
                 let probe = format!("{name}: {key}={invalid:?}");
                 assert_eq!(result.content_type, ERROR_CONTENT_TYPE, "{probe}");
                 assert_eq!(result.metadata.output_contract, ERROR_CONTRACT);
-                assert_eq!(result.payload["code"], "RUNTIME_ROUTE_INVALID", "{probe}");
-                assert_eq!(result.payload["category"], "protocol");
+                // Rule R1 (pending ratification): well-formed but unannounced
+                // is `unsupported`, malformed or non-canonical is `protocol`.
+                let well_formed = match key {
+                    "plenora.capability.name" => invalid == "plenora.rest-tools",
+                    "plenora.capability.operation" => {
+                        invalid == "storage.unknown" || invalid == other_operation(&request)
+                    }
+                    "plenora.input.contract" => {
+                        !invalid.is_empty() && invalid == invalid.to_lowercase()
+                    }
+                    _ => invalid == "2",
+                };
+                let (code, category) = if well_formed {
+                    ("RUNTIME_ROUTE_UNSUPPORTED", "unsupported")
+                } else {
+                    ("RUNTIME_ROUTE_INVALID", "protocol")
+                };
+                assert_eq!(result.payload["code"], code, "{probe}");
+                assert_eq!(result.payload["category"], category, "{probe}");
                 assert_eq!(result.payload["phase"], "validate");
                 assert_eq!(result.payload["remote_effect"], "none");
+                assert_eq!(result.payload["retry"]["kind"], "never");
                 assert_eq!(
-                    result.metadata.correlation_id,
-                    request["metadata"]["plenora.trace.correlation_id"]
+                    result.metadata.correlation_id.as_deref(),
+                    request["metadata"]["plenora.trace.correlation_id"].as_str()
                 );
+                // Rule R2: a non-canonical operation version is omitted, never "0".
+                if key == "plenora.operation.version" {
+                    assert_eq!(
+                        result.metadata.operation_version.as_deref(),
+                        (invalid == "2").then_some("2"),
+                        "{probe}"
+                    );
+                }
                 assert!(host.calls.take().is_empty(), "{probe} had effects");
                 probes += 1;
             }
         }
     }
     assert_eq!(probes, REQUEST_VECTORS.len() * (5 + 4 + 7 + 4 + 6 + 4));
+}
+
+// --- Proposed, not yet normative -------------------------------------------
+//
+// The rejection probes (`vectors/runtime-probes-v1`) and the storage cleanup
+// error vectors of `plenora-contracts` pull request 21, copied byte for byte
+// from its commit into `contracts/upstream/proposed` and pinned by SHA-256.
+// They ratify the common runtime matrix (RT-016 to RT-023, ERR-014, ERR-015)
+// but are not part of the adopted revision yet; when they reach `main` they
+// move to the adopted copies.
+
+const PROPOSED_REVISION: &str = "4890d27c120b3819bbadf6560ba9e730dfcb57aa";
+
+const PROPOSED_FILES: [(&str, &str); 24] = [
+    (
+        "runtime-probe-v1.schema.json",
+        "5188813894c59c67c5c9b1aab551c6c783e13b021e5a4896c033d1636e705c47",
+    ),
+    (
+        "runtime-probes-v1/data-run-input-contract-malformed.json",
+        "67723dae7b7e3306354a9db7548b8ec282d47524a9683632f81a93cd1f5e9115",
+    ),
+    (
+        "runtime-probes-v1/data-run-input-contract-mismatch.json",
+        "6df1dd05888fd98e73ee41620089e2df380c4e79fa072193823cbdd3127731a2",
+    ),
+    (
+        "runtime-probes-v1/database-read-capability-name-other.json",
+        "3532bb55733be7eed228d8fc3870d44a30dfde4b21df9f441565f14104169ad3",
+    ),
+    (
+        "runtime-probes-v1/database-read-correlation-uppercase.json",
+        "f4b6e801ed2b44a0de9cfc425f9f6579b49e2d01558bde8f5d90d26d3bcbe86c",
+    ),
+    (
+        "runtime-probes-v1/io-read-binding-version-leading-zero.json",
+        "8eb5f77415c630ea070243b60f81d8b01c04a3a0d32975f66e0cc7f46373627c",
+    ),
+    (
+        "runtime-probes-v1/io-read-binding-version-number.json",
+        "1f6f692f550a3293750cdc088bbd30172109347f2e584bb47e3b1b56019ed8c2",
+    ),
+    (
+        "runtime-probes-v1/io-read-binding-version-unsupported.json",
+        "f89c987df5e706616a9de33a45941fdb5e3c967b062b5f92a5d4c6d8232e6d42",
+    ),
+    (
+        "runtime-probes-v1/io-read-deadline-expired.json",
+        "e7fca723678ec7c0ac08888f37c64508f6231de4599201575151a1df0099fd32",
+    ),
+    (
+        "runtime-probes-v1/io-read-deadline-negative-zero.json",
+        "57e579e151c99c19a2a3de662233561388e36929be058a162d3a269d0631d8ec",
+    ),
+    (
+        "runtime-probes-v1/io-read-deadline-offset.json",
+        "e72e2842d23e5f0337f70a3d280291c4f45c769a2dd22975ea3a7ef0ef29feb1",
+    ),
+    (
+        "runtime-probes-v1/io-read-message-id-braces.json",
+        "06f53ccf50de9826207594102cbdf1a25a73f8a959e3d4248fe6c8e4b586c394",
+    ),
+    (
+        "runtime-probes-v1/io-read-message-id-missing.json",
+        "d7105072c272c3a96b3a5dee584fb2ef95a36f8d674155f98e50eeb0a9ed4b8d",
+    ),
+    (
+        "runtime-probes-v1/io-read-operation-version-leading-zero.json",
+        "647d373b5bb60f840d2fe5e9016e4ba17c7047a1392cfee395b52e618b41efd5",
+    ),
+    (
+        "runtime-probes-v1/io-read-operation-version-missing.json",
+        "a0438ca43545719ba800c816e6028c20833e41f75a0752987b6a6a2fb1f17e7f",
+    ),
+    (
+        "runtime-probes-v1/io-read-operation-version-number.json",
+        "bf090d9e77b4470543552d4a2ee816e860e8015c614a45c180bf6543b01afb19",
+    ),
+    (
+        "runtime-probes-v1/io-read-operation-version-unknown.json",
+        "35b98de94a3f4ee0125dd55d71d773b65c1f011a2a3ff011bf8113592771b2cc",
+    ),
+    (
+        "runtime-probes-v1/rest-upload-idempotency-key-empty.json",
+        "7c45f463cb43c6bd103136f05088c5bcad621ce5f0f8ffaea7b5e1d20c50695a",
+    ),
+    (
+        "runtime-probes-v1/rest-upload-idempotency-key-null.json",
+        "f82d67d9bac0d7f7c00277596f6311fd6a3b4fe731c56f897b4c0681642a0571",
+    ),
+    (
+        "runtime-probes-v1/storage-get-idempotency-key-unsupported.json",
+        "41e7dafb43c76183b167f688bdf43bf1742f3ba4d8a5332d203d7a5ebeeca035",
+    ),
+    (
+        "runtime-probes-v1/storage-get-operation-malformed.json",
+        "e40f680345cdffd03f5011a11d6e989503c3cab4ecfc06fdec24e91279e6ae68",
+    ),
+    (
+        "runtime-probes-v1/storage-get-operation-unknown.json",
+        "6ce399132fe3984304f48aa85f710c9442c692b759a5becfae85d9ee62abb1c9",
+    ),
+    (
+        "runtime-v1/storage-put-cleanup-local-error.json",
+        "daaa35140b64c37dccfde003fca66c2bfc8a3fef570736dcf86e1a27f6677b2a",
+    ),
+    (
+        "runtime-v1/storage-put-cleanup-remote-error.json",
+        "a4e66ac74e20039b27135a68d517e568ca1ac0df2fb7f6b062ba180b1e26d34b",
+    ),
+];
+
+fn proposed(name: &str) -> PathBuf {
+    upstream("proposed").join(name)
+}
+
+fn proposed_json(name: &str) -> Value {
+    serde_json::from_slice(&fs::read(proposed(name)).expect("proposed file")).expect("JSON")
+}
+
+#[test]
+fn proposed_files_are_the_pinned_copies_of_pull_request_21() {
+    let source = proposed_json("source.json");
+    assert_eq!(source["revision"], PROPOSED_REVISION);
+    assert_eq!(source["status"], "proposed, not yet normative");
+    let mut present = Vec::new();
+    for directory in ["runtime-probes-v1", "runtime-v1"] {
+        for entry in fs::read_dir(proposed(directory)).expect("proposed directory") {
+            let name = entry.expect("entry").file_name().into_string().unwrap();
+            present.push(format!("{directory}/{name}"));
+        }
+    }
+    present.push("runtime-probe-v1.schema.json".to_owned());
+    present.sort_unstable();
+    let mut pinned = PROPOSED_FILES.map(|(name, _)| name.to_owned()).to_vec();
+    pinned.sort_unstable();
+    assert_eq!(present, pinned, "every proposed file must be pinned");
+    for (name, digest) in PROPOSED_FILES {
+        assert_eq!(sha256_file(&proposed(name)), digest, "{name}");
+    }
+}
+
+/// Applies a probe's single metadata mutation to a request vector.
+fn mutated(request: &Value, mutation: &Value) -> Value {
+    let mut request = json!({
+        "content_type": request["content_type"],
+        "metadata": request["metadata"],
+        "payload": request["payload"],
+    });
+    let metadata = request["metadata"].as_object_mut().unwrap();
+    if let Some(key) = mutation["remove"].as_str() {
+        metadata.remove(key);
+    }
+    if let Some(set) = mutation["set"].as_object() {
+        for (key, value) in set {
+            metadata.insert(key.clone(), value.clone());
+        }
+    }
+    request
+}
+
+/// Probes whose base is not a storage request are transposed onto
+/// `storage-get-request.json`: the same mutation, and the expected routing
+/// values of the base replaced by the storage request's unless the mutation
+/// set that key.
+fn transposed_expectation(probe: &Value, storage: &Value) -> Value {
+    let mut expected = probe["expected"]["metadata"].clone();
+    let set = probe["mutation"]["set"].as_object();
+    for key in [
+        "plenora.capability.operation",
+        "plenora.operation.version",
+        "plenora.trace.correlation_id",
+    ] {
+        let mutated_key = set.is_some_and(|set| set.contains_key(key));
+        if let Some(value) = expected.get_mut(key)
+            && !mutated_key
+        {
+            *value = storage["metadata"][key].clone();
+        }
+    }
+    expected
+}
+
+#[tokio::test]
+async fn proposed_rejection_probes_produce_their_expected_results() {
+    let probe_schema = jsonschema::draft202012::options()
+        .build(&proposed_json("runtime-probe-v1.schema.json"))
+        .expect("probe schema compiles");
+    let storage_get = vector("storage-get-request.json");
+    let (engine, host) = fixture();
+    let mut probes = fs::read_dir(proposed("runtime-probes-v1"))
+        .expect("probes")
+        .map(|entry| entry.expect("probe").file_name().into_string().unwrap())
+        .collect::<Vec<_>>();
+    probes.sort_unstable();
+    assert_eq!(probes.len(), 21);
+    for name in probes {
+        let probe = proposed_json(&format!("runtime-probes-v1/{name}"));
+        assert!(probe_schema.is_valid(&probe), "{name}");
+        let base_name = probe["base"].as_str().unwrap();
+        let (base, expected_metadata) = if base_name.starts_with("storage-") {
+            (vector(base_name), probe["expected"]["metadata"].clone())
+        } else {
+            (
+                storage_get.clone(),
+                transposed_expectation(&probe, &storage_get),
+            )
+        };
+        let request = mutated(&base, &probe["mutation"]);
+        let result = RuntimeBinding::new(&engine, &host, &host)
+            .invoke_json(request.clone(), CancellationToken::new())
+            .await;
+        assert_eq!(
+            result.content_type, probe["expected"]["content_type"],
+            "{name}"
+        );
+        for axis in ["category", "phase", "remote_effect", "retry"] {
+            assert_eq!(
+                result.payload[axis], probe["expected"]["error"][axis],
+                "{name}: {axis}"
+            );
+        }
+        let mut metadata = serde_json::to_value(&result.metadata).unwrap();
+        let metadata = metadata.as_object_mut().unwrap();
+        // RT-020: always a new message identity; the causation, when present,
+        // is the request's canonical message identity.
+        let message_id = metadata.remove("plenora.message.id").unwrap();
+        assert_ne!(
+            message_id, request["metadata"]["plenora.message.id"],
+            "{name}"
+        );
+        let request_id = request["metadata"]["plenora.message.id"].as_str();
+        let canonical_request_id = request_id
+            .is_some_and(|id| id.len() == 36 && id == id.to_lowercase() && !id.starts_with('{'));
+        match metadata.remove("plenora.message.causation_id") {
+            Some(causation) => assert_eq!(causation.as_str(), request_id, "{name}"),
+            None => assert!(!canonical_request_id, "{name}: causation omitted"),
+        }
+        assert_eq!(Value::Object(metadata.clone()), expected_metadata, "{name}");
+        assert!(host.calls.take().is_empty(), "{name} reached a resolver");
+    }
+}
+
+/// ERR-015 (proposed): a proven publication followed by a failed cleanup is
+/// `committed` in `cleanup`, `never` with a local residue and
+/// `requires_recovery` with a remote one. The binding preserves both.
+#[tokio::test]
+async fn proposed_cleanup_vectors_are_preserved_by_the_binding() {
+    for name in [
+        "runtime-v1/storage-put-cleanup-local-error.json",
+        "runtime-v1/storage-put-cleanup-remote-error.json",
+    ] {
+        let expected = proposed_json(name);
+        let mut error: StorageError = serde_json::from_value(expected["payload"].clone())
+            .unwrap_or_else(|error| panic!("{name}: {error}"));
+        error.execution_id = None;
+        let (engine, host) = scripted_with(false, Some(error));
+        let request = vector("storage-put-request.json");
+        let result = invoke(&engine, &host, invocation(&request)).await;
+        assert_eq!(result.content_type, ERROR_CONTENT_TYPE, "{name}");
+        // `details` is optional in `plenora-error-v1` and its absence means
+        // no details; this component always serializes the (empty) object.
+        let mut payload = without_execution_id(&expected["payload"]);
+        payload
+            .as_object_mut()
+            .unwrap()
+            .entry("details")
+            .or_insert_with(|| json!({}));
+        assert_eq!(result.payload, payload, "{name}");
+        assert_valid(&validators(), "error-v1", &result.payload);
+    }
 }

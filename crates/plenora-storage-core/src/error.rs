@@ -331,6 +331,10 @@ impl StorageError {
 
     #[must_use]
     /// Classify deadline expiry; an interrupted mutation has unknown effect and requires recovery.
+    ///
+    /// A deadline already expired at admission (`validate`) is never retried:
+    /// the same request carries the same expired deadline. A later expiry
+    /// without a mutation leaves nothing to reconcile and may be retried.
     pub fn timeout(phase: ErrorPhase, mutating: bool) -> Self {
         Self::new(
             ErrorCategory::Timeout,
@@ -342,6 +346,8 @@ impl StorageError {
             },
             if mutating {
                 RetryDisposition::RequiresRecovery
+            } else if phase == ErrorPhase::Validate {
+                RetryDisposition::Never
             } else {
                 RetryDisposition::Safe
             },
