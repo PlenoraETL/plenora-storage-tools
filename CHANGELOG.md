@@ -8,6 +8,7 @@
 - Reject `tls_ca_pem: null` in FTP/FTPS connections; the schema types the key as a string.
 - Execute the storage fixtures of RUNTIME-VECTORS-1.0, copied byte for byte from the adopted contracts revision and pinned by SHA-256, through the runtime binding, including fail-closed routing mutations.
 - Reject non-canonical runtime version selectors such as `01` and `+1`, which were parsed as `1` and dispatched.
+- Pin the SDK build backend to `maturin==1.15.0` and list the transitive dependencies of the quality and campaign requirement files with exact versions; `check_dependencies.py` now rejects unpinned Python requirements.
 
 ## 2.1.0 — 2026-09-30
 
