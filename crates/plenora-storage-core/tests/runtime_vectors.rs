@@ -20,21 +20,34 @@ use jsonschema::{Retrieve, Uri};
 use plenora_storage_core::{
     ArtifactReference, ArtifactResolver, ArtifactSink, ArtifactSinkReference, ArtifactSource,
     CancellationToken, CopyRequest, DeleteRequest, DeleteResult, ERROR_CONTENT_TYPE,
-    ERROR_CONTRACT, Engine, EngineConfig, GetRequest, ObjectMetadata, OperationContext,
-    ProviderCapabilities, ProviderConnection, ProviderListRequest, ProviderListResult, PutRequest,
-    RUNTIME_OPERATIONS, RuntimeBinding, RuntimeInvocation, RuntimeResultEnvelope, SecretResolver,
-    StatRequest, StorageError, StorageProvider, StorageResult, TestResult, TransferResult,
+    ERROR_CONTRACT, Engine, EngineConfig, ExecutionId, GetRequest, ObjectMetadata,
+    OperationContext, ProviderCapabilities, ProviderConnection, ProviderListRequest,
+    ProviderListResult, PutRequest, RUNTIME_OPERATIONS, RuntimeBinding, RuntimeInvocation,
+    RuntimeResultEnvelope, SecretResolver, StatRequest, StorageError, StorageProvider,
+    StorageResult, TestResult, TransferResult,
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 
 /// Adopted contracts revision; must equal `contracts/upstream/source.json`.
-const ADOPTED_REVISION: &str = "f811f21f072b34896efdb6e110bee34d756153df";
+const ADOPTED_REVISION: &str = "1e902dfaab5819c1d9ce785878d5b26dbeae48b3";
 
 /// SHA-256 of each storage fixture in `vectors/runtime-v1` at the adopted
 /// revision, computed from the upstream Git blobs.
-const PINNED_VECTORS: [(&str, &str); 6] = [
+const PINNED_VECTORS: [(&str, &str); 12] = [
+    (
+        "storage-copy-request.json",
+        "03477805d6a46662c747e87eb0e70b02c37f6930074cd1b68c7cd7d0a3d0e671",
+    ),
+    (
+        "storage-delete-request.json",
+        "7bf78c79aeed240c5960dab024f905d567fec0caa2b57aaf4b91fe92d066eb8a",
+    ),
+    (
+        "storage-get-partial-error.json",
+        "c00a8f602723eb349494adaf11077b45dc8b9ad7548029f988b846769049dea2",
+    ),
     (
         "storage-get-request.json",
         "d289989ba4aae6f309f1fcc8bae83c7b9a1f7d65e8a16ad564b678e9a67181b7",
@@ -56,20 +69,37 @@ const PINNED_VECTORS: [(&str, &str); 6] = [
         "1eb229c37fc04a898a999e8fadae8d800074cbc4d625764bfc359b4bb59587c9",
     ),
     (
+        "storage-put-success.json",
+        "f83e30f04d6a1ce6b39ac0778a8e11046a5015940537ce5b3b7c13eae8c26341",
+    ),
+    (
         "storage-put-unknown-error.json",
         "36f902beb412ae5e763ea42b32b75b8a0307b4b6139ba602ca869bc606d2cbfe",
     ),
+    (
+        "storage-stat-request.json",
+        "63db5b8ef1562ee506444e039cbb97a9b53cddeb13d4ed1bc76241cf152c87b6",
+    ),
+    (
+        "storage-test-request.json",
+        "2b6745f3286d4a09972995bf79e9e263ba54496cfa003ed483000168c3cd1b8b",
+    ),
 ];
 
-/// Normative text and structural schema copied from the same revision.
-const PINNED_FILES: [(&str, &str); 2] = [
+/// Normative text, structural schema and the common Python binding map
+/// (read by the installed-SDK tests) copied from the same revision.
+const PINNED_FILES: [(&str, &str); 3] = [
     (
         "runtime-vector-v1.schema.json",
         "3ec6148b8fb3db111ca0d1ff29283c3f8a46a7727c3051a777a123c102ca1f9e",
     ),
     (
         "RUNTIME-VECTORS-1.0.md",
-        "3bcf7fd904098f51959f501cb50e904e6a67c42c73ec3e399e18febf579b3980",
+        "d7f9c42b2b6d50ee844425b77cbce59db8bc6a945726b67635d62884aacabd34",
+    ),
+    (
+        "python-sdk-v1.json",
+        "ffc5680bb9a595ba9162693e75f70d664ebaadf684d4338da7d72ea00569fbd8",
     ),
 ];
 
@@ -78,6 +108,8 @@ const PUT_SOURCE: &str = "artifact://input/storage-put-vector";
 const GET_SINK: &str = "artifact://output/storage-get-vector";
 /// Byte length declared by every storage fixture.
 const VECTOR_BYTES: usize = 17;
+/// Bytes the scripted provider writes before the partial get fails.
+const PARTIAL_BYTES: usize = 5;
 
 fn contracts_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../contracts")
@@ -196,10 +228,22 @@ impl Calls {
 }
 
 /// `s3` provider scripted with the outcomes of the storage fixtures. It never
-/// opens a network connection.
+/// opens a network connection. `failing` selects the error fixtures of the
+/// transfers: get writes part of the bytes and fails, put fails after reading.
 #[derive(Default)]
 struct ScriptedS3 {
     calls: Arc<Calls>,
+    failing: bool,
+}
+
+fn scripted_object(key: &str) -> ObjectMetadata {
+    ObjectMetadata {
+        key: key.to_owned(),
+        size: VECTOR_BYTES as u64,
+        last_modified: Some("2030-01-01T00:00:00Z".to_owned()),
+        etag: Some("provider-etag-not-a-digest".to_owned()),
+        version: Some("provider-version-17".to_owned()),
+    }
 }
 
 #[async_trait]
@@ -228,7 +272,11 @@ impl StorageProvider for ScriptedS3 {
         _: &ProviderConnection,
         _: &OperationContext<'_>,
     ) -> StorageResult<TestResult> {
-        unreachable!("no storage.test fixture")
+        self.calls.record("test");
+        Ok(TestResult {
+            provider: self.id().to_owned(),
+            reachable: true,
+        })
     }
 
     async fn list(
@@ -254,10 +302,12 @@ impl StorageProvider for ScriptedS3 {
     async fn stat(
         &self,
         _: &ProviderConnection,
-        _: &StatRequest,
+        request: &StatRequest,
         _: &OperationContext<'_>,
     ) -> StorageResult<ObjectMetadata> {
-        unreachable!("no storage.stat fixture")
+        self.calls.record("stat");
+        assert_eq!(request.key, "incoming/vector.bin");
+        Ok(scripted_object(&request.key))
     }
 
     async fn get(
@@ -269,6 +319,12 @@ impl StorageProvider for ScriptedS3 {
     ) -> StorageResult<TransferResult> {
         self.calls.record("get");
         assert_eq!(request.key, "incoming/vector.bin");
+        if self.failing {
+            sink.write_all(&[0x5a; PARTIAL_BYTES])
+                .await
+                .expect("memory sink");
+            return Err(fixture_error("storage-get-partial-error.json"));
+        }
         sink.write_all(&[0x5a; VECTOR_BYTES])
             .await
             .expect("memory sink");
@@ -290,37 +346,54 @@ impl StorageProvider for ScriptedS3 {
         let mut bytes = Vec::new();
         source.read_to_end(&mut bytes).await.expect("memory source");
         assert_eq!(bytes.len(), VECTOR_BYTES);
-        Err(fixture_error())
+        assert_eq!(request.content_length, Some(VECTOR_BYTES as u64));
+        assert!(!request.overwrite);
+        if self.failing {
+            return Err(fixture_error("storage-put-unknown-error.json"));
+        }
+        Ok(
+            serde_json::from_value(vector("storage-put-success.json")["payload"].clone())
+                .expect("fixture transfer result"),
+        )
     }
 
     async fn delete(
         &self,
         _: &ProviderConnection,
-        _: &DeleteRequest,
+        request: &DeleteRequest,
         _: &OperationContext<'_>,
     ) -> StorageResult<DeleteResult> {
-        unreachable!("no storage.delete fixture")
+        self.calls.record("delete");
+        assert_eq!(request.key, "outgoing/vector.bin");
+        assert!(!request.ignore_missing);
+        Ok(DeleteResult {
+            key: request.key.clone(),
+            deleted: true,
+        })
     }
 
     async fn copy(
         &self,
         _: &ProviderConnection,
-        _: &CopyRequest,
+        request: &CopyRequest,
         _: &OperationContext<'_>,
     ) -> StorageResult<ObjectMetadata> {
-        unreachable!("no storage.copy fixture")
+        self.calls.record("copy");
+        assert_eq!(request.source_key, "incoming/vector.bin");
+        assert_eq!(request.destination_key, "outgoing/vector.bin");
+        assert!(request.overwrite);
+        Ok(scripted_object(&request.destination_key))
     }
 }
 
-/// The error of `storage-put-unknown-error.json` without `execution_id`:
-/// `plenora-error-v1` makes it optional and `StorageError` does not carry it.
-fn fixture_error() -> StorageError {
-    let mut payload = vector("storage-put-unknown-error.json")["payload"].clone();
-    payload
-        .as_object_mut()
-        .expect("error payload object")
-        .remove("execution_id");
-    serde_json::from_value(payload).expect("fixture error is a storage error")
+/// The error of a fixture as a provider of this component returns it: every
+/// axis of the unmodified payload, but no `execution_id`, which no provider
+/// or engine of this component produces.
+fn fixture_error(name: &str) -> StorageError {
+    let mut error: StorageError = serde_json::from_value(vector(name)["payload"].clone())
+        .expect("fixture error is a storage error");
+    error.execution_id = None;
+    error
 }
 
 struct MemoryWriter(Arc<Mutex<Vec<u8>>>);
@@ -393,11 +466,21 @@ impl SecretResolver for Host {
 
 /// Engine with the scripted provider; provider and host share one call log.
 fn fixture() -> (Engine, Host) {
+    scripted(false)
+}
+
+/// Engine whose scripted transfers produce the error fixtures.
+fn failing_fixture() -> (Engine, Host) {
+    scripted(true)
+}
+
+fn scripted(failing: bool) -> (Engine, Host) {
     let calls = Arc::new(Calls::default());
     let mut engine = Engine::new(EngineConfig::default());
     engine
         .register_provider(Arc::new(ScriptedS3 {
             calls: calls.clone(),
+            failing,
         }))
         .expect("register provider");
     (
@@ -474,7 +557,7 @@ fn storage_vectors_are_the_pinned_copies_of_the_adopted_revision() {
 }
 
 /// RUNTIME-VECTORS-1.0 §5: every fixture of an advertised operation. The
-/// storage fixtures cover get, list and put, all advertised by the binding.
+/// storage fixtures cover the seven operations, all advertised by the binding.
 #[test]
 fn storage_vectors_match_runtime_and_component_schemas() {
     let validators = validators();
@@ -534,23 +617,133 @@ async fn get_request_vector_produces_the_get_success_vector() {
     assert_eq!(host.calls.take(), ["authorize", "open_sink", "get"]);
 }
 
+/// `plenora-error-v1` error fixtures deserialize unmodified, `execution_id`
+/// included, and serialize back to the same document.
+#[test]
+fn error_vectors_are_storage_errors_including_the_execution_id() {
+    for name in [
+        "storage-get-partial-error.json",
+        "storage-put-unknown-error.json",
+    ] {
+        let payload = vector(name)["payload"].clone();
+        let error: StorageError = serde_json::from_value(payload.clone())
+            .unwrap_or_else(|error| panic!("{name}: {error}"));
+        assert_eq!(
+            error.execution_id.as_ref().map(ExecutionId::as_str),
+            Some("storage-vector-execution-1"),
+            "{name}"
+        );
+        assert_eq!(serde_json::to_value(&error).unwrap(), payload, "{name}");
+    }
+}
+
+/// The fixture's `execution_id` is optional in `plenora-error-v1` and is not
+/// produced by this component, so it is the only key absent from the result.
+fn without_execution_id(payload: &Value) -> Value {
+    let mut payload = payload.clone();
+    payload
+        .as_object_mut()
+        .unwrap()
+        .remove("execution_id")
+        .expect("fixture carries an execution_id");
+    payload
+}
+
+#[tokio::test]
+async fn put_request_vector_produces_the_put_success_vector() {
+    let (engine, host) = fixture();
+    let request = vector("storage-put-request.json");
+    let expected = vector("storage-put-success.json");
+    let result = invoke(&engine, &host, invocation(&request)).await;
+    assert_result_identity(&result, &request, &expected);
+    assert_eq!(result.payload, expected["payload"]);
+    assert_eq!(host.calls.take(), ["authorize", "open_source", "put"]);
+}
+
 #[tokio::test]
 async fn put_request_vector_maps_to_the_put_unknown_error_vector() {
-    let (engine, host) = fixture();
+    let (engine, host) = failing_fixture();
     let request = vector("storage-put-request.json");
     let expected = vector("storage-put-unknown-error.json");
     let result = invoke(&engine, &host, invocation(&request)).await;
     assert_result_identity(&result, &request, &expected);
-    // Every field of the fixture is preserved except the optional
-    // `execution_id`, which this component does not produce.
-    let mut expected_payload = expected["payload"].clone();
-    expected_payload
-        .as_object_mut()
-        .unwrap()
-        .remove("execution_id");
-    assert_eq!(result.payload, expected_payload);
+    assert_eq!(result.payload, without_execution_id(&expected["payload"]));
     assert_valid(&validators(), "error-v1", &result.payload);
     assert_eq!(host.calls.take(), ["authorize", "open_source", "put"]);
+}
+
+/// Declared deviation `RUNTIME-VECTORS-1.0/storage-get-partial-error`: after
+/// the host sink is opened, a failed get reports `unknown`/`requires_recovery`
+/// instead of the fixture's `partial`/`never`. The binding cannot prove what
+/// the host-owned sink retained (it may discard unfinalized bytes), so it
+/// restates the provider's outcome as ambiguous. Every other axis of the
+/// fixture is preserved, and the sink is not finalized.
+#[tokio::test]
+async fn get_request_vector_maps_to_the_get_partial_error_vector_with_the_declared_deviation() {
+    let (engine, host) = failing_fixture();
+    let request = vector("storage-get-request.json");
+    let expected = vector("storage-get-partial-error.json");
+    let result = invoke(&engine, &host, invocation(&request)).await;
+    assert_result_identity(&result, &request, &expected);
+    let mut payload = without_execution_id(&expected["payload"]);
+    assert_eq!(payload["remote_effect"], "partial");
+    assert_eq!(payload["retry"], json!({"kind": "never"}));
+    payload["remote_effect"] = json!("unknown");
+    payload["retry"] = json!({"kind": "requires_recovery"});
+    assert_eq!(result.payload, payload);
+    assert_valid(&validators(), "error-v1", &result.payload);
+    assert_eq!(host.sink.lock().unwrap().len(), PARTIAL_BYTES);
+    assert_eq!(host.calls.take(), ["authorize", "open_sink", "get"]);
+}
+
+/// Request fixtures without a result fixture: the result keeps the request
+/// identity and the operation's output contract, and its payload is valid
+/// against the component-owned output schema.
+async fn assert_request_vector_succeeds(name: &str, calls: &[&str]) -> Value {
+    let (engine, host) = fixture();
+    let request = vector(name);
+    let operation = request["metadata"]["plenora.capability.operation"]
+        .as_str()
+        .unwrap();
+    let descriptor = RUNTIME_OPERATIONS
+        .iter()
+        .find(|descriptor| descriptor.operation == operation)
+        .unwrap();
+    let expected = json!({
+        "content_type": descriptor.content_type,
+        "metadata": {
+            "plenora.message.id": request["metadata"]["plenora.message.id"],
+            "plenora.capability.operation": operation,
+            "plenora.operation.version": request["metadata"]["plenora.operation.version"],
+            "plenora.output.contract": descriptor.output_contract,
+            "plenora.trace.correlation_id": request["metadata"]["plenora.trace.correlation_id"],
+        },
+    });
+    let result = invoke(&engine, &host, invocation(&request)).await;
+    assert_result_identity(&result, &request, &expected);
+    assert_valid(&validators(), descriptor.output_contract, &result.payload);
+    assert_eq!(host.calls.take(), calls, "{name}");
+    result.payload
+}
+
+#[tokio::test]
+async fn test_stat_copy_and_delete_request_vectors_produce_valid_results() {
+    let payload =
+        assert_request_vector_succeeds("storage-test-request.json", &["authorize", "test"]).await;
+    assert_eq!(payload, json!({"provider": "s3", "reachable": true}));
+    let payload =
+        assert_request_vector_succeeds("storage-stat-request.json", &["authorize", "stat"]).await;
+    assert_eq!(payload["key"], "incoming/vector.bin");
+    let payload =
+        assert_request_vector_succeeds("storage-copy-request.json", &["authorize", "copy"]).await;
+    assert_eq!(payload["key"], "outgoing/vector.bin");
+    let payload =
+        assert_request_vector_succeeds("storage-delete-request.json", &["authorize", "delete"])
+            .await;
+    assert_eq!(
+        payload,
+        json!({"key": "outgoing/vector.bin", "deleted": true})
+    );
 }
 
 /// The fixture cursor was issued by another engine. Cursors are engine-local
@@ -590,6 +783,17 @@ async fn list_request_vector_refuses_a_foreign_cursor_and_produces_the_list_succ
     assert_eq!(payload, expected["payload"]);
     assert_eq!(host.calls.take(), ["authorize", "list"]);
 }
+
+/// The request fixtures, one per storage operation.
+const REQUEST_VECTORS: [&str; 7] = [
+    "storage-copy-request.json",
+    "storage-delete-request.json",
+    "storage-get-request.json",
+    "storage-list-request.json",
+    "storage-put-request.json",
+    "storage-stat-request.json",
+    "storage-test-request.json",
+];
 
 /// Invalid values for each routing key of a request fixture: empty, foreign,
 /// case-changed, belonging to another operation, or a non-canonical version.
@@ -649,11 +853,7 @@ fn routing_mutations(request: &Value) -> [(&'static str, Vec<String>); 5] {
 async fn routing_mutations_of_every_request_vector_fail_closed() {
     let (engine, host) = fixture();
     let mut probes = 0;
-    for name in [
-        "storage-get-request.json",
-        "storage-list-request.json",
-        "storage-put-request.json",
-    ] {
+    for name in REQUEST_VECTORS {
         let request = vector(name);
         for (key, invalid_values) in routing_mutations(&request) {
             let mut missing = request.clone();
@@ -688,5 +888,5 @@ async fn routing_mutations_of_every_request_vector_fail_closed() {
             }
         }
     }
-    assert_eq!(probes, 3 * (5 + 4 + 7 + 4 + 6 + 4));
+    assert_eq!(probes, REQUEST_VECTORS.len() * (5 + 4 + 7 + 4 + 6 + 4));
 }

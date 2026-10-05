@@ -39,6 +39,7 @@ class PlenoraError(Exception):
         self.remote_effect = document["remote_effect"]
         self.retry = dict(document["retry"])
         self.provider = document.get("provider")
+        self.execution_id = document.get("execution_id")
         self.details = dict(document.get("details", {}))
         self.message = document["message"]
         super().__init__(self.message)

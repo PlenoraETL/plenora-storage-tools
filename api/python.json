@@ -3,6 +3,7 @@
     "category",
     "code",
     "details",
+    "execution_id",
     "message",
     "phase",
     "provider",
@@ -1720,6 +1721,33 @@
                   "node": "Store"
                 },
                 "id": "provider",
+                "node": "Name"
+              }
+            },
+            {
+              "annotation": {
+                "left": {
+                  "ctx": {
+                    "node": "Load"
+                  },
+                  "id": "str",
+                  "node": "Name"
+                },
+                "node": "BinOp",
+                "op": {
+                  "node": "BitOr"
+                },
+                "right": {
+                  "node": "Constant"
+                }
+              },
+              "node": "AnnAssign",
+              "simple": 1,
+              "target": {
+                "ctx": {
+                  "node": "Store"
+                },
+                "id": "execution_id",
                 "node": "Name"
               }
             },

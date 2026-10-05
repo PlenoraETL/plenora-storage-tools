@@ -9,6 +9,9 @@
 - Execute the storage fixtures of RUNTIME-VECTORS-1.0, copied byte for byte from the adopted contracts revision and pinned by SHA-256, through the runtime binding, including fail-closed routing mutations.
 - Reject non-canonical runtime version selectors such as `01` and `+1`, which were parsed as `1` and dispatched.
 - Pin the SDK build backend to `maturin==1.15.0` and list the transitive dependencies of the quality and campaign requirement files with exact versions; `check_dependencies.py` now rejects unpinned Python requirements.
+- **Breaking (Rust API, 3.0.0):** `StorageError` gains the public field `execution_id: Option<ExecutionId>`, so struct literals and exhaustive patterns must name it. A `plenora-error-v1` document carrying `execution_id` was rejected by `deny_unknown_fields`; it is now accepted when it is a string of 1 to 128 characters or `null`, and other lengths are refused. The key is serialized only when present, so errors produced by this component are unchanged on the wire. Python `PlenoraError` exposes the same optional `execution_id` attribute.
+- Adopt `plenora-contracts` `1e902dfaab5819c1d9ce785878d5b26dbeae48b3`: the storage profile now requires the Python SDK for the seven operations. The common Python binding map is copied and every storage entrypoint is checked from the installed wheel; the twelve storage runtime fixtures (requests for all seven operations, put success, get partial error) are executed through the runtime binding.
+- Declare the deviation `RUNTIME-VECTORS-1.0/storage-get-partial-error` in the adoption manifest: a get that fails after the host sink is opened reports `unknown`/`requires_recovery` instead of `partial`/`never`, because the binding cannot prove what the host-owned sink retained.
 
 ## 2.1.0 — 2026-09-30
 

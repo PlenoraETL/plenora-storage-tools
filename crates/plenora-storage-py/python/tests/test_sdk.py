@@ -274,6 +274,47 @@ class SDKTests(unittest.TestCase):
                 self.fail('invalid SDK input accepted')
         self.assertEqual(list(self.storage.iterdir()), [])
 
+    def test_common_python_binding_map_resolves_every_storage_entrypoint(self):
+        import json
+        root = Path(__file__).resolve().parents[4] / 'contracts/upstream'
+        bindings = json.loads((root / 'python-sdk-v1.json').read_text(encoding='utf-8'))
+        [entry] = [component for component in bindings['components']
+                   if component['component'] == 'plenora-storage-tools']
+        self.assertEqual(entry['artifact'], 'plenora-storage / plenora_storage')
+        self.assertEqual(importlib.metadata.version('plenora-storage'), version())
+        namespaces = {'plenora_storage': plenora_storage, 'Engine': Engine, 'AsyncEngine': AsyncEngine}
+
+        def resolve(symbol):
+            owner, name = symbol.rsplit('.', 1)
+            return owner, getattr(namespaces[owner], name)
+
+        for symbol in entry['discovery']:
+            _, target = resolve(symbol)
+            self.assertTrue(callable(target), symbol)
+        operations = set()
+        for binding in entry['bindings']:
+            self.assertEqual((binding['version'], binding['requirement']), (1, 'required'))
+            operations.add(binding['operation'])
+            for symbol in binding['entrypoints']:
+                owner, target = resolve(symbol)
+                self.assertEqual(symbol.rsplit('.', 1)[1], binding['operation'].split('.', 1)[1])
+                self.assertEqual(inspect.iscoroutinefunction(target), owner == 'AsyncEngine', symbol)
+        with Engine() as engine:
+            advertised = {operation['id'] for operation in engine.capabilities()['operations']}
+        self.assertEqual(operations, advertised)
+
+    def test_errors_carry_the_optional_execution_id_of_error_v1(self):
+        import json
+        root = Path(__file__).resolve().parents[4] / 'contracts/upstream/runtime-v1'
+        for name in ('storage-get-partial-error.json', 'storage-put-unknown-error.json'):
+            payload = json.loads((root / name).read_text(encoding='utf-8'))['payload']
+            error = StorageError(payload)
+            self.assertEqual(error.execution_id, 'storage-vector-execution-1')
+            self.assertEqual(error.remote_effect, payload['remote_effect'])
+        with self.assertRaises(StorageError) as raised:
+            self.engine.stat(self.connection, 'absent')
+        self.assertIsNone(raised.exception.execution_id)
+
     def test_unstructured_native_errors_are_redacted_and_require_recovery(self):
         from unittest.mock import patch, Mock
         private = 'sentinel-native-secret'

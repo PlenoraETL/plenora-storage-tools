@@ -1,11 +1,12 @@
 # Adozione del profilo pubblico storage v1
 
 Il riferimento immutabile è `plenora-contracts` alla revisione
-`f811f21f072b34896efdb6e110bee34d756153df`, profilo
+`1e902dfaab5819c1d9ce785878d5b26dbeae48b3`, profilo
 `plenora-storage-tools-profile-v1`. Gli schemi comuni copiati in
 `contracts/upstream` mantengono gli identificatori originali.
 
-Il profilo storage adottato comprende le sette operazioni su Rust, CLI e Runtime Binding 1.0.
+Il profilo storage adottato comprende le sette operazioni su Rust, CLI, Python SDK 1.0
+e Runtime Binding 1.0.
 Il binding runtime è incluso nel crate core: non richiede un servizio runtime
 distribuito separatamente né un adapter di trasporto posseduto da questa libreria.
 Il composition root del consumer mantiene autorizzazione, risoluzione di
@@ -21,9 +22,17 @@ segreti e artifact, trasporto e lifecycle.
 | Runtime Binding v1 | RT-001–RT-015: route, versioni, content type, UUID canonici, controlli, artifact, risultati ed errori completi; vettori runtime storage | `core/tests/runtime_binding.rs`, eseguito anche dall'archivio Cargo estratto; `core/tests/runtime_vectors.rs` |
 | Python SDK v1 | Identità wheel, typing, sync/async, lifecycle, errori e discovery Python | `python/tests/test_sdk.py`, eseguito dalla wheel installata in modalità isolata fuori dal checkout |
 
-Il contratto comune Python si applica alla wheel distribuita; è aggiunto al
-manifest v4 senza modificare il profilo storage upstream. Il testo normativo è
-copiato dalla medesima revisione in `contracts/upstream/PYTHON-SDK-1.0.md`.
+Dalla revisione adottata il profilo storage richiede anche lo SDK Python
+(decisione 0006 di `plenora-contracts`): `Engine` e `AsyncEngine` legano le
+stesse sette operazioni, con `plenora_storage.version`, `Engine.capabilities` e
+`AsyncEngine.capabilities` per versione e discovery. La mappa comune
+`bindings/python-sdk-v1.json` è copiata byte per byte in
+`contracts/upstream/python-sdk-v1.json`, fissata per SHA-256 da
+`core/tests/runtime_vectors.rs`, e `python/tests/test_sdk.py` verifica dalla
+wheel installata che ogni entrypoint e ogni simbolo di discovery della voce
+storage esista, sincrono in `Engine` e coroutine in `AsyncEngine`. Il testo
+normativo è copiato dalla medesima revisione in
+`contracts/upstream/PYTHON-SDK-1.0.md`.
 Trasporto runtime del consumer, compatibilità AWS e SLO prestazionali non sono
 garanzie adottate. La qualifica operativa resta distinta dai test contrattuali.
 FTP non offre pubblicazione atomica o create-if-absent: discovery e rifiuto
@@ -51,24 +60,44 @@ envelope `protocol`/`validate`/`none`.
 ## Vettori runtime
 
 RUNTIME-VECTORS-1.0 chiede di esercitare ogni fixture delle operazioni
-pubblicate. Le sei fixture `storage-*` di `vectors/runtime-v1` (get, list e put),
+pubblicate. Le dodici fixture `storage-*` di `vectors/runtime-v1` (le richieste
+delle sette operazioni, i successi di get, list e put, gli errori di get e put),
 lo schema `runtime-vector-v1` e il testo normativo sono copiati byte per byte
 dalla revisione adottata in `contracts/upstream/runtime-v1` e
 `contracts/upstream`; `core/tests/runtime_vectors.rs` ne verifica lo SHA-256
 fissato e la revisione di `source.json`. Il test valida ogni fixture contro lo
 schema dei vettori e contro lo schema del componente, poi la esegue tramite
 `RuntimeBinding` con un provider `s3` scriptato che restituisce gli esiti
-descritti dalle fixture: get produce l'envelope di successo, put l'envelope
-d'errore `unknown`/`requires_recovery`. Per ogni richiesta, capability,
+descritti dalle fixture: get e put producono gli envelope di successo e,
+quando il provider fallisce, quelli d'errore; test, stat, copy e delete, che non
+hanno fixture di risultato, producono un risultato valido contro lo schema
+d'uscita del componente con l'identità della richiesta. Per ogni richiesta, capability,
 versione, operazione, versione d'operazione e input contract mancanti o
 invalidi vengono rifiutati prima di segreti, artifact e provider.
 
-Due differenze sono intenzionali e verificate. Il cursore della fixture list
+Tre differenze sono verificate. Il cursore della fixture list
 appartiene a un altro engine: i cursori sono locali all'engine, quindi la
 richiesta è rifiutata con `LIST_CURSOR_INVALID_OR_EXPIRED`, e la stessa richiesta
 senza cursore produce il payload di successo con un cursore emesso da questo
 engine. `execution_id`, facoltativo in `plenora-error-v1`, non è prodotto da
-questo componente e non compare nell'envelope d'errore.
+questo componente e non compare nell'envelope d'errore; `StorageError` lo
+accetta in lettura (stringa di 1–128 caratteri o `null`, come nello schema) e
+lo riserializza solo se presente, così le fixture d'errore si deserializzano
+senza modifiche. La terza è la deviazione dichiarata qui sotto.
+
+## Deviazioni dichiarate
+
+Il manifest v4 generato da `scripts/build_release.py` dichiara una deviazione.
+
+| Campo | Valore |
+| --- | --- |
+| Regola | `RUNTIME-VECTORS-1.0/storage-get-partial-error` |
+| Ambito | superficie `runtime`, artefatto `plenora-storage-runtime-binding` |
+| Comportamento | Un `storage.get` che fallisce dopo l'apertura del sink dell'host riporta `remote_effect: unknown` e `retry: requires_recovery`, invece di `partial`/`never` della fixture; codice, categoria, fase, provider, messaggio e dettagli dell'errore del provider sono conservati, e il sink non viene finalizzato. |
+| Rischio | Esito più prudente della fixture: un consumer che si aspetta `partial` riceve `unknown` e deve riconciliare l'artifact prima di riprovare. Nessun retry automatico in entrambi i casi. |
+| Motivo | Il sink appartiene all'host e può scartare i byte non finalizzati: il binding non può provare che una parte del trasferimento sia rimasta, condizione richiesta da `partial`. |
+| Rilevabile prima dell'invocazione | Sì, dal manifest e da questo documento. |
+| Rientro | Quando `ArtifactResolver` potrà attestare lo stato del sink dopo un errore (byte trattenuti o scartati), il binding riporterà `partial` o `rolled_back`; il test `get_request_vector_maps_to_the_get_partial_error_vector_with_the_declared_deviation` fissa il comportamento attuale. |
 
 ## Manifest ed evidenze immutabili
 

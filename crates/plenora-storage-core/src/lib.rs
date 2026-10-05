@@ -24,7 +24,8 @@ pub use engine::{
     LIST_CURSOR_MAX_BYTES, LIST_CURSOR_TTL_SECONDS,
 };
 pub use error::{
-    ErrorCategory, ErrorPhase, RemoteEffect, RetryDisposition, StorageError, StorageResult,
+    ErrorCategory, ErrorPhase, ExecutionId, RemoteEffect, RetryDisposition, StorageError,
+    StorageResult,
 };
 pub use model::{
     ArtifactMetadata, ArtifactReference, ArtifactSinkReference, CONNECTION_CONFIG_MAX_PROPERTIES,

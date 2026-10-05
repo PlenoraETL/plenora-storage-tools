@@ -168,12 +168,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ('plenora-public-security-v1', ['provider preflight, credential reference, SSRF and artifact boundary tests']),
                 ('plenora-cli-v2', ['CLI protocol tests, version and capabilities on the packaged binary']),
                 ('plenora-runtime-binding-v1', ['runtime_binding integration suite executed from extracted core archive',
-                                                'runtime_vectors: RUNTIME-VECTORS-1.0 storage fixtures pinned by SHA-256 at the adopted revision']),
+                                                'runtime_vectors: the twelve RUNTIME-VECTORS-1.0 storage fixtures pinned by SHA-256 at the adopted revision']),
                 ('plenora-python-sdk-v1', ['Installed SDK identity, typing, lifecycle, parity, discovery and redaction tests',
-                                         'crates/plenora-storage-py/python/tests/test_sdk.py']),
+                                         'crates/plenora-storage-py/python/tests/test_sdk.py',
+                                         'Common python-sdk-v1 binding map entrypoints resolved from the installed wheel']),
             ]
         ],
-        'deviations': [],
+        'deviations': [
+            {'rule': 'RUNTIME-VECTORS-1.0/storage-get-partial-error',
+             'artifact': 'plenora-storage-runtime-binding', 'surface': 'runtime',
+             'observed_behavior': 'storage.get failing after the host sink is opened reports remote_effect unknown '
+                                  'with retry requires_recovery instead of partial with never: the host-owned sink '
+                                  'may discard unfinalized bytes, so a partial effect cannot be proved. Other error '
+                                  'axes are preserved and the sink is not finalized.',
+             'tracking': 'docs/contract-adoption.md#deviazioni-dichiarate',
+             'detectable_before_invocation': True},
+        ],
     }
     assert not adoption_errors(adoption), adoption_errors(adoption)
     adoption_path = output / 'adoption-manifest-v4.json'

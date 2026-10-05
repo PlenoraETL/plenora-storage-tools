@@ -35,7 +35,8 @@ does not satisfy the fixture.
 
 An error vector uses `application/vnd.plenora.error+json`, identifies
 `plenora-error-v1` and carries all common error axes. Unknown remote effect is
-paired with quarantine or recovery, never automatic retry.
+paired with `never`, `quarantine` or `requires_recovery` (ERR-006), never
+automatic retry.
 
 ## 4. Use by adopters
 
@@ -61,11 +62,19 @@ component-owned payload. It includes:
 - requests for database, data, IO, REST and storage selectors;
 - JSON and Arrow success envelopes;
 - deadline and causation metadata;
-- opaque secret, endpoint, transaction and artifact references, including
-  storage source and sink roles with bounded metadata, explicit overwrite and
-  publication policy;
+- opaque secret, endpoint and artifact references, including storage source
+  and sink roles with bounded metadata, explicit overwrite and publication
+  policy;
 - typed failures with `none` and `unknown` remote effects;
 - safe retry and recovery-required dispositions.
+
+The storage subset includes requests for all seven selected operations, list
+and get/put success envelopes, and partial/unknown transfer errors. Its payload
+counterexamples are exercised as mutations by
+[`test_storage_contracts.py`](../../tools/test_storage_contracts.py); they cover
+explicit policies, source/sink roles, bounded artifact references, secret/path
+rejection, integrity, byte counts, cursors and unsafe retry. These tests validate
+the fixture semantics, not a provider implementation.
 
 An adopter MUST exercise every fixture whose operation it advertises. The
 runtime transport consumer MUST exercise the complete set. For every request
