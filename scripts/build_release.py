@@ -167,7 +167,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ('plenora-error-v1', ['CLI error schema validation and runtime error-axis tests']),
                 ('plenora-public-security-v1', ['provider preflight, credential reference, SSRF and artifact boundary tests']),
                 ('plenora-cli-v2', ['CLI protocol tests, version and capabilities on the packaged binary']),
-                ('plenora-runtime-binding-v1', ['runtime_binding integration suite executed from extracted core archive']),
+                ('plenora-runtime-binding-v1', ['runtime_binding integration suite executed from extracted core archive',
+                                                'runtime_vectors: RUNTIME-VECTORS-1.0 storage fixtures pinned by SHA-256 at the adopted revision']),
                 ('plenora-python-sdk-v1', ['Installed SDK identity, typing, lifecycle, parity, discovery and redaction tests',
                                          'crates/plenora-storage-py/python/tests/test_sdk.py']),
             ]

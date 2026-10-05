@@ -603,9 +603,16 @@ async fn runtime_route_and_security_mismatches_fail_closed() {
     let mut route = base.clone();
     route.metadata.capability_name = "other".to_owned();
     invalid.push(route);
-    let mut route = base.clone();
-    route.metadata.operation_version = "2".to_owned();
-    invalid.push(route);
+    // `u32::from_str` accepts a sign and leading zeros; the selector must be
+    // the canonical decimal of the descriptor version.
+    for version in ["2", "01", "+1", "", "1.0"] {
+        let mut route = base.clone();
+        route.metadata.operation_version = version.to_owned();
+        invalid.push(route);
+        let mut route = base.clone();
+        route.metadata.capability_version = version.to_owned();
+        invalid.push(route);
+    }
     let mut route = base.clone();
     route.metadata.input_contract = "wrong".to_owned();
     invalid.push(route);

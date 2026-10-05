@@ -335,10 +335,7 @@ impl<'a> RuntimeBinding<'a> {
                 .find(|item| item.operation == invocation.metadata.operation)
                 .map_or("storage.unknown", |item| item.operation)
                 .to_owned(),
-            operation_version: invocation
-                .metadata
-                .operation_version
-                .parse::<u32>()
+            operation_version: parse_version(&invocation.metadata.operation_version)
                 .map_or_else(|_| "0".to_owned(), |version| version.to_string()),
             output_contract: ERROR_CONTRACT.to_owned(),
             correlation_id: public_uuid(&invocation.metadata.correlation_id),
@@ -574,10 +571,15 @@ fn serialize_result<T: Serialize>(result: T) -> StorageResult<Value> {
     })
 }
 
+/// Accepts only the canonical decimal form (`^[1-9][0-9]*$` in the runtime
+/// vector schema). `u32::from_str` alone also accepts `+1` and `01`, which
+/// would admit a selector that differs textually from the descriptor.
 fn parse_version(value: &str) -> StorageResult<u32> {
-    value
-        .parse()
-        .map_err(|_| route_error("runtime version is invalid"))
+    let canonical = value.bytes().all(|byte| byte.is_ascii_digit()) && !value.starts_with('0');
+    canonical
+        .then(|| value.parse().ok())
+        .flatten()
+        .ok_or_else(|| route_error("runtime version is invalid"))
 }
 
 fn runtime_control(

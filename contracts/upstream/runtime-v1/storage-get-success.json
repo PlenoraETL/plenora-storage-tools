@@ -1,0 +1,29 @@
+{
+  "$schema": "../../schemas/runtime-vector-v1.schema.json",
+  "schema_version": 1,
+  "contract": "plenora-runtime-vector-v1",
+  "kind": "success",
+  "content_type": "application/json",
+  "metadata": {
+    "plenora.message.id": "018f3d84-7b2c-7f00-8000-000000000115",
+    "plenora.capability.operation": "storage.get",
+    "plenora.operation.version": "1",
+    "plenora.output.contract": "plenora-storage-get-output-v1",
+    "plenora.trace.correlation_id": "018f3d84-7b2c-7f00-8000-000000000015"
+  },
+  "payload": {
+    "key": "incoming/vector.bin",
+    "bytes_transferred": 17,
+    "checksum": {
+      "algorithm": "sha256",
+      "value": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    },
+    "artifact": {
+      "content_type": "application/octet-stream",
+      "size": 17,
+      "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    },
+    "etag": "provider-etag-not-a-digest",
+    "version": "provider-version-17"
+  }
+}

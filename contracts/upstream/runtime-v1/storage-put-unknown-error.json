@@ -1,0 +1,25 @@
+{
+  "$schema": "../../schemas/runtime-vector-v1.schema.json",
+  "schema_version": 1,
+  "contract": "plenora-runtime-vector-v1",
+  "kind": "error",
+  "content_type": "application/vnd.plenora.error+json",
+  "metadata": {
+    "plenora.message.id": "018f3d84-7b2c-7f00-8000-000000000116",
+    "plenora.capability.operation": "storage.put",
+    "plenora.operation.version": "1",
+    "plenora.output.contract": "plenora-error-v1",
+    "plenora.trace.correlation_id": "018f3d84-7b2c-7f00-8000-000000000016"
+  },
+  "payload": {
+    "category": "timeout",
+    "phase": "commit",
+    "remote_effect": "unknown",
+    "retry": {"kind": "requires_recovery"},
+    "code": "STORAGE_PUT_OUTCOME_UNKNOWN",
+    "provider": "s3",
+    "execution_id": "storage-vector-execution-1",
+    "message": "The storage upload outcome is unknown; reconcile the object before retrying.",
+    "details": {"recovery_ref": "recovery://storage/put-vector"}
+  }
+}
