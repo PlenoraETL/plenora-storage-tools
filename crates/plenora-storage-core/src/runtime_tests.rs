@@ -1,4 +1,5 @@
 use super::*;
+use crate::CAPABILITY_NAME;
 
 #[test]
 fn runtime_routes_fail_closed_before_invocation() {

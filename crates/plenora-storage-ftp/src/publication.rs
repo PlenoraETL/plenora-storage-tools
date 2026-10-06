@@ -4,9 +4,9 @@ use super::{
     AsyncRead, CopyRequest, ErrorCategory, ErrorPhase, FtpProvider, ObjectMetadata,
     OperationContext, PROVIDER_ID, ProviderConnection, PutRequest, RemoteEffect, RetryDisposition,
     StorageError, StorageProvider, StorageResult, TransferResult, abort_transfer,
-    committed_verification_error, copy_with_control, ensure_parent_directories, finish_upload,
-    map_ftp_error, stat_file, transfer_limit_error, transfer_result, validate_file_metadata,
-    validate_ftp_publication, validate_key,
+    committed_mismatch_error, committed_verification_error, copy_with_control,
+    ensure_parent_directories, finish_upload, map_ftp_error, stat_file, transfer_limit_error,
+    transfer_result, validate_file_metadata, validate_ftp_publication, validate_key,
 };
 
 pub async fn put(
@@ -84,7 +84,7 @@ pub async fn put(
                 .await
                 .map_err(|_| committed_verification_error())?;
             if published.size != bytes_transferred {
-                return Err(committed_verification_error());
+                return Err(committed_mismatch_error());
             }
             Ok(transfer_result(
                 request.key.clone(),
@@ -231,7 +231,7 @@ pub async fn copy(
             .await
             .map_err(|_| committed_verification_error())?;
             if published.size != transferred || transferred != expected_size {
-                return Err(committed_verification_error());
+                return Err(committed_mismatch_error());
             }
             Ok(published)
         }

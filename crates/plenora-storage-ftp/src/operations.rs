@@ -6,7 +6,7 @@ use super::{
     ObjectMetadata, OperationContext, PROVIDER_ID, ProviderCapabilities, ProviderConnection,
     ProviderListRequest, ProviderListResult, PutRequest, RemoteEffect, RetryDisposition,
     StatRequest, StorageError, StorageProvider, StorageResult, TestResult, TransferResult,
-    async_trait, committed_verification_error, configuration_error, copy_with_control,
+    async_trait, committed_mismatch_error, configuration_error, copy_with_control,
     directory_may_contain, ftp_object_exists, key_matches_prefix, list_limit, list_name_error,
     map_ftp_error, parse_config, public_metadata, scan_directory, stat_file, transfer_result,
     validate_key, validate_prefix,
@@ -279,7 +279,7 @@ impl StorageProvider for FtpProvider {
                 )
                 .await?;
             if bytes_transferred != expected_size {
-                return Err(committed_verification_error().with_provider(self.id()));
+                return Err(committed_mismatch_error().with_provider(self.id()));
             }
             Ok(transfer_result(
                 request.key.clone(),

@@ -13,7 +13,7 @@ use serde_json::Value;
 use plenora_storage_core::{
     ArtifactMetadata, ArtifactReference, ArtifactRole, ArtifactSinkReference, CapabilityDocument,
     CapabilityStatus, CopyInput, CopyRequest, DeleteInput, DeleteRequest, DeleteResult, ErrorPhase,
-    GetInput, GetRequest, IntegrityMetadata, ListInput, ListRequest, ListResult,
+    ExecutionId, GetInput, GetRequest, IntegrityMetadata, ListInput, ListRequest, ListResult,
     OPERATION_SCHEMA_VERSION, ObjectMetadata, ProviderCapabilities, ProviderConnection,
     PublicationPolicy, PutInput, PutRequest, RUNTIME_OPERATIONS, RemoteEffect, RetryDisposition,
     SideEffect, StatInput, StatRequest, StorageError, Surface, TestInput, TestResult,
@@ -826,4 +826,67 @@ fn nullable_output_keys_are_required_when_deserializing() {
         }),
         &["next_cursor"],
     );
+}
+
+/// `plenora-error-v1` allows an optional `execution_id` that is a string of
+/// 1 to 128 code points or `null`. `StorageError` must deserialize exactly the
+/// documents the schema accepts, and must not emit the key when it is absent.
+#[test]
+fn storage_error_execution_id_agrees_with_error_v1() {
+    let schema: Value = serde_json::from_slice(
+        &fs::read(contracts_root().join("upstream/error-v1.schema.json")).expect("error-v1"),
+    )
+    .expect("error-v1 is JSON");
+    let validator = validator_for(&schema, HashMap::new());
+    let base = serde_json::json!({
+        "category": "io",
+        "phase": "write",
+        "remote_effect": "unknown",
+        "retry": {"kind": "requires_recovery"},
+        "code": "STORAGE_VECTOR",
+        "provider": "s3",
+        "message": "storage operation failed",
+        "details": {}
+    });
+    let cases = [
+        serde_json::json!("e"),
+        serde_json::json!("e".repeat(128)),
+        // 128 code points but 256 UTF-8 bytes: lengths count characters.
+        serde_json::json!("é".repeat(128)),
+        serde_json::json!(""),
+        serde_json::json!("e".repeat(129)),
+        serde_json::json!("é".repeat(129)),
+        Value::Null,
+        serde_json::json!(17),
+    ];
+    for value in cases {
+        let mut document = base.clone();
+        document["execution_id"] = value.clone();
+        let schema_accepts = validator.is_valid(&document);
+        let parsed = serde_json::from_value::<StorageError>(document);
+        assert_eq!(parsed.is_ok(), schema_accepts, "execution_id={value}");
+        if let Ok(error) = parsed {
+            assert_eq!(
+                error.execution_id.as_ref().map(ExecutionId::as_str),
+                value.as_str()
+            );
+            if let Some(id) = value.as_str() {
+                assert_eq!(ExecutionId::new(id).ok(), error.execution_id);
+            }
+        } else if let Some(id) = value.as_str() {
+            let rejected = ExecutionId::new(id).expect_err("schema rejects the identifier");
+            assert_eq!(rejected.code, "EXECUTION_ID_INVALID");
+            assert!(id.is_empty() || !rejected.message.contains(id));
+        }
+    }
+
+    let absent: StorageError = serde_json::from_value(base.clone()).expect("absent execution_id");
+    assert_eq!(absent.execution_id, None);
+    assert_eq!(serde_json::to_value(&absent).unwrap(), base);
+
+    let mut carried = base;
+    carried["execution_id"] = serde_json::json!("host-execution-1");
+    let error: StorageError = serde_json::from_value(carried.clone()).expect("carried");
+    assert_eq!(serde_json::to_value(&error).unwrap(), carried);
+    assert!(validator.is_valid(&carried));
 }

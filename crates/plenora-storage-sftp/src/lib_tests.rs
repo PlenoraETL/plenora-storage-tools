@@ -399,3 +399,17 @@ async fn listing_stops_between_batches_without_waiting_for_directory_eof() {
     assert_eq!(visited, ["file-0", "file-1"]);
     assert_eq!(requests.load(Ordering::SeqCst), 3);
 }
+
+/// Case 9e of the common runtime matrix: a proved publication whose metadata
+/// cannot be read back is `committed` in `cleanup` and is never retried,
+/// because repeating the request would publish again.
+#[test]
+fn unavailable_metadata_after_publication_is_committed_and_never_retried() {
+    let error = super::committed_verification_error();
+    assert_eq!(
+        error.remote_effect,
+        plenora_storage_core::RemoteEffect::Committed
+    );
+    assert_eq!(error.phase, plenora_storage_core::ErrorPhase::Cleanup);
+    assert_eq!(error.retry, plenora_storage_core::RetryDisposition::Never);
+}

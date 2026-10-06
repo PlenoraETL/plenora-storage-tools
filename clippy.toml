@@ -1,0 +1,4 @@
+# StorageError is the error of every StorageResult. It is 144 bytes on 64-bit
+# targets since `execution_id` (plenora-error-v1) was added in 3.0.0; the
+# threshold is that size plus one, so any further growth fails `result_large_err`.
+large-error-threshold = 145
