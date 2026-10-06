@@ -12,7 +12,7 @@ Mechanical adjustments: rustfmt formatting and three scoped lint annotations for
 
 In Plenora 0.2.2, dependency requirements were refreshed to current stable releases,
 including CCM 0.6.1 (replacing the release candidate) and lz4_flex 0.14.0.
-The declared Rust minimum follows the workspace at 1.92, with equivalent
+The declared Rust minimum follows the workspace (1.92 at the time; 1.98 from Plenora 3.0.0), with equivalent
 `is_multiple_of` substitutions required by Clippy at that minimum. The upstream archive
 hash above identifies the original source, not this modified package.
 

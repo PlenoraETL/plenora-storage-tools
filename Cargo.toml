@@ -16,7 +16,7 @@ resolver = "3"
 [workspace.package]
 version = "2.1.0"
 edition = "2024"
-rust-version = "1.92"
+rust-version = "1.98"
 # I crate usano la licenza proprietaria del repository; sono distribuiti solo
 # come asset delle GitHub Release, non su crates.io. `publish = false` non è
 # impostato perché impedirebbe a `cargo package --workspace` (build_release.py)

@@ -286,7 +286,7 @@
     }
   },
   "python_requires": ">=3.10",
-  "rust_version": "1.92",
+  "rust_version": "1.98",
   "schema_version": 1,
   "upstream_contracts": {
     "repository": "https://github.com/PlenoraETL/plenora-contracts.git",

@@ -13,6 +13,7 @@ impl core::marker::Freeze for plenora_storage_providers::Azure
 impl core::marker::Send for plenora_storage_providers::Azure
 impl core::marker::Sync for plenora_storage_providers::Azure
 impl core::marker::Unpin for plenora_storage_providers::Azure
+impl core::marker::UnsafeUnpin for plenora_storage_providers::Azure
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::Azure
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::Azure
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Azure
@@ -87,8 +88,8 @@ impl<T> core::convert::From<T> for plenora_storage_providers::Azure
 pub fn plenora_storage_providers::Azure::from(t: T) -> T
 impl<T> core::mem::SizedTypeProperties for plenora_storage_providers::Azure
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::Azure where T: ?core::marker::Sized
-pub fn plenora_storage_providers::Azure::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
-pub fn plenora_storage_providers::Azure::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::Azure::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::Azure::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
 impl<T> tracing::instrument::Instrument for plenora_storage_providers::Azure
 impl<T> tracing::instrument::WithSubscriber for plenora_storage_providers::Azure
 impl<T> typenum::type_operators::Same for plenora_storage_providers::Azure
@@ -107,6 +108,7 @@ impl core::marker::Freeze for plenora_storage_providers::AzureConnectionConfig
 impl core::marker::Send for plenora_storage_providers::AzureConnectionConfig
 impl core::marker::Sync for plenora_storage_providers::AzureConnectionConfig
 impl core::marker::Unpin for plenora_storage_providers::AzureConnectionConfig
+impl core::marker::UnsafeUnpin for plenora_storage_providers::AzureConnectionConfig
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::AzureConnectionConfig
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::AzureConnectionConfig
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_providers::AzureConnectionConfig
@@ -188,8 +190,8 @@ pub fn plenora_storage_providers::AzureConnectionConfig::from(t: T) -> T
 impl<T> core::mem::SizedTypeProperties for plenora_storage_providers::AzureConnectionConfig
 impl<T> serde_core::de::DeserializeOwned for plenora_storage_providers::AzureConnectionConfig where T: for<'de> serde_core::de::Deserialize<'de>
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::AzureConnectionConfig where T: ?core::marker::Sized
-pub fn plenora_storage_providers::AzureConnectionConfig::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
-pub fn plenora_storage_providers::AzureConnectionConfig::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::AzureConnectionConfig::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::AzureConnectionConfig::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
 impl<T> tracing::instrument::Instrument for plenora_storage_providers::AzureConnectionConfig
 impl<T> tracing::instrument::WithSubscriber for plenora_storage_providers::AzureConnectionConfig
 impl<T> typenum::type_operators::Same for plenora_storage_providers::AzureConnectionConfig
@@ -208,6 +210,7 @@ impl core::marker::Freeze for plenora_storage_providers::Gcs
 impl core::marker::Send for plenora_storage_providers::Gcs
 impl core::marker::Sync for plenora_storage_providers::Gcs
 impl core::marker::Unpin for plenora_storage_providers::Gcs
+impl core::marker::UnsafeUnpin for plenora_storage_providers::Gcs
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::Gcs
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::Gcs
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Gcs
@@ -282,8 +285,8 @@ impl<T> core::convert::From<T> for plenora_storage_providers::Gcs
 pub fn plenora_storage_providers::Gcs::from(t: T) -> T
 impl<T> core::mem::SizedTypeProperties for plenora_storage_providers::Gcs
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::Gcs where T: ?core::marker::Sized
-pub fn plenora_storage_providers::Gcs::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
-pub fn plenora_storage_providers::Gcs::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::Gcs::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::Gcs::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
 impl<T> tracing::instrument::Instrument for plenora_storage_providers::Gcs
 impl<T> tracing::instrument::WithSubscriber for plenora_storage_providers::Gcs
 impl<T> typenum::type_operators::Same for plenora_storage_providers::Gcs
@@ -301,6 +304,7 @@ impl core::marker::Freeze for plenora_storage_providers::GcsConnectionConfig
 impl core::marker::Send for plenora_storage_providers::GcsConnectionConfig
 impl core::marker::Sync for plenora_storage_providers::GcsConnectionConfig
 impl core::marker::Unpin for plenora_storage_providers::GcsConnectionConfig
+impl core::marker::UnsafeUnpin for plenora_storage_providers::GcsConnectionConfig
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::GcsConnectionConfig
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::GcsConnectionConfig
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_providers::GcsConnectionConfig
@@ -382,8 +386,8 @@ pub fn plenora_storage_providers::GcsConnectionConfig::from(t: T) -> T
 impl<T> core::mem::SizedTypeProperties for plenora_storage_providers::GcsConnectionConfig
 impl<T> serde_core::de::DeserializeOwned for plenora_storage_providers::GcsConnectionConfig where T: for<'de> serde_core::de::Deserialize<'de>
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::GcsConnectionConfig where T: ?core::marker::Sized
-pub fn plenora_storage_providers::GcsConnectionConfig::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
-pub fn plenora_storage_providers::GcsConnectionConfig::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::GcsConnectionConfig::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::GcsConnectionConfig::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
 impl<T> tracing::instrument::Instrument for plenora_storage_providers::GcsConnectionConfig
 impl<T> tracing::instrument::WithSubscriber for plenora_storage_providers::GcsConnectionConfig
 impl<T> typenum::type_operators::Same for plenora_storage_providers::GcsConnectionConfig
@@ -402,6 +406,7 @@ impl core::marker::Freeze for plenora_storage_providers::Local
 impl core::marker::Send for plenora_storage_providers::Local
 impl core::marker::Sync for plenora_storage_providers::Local
 impl core::marker::Unpin for plenora_storage_providers::Local
+impl core::marker::UnsafeUnpin for plenora_storage_providers::Local
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::Local
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::Local
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Local
@@ -476,8 +481,8 @@ impl<T> core::convert::From<T> for plenora_storage_providers::Local
 pub fn plenora_storage_providers::Local::from(t: T) -> T
 impl<T> core::mem::SizedTypeProperties for plenora_storage_providers::Local
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::Local where T: ?core::marker::Sized
-pub fn plenora_storage_providers::Local::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
-pub fn plenora_storage_providers::Local::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::Local::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::Local::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
 impl<T> tracing::instrument::Instrument for plenora_storage_providers::Local
 impl<T> tracing::instrument::WithSubscriber for plenora_storage_providers::Local
 impl<T> typenum::type_operators::Same for plenora_storage_providers::Local
@@ -494,6 +499,7 @@ impl core::marker::Freeze for plenora_storage_providers::LocalConnectionConfig
 impl core::marker::Send for plenora_storage_providers::LocalConnectionConfig
 impl core::marker::Sync for plenora_storage_providers::LocalConnectionConfig
 impl core::marker::Unpin for plenora_storage_providers::LocalConnectionConfig
+impl core::marker::UnsafeUnpin for plenora_storage_providers::LocalConnectionConfig
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::LocalConnectionConfig
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::LocalConnectionConfig
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_providers::LocalConnectionConfig
@@ -575,8 +581,8 @@ pub fn plenora_storage_providers::LocalConnectionConfig::from(t: T) -> T
 impl<T> core::mem::SizedTypeProperties for plenora_storage_providers::LocalConnectionConfig
 impl<T> serde_core::de::DeserializeOwned for plenora_storage_providers::LocalConnectionConfig where T: for<'de> serde_core::de::Deserialize<'de>
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::LocalConnectionConfig where T: ?core::marker::Sized
-pub fn plenora_storage_providers::LocalConnectionConfig::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
-pub fn plenora_storage_providers::LocalConnectionConfig::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::LocalConnectionConfig::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::LocalConnectionConfig::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
 impl<T> tracing::instrument::Instrument for plenora_storage_providers::LocalConnectionConfig
 impl<T> tracing::instrument::WithSubscriber for plenora_storage_providers::LocalConnectionConfig
 impl<T> typenum::type_operators::Same for plenora_storage_providers::LocalConnectionConfig
@@ -601,6 +607,7 @@ impl<F> core::marker::Freeze for plenora_storage_providers::Provider<F>
 impl<F> core::marker::Send for plenora_storage_providers::Provider<F>
 impl<F> core::marker::Sync for plenora_storage_providers::Provider<F>
 impl<F> core::marker::Unpin for plenora_storage_providers::Provider<F> where F: core::marker::Unpin
+impl<F> core::marker::UnsafeUnpin for plenora_storage_providers::Provider<F>
 impl<F> !core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::Provider<F>
 impl<F> !core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::Provider<F>
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Provider<F>
@@ -675,8 +682,8 @@ impl<T> core::convert::From<T> for plenora_storage_providers::Provider<F>
 pub fn plenora_storage_providers::Provider<F>::from(t: T) -> T
 impl<T> core::mem::SizedTypeProperties for plenora_storage_providers::Provider<F>
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::Provider<F> where T: ?core::marker::Sized
-pub fn plenora_storage_providers::Provider<F>::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
-pub fn plenora_storage_providers::Provider<F>::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::Provider<F>::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::Provider<F>::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
 impl<T> tracing::instrument::Instrument for plenora_storage_providers::Provider<F>
 impl<T> tracing::instrument::WithSubscriber for plenora_storage_providers::Provider<F>
 impl<T> typenum::type_operators::Same for plenora_storage_providers::Provider<F>
@@ -695,6 +702,7 @@ impl core::marker::Freeze for plenora_storage_providers::Smb
 impl core::marker::Send for plenora_storage_providers::Smb
 impl core::marker::Sync for plenora_storage_providers::Smb
 impl core::marker::Unpin for plenora_storage_providers::Smb
+impl core::marker::UnsafeUnpin for plenora_storage_providers::Smb
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::Smb
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::Smb
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_providers::Smb
@@ -769,8 +777,8 @@ impl<T> core::convert::From<T> for plenora_storage_providers::Smb
 pub fn plenora_storage_providers::Smb::from(t: T) -> T
 impl<T> core::mem::SizedTypeProperties for plenora_storage_providers::Smb
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::Smb where T: ?core::marker::Sized
-pub fn plenora_storage_providers::Smb::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
-pub fn plenora_storage_providers::Smb::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::Smb::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::Smb::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
 impl<T> tracing::instrument::Instrument for plenora_storage_providers::Smb
 impl<T> tracing::instrument::WithSubscriber for plenora_storage_providers::Smb
 impl<T> typenum::type_operators::Same for plenora_storage_providers::Smb
@@ -790,6 +798,7 @@ impl core::marker::Freeze for plenora_storage_providers::SmbConnectionConfig
 impl core::marker::Send for plenora_storage_providers::SmbConnectionConfig
 impl core::marker::Sync for plenora_storage_providers::SmbConnectionConfig
 impl core::marker::Unpin for plenora_storage_providers::SmbConnectionConfig
+impl core::marker::UnsafeUnpin for plenora_storage_providers::SmbConnectionConfig
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::SmbConnectionConfig
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::SmbConnectionConfig
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_providers::SmbConnectionConfig
@@ -871,8 +880,8 @@ pub fn plenora_storage_providers::SmbConnectionConfig::from(t: T) -> T
 impl<T> core::mem::SizedTypeProperties for plenora_storage_providers::SmbConnectionConfig
 impl<T> serde_core::de::DeserializeOwned for plenora_storage_providers::SmbConnectionConfig where T: for<'de> serde_core::de::Deserialize<'de>
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::SmbConnectionConfig where T: ?core::marker::Sized
-pub fn plenora_storage_providers::SmbConnectionConfig::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
-pub fn plenora_storage_providers::SmbConnectionConfig::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::SmbConnectionConfig::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::SmbConnectionConfig::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
 impl<T> tracing::instrument::Instrument for plenora_storage_providers::SmbConnectionConfig
 impl<T> tracing::instrument::WithSubscriber for plenora_storage_providers::SmbConnectionConfig
 impl<T> typenum::type_operators::Same for plenora_storage_providers::SmbConnectionConfig
@@ -891,6 +900,7 @@ impl core::marker::Freeze for plenora_storage_providers::WebDav
 impl core::marker::Send for plenora_storage_providers::WebDav
 impl core::marker::Sync for plenora_storage_providers::WebDav
 impl core::marker::Unpin for plenora_storage_providers::WebDav
+impl core::marker::UnsafeUnpin for plenora_storage_providers::WebDav
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::WebDav
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::WebDav
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_providers::WebDav
@@ -965,8 +975,8 @@ impl<T> core::convert::From<T> for plenora_storage_providers::WebDav
 pub fn plenora_storage_providers::WebDav::from(t: T) -> T
 impl<T> core::mem::SizedTypeProperties for plenora_storage_providers::WebDav
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::WebDav where T: ?core::marker::Sized
-pub fn plenora_storage_providers::WebDav::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
-pub fn plenora_storage_providers::WebDav::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::WebDav::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::WebDav::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
 impl<T> tracing::instrument::Instrument for plenora_storage_providers::WebDav
 impl<T> tracing::instrument::WithSubscriber for plenora_storage_providers::WebDav
 impl<T> typenum::type_operators::Same for plenora_storage_providers::WebDav
@@ -983,6 +993,7 @@ impl core::marker::Freeze for plenora_storage_providers::WebDavConnectionConfig
 impl core::marker::Send for plenora_storage_providers::WebDavConnectionConfig
 impl core::marker::Sync for plenora_storage_providers::WebDavConnectionConfig
 impl core::marker::Unpin for plenora_storage_providers::WebDavConnectionConfig
+impl core::marker::UnsafeUnpin for plenora_storage_providers::WebDavConnectionConfig
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_providers::WebDavConnectionConfig
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_providers::WebDavConnectionConfig
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_providers::WebDavConnectionConfig
@@ -1064,8 +1075,8 @@ pub fn plenora_storage_providers::WebDavConnectionConfig::from(t: T) -> T
 impl<T> core::mem::SizedTypeProperties for plenora_storage_providers::WebDavConnectionConfig
 impl<T> serde_core::de::DeserializeOwned for plenora_storage_providers::WebDavConnectionConfig where T: for<'de> serde_core::de::Deserialize<'de>
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_providers::WebDavConnectionConfig where T: ?core::marker::Sized
-pub fn plenora_storage_providers::WebDavConnectionConfig::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
-pub fn plenora_storage_providers::WebDavConnectionConfig::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::WebDavConnectionConfig::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_providers::WebDavConnectionConfig::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
 impl<T> tracing::instrument::Instrument for plenora_storage_providers::WebDavConnectionConfig
 impl<T> tracing::instrument::WithSubscriber for plenora_storage_providers::WebDavConnectionConfig
 impl<T> typenum::type_operators::Same for plenora_storage_providers::WebDavConnectionConfig

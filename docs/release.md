@@ -135,7 +135,7 @@ nel job `product-quality` della CI.
 
 ## Ambito e limiti operativi
 
-- Rust richiede Tokio; toolchain minima dichiarata: 1.92. Non è dichiarata
+- Rust richiede Tokio; toolchain minima dichiarata: 1.98 (1.92 fino alla 2.1). Non è dichiarata
   compatibilità con versioni Rust più vecchie.
 - Linux x86_64 viene qualificato nel container Debian Bookworm. Windows x86_64
   supera build/test nativi e la matrice CLI contro le fixture della VM (S3 HTTP

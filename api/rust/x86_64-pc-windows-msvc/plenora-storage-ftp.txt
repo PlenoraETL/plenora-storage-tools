@@ -4,8 +4,9 @@ pub plenora_storage_ftp::FtpMode::ExtendedPassive
 pub plenora_storage_ftp::FtpMode::Passive
 impl core::clone::Clone for plenora_storage_ftp::FtpMode
 pub fn plenora_storage_ftp::FtpMode::clone(&self) -> plenora_storage_ftp::FtpMode
+impl core::clone::TrivialClone for plenora_storage_ftp::FtpMode
 impl core::cmp::Eq for plenora_storage_ftp::FtpMode
-pub fn plenora_storage_ftp::FtpMode::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_ftp::FtpMode::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_ftp::FtpMode
 pub fn plenora_storage_ftp::FtpMode::eq(&self, other: &plenora_storage_ftp::FtpMode) -> bool
 impl core::default::Default for plenora_storage_ftp::FtpMode
@@ -20,6 +21,7 @@ impl core::marker::Freeze for plenora_storage_ftp::FtpMode
 impl core::marker::Send for plenora_storage_ftp::FtpMode
 impl core::marker::Sync for plenora_storage_ftp::FtpMode
 impl core::marker::Unpin for plenora_storage_ftp::FtpMode
+impl core::marker::UnsafeUnpin for plenora_storage_ftp::FtpMode
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_ftp::FtpMode
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_ftp::FtpMode
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_ftp::FtpMode
@@ -112,7 +114,7 @@ pub plenora_storage_ftp::FtpConnectionConfig::tls_ca_pem: core::option::Option<a
 impl core::clone::Clone for plenora_storage_ftp::FtpConnectionConfig
 pub fn plenora_storage_ftp::FtpConnectionConfig::clone(&self) -> plenora_storage_ftp::FtpConnectionConfig
 impl core::cmp::Eq for plenora_storage_ftp::FtpConnectionConfig
-pub fn plenora_storage_ftp::FtpConnectionConfig::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_ftp::FtpConnectionConfig::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_ftp::FtpConnectionConfig
 pub fn plenora_storage_ftp::FtpConnectionConfig::eq(&self, other: &plenora_storage_ftp::FtpConnectionConfig) -> bool
 impl core::fmt::Debug for plenora_storage_ftp::FtpConnectionConfig
@@ -124,6 +126,7 @@ impl core::marker::Freeze for plenora_storage_ftp::FtpConnectionConfig
 impl core::marker::Send for plenora_storage_ftp::FtpConnectionConfig
 impl core::marker::Sync for plenora_storage_ftp::FtpConnectionConfig
 impl core::marker::Unpin for plenora_storage_ftp::FtpConnectionConfig
+impl core::marker::UnsafeUnpin for plenora_storage_ftp::FtpConnectionConfig
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_ftp::FtpConnectionConfig
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_ftp::FtpConnectionConfig
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_ftp::FtpConnectionConfig
@@ -226,6 +229,7 @@ impl core::marker::Freeze for plenora_storage_ftp::FtpProvider
 impl core::marker::Send for plenora_storage_ftp::FtpProvider
 impl core::marker::Sync for plenora_storage_ftp::FtpProvider
 impl core::marker::Unpin for plenora_storage_ftp::FtpProvider
+impl core::marker::UnsafeUnpin for plenora_storage_ftp::FtpProvider
 impl !core::panic::unwind_safe::RefUnwindSafe for plenora_storage_ftp::FtpProvider
 impl !core::panic::unwind_safe::UnwindSafe for plenora_storage_ftp::FtpProvider
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_ftp::FtpProvider

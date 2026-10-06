@@ -37,6 +37,8 @@
   - the binding executes the 21 rejection probes and the two storage cleanup vectors proposed by `plenora-contracts` pull request 21, copied and pinned as not yet normative;
   - a deadline already expired at admission is `timeout`/`validate`/`none` with retry `never` instead of `safe`, on every surface (P).
 - A proved S3, SFTP or FTP publication whose metadata cannot be read back is `committed`/`cleanup` with retry `never` instead of `requires_recovery` (P); an FTP object published or downloaded with a size different from the transferred bytes keeps `requires_recovery` under the new code `FTP_COMMITTED_SIZE_MISMATCH`.
+- **Breaking (MSRV):** raise the Rust toolchain to 1.98.1 and the declared minimum (`rust-version`) to 1.98, aligned with the other Plenora libraries; Docker images use `rust:1.98.1-bookworm` pinned by digest. API snapshots are regenerated with 1.98.1: the differences are auto-trait and std path rendering only, not crate signatures.
+
 ## 2.1.0 — 2026-09-30
 
 - Add explicit private-file upload preparation for local, Azure, GCS, SMB and WebDAV through Rust, CLI and Python, preserving default buffered limits.

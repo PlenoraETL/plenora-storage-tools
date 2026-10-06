@@ -237,6 +237,10 @@ impl SftpAuthentication {
     }
 }
 
+#[allow(
+    clippy::unused_async_trait_impl,
+    reason = "russh declares the handler methods as async; the impl keeps that shape"
+)]
 impl client::Handler for SshClient {
     type Error = russh::Error;
 

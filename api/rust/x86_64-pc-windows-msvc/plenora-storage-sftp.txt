@@ -8,7 +8,7 @@ pub plenora_storage_sftp::SftpConnectionConfig::root: alloc::string::String
 impl core::clone::Clone for plenora_storage_sftp::SftpConnectionConfig
 pub fn plenora_storage_sftp::SftpConnectionConfig::clone(&self) -> plenora_storage_sftp::SftpConnectionConfig
 impl core::cmp::Eq for plenora_storage_sftp::SftpConnectionConfig
-pub fn plenora_storage_sftp::SftpConnectionConfig::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_sftp::SftpConnectionConfig::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_sftp::SftpConnectionConfig
 pub fn plenora_storage_sftp::SftpConnectionConfig::eq(&self, other: &plenora_storage_sftp::SftpConnectionConfig) -> bool
 impl core::fmt::Debug for plenora_storage_sftp::SftpConnectionConfig
@@ -20,6 +20,7 @@ impl core::marker::Freeze for plenora_storage_sftp::SftpConnectionConfig
 impl core::marker::Send for plenora_storage_sftp::SftpConnectionConfig
 impl core::marker::Sync for plenora_storage_sftp::SftpConnectionConfig
 impl core::marker::Unpin for plenora_storage_sftp::SftpConnectionConfig
+impl core::marker::UnsafeUnpin for plenora_storage_sftp::SftpConnectionConfig
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_sftp::SftpConnectionConfig
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_sftp::SftpConnectionConfig
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_sftp::SftpConnectionConfig
@@ -124,6 +125,7 @@ impl core::marker::Freeze for plenora_storage_sftp::SftpProvider
 impl core::marker::Send for plenora_storage_sftp::SftpProvider
 impl core::marker::Sync for plenora_storage_sftp::SftpProvider
 impl core::marker::Unpin for plenora_storage_sftp::SftpProvider
+impl core::marker::UnsafeUnpin for plenora_storage_sftp::SftpProvider
 impl !core::panic::unwind_safe::RefUnwindSafe for plenora_storage_sftp::SftpProvider
 impl !core::panic::unwind_safe::UnwindSafe for plenora_storage_sftp::SftpProvider
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_sftp::SftpProvider
