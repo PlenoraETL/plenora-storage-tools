@@ -36,6 +36,43 @@ def check_manifest(document, *, workspace=False, exceptions=()):
     return errors
 
 
+DEVIATION_FIELDS = ('id', 'rule', 'scope', 'hazard', 'reentry')
+
+
+def check_deviation(deviation):
+    """The range exception is a declared deviation: rule, scope, hazard and
+    re-entry condition are all stated."""
+    if not isinstance(deviation, dict):
+        return ['dependency-policy.json: deviation required for compatible requirements']
+    return [f'dependency-policy.json: deviation.{field} required' for field in DEVIATION_FIELDS
+            if not (isinstance(deviation.get(field), str) and deviation[field].strip())]
+
+
+def check_range_motivations(text, names, deviation_id):
+    """Each compatible requirement has its motivation next to it: a comment
+    block immediately above the entry that names the declared deviation."""
+    errors = []
+    lines = text.splitlines()
+    section = ''
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith('['):
+            section = stripped
+            continue
+        name = stripped.split('=', 1)[0].strip()
+        if section != '[workspace.dependencies]' or name not in names or '=' not in stripped:
+            continue
+        block = []
+        above = index - 1
+        while above >= 0 and lines[above].strip().startswith('#'):
+            block.append(lines[above].strip().lstrip('#').strip())
+            above -= 1
+        comment = ' '.join(reversed(block))
+        if deviation_id not in comment or len(comment.replace(deviation_id, '')) < 40:
+            errors.append(f'Cargo.toml: {name}: motivation naming {deviation_id} required next to the range')
+    return errors
+
+
 def check_python_pins(name, requirements):
     """Every entry is an exact `name==version`; transitive dependencies are
     listed explicitly, since pip resolves anything unlisted at install time."""
@@ -45,15 +82,17 @@ def check_python_pins(name, requirements):
 
 def main():
     policy = json.loads((ROOT / 'scripts/dependency-policy.json').read_text())
-    exceptions = policy['compatible_workspace_requirements']
-    workspace = tomllib.loads((ROOT / 'Cargo.toml').read_text())
-    if not all(isinstance(value, str) and value.strip() for value in exceptions.values()):
-        raise ValueError('dependency exceptions require a reason')
-    if not set(exceptions) <= set(workspace['workspace']['dependencies']):
+    exceptions = set(policy['compatible_workspace_requirements'])
+    manifest_text = (ROOT / 'Cargo.toml').read_text(encoding='utf-8')
+    workspace = tomllib.loads(manifest_text)
+    if not exceptions <= set(workspace['workspace']['dependencies']):
         raise ValueError('stale dependency exception')
+    deviation = policy.get('deviation')
+    failures = check_deviation(deviation)
+    if not failures:
+        failures.extend(check_range_motivations(manifest_text, exceptions, deviation['id']))
     manifests = [ROOT / 'Cargo.toml', *sorted((ROOT / 'crates').glob('*/Cargo.toml')),
                  ROOT / 'fuzz/Cargo.toml', ROOT / 'tools/api-inventory/Cargo.toml']
-    failures = []
     for path in manifests:
         failures.extend(f'{path.relative_to(ROOT)}: {error}' for error in check_manifest(
             tomllib.loads(path.read_text()), workspace=path == ROOT / 'Cargo.toml', exceptions=exceptions))
