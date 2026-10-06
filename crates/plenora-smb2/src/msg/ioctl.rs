@@ -3,10 +3,10 @@
 //! The IOCTL request sends a control code to a server, optionally with input
 //! data. The response returns output data from the control operation.
 
+use crate::Error;
 use crate::error::Result;
 use crate::pack::{Pack, ReadCursor, Unpack, WriteCursor};
 use crate::types::FileId;
-use crate::Error;
 
 // ── IOCTL flags ────────────────────────────────────────────────────────
 

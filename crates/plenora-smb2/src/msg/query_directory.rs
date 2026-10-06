@@ -4,11 +4,11 @@
 //! a search pattern (typically `"*"`) and the response contains directory
 //! entries in the requested information class format.
 
+use crate::Error;
 use crate::error::Result;
 use crate::msg::header::Header;
 use crate::pack::{Pack, ReadCursor, Unpack, WriteCursor};
 use crate::types::FileId;
-use crate::Error;
 
 // ── Enums / flags ────────────────────────────────────────────────────────
 

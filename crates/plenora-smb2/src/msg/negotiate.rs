@@ -11,12 +11,12 @@
 //! such as preauthentication integrity, encryption, compression, and
 //! signing algorithms.
 
+use crate::Error;
 use crate::error::Result;
 use crate::msg::header::Header;
 use crate::pack::{Guid, Pack, ReadCursor, Unpack, WriteCursor};
-use crate::types::flags::{Capabilities, SecurityMode};
 use crate::types::Dialect;
-use crate::Error;
+use crate::types::flags::{Capabilities, SecurityMode};
 
 // ── Negotiate context type constants ───────────────────────────────────
 
@@ -229,7 +229,7 @@ fn unpack_negotiate_context(cursor: &mut ReadCursor<'_>) -> Result<NegotiateCont
         NEGOTIATE_CONTEXT_PREAUTH_INTEGRITY => {
             let hash_count = cursor.read_u16_le()? as usize;
             let salt_length = cursor.read_u16_le()? as usize;
-            let mut hash_algorithms = Vec::with_capacity(hash_count);
+            let mut hash_algorithms = Vec::with_capacity(cursor.capacity_for(hash_count, 2)?);
             for _ in 0..hash_count {
                 hash_algorithms.push(cursor.read_u16_le()?);
             }
@@ -241,7 +241,7 @@ fn unpack_negotiate_context(cursor: &mut ReadCursor<'_>) -> Result<NegotiateCont
         }
         NEGOTIATE_CONTEXT_ENCRYPTION => {
             let cipher_count = cursor.read_u16_le()? as usize;
-            let mut ciphers = Vec::with_capacity(cipher_count);
+            let mut ciphers = Vec::with_capacity(cursor.capacity_for(cipher_count, 2)?);
             for _ in 0..cipher_count {
                 ciphers.push(cursor.read_u16_le()?);
             }
@@ -251,7 +251,7 @@ fn unpack_negotiate_context(cursor: &mut ReadCursor<'_>) -> Result<NegotiateCont
             let alg_count = cursor.read_u16_le()? as usize;
             let _padding = cursor.read_u16_le()?;
             let flags = cursor.read_u32_le()?;
-            let mut algorithms = Vec::with_capacity(alg_count);
+            let mut algorithms = Vec::with_capacity(cursor.capacity_for(alg_count, 2)?);
             for _ in 0..alg_count {
                 algorithms.push(cursor.read_u16_le()?);
             }
@@ -259,7 +259,7 @@ fn unpack_negotiate_context(cursor: &mut ReadCursor<'_>) -> Result<NegotiateCont
         }
         NEGOTIATE_CONTEXT_SIGNING => {
             let alg_count = cursor.read_u16_le()? as usize;
-            let mut algorithms = Vec::with_capacity(alg_count);
+            let mut algorithms = Vec::with_capacity(cursor.capacity_for(alg_count, 2)?);
             for _ in 0..alg_count {
                 algorithms.push(cursor.read_u16_le()?);
             }
@@ -277,7 +277,8 @@ fn unpack_negotiate_contexts(
     cursor: &mut ReadCursor<'_>,
     count: usize,
 ) -> Result<Vec<NegotiateContext>> {
-    let mut contexts = Vec::with_capacity(count);
+    // Each context has at least its 8-byte header.
+    let mut contexts = Vec::with_capacity(cursor.capacity_for(count, 8)?);
     for i in 0..count {
         // Each context after the first must be 8-byte aligned.
         if i > 0 {
@@ -342,7 +343,7 @@ impl Pack for NegotiateRequest {
             // NegotiateContextOffset (4) -- will be backpatched
             let ctx_offset_pos = cursor.position();
             cursor.write_u32_le(0); // placeholder
-                                    // NegotiateContextCount (2)
+            // NegotiateContextCount (2)
             cursor.write_u16_le(self.negotiate_contexts.len() as u16);
             // Reserved2 (2)
             cursor.write_u16_le(0);
@@ -409,7 +410,7 @@ impl Unpack for NegotiateRequest {
         let raw_8 = cursor.read_bytes(8)?;
 
         // Dialects array
-        let mut dialects = Vec::with_capacity(dialect_count);
+        let mut dialects = Vec::with_capacity(cursor.capacity_for(dialect_count, 2)?);
         for _ in 0..dialect_count {
             let d = cursor.read_u16_le()?;
             dialects.push(
@@ -634,6 +635,30 @@ impl Unpack for NegotiateResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Asserts the decoder refused the count before reserving for it: the
+    /// error is the count bound, not a later truncation.
+    fn assert_count_refused<T: std::fmt::Debug>(result: Result<T>) {
+        match result {
+            Err(crate::Error::InvalidData { ref message }) if message.contains("element count") => {
+            }
+            other => panic!("expected the element count bound, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn forged_negotiate_counts_are_refused_before_reserving() {
+        // Context list: u16::MAX contexts, no bytes.
+        assert_count_refused(unpack_negotiate_contexts(&mut ReadCursor::new(&[]), 0xFFFF));
+        // A preauth context declaring u16::MAX hash algorithms.
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&NEGOTIATE_CONTEXT_PREAUTH_INTEGRITY.to_le_bytes());
+        bytes.extend_from_slice(&4u16.to_le_bytes());
+        bytes.extend_from_slice(&0u32.to_le_bytes());
+        bytes.extend_from_slice(&u16::MAX.to_le_bytes());
+        bytes.extend_from_slice(&0u16.to_le_bytes());
+        assert_count_refused(unpack_negotiate_contexts(&mut ReadCursor::new(&bytes), 1));
+    }
 
     // ── Helpers ────────────────────────────────────────────────────
 

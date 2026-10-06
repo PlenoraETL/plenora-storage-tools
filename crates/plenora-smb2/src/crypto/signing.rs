@@ -10,8 +10,8 @@
 
 use log::{error, trace};
 
-use crate::types::Dialect;
 use crate::Error;
+use crate::types::Dialect;
 
 /// Offset of the 16-byte Signature field within the SMB2 header.
 const SIGNATURE_OFFSET: usize = 48;
@@ -93,12 +93,7 @@ pub fn sign_message(
     // high-throughput operations (e.g. a recursive directory scan). See AGENTS.md § Logging.
     trace!(
         "signing: signed msg_id={}, algo={:?}, sig={:02x}{:02x}{:02x}{:02x}...",
-        message_id,
-        algorithm,
-        signature[0],
-        signature[1],
-        signature[2],
-        signature[3]
+        message_id, algorithm, signature[0], signature[1], signature[2], signature[3]
     );
     Ok(())
 }
@@ -162,21 +157,23 @@ pub fn verify_signature(
     if received_sig != expected_sig {
         error!(
             "signing: verification failed, msg_id={}, algo={:?}, got={:02x}{:02x}{:02x}{:02x}..., want={:02x}{:02x}{:02x}{:02x}...",
-            message_id, algorithm,
-            received_sig[0], received_sig[1], received_sig[2], received_sig[3],
-            expected_sig[0], expected_sig[1], expected_sig[2], expected_sig[3]
+            message_id,
+            algorithm,
+            received_sig[0],
+            received_sig[1],
+            received_sig[2],
+            received_sig[3],
+            expected_sig[0],
+            expected_sig[1],
+            expected_sig[2],
+            expected_sig[3]
         );
         return Err(Error::invalid_data("signature verification failed"));
     }
 
     trace!(
         "signing: verified msg_id={}, algo={:?}, sig={:02x}{:02x}{:02x}{:02x}...",
-        message_id,
-        algorithm,
-        received_sig[0],
-        received_sig[1],
-        received_sig[2],
-        received_sig[3]
+        message_id, algorithm, received_sig[0], received_sig[1], received_sig[2], received_sig[3]
     );
     Ok(())
 }
@@ -320,7 +317,7 @@ mod tests {
         // Fill some fields so the message isn't all zeros
         msg[12..14].copy_from_slice(&0x0008u16.to_le_bytes()); // Command = Read
         msg[24..32].copy_from_slice(&42u64.to_le_bytes()); // MessageId = 42
-                                                           // Append body
+        // Append body
         msg[64..].copy_from_slice(body_extra);
         msg
     }
@@ -470,10 +467,12 @@ mod tests {
 
         let result = verify_signature(&msg, &key, SigningAlgorithm::HmacSha256, 0, false);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("verification failed"),);
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("verification failed"),
+        );
     }
 
     #[test]

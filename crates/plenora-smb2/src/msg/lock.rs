@@ -3,10 +3,10 @@
 //! The LOCK request locks or unlocks byte ranges within a file.
 //! Multiple ranges can be locked/unlocked in a single request.
 
+use crate::Error;
 use crate::error::Result;
 use crate::pack::{Pack, ReadCursor, Unpack, WriteCursor};
 use crate::types::FileId;
-use crate::Error;
 
 /// Lock flag: shared lock (allows other readers).
 pub const SMB2_LOCKFLAG_SHARED_LOCK: u32 = 0x0000_0001;
@@ -121,7 +121,8 @@ impl Unpack for LockRequest {
         let persistent = cursor.read_u64_le()?;
         let volatile = cursor.read_u64_le()?;
 
-        let mut locks = Vec::with_capacity(lock_count as usize);
+        let mut locks =
+            Vec::with_capacity(cursor.capacity_for(lock_count as usize, LockElement::SIZE)?);
         for _ in 0..lock_count {
             locks.push(LockElement::unpack(cursor)?);
         }
@@ -176,6 +177,25 @@ impl Unpack for LockResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Asserts the decoder refused the count before reserving for it: the
+    /// error is the count bound, not a later truncation.
+    fn assert_count_refused<T: std::fmt::Debug>(result: Result<T>) {
+        match result {
+            Err(crate::Error::InvalidData { ref message }) if message.contains("element count") => {
+            }
+            other => panic!("expected the element count bound, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_forged_lock_count_is_refused_before_reserving() {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&LockRequest::STRUCTURE_SIZE.to_le_bytes());
+        bytes.extend_from_slice(&u16::MAX.to_le_bytes());
+        bytes.extend_from_slice(&[0u8; 4 + 16]);
+        assert_count_refused(LockRequest::unpack(&mut ReadCursor::new(&bytes)));
+    }
 
     // ── LockElement tests ──────────────────────────────────────────
 

@@ -6,14 +6,18 @@
 //!
 //! Two implementations are provided:
 //! - [`TcpTransport`] -- direct TCP connection to an SMB server (port 445)
-//! - [`MockTransport`] -- canned responses for testing
+//! - `MockTransport` -- canned responses for testing; compiled only for this
+//!   crate's tests or with the `testing` feature, so it is not part of the
+//!   production API
 //!
 //! Most users don't need this module directly -- use [`SmbClient`](crate::SmbClient)
 //! which handles transport setup internally.
 
+#[cfg(any(test, feature = "testing"))]
 pub mod mock;
 pub mod tcp;
 
+#[cfg(any(test, feature = "testing"))]
 pub use mock::MockTransport;
 pub use tcp::{ConnectAttempt, ConnectOptions, TcpTransport};
 
@@ -52,7 +56,7 @@ mod tests {
     use super::*;
     use crate::msg::header::Header;
     use crate::msg::negotiate::{
-        NegotiateContext, NegotiateRequest, NegotiateResponse, HASH_ALGORITHM_SHA512,
+        HASH_ALGORITHM_SHA512, NegotiateContext, NegotiateRequest, NegotiateResponse,
     };
     use crate::pack::{Guid, Pack, ReadCursor, Unpack, WriteCursor};
     use crate::types::flags::{Capabilities, SecurityMode};

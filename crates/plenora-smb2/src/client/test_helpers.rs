@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use crate::client::connection::{pack_message, Connection, NegotiatedParams};
+use crate::client::connection::{Connection, NegotiatedParams, pack_message};
 use crate::msg::close::CloseResponse;
 use crate::msg::create::{CreateAction, CreateResponse};
 use crate::msg::header::Header;
@@ -51,7 +51,8 @@ pub(crate) fn setup_connection_without_credits(mock: &Arc<MockTransport>) -> Con
         Box::new(mock.clone()),
         Box::new(mock.clone()),
         "test-server",
-    );
+    )
+    .unwrap();
     conn.set_test_params(NegotiatedParams {
         dialect: Dialect::Smb2_0_2,
         max_read_size: 65536,
@@ -64,7 +65,7 @@ pub(crate) fn setup_connection_without_credits(mock: &Arc<MockTransport>) -> Con
         cipher: None,
         compression_supported: false,
     });
-    conn.set_session_id(SessionId(0x1234));
+    conn.set_session_id(SessionId(0x1234)).unwrap();
     conn
 }
 

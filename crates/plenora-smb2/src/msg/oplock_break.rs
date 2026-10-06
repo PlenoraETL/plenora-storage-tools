@@ -14,10 +14,10 @@
 //! 2.2.24.2, 2.2.25.2) use a different structure with LeaseKey, LeaseState,
 //! etc. Lease break handling is deferred to a future implementation.
 
+use crate::Error;
 use crate::error::Result;
 use crate::pack::{Pack, ReadCursor, Unpack, WriteCursor};
 use crate::types::{FileId, OplockLevel};
-use crate::Error;
 
 // ── OplockBreak (shared struct) ────────────────────────────────────────
 

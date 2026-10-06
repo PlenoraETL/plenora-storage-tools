@@ -302,6 +302,8 @@ pub enum smb2::auth::kerberos::crypto::EncryptionType
 pub smb2::auth::kerberos::crypto::EncryptionType::Aes128CtsHmacSha196 = 17
 pub smb2::auth::kerberos::crypto::EncryptionType::Aes256CtsHmacSha196 = 18
 pub smb2::auth::kerberos::crypto::EncryptionType::Rc4Hmac = 23
+impl smb2::auth::kerberos::crypto::EncryptionType
+pub const fn smb2::auth::kerberos::crypto::EncryptionType::key_len(self) -> usize
 impl core::clone::Clone for smb2::auth::kerberos::crypto::EncryptionType
 pub fn smb2::auth::kerberos::crypto::EncryptionType::clone(&self) -> smb2::auth::kerberos::crypto::EncryptionType
 impl core::cmp::Eq for smb2::auth::kerberos::crypto::EncryptionType
@@ -398,13 +400,13 @@ pub fn smb2::auth::kerberos::crypto::EncryptionType::from(t: T) -> T
 impl<T> core::mem::SizedTypeProperties for smb2::auth::kerberos::crypto::EncryptionType
 impl<T> typenum::type_operators::Same for smb2::auth::kerberos::crypto::EncryptionType
 pub type smb2::auth::kerberos::crypto::EncryptionType::Output = T
-pub fn smb2::auth::kerberos::crypto::compute_checksum(key: &[u8], usage: u32, data: &[u8], etype: smb2::auth::kerberos::crypto::EncryptionType) -> alloc::vec::Vec<u8>
+pub fn smb2::auth::kerberos::crypto::compute_checksum(key: &[u8], usage: u32, data: &[u8], etype: smb2::auth::kerberos::crypto::EncryptionType) -> core::result::Result<alloc::vec::Vec<u8>, smb2::error::Error>
 pub fn smb2::auth::kerberos::crypto::decrypt_aes_cts(key: &[u8], iv: &[u8], ciphertext: &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, smb2::error::Error>
 pub fn smb2::auth::kerberos::crypto::decrypt_rc4_hmac(key: &[u8], usage: u32, ciphertext: &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, smb2::error::Error>
-pub fn smb2::auth::kerberos::crypto::derive_key_aes(base_key: &[u8], usage: &[u8]) -> alloc::vec::Vec<u8>
-pub fn smb2::auth::kerberos::crypto::encrypt_aes_cts(key: &[u8], iv: &[u8], plaintext: &[u8]) -> alloc::vec::Vec<u8>
-pub fn smb2::auth::kerberos::crypto::encrypt_rc4_hmac(key: &[u8], usage: u32, plaintext: &[u8]) -> alloc::vec::Vec<u8>
-pub fn smb2::auth::kerberos::crypto::string_to_key_aes(password: &str, salt: &str, key_size: usize) -> alloc::vec::Vec<u8>
+pub fn smb2::auth::kerberos::crypto::derive_key_aes(base_key: &[u8], usage: &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, smb2::error::Error>
+pub fn smb2::auth::kerberos::crypto::encrypt_aes_cts(key: &[u8], iv: &[u8], plaintext: &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, smb2::error::Error>
+pub fn smb2::auth::kerberos::crypto::encrypt_rc4_hmac(key: &[u8], usage: u32, plaintext: &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, smb2::error::Error>
+pub fn smb2::auth::kerberos::crypto::string_to_key_aes(password: &str, salt: &str, key_size: usize) -> core::result::Result<alloc::vec::Vec<u8>, smb2::error::Error>
 pub fn smb2::auth::kerberos::crypto::string_to_key_rc4(password: &str) -> alloc::vec::Vec<u8>
 pub fn smb2::auth::kerberos::crypto::usage_chk(usage: u32) -> [u8; 5]
 pub fn smb2::auth::kerberos::crypto::usage_enc(usage: u32) -> [u8; 5]
@@ -2604,8 +2606,8 @@ impl<T> typenum::type_operators::Same for smb2::client::connection::CompoundOp<'
 pub type smb2::client::connection::CompoundOp<'a>::Output = T
 pub struct smb2::client::connection::Connection
 impl smb2::client::connection::Connection
-pub fn smb2::client::connection::Connection::activate_encryption(&mut self, enc_key: alloc::vec::Vec<u8>, dec_key: alloc::vec::Vec<u8>, cipher: smb2::crypto::encryption::Cipher)
-pub fn smb2::client::connection::Connection::activate_signing(&mut self, key: alloc::vec::Vec<u8>, algorithm: smb2::crypto::signing::SigningAlgorithm)
+pub fn smb2::client::connection::Connection::activate_encryption(&mut self, enc_key: alloc::vec::Vec<u8>, dec_key: alloc::vec::Vec<u8>, cipher: smb2::crypto::encryption::Cipher) -> smb2::error::Result<()>
+pub fn smb2::client::connection::Connection::activate_signing(&mut self, key: alloc::vec::Vec<u8>, algorithm: smb2::crypto::signing::SigningAlgorithm) -> smb2::error::Result<()>
 pub fn smb2::client::connection::Connection::adopt_session(&self, session: &smb2::client::session::Session)
 pub fn smb2::client::connection::Connection::can_reconnect(&self) -> bool
 pub fn smb2::client::connection::Connection::compression_enabled(&self) -> bool
@@ -2614,13 +2616,13 @@ pub async fn smb2::client::connection::Connection::connect_with(addr: &str, opts
 pub fn smb2::client::connection::Connection::credit_capacity_for(&self, bytes: u64) -> usize
 pub fn smb2::client::connection::Connection::credits(&self) -> u16
 pub fn smb2::client::connection::Connection::current_session(&self) -> core::option::Option<alloc::sync::Arc<smb2::client::session::Session>>
-pub fn smb2::client::connection::Connection::deregister_dfs_tree(&mut self, tree_id: smb2::types::TreeId)
-pub fn smb2::client::connection::Connection::diagnostics(&self) -> smb2::client::diagnostics::ConnectionDiagnostics
+pub fn smb2::client::connection::Connection::deregister_dfs_tree(&mut self, tree_id: smb2::types::TreeId) -> smb2::error::Result<()>
+pub fn smb2::client::connection::Connection::diagnostics(&self) -> smb2::error::Result<smb2::client::diagnostics::ConnectionDiagnostics>
 pub fn smb2::client::connection::Connection::estimated_rtt(&self) -> core::option::Option<core::time::Duration>
 pub async fn smb2::client::connection::Connection::execute(&self, command: smb2::types::Command, body: &dyn smb2::pack::Pack, tree_id: core::option::Option<smb2::types::TreeId>) -> smb2::error::Result<smb2::client::connection::Frame>
 pub async fn smb2::client::connection::Connection::execute_compound(&self, ops: &[smb2::client::connection::CompoundOp<'_>]) -> smb2::error::Result<alloc::vec::Vec<smb2::error::Result<smb2::client::connection::Frame>>>
 pub async fn smb2::client::connection::Connection::execute_with_credits(&self, command: smb2::types::Command, body: &dyn smb2::pack::Pack, tree_id: core::option::Option<smb2::types::TreeId>, credit_charge: smb2::types::CreditCharge) -> smb2::error::Result<smb2::client::connection::Frame>
-pub fn smb2::client::connection::Connection::from_transport(sender: alloc::boxed::Box<dyn smb2::transport::TransportSend>, receiver: alloc::boxed::Box<dyn smb2::transport::TransportReceive>, server_name: impl core::convert::Into<alloc::string::String>) -> Self
+pub fn smb2::client::connection::Connection::from_transport(sender: alloc::boxed::Box<dyn smb2::transport::TransportSend>, receiver: alloc::boxed::Box<dyn smb2::transport::TransportReceive>, server_name: impl core::convert::Into<alloc::string::String>) -> smb2::error::Result<Self>
 pub fn smb2::client::connection::Connection::generation(&self) -> u64
 pub fn smb2::client::connection::Connection::is_disconnected(&self) -> bool
 pub fn smb2::client::connection::Connection::long_poll_refresh(&self) -> core::option::Option<core::time::Duration>
@@ -2628,17 +2630,17 @@ pub fn smb2::client::connection::Connection::mark_dead(&self)
 pub async fn smb2::client::connection::Connection::negotiate(&mut self) -> smb2::error::Result<()>
 pub fn smb2::client::connection::Connection::next_message_id(&self) -> u64
 pub fn smb2::client::connection::Connection::on_reconnect(&self, observer: core::option::Option<smb2::client::connection::ReconnectObserver>)
-pub fn smb2::client::connection::Connection::outstanding_requests(&self) -> alloc::vec::Vec<smb2::client::diagnostics::OutstandingRequest>
+pub fn smb2::client::connection::Connection::outstanding_requests(&self) -> smb2::error::Result<alloc::vec::Vec<smb2::client::diagnostics::OutstandingRequest>>
 pub fn smb2::client::connection::Connection::params(&self) -> core::option::Option<smb2::client::connection::NegotiatedParams>
-pub fn smb2::client::connection::Connection::preauth_hasher(&self) -> smb2::crypto::kdf::PreauthHasher
+pub fn smb2::client::connection::Connection::preauth_hasher(&self) -> smb2::error::Result<smb2::crypto::kdf::PreauthHasher>
 pub fn smb2::client::connection::Connection::previous_session_id(&self) -> smb2::types::SessionId
 pub async fn smb2::client::connection::Connection::reconnect_if_needed(&self) -> smb2::error::Result<()>
 pub fn smb2::client::connection::Connection::reconnect_policy(&self) -> smb2::client::connection::ReconnectPolicy
-pub fn smb2::client::connection::Connection::register_dfs_tree(&mut self, tree_id: smb2::types::TreeId)
+pub fn smb2::client::connection::Connection::register_dfs_tree(&mut self, tree_id: smb2::types::TreeId) -> smb2::error::Result<()>
 pub async fn smb2::client::connection::Connection::send_cancel(&self, original_msg_id: smb2::types::MessageId, async_id: core::option::Option<u64>, generation: u64) -> smb2::error::Result<()>
 pub fn smb2::client::connection::Connection::send_queue_depth(&self) -> usize
 pub fn smb2::client::connection::Connection::server_name(&self) -> &str
-pub fn smb2::client::connection::Connection::session_id(&self) -> smb2::types::SessionId
+pub fn smb2::client::connection::Connection::session_id(&self) -> smb2::error::Result<smb2::types::SessionId>
 pub fn smb2::client::connection::Connection::set_compression_requested(&mut self, requested: bool)
 pub fn smb2::client::connection::Connection::set_credit_wait_timeout(&self, after: core::time::Duration)
 pub fn smb2::client::connection::Connection::set_keepalive(&self, after: core::option::Option<core::time::Duration>)
@@ -2647,11 +2649,11 @@ pub fn smb2::client::connection::Connection::set_reconnect_policy(&self, policy:
 pub fn smb2::client::connection::Connection::set_response_timeout(&self, after: core::option::Option<core::time::Duration>)
 pub fn smb2::client::connection::Connection::set_reviver(&self, reviver: core::option::Option<alloc::sync::Arc<dyn smb2::client::connection::SessionReviver>>)
 pub fn smb2::client::connection::Connection::set_send_timeout(&self, after: core::option::Option<core::time::Duration>)
-pub fn smb2::client::connection::Connection::set_session_id(&mut self, id: smb2::types::SessionId)
+pub fn smb2::client::connection::Connection::set_session_id(&mut self, id: smb2::types::SessionId) -> smb2::error::Result<()>
 pub fn smb2::client::connection::Connection::set_stale_request_warning(&self, after: core::option::Option<core::time::Duration>)
 pub fn smb2::client::connection::Connection::set_write_budget(&self, bytes: u64)
-pub fn smb2::client::connection::Connection::should_encrypt(&self) -> bool
-pub fn smb2::client::connection::Connection::with_preauth_hasher_mut<R>(&self, f: impl core::ops::function::FnOnce(&mut smb2::crypto::kdf::PreauthHasher) -> R) -> R
+pub fn smb2::client::connection::Connection::should_encrypt(&self) -> smb2::error::Result<bool>
+pub fn smb2::client::connection::Connection::with_preauth_hasher_mut<R>(&self, f: impl core::ops::function::FnOnce(&mut smb2::crypto::kdf::PreauthHasher) -> R) -> smb2::error::Result<R>
 pub fn smb2::client::connection::Connection::write_budget(&self) -> u64
 impl core::clone::Clone for smb2::client::connection::Connection
 pub fn smb2::client::connection::Connection::clone(&self) -> smb2::client::connection::Connection
@@ -5523,8 +5525,8 @@ pub mod smb2::client::stream
 pub struct smb2::client::stream::FileDownload<'a>
 impl<'a> smb2::client::stream::FileDownload<'a>
 pub fn smb2::client::stream::FileDownload<'a>::bytes_received(&self) -> u64
-pub async fn smb2::client::stream::FileDownload<'a>::collect(self) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::stream::FileDownload<'a>::collect_with_progress<F>(self, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
+pub async fn smb2::client::stream::FileDownload<'a>::collect(self, max_bytes: u64) -> smb2::error::Result<alloc::vec::Vec<u8>>
+pub async fn smb2::client::stream::FileDownload<'a>::collect_with_progress<F>(self, max_bytes: u64, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
 pub fn smb2::client::stream::FileDownload<'a>::new(tree: &'a smb2::client::tree::Tree, conn: &'a mut smb2::client::connection::Connection, file_id: smb2::types::FileId, file_size: u64, chunk_size: u32) -> Self
 pub async fn smb2::client::stream::FileDownload<'a>::next_chunk(&mut self) -> core::option::Option<smb2::error::Result<alloc::vec::Vec<u8>>>
 pub fn smb2::client::stream::FileDownload<'a>::progress(&self) -> smb2::client::stream::Progress
@@ -6576,8 +6578,8 @@ pub async fn smb2::client::tree::Tree::open_file_readwrite(&self, conn: &mut smb
 pub async fn smb2::client::tree::Tree::read_file(&self, conn: &mut smb2::client::connection::Connection, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
 pub async fn smb2::client::tree::Tree::read_file_compound(&self, conn: &mut smb2::client::connection::Connection, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
 pub async fn smb2::client::tree::Tree::read_file_compound_sized(&self, conn: &mut smb2::client::connection::Connection, path: &str, expected_size: u64) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::tree::Tree::read_file_pipelined(&self, conn: &mut smb2::client::connection::Connection, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::tree::Tree::read_file_pipelined_with_progress<F>(&self, conn: &mut smb2::client::connection::Connection, path: &str, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
+pub async fn smb2::client::tree::Tree::read_file_pipelined(&self, conn: &mut smb2::client::connection::Connection, path: &str, max_bytes: u64) -> smb2::error::Result<alloc::vec::Vec<u8>>
+pub async fn smb2::client::tree::Tree::read_file_pipelined_with_progress<F>(&self, conn: &mut smb2::client::connection::Connection, path: &str, max_bytes: u64, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
 pub async fn smb2::client::tree::Tree::rename(&self, conn: &mut smb2::client::connection::Connection, from: &str, to: &str) -> smb2::error::Result<()>
 pub async fn smb2::client::tree::Tree::rename_files(&self, conn: &mut smb2::client::connection::Connection, renames: &[(&str, &str)]) -> alloc::vec::Vec<smb2::error::Result<()>>
 pub async fn smb2::client::tree::Tree::stat(&self, conn: &mut smb2::client::connection::Connection, path: &str) -> smb2::error::Result<smb2::client::tree::FileInfo>
@@ -7961,8 +7963,8 @@ impl<T> typenum::type_operators::Same for smb2::client::diagnostics::Compression
 pub type smb2::client::diagnostics::CompressionInfo::Output = T
 pub struct smb2::client::Connection
 impl smb2::client::connection::Connection
-pub fn smb2::client::connection::Connection::activate_encryption(&mut self, enc_key: alloc::vec::Vec<u8>, dec_key: alloc::vec::Vec<u8>, cipher: smb2::crypto::encryption::Cipher)
-pub fn smb2::client::connection::Connection::activate_signing(&mut self, key: alloc::vec::Vec<u8>, algorithm: smb2::crypto::signing::SigningAlgorithm)
+pub fn smb2::client::connection::Connection::activate_encryption(&mut self, enc_key: alloc::vec::Vec<u8>, dec_key: alloc::vec::Vec<u8>, cipher: smb2::crypto::encryption::Cipher) -> smb2::error::Result<()>
+pub fn smb2::client::connection::Connection::activate_signing(&mut self, key: alloc::vec::Vec<u8>, algorithm: smb2::crypto::signing::SigningAlgorithm) -> smb2::error::Result<()>
 pub fn smb2::client::connection::Connection::adopt_session(&self, session: &smb2::client::session::Session)
 pub fn smb2::client::connection::Connection::can_reconnect(&self) -> bool
 pub fn smb2::client::connection::Connection::compression_enabled(&self) -> bool
@@ -7971,13 +7973,13 @@ pub async fn smb2::client::connection::Connection::connect_with(addr: &str, opts
 pub fn smb2::client::connection::Connection::credit_capacity_for(&self, bytes: u64) -> usize
 pub fn smb2::client::connection::Connection::credits(&self) -> u16
 pub fn smb2::client::connection::Connection::current_session(&self) -> core::option::Option<alloc::sync::Arc<smb2::client::session::Session>>
-pub fn smb2::client::connection::Connection::deregister_dfs_tree(&mut self, tree_id: smb2::types::TreeId)
-pub fn smb2::client::connection::Connection::diagnostics(&self) -> smb2::client::diagnostics::ConnectionDiagnostics
+pub fn smb2::client::connection::Connection::deregister_dfs_tree(&mut self, tree_id: smb2::types::TreeId) -> smb2::error::Result<()>
+pub fn smb2::client::connection::Connection::diagnostics(&self) -> smb2::error::Result<smb2::client::diagnostics::ConnectionDiagnostics>
 pub fn smb2::client::connection::Connection::estimated_rtt(&self) -> core::option::Option<core::time::Duration>
 pub async fn smb2::client::connection::Connection::execute(&self, command: smb2::types::Command, body: &dyn smb2::pack::Pack, tree_id: core::option::Option<smb2::types::TreeId>) -> smb2::error::Result<smb2::client::connection::Frame>
 pub async fn smb2::client::connection::Connection::execute_compound(&self, ops: &[smb2::client::connection::CompoundOp<'_>]) -> smb2::error::Result<alloc::vec::Vec<smb2::error::Result<smb2::client::connection::Frame>>>
 pub async fn smb2::client::connection::Connection::execute_with_credits(&self, command: smb2::types::Command, body: &dyn smb2::pack::Pack, tree_id: core::option::Option<smb2::types::TreeId>, credit_charge: smb2::types::CreditCharge) -> smb2::error::Result<smb2::client::connection::Frame>
-pub fn smb2::client::connection::Connection::from_transport(sender: alloc::boxed::Box<dyn smb2::transport::TransportSend>, receiver: alloc::boxed::Box<dyn smb2::transport::TransportReceive>, server_name: impl core::convert::Into<alloc::string::String>) -> Self
+pub fn smb2::client::connection::Connection::from_transport(sender: alloc::boxed::Box<dyn smb2::transport::TransportSend>, receiver: alloc::boxed::Box<dyn smb2::transport::TransportReceive>, server_name: impl core::convert::Into<alloc::string::String>) -> smb2::error::Result<Self>
 pub fn smb2::client::connection::Connection::generation(&self) -> u64
 pub fn smb2::client::connection::Connection::is_disconnected(&self) -> bool
 pub fn smb2::client::connection::Connection::long_poll_refresh(&self) -> core::option::Option<core::time::Duration>
@@ -7985,17 +7987,17 @@ pub fn smb2::client::connection::Connection::mark_dead(&self)
 pub async fn smb2::client::connection::Connection::negotiate(&mut self) -> smb2::error::Result<()>
 pub fn smb2::client::connection::Connection::next_message_id(&self) -> u64
 pub fn smb2::client::connection::Connection::on_reconnect(&self, observer: core::option::Option<smb2::client::connection::ReconnectObserver>)
-pub fn smb2::client::connection::Connection::outstanding_requests(&self) -> alloc::vec::Vec<smb2::client::diagnostics::OutstandingRequest>
+pub fn smb2::client::connection::Connection::outstanding_requests(&self) -> smb2::error::Result<alloc::vec::Vec<smb2::client::diagnostics::OutstandingRequest>>
 pub fn smb2::client::connection::Connection::params(&self) -> core::option::Option<smb2::client::connection::NegotiatedParams>
-pub fn smb2::client::connection::Connection::preauth_hasher(&self) -> smb2::crypto::kdf::PreauthHasher
+pub fn smb2::client::connection::Connection::preauth_hasher(&self) -> smb2::error::Result<smb2::crypto::kdf::PreauthHasher>
 pub fn smb2::client::connection::Connection::previous_session_id(&self) -> smb2::types::SessionId
 pub async fn smb2::client::connection::Connection::reconnect_if_needed(&self) -> smb2::error::Result<()>
 pub fn smb2::client::connection::Connection::reconnect_policy(&self) -> smb2::client::connection::ReconnectPolicy
-pub fn smb2::client::connection::Connection::register_dfs_tree(&mut self, tree_id: smb2::types::TreeId)
+pub fn smb2::client::connection::Connection::register_dfs_tree(&mut self, tree_id: smb2::types::TreeId) -> smb2::error::Result<()>
 pub async fn smb2::client::connection::Connection::send_cancel(&self, original_msg_id: smb2::types::MessageId, async_id: core::option::Option<u64>, generation: u64) -> smb2::error::Result<()>
 pub fn smb2::client::connection::Connection::send_queue_depth(&self) -> usize
 pub fn smb2::client::connection::Connection::server_name(&self) -> &str
-pub fn smb2::client::connection::Connection::session_id(&self) -> smb2::types::SessionId
+pub fn smb2::client::connection::Connection::session_id(&self) -> smb2::error::Result<smb2::types::SessionId>
 pub fn smb2::client::connection::Connection::set_compression_requested(&mut self, requested: bool)
 pub fn smb2::client::connection::Connection::set_credit_wait_timeout(&self, after: core::time::Duration)
 pub fn smb2::client::connection::Connection::set_keepalive(&self, after: core::option::Option<core::time::Duration>)
@@ -8004,11 +8006,11 @@ pub fn smb2::client::connection::Connection::set_reconnect_policy(&self, policy:
 pub fn smb2::client::connection::Connection::set_response_timeout(&self, after: core::option::Option<core::time::Duration>)
 pub fn smb2::client::connection::Connection::set_reviver(&self, reviver: core::option::Option<alloc::sync::Arc<dyn smb2::client::connection::SessionReviver>>)
 pub fn smb2::client::connection::Connection::set_send_timeout(&self, after: core::option::Option<core::time::Duration>)
-pub fn smb2::client::connection::Connection::set_session_id(&mut self, id: smb2::types::SessionId)
+pub fn smb2::client::connection::Connection::set_session_id(&mut self, id: smb2::types::SessionId) -> smb2::error::Result<()>
 pub fn smb2::client::connection::Connection::set_stale_request_warning(&self, after: core::option::Option<core::time::Duration>)
 pub fn smb2::client::connection::Connection::set_write_budget(&self, bytes: u64)
-pub fn smb2::client::connection::Connection::should_encrypt(&self) -> bool
-pub fn smb2::client::connection::Connection::with_preauth_hasher_mut<R>(&self, f: impl core::ops::function::FnOnce(&mut smb2::crypto::kdf::PreauthHasher) -> R) -> R
+pub fn smb2::client::connection::Connection::should_encrypt(&self) -> smb2::error::Result<bool>
+pub fn smb2::client::connection::Connection::with_preauth_hasher_mut<R>(&self, f: impl core::ops::function::FnOnce(&mut smb2::crypto::kdf::PreauthHasher) -> R) -> smb2::error::Result<R>
 pub fn smb2::client::connection::Connection::write_budget(&self) -> u64
 impl core::clone::Clone for smb2::client::connection::Connection
 pub fn smb2::client::connection::Connection::clone(&self) -> smb2::client::connection::Connection
@@ -8986,8 +8988,8 @@ pub type smb2::client::diagnostics::EncryptionInfo::Output = T
 pub struct smb2::client::FileDownload<'a>
 impl<'a> smb2::client::stream::FileDownload<'a>
 pub fn smb2::client::stream::FileDownload<'a>::bytes_received(&self) -> u64
-pub async fn smb2::client::stream::FileDownload<'a>::collect(self) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::stream::FileDownload<'a>::collect_with_progress<F>(self, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
+pub async fn smb2::client::stream::FileDownload<'a>::collect(self, max_bytes: u64) -> smb2::error::Result<alloc::vec::Vec<u8>>
+pub async fn smb2::client::stream::FileDownload<'a>::collect_with_progress<F>(self, max_bytes: u64, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
 pub fn smb2::client::stream::FileDownload<'a>::new(tree: &'a smb2::client::tree::Tree, conn: &'a mut smb2::client::connection::Connection, file_id: smb2::types::FileId, file_size: u64, chunk_size: u32) -> Self
 pub async fn smb2::client::stream::FileDownload<'a>::next_chunk(&mut self) -> core::option::Option<smb2::error::Result<alloc::vec::Vec<u8>>>
 pub fn smb2::client::stream::FileDownload<'a>::progress(&self) -> smb2::client::stream::Progress
@@ -10719,7 +10721,7 @@ pub fn smb2::client::SmbClient::credits(&self) -> u16
 pub async fn smb2::client::SmbClient::delete_directory(&mut self, tree: &mut smb2::client::tree::Tree, path: &str) -> smb2::error::Result<()>
 pub async fn smb2::client::SmbClient::delete_file(&mut self, tree: &mut smb2::client::tree::Tree, path: &str) -> smb2::error::Result<()>
 pub async fn smb2::client::SmbClient::delete_files(&mut self, tree: &mut smb2::client::tree::Tree, paths: &[&str]) -> alloc::vec::Vec<smb2::error::Result<()>>
-pub fn smb2::client::SmbClient::diagnostics(&self) -> smb2::client::diagnostics::Diagnostics
+pub fn smb2::client::SmbClient::diagnostics(&self) -> smb2::error::Result<smb2::client::diagnostics::Diagnostics>
 pub async fn smb2::client::SmbClient::disconnect_share(&mut self, tree: &smb2::client::tree::Tree) -> smb2::error::Result<()>
 pub async fn smb2::client::SmbClient::download<'a>(&'a mut self, tree: &'a smb2::client::tree::Tree, path: &str) -> smb2::error::Result<smb2::client::stream::FileDownload<'a>>
 pub fn smb2::client::SmbClient::estimated_rtt(&self) -> core::option::Option<core::time::Duration>
@@ -10733,8 +10735,8 @@ pub async fn smb2::client::SmbClient::open_file_reader(&self, tree: &smb2::clien
 pub fn smb2::client::SmbClient::params(&self) -> core::option::Option<smb2::client::connection::NegotiatedParams>
 pub async fn smb2::client::SmbClient::read_file(&mut self, tree: &mut smb2::client::tree::Tree, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
 pub async fn smb2::client::SmbClient::read_file_compound(&mut self, tree: &mut smb2::client::tree::Tree, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::SmbClient::read_file_pipelined(&mut self, tree: &mut smb2::client::tree::Tree, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::SmbClient::read_file_with_progress<F>(&mut self, tree: &mut smb2::client::tree::Tree, path: &str, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
+pub async fn smb2::client::SmbClient::read_file_pipelined(&mut self, tree: &mut smb2::client::tree::Tree, path: &str, max_bytes: u64) -> smb2::error::Result<alloc::vec::Vec<u8>>
+pub async fn smb2::client::SmbClient::read_file_with_progress<F>(&mut self, tree: &mut smb2::client::tree::Tree, path: &str, max_bytes: u64, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
 pub async fn smb2::client::SmbClient::reconnect(&mut self) -> smb2::error::Result<()>
 pub async fn smb2::client::SmbClient::rename(&mut self, tree: &mut smb2::client::tree::Tree, from: &str, to: &str) -> smb2::error::Result<()>
 pub async fn smb2::client::SmbClient::rename_files(&mut self, tree: &mut smb2::client::tree::Tree, renames: &[(&str, &str)]) -> alloc::vec::Vec<smb2::error::Result<()>>
@@ -10859,8 +10861,8 @@ pub async fn smb2::client::tree::Tree::open_file_readwrite(&self, conn: &mut smb
 pub async fn smb2::client::tree::Tree::read_file(&self, conn: &mut smb2::client::connection::Connection, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
 pub async fn smb2::client::tree::Tree::read_file_compound(&self, conn: &mut smb2::client::connection::Connection, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
 pub async fn smb2::client::tree::Tree::read_file_compound_sized(&self, conn: &mut smb2::client::connection::Connection, path: &str, expected_size: u64) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::tree::Tree::read_file_pipelined(&self, conn: &mut smb2::client::connection::Connection, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::tree::Tree::read_file_pipelined_with_progress<F>(&self, conn: &mut smb2::client::connection::Connection, path: &str, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
+pub async fn smb2::client::tree::Tree::read_file_pipelined(&self, conn: &mut smb2::client::connection::Connection, path: &str, max_bytes: u64) -> smb2::error::Result<alloc::vec::Vec<u8>>
+pub async fn smb2::client::tree::Tree::read_file_pipelined_with_progress<F>(&self, conn: &mut smb2::client::connection::Connection, path: &str, max_bytes: u64, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
 pub async fn smb2::client::tree::Tree::rename(&self, conn: &mut smb2::client::connection::Connection, from: &str, to: &str) -> smb2::error::Result<()>
 pub async fn smb2::client::tree::Tree::rename_files(&self, conn: &mut smb2::client::connection::Connection, renames: &[(&str, &str)]) -> alloc::vec::Vec<smb2::error::Result<()>>
 pub async fn smb2::client::tree::Tree::stat(&self, conn: &mut smb2::client::connection::Connection, path: &str) -> smb2::error::Result<smb2::client::tree::FileInfo>
@@ -11266,7 +11268,7 @@ pub type smb2::crypto::encryption::Cipher::Output = T
 pub struct smb2::crypto::encryption::NonceGenerator
 impl smb2::crypto::encryption::NonceGenerator
 pub fn smb2::crypto::encryption::NonceGenerator::new() -> Self
-pub fn smb2::crypto::encryption::NonceGenerator::next(&mut self, _cipher: smb2::crypto::encryption::Cipher) -> [u8; 16]
+pub fn smb2::crypto::encryption::NonceGenerator::next(&mut self, _cipher: smb2::crypto::encryption::Cipher) -> core::result::Result<[u8; 16], smb2::error::Error>
 impl core::default::Default for smb2::crypto::encryption::NonceGenerator
 pub fn smb2::crypto::encryption::NonceGenerator::default() -> Self
 impl core::marker::Freeze for smb2::crypto::encryption::NonceGenerator
@@ -11538,8 +11540,8 @@ pub fn smb2::crypto::kdf::PreauthHasher::from(t: T) -> T
 impl<T> core::mem::SizedTypeProperties for smb2::crypto::kdf::PreauthHasher
 impl<T> typenum::type_operators::Same for smb2::crypto::kdf::PreauthHasher
 pub type smb2::crypto::kdf::PreauthHasher::Output = T
-pub fn smb2::crypto::kdf::derive_session_keys(session_key: &[u8], dialect: smb2::types::Dialect, preauth_hash: core::option::Option<&[u8; 64]>, key_length_bits: u32) -> smb2::crypto::kdf::DerivedKeys
-pub fn smb2::crypto::kdf::sp800_108_kdf(key: &[u8], label: &[u8], context: &[u8], key_length_bits: u32) -> alloc::vec::Vec<u8>
+pub fn smb2::crypto::kdf::derive_session_keys(session_key: &[u8], dialect: smb2::types::Dialect, preauth_hash: core::option::Option<&[u8; 64]>, key_length_bits: u32) -> core::result::Result<smb2::crypto::kdf::DerivedKeys, smb2::error::Error>
+pub fn smb2::crypto::kdf::sp800_108_kdf(key: &[u8], label: &[u8], context: &[u8], key_length_bits: u32) -> core::result::Result<alloc::vec::Vec<u8>, smb2::error::Error>
 pub mod smb2::crypto::signing
 pub enum smb2::crypto::signing::SigningAlgorithm
 pub smb2::crypto::signing::SigningAlgorithm::AesCmac
@@ -11763,6 +11765,9 @@ pub smb2::error::Error::CreditStarvation
 pub smb2::error::Error::CreditStarvation::available: u16
 pub smb2::error::Error::CreditStarvation::needed: u16
 pub smb2::error::Error::CreditStarvation::waited: core::time::Duration
+pub smb2::error::Error::DeclaredSizeOverLimit
+pub smb2::error::Error::DeclaredSizeOverLimit::limit: u64
+pub smb2::error::Error::DeclaredSizeOverLimit::size: u64
 pub smb2::error::Error::DfsNoReachableTarget
 pub smb2::error::Error::DfsNoReachableTarget::namespace: alloc::string::String
 pub smb2::error::Error::DfsNoReachableTarget::source: alloc::boxed::Box<smb2::error::Error>
@@ -11779,6 +11784,8 @@ pub smb2::error::Error::DurableHandleLost::reason: smb2::error::DurableLoss
 pub smb2::error::Error::FileTooLargeForSingleRead
 pub smb2::error::Error::FileTooLargeForSingleRead::requested: u32
 pub smb2::error::Error::FileTooLargeForSingleRead::size: u64
+pub smb2::error::Error::Internal
+pub smb2::error::Error::Internal::what: &'static str
 pub smb2::error::Error::InvalidData
 pub smb2::error::Error::InvalidData::message: alloc::string::String
 pub smb2::error::Error::Io(std::io::error::Error)
@@ -11907,6 +11914,7 @@ pub smb2::error::ErrorKind::Cancelled
 pub smb2::error::ErrorKind::ConnectionLost
 pub smb2::error::ErrorKind::DfsReferral
 pub smb2::error::ErrorKind::DiskFull
+pub smb2::error::ErrorKind::Internal
 pub smb2::error::ErrorKind::InvalidData
 pub smb2::error::ErrorKind::InvalidName
 pub smb2::error::ErrorKind::Io
@@ -12026,10 +12034,14 @@ pub fn smb2::fuzzing::fuzz_dfs_referral_response_parse(data: &[u8])
 pub fn smb2::fuzzing::fuzz_error_context_walk(data: &[u8])
 pub fn smb2::fuzzing::fuzz_frame_parse(data: &[u8])
 pub fn smb2::fuzzing::fuzz_header_parse(data: &[u8])
+pub fn smb2::fuzzing::fuzz_kerberos_messages(data: &[u8])
 pub fn smb2::fuzzing::fuzz_name_round_trip(data: &[u8])
 pub fn smb2::fuzzing::fuzz_negotiate_request_parse(data: &[u8])
 pub fn smb2::fuzzing::fuzz_negotiate_response_parse(data: &[u8])
+pub fn smb2::fuzzing::fuzz_ntlm_challenge(data: &[u8])
 pub fn smb2::fuzzing::fuzz_query_info_response_parse(data: &[u8])
+pub fn smb2::fuzzing::fuzz_smb2_messages(data: &[u8])
+pub fn smb2::fuzzing::fuzz_spnego_der(data: &[u8])
 pub fn smb2::fuzzing::fuzz_sub_frame_parse(data: &[u8])
 pub fn smb2::fuzzing::fuzz_transform_header_parse(data: &[u8])
 pub mod smb2::msg
@@ -23404,6 +23416,9 @@ pub smb2::Error::CreditStarvation
 pub smb2::Error::CreditStarvation::available: u16
 pub smb2::Error::CreditStarvation::needed: u16
 pub smb2::Error::CreditStarvation::waited: core::time::Duration
+pub smb2::Error::DeclaredSizeOverLimit
+pub smb2::Error::DeclaredSizeOverLimit::limit: u64
+pub smb2::Error::DeclaredSizeOverLimit::size: u64
 pub smb2::Error::DfsNoReachableTarget
 pub smb2::Error::DfsNoReachableTarget::namespace: alloc::string::String
 pub smb2::Error::DfsNoReachableTarget::source: alloc::boxed::Box<smb2::error::Error>
@@ -23420,6 +23435,8 @@ pub smb2::Error::DurableHandleLost::reason: smb2::error::DurableLoss
 pub smb2::Error::FileTooLargeForSingleRead
 pub smb2::Error::FileTooLargeForSingleRead::requested: u32
 pub smb2::Error::FileTooLargeForSingleRead::size: u64
+pub smb2::Error::Internal
+pub smb2::Error::Internal::what: &'static str
 pub smb2::Error::InvalidData
 pub smb2::Error::InvalidData::message: alloc::string::String
 pub smb2::Error::Io(std::io::error::Error)
@@ -23548,6 +23565,7 @@ pub smb2::ErrorKind::Cancelled
 pub smb2::ErrorKind::ConnectionLost
 pub smb2::ErrorKind::DfsReferral
 pub smb2::ErrorKind::DiskFull
+pub smb2::ErrorKind::Internal
 pub smb2::ErrorKind::InvalidData
 pub smb2::ErrorKind::InvalidName
 pub smb2::ErrorKind::Io
@@ -25439,8 +25457,8 @@ pub type smb2::client::diagnostics::EncryptionInfo::Output = T
 pub struct smb2::FileDownload<'a>
 impl<'a> smb2::client::stream::FileDownload<'a>
 pub fn smb2::client::stream::FileDownload<'a>::bytes_received(&self) -> u64
-pub async fn smb2::client::stream::FileDownload<'a>::collect(self) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::stream::FileDownload<'a>::collect_with_progress<F>(self, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
+pub async fn smb2::client::stream::FileDownload<'a>::collect(self, max_bytes: u64) -> smb2::error::Result<alloc::vec::Vec<u8>>
+pub async fn smb2::client::stream::FileDownload<'a>::collect_with_progress<F>(self, max_bytes: u64, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
 pub fn smb2::client::stream::FileDownload<'a>::new(tree: &'a smb2::client::tree::Tree, conn: &'a mut smb2::client::connection::Connection, file_id: smb2::types::FileId, file_size: u64, chunk_size: u32) -> Self
 pub async fn smb2::client::stream::FileDownload<'a>::next_chunk(&mut self) -> core::option::Option<smb2::error::Result<alloc::vec::Vec<u8>>>
 pub fn smb2::client::stream::FileDownload<'a>::progress(&self) -> smb2::client::stream::Progress
@@ -27739,7 +27757,7 @@ pub fn smb2::client::SmbClient::credits(&self) -> u16
 pub async fn smb2::client::SmbClient::delete_directory(&mut self, tree: &mut smb2::client::tree::Tree, path: &str) -> smb2::error::Result<()>
 pub async fn smb2::client::SmbClient::delete_file(&mut self, tree: &mut smb2::client::tree::Tree, path: &str) -> smb2::error::Result<()>
 pub async fn smb2::client::SmbClient::delete_files(&mut self, tree: &mut smb2::client::tree::Tree, paths: &[&str]) -> alloc::vec::Vec<smb2::error::Result<()>>
-pub fn smb2::client::SmbClient::diagnostics(&self) -> smb2::client::diagnostics::Diagnostics
+pub fn smb2::client::SmbClient::diagnostics(&self) -> smb2::error::Result<smb2::client::diagnostics::Diagnostics>
 pub async fn smb2::client::SmbClient::disconnect_share(&mut self, tree: &smb2::client::tree::Tree) -> smb2::error::Result<()>
 pub async fn smb2::client::SmbClient::download<'a>(&'a mut self, tree: &'a smb2::client::tree::Tree, path: &str) -> smb2::error::Result<smb2::client::stream::FileDownload<'a>>
 pub fn smb2::client::SmbClient::estimated_rtt(&self) -> core::option::Option<core::time::Duration>
@@ -27753,8 +27771,8 @@ pub async fn smb2::client::SmbClient::open_file_reader(&self, tree: &smb2::clien
 pub fn smb2::client::SmbClient::params(&self) -> core::option::Option<smb2::client::connection::NegotiatedParams>
 pub async fn smb2::client::SmbClient::read_file(&mut self, tree: &mut smb2::client::tree::Tree, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
 pub async fn smb2::client::SmbClient::read_file_compound(&mut self, tree: &mut smb2::client::tree::Tree, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::SmbClient::read_file_pipelined(&mut self, tree: &mut smb2::client::tree::Tree, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::SmbClient::read_file_with_progress<F>(&mut self, tree: &mut smb2::client::tree::Tree, path: &str, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
+pub async fn smb2::client::SmbClient::read_file_pipelined(&mut self, tree: &mut smb2::client::tree::Tree, path: &str, max_bytes: u64) -> smb2::error::Result<alloc::vec::Vec<u8>>
+pub async fn smb2::client::SmbClient::read_file_with_progress<F>(&mut self, tree: &mut smb2::client::tree::Tree, path: &str, max_bytes: u64, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
 pub async fn smb2::client::SmbClient::reconnect(&mut self) -> smb2::error::Result<()>
 pub async fn smb2::client::SmbClient::rename(&mut self, tree: &mut smb2::client::tree::Tree, from: &str, to: &str) -> smb2::error::Result<()>
 pub async fn smb2::client::SmbClient::rename_files(&mut self, tree: &mut smb2::client::tree::Tree, renames: &[(&str, &str)]) -> alloc::vec::Vec<smb2::error::Result<()>>
@@ -27879,8 +27897,8 @@ pub async fn smb2::client::tree::Tree::open_file_readwrite(&self, conn: &mut smb
 pub async fn smb2::client::tree::Tree::read_file(&self, conn: &mut smb2::client::connection::Connection, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
 pub async fn smb2::client::tree::Tree::read_file_compound(&self, conn: &mut smb2::client::connection::Connection, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
 pub async fn smb2::client::tree::Tree::read_file_compound_sized(&self, conn: &mut smb2::client::connection::Connection, path: &str, expected_size: u64) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::tree::Tree::read_file_pipelined(&self, conn: &mut smb2::client::connection::Connection, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::tree::Tree::read_file_pipelined_with_progress<F>(&self, conn: &mut smb2::client::connection::Connection, path: &str, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
+pub async fn smb2::client::tree::Tree::read_file_pipelined(&self, conn: &mut smb2::client::connection::Connection, path: &str, max_bytes: u64) -> smb2::error::Result<alloc::vec::Vec<u8>>
+pub async fn smb2::client::tree::Tree::read_file_pipelined_with_progress<F>(&self, conn: &mut smb2::client::connection::Connection, path: &str, max_bytes: u64, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
 pub async fn smb2::client::tree::Tree::rename(&self, conn: &mut smb2::client::connection::Connection, from: &str, to: &str) -> smb2::error::Result<()>
 pub async fn smb2::client::tree::Tree::rename_files(&self, conn: &mut smb2::client::connection::Connection, renames: &[(&str, &str)]) -> alloc::vec::Vec<smb2::error::Result<()>>
 pub async fn smb2::client::tree::Tree::stat(&self, conn: &mut smb2::client::connection::Connection, path: &str) -> smb2::error::Result<smb2::client::tree::FileInfo>

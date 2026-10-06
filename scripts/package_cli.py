@@ -8,7 +8,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCUMENTS = [
-    'README.md', 'LICENSE-MIT', 'LICENSE-APACHE',
+    'README.md', 'LICENSE',
     'crates/plenora-storage-py/README.md',
     'crates/plenora-storage-py/examples/local_roundtrip.py',
     'crates/plenora-smb2/PROVENANCE.md', 'crates/plenora-smb2/LICENSE-MIT',

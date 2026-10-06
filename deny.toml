@@ -7,8 +7,53 @@ allow = [
     "Apache-2.0", "Apache-2.0 WITH LLVM-exception", "MIT", "MIT-0", "ISC",
     "BSD-1-Clause", "BSD-3-Clause", "Zlib", "Unicode-3.0",
     "CC0-1.0", "Unlicense", "BSL-1.0", "CDLA-Permissive-2.0",
+    "LicenseRef-Plenora-Proprietary",
 ]
 confidence-threshold = 0.95
+# I crate del workspace usano la licenza proprietaria di `LICENSE`, che non ha
+# un identificatore SPDX: la dichiarazione la lega al testo tramite hash, così
+# un testo cambiato o un crate nuovo senza dichiarazione fanno fallire il gate.
+# Il fork `plenora-smb2` conserva la licenza upstream e resta nella allowlist.
+
+[[licenses.clarify]]
+crate = "plenora-storage-cli"
+expression = "LicenseRef-Plenora-Proprietary"
+license-files = [{ path = "../../LICENSE", hash = 0xdbba1ffc }]
+
+[[licenses.clarify]]
+crate = "plenora-storage-core"
+expression = "LicenseRef-Plenora-Proprietary"
+license-files = [{ path = "../../LICENSE", hash = 0xdbba1ffc }]
+
+[[licenses.clarify]]
+crate = "plenora-storage-engine"
+expression = "LicenseRef-Plenora-Proprietary"
+license-files = [{ path = "../../LICENSE", hash = 0xdbba1ffc }]
+
+[[licenses.clarify]]
+crate = "plenora-storage-ftp"
+expression = "LicenseRef-Plenora-Proprietary"
+license-files = [{ path = "../../LICENSE", hash = 0xdbba1ffc }]
+
+[[licenses.clarify]]
+crate = "plenora-storage-providers"
+expression = "LicenseRef-Plenora-Proprietary"
+license-files = [{ path = "../../LICENSE", hash = 0xdbba1ffc }]
+
+[[licenses.clarify]]
+crate = "plenora-storage-py"
+expression = "LicenseRef-Plenora-Proprietary"
+license-files = [{ path = "../../LICENSE", hash = 0xdbba1ffc }]
+
+[[licenses.clarify]]
+crate = "plenora-storage-s3"
+expression = "LicenseRef-Plenora-Proprietary"
+license-files = [{ path = "../../LICENSE", hash = 0xdbba1ffc }]
+
+[[licenses.clarify]]
+crate = "plenora-storage-sftp"
+expression = "LicenseRef-Plenora-Proprietary"
+license-files = [{ path = "../../LICENSE", hash = 0xdbba1ffc }]
 
 [bans]
 multiple-versions = "allow"

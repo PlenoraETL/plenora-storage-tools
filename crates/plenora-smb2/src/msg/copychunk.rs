@@ -18,9 +18,9 @@
 //! These structs are the wire layer only. The high-level, batching client API
 //! lives in [`client::copy`](crate::client::copy).
 
+use crate::Error;
 use crate::error::Result;
 use crate::pack::{Pack, ReadCursor, Unpack, WriteCursor};
-use crate::Error;
 
 /// Length in bytes of a server-side copy resume key (MS-SMB2 2.2.32.3).
 pub const RESUME_KEY_LEN: usize = 24;
@@ -116,7 +116,8 @@ impl Unpack for SrvCopychunkCopy {
         let chunk_count = cursor.read_u32_le()?;
         let _reserved = cursor.read_u32_le()?;
 
-        let mut chunks = Vec::with_capacity(chunk_count as usize);
+        let chunk_count = cursor.capacity_for(chunk_count as usize, SrvCopychunk::SIZE)?;
+        let mut chunks = Vec::with_capacity(chunk_count);
         for _ in 0..chunk_count {
             chunks.push(SrvCopychunk::unpack(cursor)?);
         }
@@ -216,6 +217,25 @@ impl Unpack for SrvRequestResumeKeyResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Asserts the decoder refused the count before reserving for it: the
+    /// error is the count bound, not a later truncation.
+    fn assert_count_refused<T: std::fmt::Debug>(result: Result<T>) {
+        match result {
+            Err(crate::Error::InvalidData { ref message }) if message.contains("element count") => {
+            }
+            other => panic!("expected the element count bound, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_forged_chunk_count_is_refused_before_reserving() {
+        // u32::MAX chunks of 24 bytes would reserve about 100 GB.
+        let mut bytes = vec![0u8; RESUME_KEY_LEN];
+        bytes.extend_from_slice(&u32::MAX.to_le_bytes());
+        bytes.extend_from_slice(&0u32.to_le_bytes());
+        assert_count_refused(SrvCopychunkCopy::unpack(&mut ReadCursor::new(&bytes)));
+    }
 
     #[test]
     fn copychunk_roundtrip() {

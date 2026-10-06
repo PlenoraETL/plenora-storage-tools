@@ -212,8 +212,8 @@ pub fn arb_info_type() -> impl Strategy<Value = crate::msg::query_info::InfoType
     ]
 }
 
-pub fn arb_file_information_class(
-) -> impl Strategy<Value = crate::msg::query_directory::FileInformationClass> {
+pub fn arb_file_information_class()
+-> impl Strategy<Value = crate::msg::query_directory::FileInformationClass> {
     use crate::msg::query_directory::FileInformationClass;
     prop_oneof![
         Just(FileInformationClass::FileDirectoryInformation),

@@ -4,11 +4,11 @@
 //! The request buffer contains the information to set, stored as raw bytes.
 //! The response is a minimal 2-byte structure.
 
+use crate::Error;
 use crate::error::Result;
 use crate::msg::header::Header;
 use crate::pack::{Pack, ReadCursor, Unpack, WriteCursor};
 use crate::types::FileId;
-use crate::Error;
 
 // Re-use InfoType from query_info
 pub use super::query_info::InfoType;

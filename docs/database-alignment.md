@@ -1,8 +1,8 @@
 # Allineamento al modello Database Tools
 
 Database Tools è il riferimento per separazione delle responsabilità, utilizzo
-applicativo e qualità del rilascio. Storage mantiene i propri contratti e la
-licenza MIT/Apache-2.0. Il profilo database non è un profilo storage.
+applicativo e qualità del rilascio. Storage mantiene i propri contratti e, come
+Database Tools, la licenza proprietaria del repository. Il profilo database non è un profilo storage.
 
 Il [confronto del 27 settembre 2026](database-reference-review.md) identifica
 le revisioni esaminate e le differenze osservate in quel momento. Il

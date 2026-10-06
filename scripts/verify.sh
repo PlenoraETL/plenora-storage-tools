@@ -18,6 +18,7 @@ export PLENORA_SFTP_ENCRYPTED_KEY_FILE="$PWD/.fixtures/sftp-client-encrypted"
 python3 scripts/check_webdav_fixture.py
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+python3 scripts/check_anti_panic.py
 cargo test --workspace --all-targets --locked -- --include-ignored
 cargo build --quiet --locked -p plenora-storage-cli
 python3 scripts/release_publication.py smoke-cli --binary target/debug/plenora-storage

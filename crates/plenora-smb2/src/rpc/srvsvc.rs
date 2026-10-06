@@ -3,9 +3,9 @@
 //! Encodes the NetrShareEnum request (opnum 15) and decodes the response,
 //! extracting share names, types, and comments.
 
+use crate::Error;
 use crate::error::Result;
 use crate::pack::{ReadCursor, WriteCursor};
-use crate::Error;
 
 /// Share type: disk share.
 pub const STYPE_DISKTREE: u32 = 0x0000_0000;
@@ -160,7 +160,8 @@ pub(crate) fn parse_net_share_enum_all_stub(stub: &[u8]) -> Result<Vec<ShareInfo
         comment_ptr: u32,
     }
 
-    let mut entries = Vec::with_capacity(count as usize);
+    // Each fixed-size entry takes 12 bytes.
+    let mut entries = Vec::with_capacity(r.capacity_for(count as usize, 12)?);
     for _ in 0..count {
         let name_ptr = r.read_u32_le()?;
         let share_type = r.read_u32_le()?;
@@ -173,7 +174,7 @@ pub(crate) fn parse_net_share_enum_all_stub(stub: &[u8]) -> Result<Vec<ShareInfo
     }
 
     // Now read the deferred pointer data (conformant+varying strings)
-    let mut shares = Vec::with_capacity(count as usize);
+    let mut shares = Vec::with_capacity(entries.len());
     for entry in &entries {
         let name = if entry.name_ptr != 0 {
             read_ndr_string(&mut r)?
@@ -245,6 +246,27 @@ pub fn filter_disk_shares(shares: Vec<ShareInfo>) -> Vec<ShareInfo> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Asserts the decoder refused the count before reserving for it: the
+    /// error is the count bound, not a later truncation.
+    fn assert_count_refused<T: std::fmt::Debug>(result: Result<T>) {
+        match result {
+            Err(crate::Error::InvalidData { ref message }) if message.contains("element count") => {
+            }
+            other => panic!("expected the element count bound, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_forged_share_count_is_refused_before_reserving() {
+        // level 1, discriminant 1, container pointer, count, array pointer,
+        // max count: u32::MAX entries of 12 bytes would reserve about 51 GB.
+        let mut stub = Vec::new();
+        for word in [1u32, 1, 0x0002_0000, u32::MAX, 0x0002_0004, u32::MAX] {
+            stub.extend_from_slice(&word.to_le_bytes());
+        }
+        assert_count_refused(parse_net_share_enum_all_stub(&stub));
+    }
 
     #[test]
     fn build_request_has_opnum_15() {

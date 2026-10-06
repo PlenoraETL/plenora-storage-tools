@@ -17,7 +17,15 @@ resolver = "3"
 version = "2.1.0"
 edition = "2024"
 rust-version = "1.92"
-license = "MIT OR Apache-2.0"
+# I crate usano la licenza proprietaria del repository; sono distribuiti solo
+# come asset delle GitHub Release, non su crates.io. `publish = false` non è
+# impostato perché impedirebbe a `cargo package --workspace` (build_release.py)
+# di risolvere le dipendenze tra crate del workspace.
+# `license-file` è il campo Cargo previsto quando non esiste un identificatore
+# SPDX applicabile; i manifest figli lo ereditano dal workspace. Il fork
+# `plenora-smb2` non eredita questo campo: conserva la licenza upstream
+# (MIT OR Apache-2.0) e i relativi testi, come richiesto da quelle licenze.
+license-file = "LICENSE"
 authors = ["PlenoraETL contributors"]
 repository = "https://github.com/PlenoraETL/plenora-storage-tools"
 

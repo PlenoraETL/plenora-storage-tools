@@ -110,6 +110,17 @@ L'[attestazione personalizzata](https://github.com/actions/attest#attestation-mo
 descrive la qualifica dei digest distribuiti. Non dichiara che i runner di
 pubblicazione abbiano compilato gli artefatti prodotti sulla VM.
 
+La provenienza di build (SLSA v1) e la SBOM CycloneDX di CLI, wheel e sorgenti
+sono attestate dai job `linux` e `windows` di release-candidate, cioè dai runner
+che compilano quei byte, subito dopo `build_release.py`. Prima di pubblicare, il
+workflow di release verifica con `gh attestation verify` che ogni file distribuito
+abbia entrambe le attestazioni, firmate da release-candidate di questo repository
+su un runner ospitato da GitHub, al commit del tag; un artefatto senza di esse
+blocca la pubblicazione. Per ciascun target la release pubblica anche la SBOM
+(`plenora-storage-<versione>-<target>.sbom.cdx.json`) e il manifest di adozione
+dei contratti (`plenora-storage-<versione>-<target>.adoption-manifest-v4.json`),
+copiati dagli artefatti qualificati con lo stesso digest.
+
 Questa procedura è implementata e sottoposta a controlli negativi in CI; la sua
 presenza non significa che sia già stata completata una pubblicazione 1.0.
 Le prove su account cloud reali rimangono rinviate secondo la

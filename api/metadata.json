@@ -47,7 +47,9 @@
         "name": "smb2",
         "path": "src/lib.rs"
       },
-      "rust_version": "1.92"
+      "rust_version": {
+        "workspace": true
+      }
     },
     "plenora-storage-cli": {
       "features": {
