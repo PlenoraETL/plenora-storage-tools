@@ -1,9 +1,11 @@
 # Changelog
 
-## Unreleased
+## 3.0.0 — 2026-10-06
+
+Major release: rejects inputs accepted by 2.1 and changes public Rust signatures; see `docs/migration-3.0.md`.
 
 - Replace the yanked `yoke-derive` 0.8.3 with 0.8.4 in the workspace and fuzz lockfiles; `cargo deny` now rejects yanked crates like `cargo audit --deny warnings`.
-- Reject `null` for optional runtime metadata (`plenora.execution.deadline`, `plenora.idempotency.key`, `plenora.message.causation_id`) instead of reading it as absent; a null deadline previously started the operation without a deadline. Absent values are no longer serialized as `null`.
+- Reject `null` for optional runtime metadata (`plenora.execution.deadline`, `plenora.message.causation_id`; the idempotency key is covered by the runtime binding entry below) instead of reading it as absent; a null deadline previously started the operation without a deadline. Absent values are no longer serialized as `null`.
 - Require the `content_type`, `size` and `sha256` keys of artifact metadata (nullable but present, as in `plenora-storage-common-v1`) and the nullable keys of object, list and transfer results when deserializing.
 - Reject `tls_ca_pem: null` in FTP/FTPS connections; the schema types the key as a string.
 - Execute the storage fixtures of RUNTIME-VECTORS-1.0, copied byte for byte from the adopted contracts revision and pinned by SHA-256, through the runtime binding, including fail-closed routing mutations.
@@ -22,7 +24,6 @@
 - **Breaking (plenora-smb2 Rust API, 3.0.0):** whole-file reads whose buffer is sized by the server-declared file size take an explicit `max_bytes` limit: `Tree::read_file_pipelined`, `Tree::read_file_pipelined_with_progress`, `SmbClient::read_file_pipelined`, `SmbClient::read_file_with_progress`, `FileDownload::collect` and `FileDownload::collect_with_progress`. A larger declared size, or a server sending more than the limit, fails with the new `Error::DeclaredSizeOverLimit` (`ErrorKind::TooLarge`) before memory is reserved; the reservation itself is fallible. Previously a forged size aborted the process on allocation. The product reads SMB through `FileReader` and was not affected.
 - plenora-smb2 decoders check element counts received from the peer against the remaining bytes before reserving: SMB2 NEGOTIATE dialects and contexts, LOCK elements, server-side copychunk descriptors and srvsvc share entries (a forged `u32` count previously reserved up to about 100 GB).
 - Keep compatible requirements for the six dependencies that cross the public Rust API (`async-trait`, `bytes`, `serde`, `serde_json`, `tokio`, `tokio-util`) as the declared deviation `DEP-RANGE-1` (rule, scope, hazard, re-entry in `scripts/dependency-policy.json`), with each motivation next to its line in `Cargo.toml`; `check_dependencies.py` rejects a range without it.
-
 - **Breaking (Rust API, 3.0.0):** `StorageError` gains the public field `execution_id: Option<ExecutionId>`, so struct literals and exhaustive patterns must name it. A `plenora-error-v1` document carrying `execution_id` was rejected by `deny_unknown_fields`; it is now accepted when it is a string of 1 to 128 characters or `null`, and other lengths are refused. The key is serialized only when present, so errors produced by this component are unchanged on the wire. Python `PlenoraError` exposes the same optional `execution_id` attribute.
 - Adopt `plenora-contracts` `1e902dfaab5819c1d9ce785878d5b26dbeae48b3`: the storage profile now requires the Python SDK for the seven operations. The common Python binding map is copied and every storage entrypoint is checked from the installed wheel; the twelve storage runtime fixtures (requests for all seven operations, put success, get partial error) are executed through the runtime binding.
 - A runtime get that fails after part of the transfer reached the host sink reports `partial`/`never`, as the `storage-get-partial-error` vector requires; with no byte delivered it stays `unknown`/`requires_recovery`. The adoption manifest declares no deviation.

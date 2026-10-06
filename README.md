@@ -6,6 +6,8 @@ Azure Blob / ADLS Gen2, SMB, Google Cloud Storage e WebDAV.
 
 La [release 2.1.0](https://github.com/PlenoraETL/plenora-storage-tools/releases/tag/v2.1.0)
 è pubblicata; il [resoconto di qualifica](docs/release-2.1.0.md) riporta prove e limiti.
+La 3.0.0 è in preparazione e non è pubblicata: [note](docs/release-notes-3.0.0.md)
+e [migrazione](docs/migration-3.0.md) descrivono le incompatibilità.
 
 La [2.1](docs/roadmap-2.1.0.md) aggiunge trasferimenti grandi su cinque provider
 tramite [preparazione privata su disco](docs/large-transfers.md), disponibile

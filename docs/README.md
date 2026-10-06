@@ -29,6 +29,8 @@ artefatti attestano una qualifica.
 | [Piano 2.0](roadmap-2.0.0.md) | Sei ambiti di allineamento completati e criteri di chiusura |
 | [Qualità 2.0](quality-2.0.md) | Metriche, commenti, rustdoc, dipendenze e scansione degli artefatti |
 | [Migrazione 2.0](migration-2.0.md) | Contratti mantenuti e aggiornamento delle distribuzioni |
+| [Migrazione 3.0](migration-3.0.md) | Incompatibilità della 3.0: `null` non più assente, firme Rust, licenza |
+| [Note 3.0.0](release-notes-3.0.0.md) | Contenuto della 3.0.0 in preparazione, non pubblicata |
 | [Piano 1.0](roadmap-1.0.0.md) | Piano storico: milestone, perimetro e criteri di uscita della prima release |
 
 ## Resoconti e baseline storiche

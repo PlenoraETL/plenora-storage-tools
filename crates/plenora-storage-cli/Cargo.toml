@@ -29,10 +29,10 @@ smb = ["plenora-storage-engine/smb"]
 webdav = ["plenora-storage-engine/webdav"]
 
 [dependencies]
-plenora-storage-engine = { path = "../plenora-storage-engine", version = "2.1.0", default-features = false }
+plenora-storage-engine = { path = "../plenora-storage-engine", version = "3.0.0", default-features = false }
 clap.workspace = true
 futures-util.workspace = true
-plenora-storage-core = { path = "../plenora-storage-core", version = "2.1.0" }
+plenora-storage-core = { path = "../plenora-storage-core", version = "3.0.0" }
 serde.workspace = true
 serde_json.workspace = true
 time.workspace = true
