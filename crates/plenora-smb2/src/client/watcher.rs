@@ -16,9 +16,10 @@
 
 use log::{debug, trace};
 
+use crate::Error;
+use crate::client::Frame;
 use crate::client::connection::{Connection, LongPollOutcome, WaiterGuard};
 use crate::client::tree::Tree;
-use crate::client::Frame;
 use crate::error::Result;
 use crate::msg::change_notify::{
     ChangeNotifyRequest, ChangeNotifyResponse, FILE_NOTIFY_CHANGE_ATTRIBUTES,
@@ -28,7 +29,6 @@ use crate::msg::change_notify::{
 use crate::pack::{ReadCursor, Unpack};
 use crate::types::status::NtStatus;
 use crate::types::{Command, FileId, MessageId};
-use crate::Error;
 
 /// Default completion filter: watch for most common changes.
 const DEFAULT_COMPLETION_FILTER: u32 = FILE_NOTIFY_CHANGE_FILE_NAME
@@ -204,7 +204,11 @@ impl Watcher {
             // when it returns, the next CHANGE_NOTIFY is on the wire and the
             // server has somewhere to put new events even while we process
             // the response for the previous one.
-            let in_flight = self.pending.take().expect("pending populated above");
+            let Some(in_flight) = self.pending.take() else {
+                return Err(Error::Internal {
+                    what: "change watcher lost its in-flight request",
+                });
+            };
             let next_rx = self.dispatch_next().await?;
             self.pending = Some(next_rx);
 
@@ -330,7 +334,7 @@ impl Watcher {
         // 3. And its equally-old sibling, salvaging an answer if it has one.
         let mut answered = None;
         if let Some(mut sibling) = self.pending.take() {
-            let (msg_id, async_id) = (sibling.msg_id(), sibling.async_id());
+            let (msg_id, async_id) = (sibling.msg_id(), sibling.async_id()?);
             let generation = sibling.generation();
             answered = sibling.try_recv().transpose()?;
             drop(sibling);
@@ -408,10 +412,11 @@ fn parse_notify_information(data: &[u8]) -> Result<Vec<FileNotifyEvent>> {
         }
 
         let next_entry_offset =
-            u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap()) as usize;
-        let action_raw = u32::from_le_bytes(data[offset + 4..offset + 8].try_into().unwrap());
+            crate::bytes::le_u32(data, offset, "FILE_NOTIFY_INFORMATION truncated")? as usize;
+        let action_raw =
+            crate::bytes::le_u32(data, offset + 4, "FILE_NOTIFY_INFORMATION truncated")?;
         let filename_length =
-            u32::from_le_bytes(data[offset + 8..offset + 12].try_into().unwrap()) as usize;
+            crate::bytes::le_u32(data, offset + 8, "FILE_NOTIFY_INFORMATION truncated")? as usize;
 
         // Filename starts right after the 12-byte fixed header.
         let filename_start = offset + 12;
@@ -454,8 +459,10 @@ fn decode_utf16le(bytes: &[u8]) -> Result<String> {
     }
 
     let u16s: Vec<u16> = bytes
-        .chunks_exact(2)
-        .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|chunk| u16::from_le_bytes(*chunk))
         .collect();
 
     String::from_utf16(&u16s)
@@ -607,7 +614,7 @@ mod tests {
 #[cfg(test)]
 mod loss_window_tests {
     use super::*;
-    use crate::client::connection::{pack_message, Connection, NegotiatedParams};
+    use crate::client::connection::{Connection, NegotiatedParams, pack_message};
     use crate::client::tree::Tree;
     use crate::msg::change_notify::ChangeNotifyResponse;
     use crate::msg::header::Header;
@@ -783,7 +790,8 @@ mod loss_window_tests {
 
     fn setup_connection(sim: &Arc<LossySim>) -> Connection {
         let mut conn =
-            Connection::from_transport(Box::new(sim.clone()), Box::new(sim.clone()), "test-server");
+            Connection::from_transport(Box::new(sim.clone()), Box::new(sim.clone()), "test-server")
+                .unwrap();
         // The credit window a real connection holds by the time it watches a
         // directory; a fresh pool is empty until the server grants.
         conn.set_credits(512);
@@ -799,7 +807,7 @@ mod loss_window_tests {
             cipher: None,
             compression_supported: false,
         });
-        conn.set_session_id(SessionId(0x1234));
+        conn.set_session_id(SessionId(0x1234)).unwrap();
         conn
     }
 

@@ -2,7 +2,7 @@
 
 <!-- Generato da scripts/render_state.py. Non modificare a mano. -->
 
-Versione sorgente: `3.0.0`. Rust minimo: `1.92`.
+Versione sorgente: `3.0.0`. Rust minimo: `1.98`.
 
 Questo inventario descrive il codice compilato. Non certifica una release:
 la qualifica richiede le evidenze vincolate al commit e ai digest degli artefatti.
@@ -55,7 +55,7 @@ Le feature sono condivise da engine, CLI e binding Python. `default = full`;
 ```json
 {
   "repository": "https://github.com/PlenoraETL/plenora-contracts.git",
-  "revision": "f811f21f072b34896efdb6e110bee34d756153df"
+  "revision": "1e902dfaab5819c1d9ce785878d5b26dbeae48b3"
 }
 ```
 

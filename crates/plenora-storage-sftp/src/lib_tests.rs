@@ -100,6 +100,10 @@ struct ParentCreationRace {
     created: bool,
 }
 
+#[allow(
+    clippy::unused_async_trait_impl,
+    reason = "russh-sftp declares the handler methods as async; the test servers keep that shape"
+)]
 impl Handler for ParentCreationRace {
     type Error = StatusCode;
 
@@ -189,6 +193,10 @@ struct InterruptedCommit {
     reached: Arc<tokio::sync::Notify>,
 }
 
+#[allow(
+    clippy::unused_async_trait_impl,
+    reason = "russh-sftp declares the handler methods as async; the test servers keep that shape"
+)]
 impl Handler for InterruptedCommit {
     type Error = StatusCode;
 
@@ -342,6 +350,10 @@ async fn atomic_publication_rejects_a_server_without_posix_rename() {
     );
 }
 
+#[allow(
+    clippy::unused_async_trait_impl,
+    reason = "russh-sftp declares the handler methods as async; the test servers keep that shape"
+)]
 impl Handler for EndlessDirectory {
     type Error = StatusCode;
     fn unimplemented(&self) -> Self::Error {
@@ -398,4 +410,18 @@ async fn listing_stops_between_batches_without_waiting_for_directory_eof() {
     assert_eq!(error.code, "LIST_SCAN_LIMIT_EXCEEDED");
     assert_eq!(visited, ["file-0", "file-1"]);
     assert_eq!(requests.load(Ordering::SeqCst), 3);
+}
+
+/// Case 9e of the common runtime matrix: a proved publication whose metadata
+/// cannot be read back is `committed` in `cleanup` and is never retried,
+/// because repeating the request would publish again.
+#[test]
+fn unavailable_metadata_after_publication_is_committed_and_never_retried() {
+    let error = super::committed_verification_error();
+    assert_eq!(
+        error.remote_effect,
+        plenora_storage_core::RemoteEffect::Committed
+    );
+    assert_eq!(error.phase, plenora_storage_core::ErrorPhase::Cleanup);
+    assert_eq!(error.retry, plenora_storage_core::RetryDisposition::Never);
 }

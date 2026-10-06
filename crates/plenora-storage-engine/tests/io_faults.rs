@@ -193,12 +193,12 @@ async fn exercise(provider: &str, strategy: UploadStrategy) {
         redacted(&error, provider, ErrorPhase::Write);
         assert!(sink.accepted > 0, "{provider}");
         assert_eq!(sink.flushed, fail_flush, "{provider}");
-        assert_eq!(error.remote_effect, RemoteEffect::Unknown, "{provider}");
-        assert_eq!(
-            error.retry,
-            RetryDisposition::RequiresRecovery,
-            "{provider}"
-        );
+        // The sink accepted a prefix and then failed: every provider reports
+        // the same partial transfer, never retried automatically.
+        assert_eq!(error.code, "STORAGE_GET_SINK_PARTIAL", "{provider}");
+        assert_eq!(error.remote_effect, RemoteEffect::Partial, "{provider}");
+        assert_eq!(error.retry, RetryDisposition::Never, "{provider}");
+        assert_eq!(error.provider.as_deref(), Some(provider), "{provider}");
     }
     let cancelled = control();
     let mut sink = BrokenWriter {

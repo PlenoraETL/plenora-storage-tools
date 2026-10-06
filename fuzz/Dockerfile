@@ -1,4 +1,4 @@
-FROM rust:1.92-bookworm@sha256:e90e846de4124376164ddfbaab4b0774c7bdeef5e738866295e5a90a34a307a2
+FROM rust:1.98.1-bookworm@sha256:93ce27a88655056a51dbdd8f5f2d7ddc071c7b0070fb288a37b5a285fc83971e
 RUN apt-get update && apt-get install -y --no-install-recommends python3 clang \
     && rm -rf /var/lib/apt/lists/*
 RUN rustup toolchain install nightly-2026-09-20 --profile minimal

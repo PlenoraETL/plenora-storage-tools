@@ -13,8 +13,8 @@ pub mod guid;
 pub use filetime::FileTime;
 pub use guid::Guid;
 
-use crate::error::Result;
 use crate::Error;
+use crate::error::Result;
 
 /// Trait for types that can serialize themselves into binary format.
 pub trait Pack: Send + Sync {
@@ -99,8 +99,10 @@ impl<'a> ReadCursor<'a> {
         }
         let raw = self.read_bytes(byte_len)?;
         let code_units: Vec<u16> = raw
-            .chunks_exact(2)
-            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|chunk| u16::from_le_bytes(*chunk))
             .collect();
         String::from_utf16(&code_units)
             .map_err(|_| Error::invalid_data("invalid UTF-16LE encoding"))
@@ -116,6 +118,20 @@ impl<'a> ReadCursor<'a> {
     /// Return the number of bytes remaining.
     pub fn remaining(&self) -> usize {
         self.data.len() - self.pos
+    }
+
+    /// Capacity for `count` elements that each take at least
+    /// `min_element_len` wire bytes, refusing a count the remaining bytes
+    /// cannot hold. A count comes from the peer, so reserving it before the
+    /// bytes are known to exist would let a forged count exhaust memory.
+    pub(crate) fn capacity_for(&self, count: usize, min_element_len: usize) -> Result<usize> {
+        match count.checked_mul(min_element_len) {
+            Some(needed) if needed <= self.remaining() => Ok(count),
+            _ => Err(Error::invalid_data(format!(
+                "element count {count} exceeds the {} remaining bytes",
+                self.remaining()
+            ))),
+        }
     }
 
     /// Return the current byte position.

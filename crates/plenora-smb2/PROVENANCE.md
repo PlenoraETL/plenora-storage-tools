@@ -12,7 +12,7 @@ Mechanical adjustments: rustfmt formatting and three scoped lint annotations for
 
 In Plenora 0.2.2, dependency requirements were refreshed to current stable releases,
 including CCM 0.6.1 (replacing the release candidate) and lz4_flex 0.14.0.
-The declared Rust minimum follows the workspace at 1.92, with equivalent
+The declared Rust minimum follows the workspace (1.92 at the time; 1.98 from Plenora 3.0.0), with equivalent
 `is_multiple_of` substitutions required by Clippy at that minimum. The upstream archive
 hash above identifies the original source, not this modified package.
 
@@ -25,3 +25,18 @@ exposed one retained socket per SMB operation. The regression checks that TCP
 stays open while another clone exists and that the peer observes EOF after the
 final clone drops, without requiring the server to initiate teardown. The
 shared transport fix applies to every SMB operation and to Rust, CLI and Python.
+
+In Plenora 3.0.0 the fork follows the workspace rules instead of an exemption.
+It inherits the workspace lints and edition 2024; the pedantic and nursery lints
+upstream code still violates are listed, with their reason, at the top of
+`src/lib.rs`, and every other lint applies. Its dependencies are exact pins with
+a motivation, or inherited from the workspace where they cross the public API
+boundary, and `scripts/check_dependencies.py` no longer skips this manifest.
+Library code contains no `unwrap`, `expect`, `panic!` or `unreachable!`
+(`scripts/check_anti_panic.py`): a poisoned connection lock, a failing random
+source, an exhausted nonce counter, an AES key of the wrong length from a KDC
+reply and the other former panics are typed errors (`Error::Internal`,
+`Error::InvalidData`). The fallible accessors of `Connection` and the Kerberos
+and KDF helpers now return `Result`, and `MockTransport` is compiled only for
+tests or with the `testing` feature. These are API changes of the fork, part of
+the Plenora 3.0.0 major release.

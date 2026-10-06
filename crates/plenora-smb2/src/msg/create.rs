@@ -4,12 +4,12 @@
 //! The response carries the file handle ([`FileId`]) plus timestamps,
 //! attributes, and optional create contexts.
 
+use crate::Error;
 use crate::error::Result;
 use crate::msg::header::Header;
 use crate::pack::{FileTime, Pack, ReadCursor, Unpack, WriteCursor};
 use crate::types::flags::FileAccessMask;
 use crate::types::{FileId, OplockLevel};
-use crate::Error;
 
 // ── Enums ────────────────────────────────────────────────────────────────
 

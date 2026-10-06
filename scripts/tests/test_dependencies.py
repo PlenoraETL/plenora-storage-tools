@@ -3,7 +3,8 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from check_dependencies import check_manifest, check_python_pins
+from check_dependencies import (check_deviation, check_manifest, check_python_pins,
+                                check_range_motivations)
 
 
 class DependencyPolicyTests(unittest.TestCase):
@@ -23,3 +24,27 @@ class DependencyPolicyTests(unittest.TestCase):
         for requirement in ('maturin>=1.7,<2.0', 'jsonschema', 'x==1.0; python_version < "3.13"',
                             'x~=1.0', 'x==1.*', '-r other.txt', 'x == 1.0'):
             self.assertTrue(check_python_pins('r', [requirement]), requirement)
+
+    def test_range_requires_the_motivation_next_to_it(self):
+        motivated = ('[workspace.dependencies]\n'
+                     '# Range, not an exact pin (deviation DEP-RANGE-1): public source and sink\n'
+                     '# interfaces use Tokio I/O traits and must share the host Tokio.\n'
+                     'tokio = "1.53.1"\n')
+        self.assertEqual(check_range_motivations(motivated, {'tokio'}, 'DEP-RANGE-1'), [])
+        bare = '[workspace.dependencies]\nhex = "=0.4.3"\ntokio = "1.53.1"\n'
+        self.assertTrue(check_range_motivations(bare, {'tokio'}, 'DEP-RANGE-1'))
+        # A comment that is not adjacent, or does not name the deviation, is not a motivation.
+        detached = ('[workspace.dependencies]\n# Range (deviation DEP-RANGE-1): Tokio traits cross the API.\n'
+                    'hex = "=0.4.3"\ntokio = "1.53.1"\n')
+        self.assertTrue(check_range_motivations(detached, {'tokio'}, 'DEP-RANGE-1'))
+        unnamed = '[workspace.dependencies]\n# Public source and sink interfaces use Tokio I/O traits.\ntokio = "1.53.1"\n'
+        self.assertTrue(check_range_motivations(unnamed, {'tokio'}, 'DEP-RANGE-1'))
+        self.assertTrue(check_range_motivations('[workspace.dependencies]\n# DEP-RANGE-1\ntokio = "1.53.1"\n',
+                                                {'tokio'}, 'DEP-RANGE-1'))
+
+    def test_range_exception_is_a_declared_deviation(self):
+        complete = {'id': 'DEP-RANGE-1', 'rule': 'r', 'scope': 's', 'hazard': 'h', 'reentry': 'e'}
+        self.assertEqual(check_deviation(complete), [])
+        self.assertTrue(check_deviation(None))
+        for field in complete:
+            self.assertTrue(check_deviation({**complete, field: ' '}), field)

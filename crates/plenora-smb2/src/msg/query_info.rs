@@ -4,11 +4,11 @@
 //! The response buffer is stored as raw bytes -- parsing into specific
 //! information classes is deferred.
 
+use crate::Error;
 use crate::error::Result;
 use crate::msg::header::Header;
 use crate::pack::{Pack, ReadCursor, Unpack, WriteCursor};
 use crate::types::FileId;
-use crate::Error;
 
 // ── Enums ────────────────────────────────────────────────────────────────
 

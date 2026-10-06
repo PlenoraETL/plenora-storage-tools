@@ -134,6 +134,7 @@ La console MinIO è esposta su `http://localhost:9001`; l'API S3 è esposta su
 ```powershell
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+python scripts/check_anti_panic.py
 cargo test --workspace --all-targets --locked
 ```
 
@@ -149,7 +150,11 @@ adozione v4 associato ai digest dei crate e della CLI. La
 
 ## Licenza
 
-MIT OR Apache-2.0; testi inclusi in ogni crate.
+Licenza proprietaria: Copyright (c) Plenora ETL. All rights reserved. Il testo
+è in [`LICENSE`](LICENSE) e accompagna crate, archivi CLI e sorgenti
+distribuiti. Il fork `crates/plenora-smb2` deriva dal crate `smb2` e conserva
+la licenza upstream MIT OR Apache-2.0 con i relativi testi
+([provenienza](crates/plenora-smb2/PROVENANCE.md)).
 
 ## Candidati di release
 

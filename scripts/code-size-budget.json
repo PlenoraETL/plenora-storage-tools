@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "basis": "Reviewed 2.0 adapter separation; provider budget reviewed for 2.1 private-file preparation and publication (docs/roadmap-2.1.0.md). Other budgets unchanged.",
+  "basis": "Reviewed 2.0 adapter separation; provider budget reviewed for 2.1 private-file preparation and publication (docs/roadmap-2.1.0.md). Other budgets unchanged. Core code budget raised to 2650 for the 3.0.0 runtime binding admission (Runtime Binding 1.0 RT-016 to RT-023: reserved-key grammars, rejection categories, result identity, envelope-level rejection), split into runtime_admission.rs.",
   "areas": {
     "plenora-smb2": {
       "code_lines": 21100,
@@ -13,7 +13,7 @@
       "max_file_code_lines": 300
     },
     "plenora-storage-core": {
-      "code_lines": 2500,
+      "code_lines": 2650,
       "physical_lines": 3650,
       "max_file_code_lines": 700
     },

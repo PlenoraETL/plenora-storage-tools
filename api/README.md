@@ -2,6 +2,10 @@
 
 Questa baseline nasce dal codice `58fb010f88d896fd463a29accca3e4ac74946480`
 della serie **1.0.0-alpha.1**, con Rust **1.92.0** e `public-api` **0.51.0**.
+Dalla 3.0.0 gli snapshot sono generati con Rust **1.98.1**: il passaggio da
+1.92.0 aggiunge le implementazioni automatiche di `TrivialClone` e `UnsafeUnpin`,
+il percorso `core::io::Error` e i metodi nascosti generati da `derive(Eq)`, senza
+cambiare le firme dichiarate dai crate.
 È un riferimento di compatibilità durante lo sviluppo; non è una qualifica
 di produzione e non implica che esista già una release stabile.
 

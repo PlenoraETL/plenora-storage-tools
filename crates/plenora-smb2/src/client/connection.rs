@@ -12,12 +12,14 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex as StdMutex, Weak};
+use std::sync::{Arc, Weak};
+
+use crate::sync::{StateLock, ValueLock};
 use std::time::{Duration, Instant};
 
-use futures_util::future::{select, Either};
-use log::{debug, error, info, trace, warn, Level};
-use tokio::sync::{mpsc, oneshot, Semaphore};
+use futures_util::future::{Either, select};
+use log::{Level, debug, error, info, trace, warn};
+use tokio::sync::{Semaphore, mpsc, oneshot};
 
 /// One in-flight request: who is waiting, what they asked for, and since when.
 ///
@@ -96,7 +98,7 @@ impl WaiterGuard {
 
     /// The `AsyncId` the server assigned this request, if it has sent an
     /// interim STATUS_PENDING. What a CANCEL for it has to carry.
-    pub(crate) fn async_id(&self) -> Option<u64> {
+    pub(crate) fn async_id(&self) -> Result<Option<u64>> {
         self.inner.async_id_for(self.msg_id)
     }
 
@@ -136,16 +138,20 @@ impl Drop for WaiterGuard {
         // Routing removes the entry when the response lands, and the response
         // deadline removes it when it gives up, so this is usually a no-op.
         // It is idempotent by design: MessageIds are never reused, so a late
-        // removal can't evict somebody else's waiter.
+        // removal can't evict somebody else's waiter. Removing our own entry
+        // is teardown, so it proceeds on a poisoned map; the abandoned ring is
+        // bookkeeping for later routing, and a poisoned ring is skipped
+        // because every routing decision that reads it already fails.
         if self
             .inner
             .waiters
-            .lock()
-            .unwrap()
+            .lock_for_teardown()
             .remove(&self.msg_id)
             .is_some()
         {
-            let mut abandoned = self.inner.abandoned.lock().unwrap();
+            let Ok(mut abandoned) = self.inner.abandoned.lock() else {
+                return;
+            };
             if abandoned.len() >= ABANDONED_ID_MEMORY {
                 abandoned.pop_front();
             }
@@ -461,7 +467,7 @@ async fn writer_loop(
         let Some(strong) = inner.upgrade() else {
             return; // last Connection clone dropped
         };
-        let deadline = *strong.send_timeout.lock().unwrap();
+        let deadline = strong.send_timeout.get();
         let len = job.bytes.len();
         let started = std::time::Instant::now();
 
@@ -489,22 +495,19 @@ async fn writer_loop(
         }
         trace!(
             "send: cmd={:?}, {} bytes, {:?} queued + {:?} writing",
-            job.command,
-            len,
-            queued_for,
-            wrote_in
+            job.command, len, queued_for, wrote_in
         );
 
         let fatal = matches!(result, Err(Error::SendTimeout { .. }) | Err(Error::Io(_)));
-        if let Err(ref e) = result {
-            if fatal {
-                strong.metrics.send_failures.fetch_add(1, Ordering::Relaxed);
-                error!(
-                    "send failed after {:?}: cmd={:?}, {} bytes: {e}; tearing the connection down \
+        if let Err(ref e) = result
+            && fatal
+        {
+            strong.metrics.send_failures.fetch_add(1, Ordering::Relaxed);
+            error!(
+                "send failed after {:?}: cmd={:?}, {} bytes: {e}; tearing the connection down \
                      because a partly-written frame leaves the stream out of sync",
-                    wrote_in, job.command, len
-                );
-            }
+                wrote_in, job.command, len
+            );
         }
         let _ = job.done.send(result);
 
@@ -567,10 +570,10 @@ struct OutstandingSplit {
     parked: Vec<Outstanding>,
 }
 
-fn classify_outstanding(inner: &Inner, threshold: std::time::Duration) -> OutstandingSplit {
+fn classify_outstanding(inner: &Inner, threshold: std::time::Duration) -> Result<OutstandingSplit> {
     let now = std::time::Instant::now();
     let mut split = OutstandingSplit::default();
-    for (id, w) in inner.waiters.lock().unwrap().iter() {
+    for (id, w) in inner.waiters.lock()?.iter() {
         let request = Outstanding {
             msg_id: *id,
             command: w.command,
@@ -588,7 +591,7 @@ fn classify_outstanding(inner: &Inner, threshold: std::time::Duration) -> Outsta
             }
         }
     }
-    split
+    Ok(split)
 }
 
 /// Whether the send side is still moving.
@@ -744,10 +747,13 @@ fn spawn_connection_sweeper(inner: &Arc<Inner>) {
             if inner.disconnected.load(Ordering::Acquire) {
                 return;
             }
-            sweep_connection(&inner);
+            if let Err(e) = sweep_connection(&inner) {
+                error!("stale-request sweeper stopped: {e}");
+                return;
+            }
         }
     });
-    if let Some(old) = inner.sweeper_task.lock().unwrap().replace(handle) {
+    if let Some(old) = inner.sweeper_task.replace(Some(handle)) {
         old.abort();
     }
 }
@@ -819,7 +825,7 @@ enum ProbeOutcome {
 fn spawn_keepalive(inner: &Arc<Inner>) {
     let weak = Arc::downgrade(inner);
     let handle = tokio::spawn(async move { keepalive_loop(weak).await });
-    if let Some(old) = inner.keepalive_task.lock().unwrap().replace(handle) {
+    if let Some(old) = inner.keepalive_task.replace(Some(handle)) {
         old.abort();
     }
 }
@@ -846,7 +852,7 @@ fn spawn_plumbing(
     let writer = tokio::spawn(async move {
         writer_loop(sender, write_rx, weak).await;
     });
-    if let Some(old) = inner.writer_task.lock().unwrap().replace(writer) {
+    if let Some(old) = inner.writer_task.replace(Some(writer)) {
         old.abort();
     }
 
@@ -856,7 +862,7 @@ fn spawn_plumbing(
     let handle = tokio::spawn(async move {
         receiver_loop(receiver, inner_for_task).await;
     });
-    if let Some(old) = inner.receiver_task.lock().unwrap().replace(handle) {
+    if let Some(old) = inner.receiver_task.replace(Some(handle)) {
         old.abort();
     }
 
@@ -878,7 +884,7 @@ async fn keepalive_loop(weak: Weak<Inner>) {
         // timer per second per connection is not the cost worth chasing.
         let tick = match weak.upgrade() {
             Some(inner) => {
-                let after = (*inner.keepalive_after.lock().unwrap()).unwrap_or(KEEPALIVE_AFTER);
+                let after = inner.keepalive_after.get().unwrap_or(KEEPALIVE_AFTER);
                 Inner::keepalive_tick(after)
             }
             None => return, // last Connection clone dropped
@@ -896,8 +902,15 @@ async fn keepalive_loop(weak: Weak<Inner>) {
         // own, so only this one notices a stall on a connection with nothing
         // outstanding — and the clocks have to be right BEFORE the next
         // request arrives, not after it has already been misjudged.
-        inner.forgive_scheduling_stall();
-        let Some(after) = *inner.keepalive_after.lock().unwrap() else {
+        //
+        // A poisoned waiter map ends the loop: every request on the
+        // connection already fails with the same error, and probing a
+        // connection whose state cannot be read proves nothing.
+        if let Err(e) = inner.forgive_scheduling_stall() {
+            error!("keepalive stopped: {e}");
+            return;
+        }
+        let Some(after) = inner.keepalive_after.get() else {
             continue;
         };
         // Nothing on the wire (no work to protect), or the server has spoken
@@ -905,8 +918,12 @@ async fn keepalive_loop(weak: Weak<Inner>) {
         // would cost a round trip and buy nothing, which is why a busy
         // connection never sends one.
         match inner.quiet_for() {
-            Some(quiet) if quiet >= after => {}
-            _ => continue,
+            Ok(Some(quiet)) if quiet >= after => {}
+            Ok(_) => continue,
+            Err(e) => {
+                error!("keepalive stopped: {e}");
+                return;
+            }
         }
 
         let conn = Connection {
@@ -1128,19 +1145,19 @@ fn sweep_report(
 /// the genuine lines their meaning. They stay observable two ways instead: at
 /// TRACE every sweep, and named in full whenever a REAL stale request is
 /// warned about, since a wedge investigation wants the whole in-flight picture.
-fn sweep_connection(inner: &Inner) {
+fn sweep_connection(inner: &Inner) -> Result<()> {
     // Read before anything can return early, so the send side's clock and the
     // writer's tally stay honest across a consumer toggling the warning off
     // and back on. Both are consumed by whoever looks, so exactly one look per
     // sweep is the contract.
-    let tolerance = stall_tolerance(*inner.send_timeout.lock().unwrap());
-    let reading = inner.observe_send_side(Instant::now(), tolerance);
+    let tolerance = stall_tolerance(inner.send_timeout.get());
+    let reading = inner.observe_send_side(Instant::now(), tolerance)?;
     let activity = inner.send_tally.drain();
 
-    let Some(threshold) = *inner.stale_request_after.lock().unwrap() else {
-        return; // consumer turned the warning off
+    let Some(threshold) = inner.stale_request_after.get() else {
+        return Ok(()); // consumer turned the warning off
     };
-    let split = classify_outstanding(inner, threshold);
+    let split = classify_outstanding(inner, threshold)?;
     let queue_depth = inner.send_queue_depth.load(Ordering::Relaxed);
     for (level, message) in sweep_report(&split, &reading, &activity, queue_depth) {
         log::log!(level, "{message}");
@@ -1154,10 +1171,11 @@ fn sweep_connection(inner: &Inner) {
             describe_requests(&split.queued, "waiting")
         );
     }
+    Ok(())
 }
 
 use crate::client::credits::{self, CreditPool, CreditReservation};
-use crate::crypto::compression::{compress_message, decompress_message, CompressedMessage};
+use crate::crypto::compression::{CompressedMessage, compress_message, decompress_message};
 use crate::crypto::encryption::{self, Cipher, NonceGenerator};
 use crate::crypto::kdf::PreauthHasher;
 use crate::crypto::signing::{self, SigningAlgorithm};
@@ -1165,13 +1183,13 @@ use crate::error::{Error, Result};
 use crate::msg::echo::EchoRequest;
 use crate::msg::header::Header;
 use crate::msg::negotiate::{
-    NegotiateContext, NegotiateRequest, NegotiateResponse, CIPHER_AES_128_CCM, CIPHER_AES_128_GCM,
-    CIPHER_AES_256_CCM, CIPHER_AES_256_GCM, COMPRESSION_LZ4, HASH_ALGORITHM_SHA512,
+    CIPHER_AES_128_CCM, CIPHER_AES_128_GCM, CIPHER_AES_256_CCM, CIPHER_AES_256_GCM,
+    COMPRESSION_LZ4, HASH_ALGORITHM_SHA512, NegotiateContext, NegotiateRequest, NegotiateResponse,
     SIGNING_AES_CMAC, SIGNING_AES_GMAC, SIGNING_HMAC_SHA256,
 };
 use crate::msg::transform::{
-    CompressionTransformHeader, TransformHeader, COMPRESSION_ALGORITHM_LZ4,
-    COMPRESSION_PROTOCOL_ID, SMB2_COMPRESSION_FLAG_NONE, TRANSFORM_PROTOCOL_ID,
+    COMPRESSION_ALGORITHM_LZ4, COMPRESSION_PROTOCOL_ID, CompressionTransformHeader,
+    SMB2_COMPRESSION_FLAG_NONE, TRANSFORM_PROTOCOL_ID, TransformHeader,
 };
 use crate::pack::{Guid, Pack, ReadCursor, Unpack, WriteCursor};
 use crate::transport::{TcpTransport, TransportReceive, TransportSend};
@@ -1461,21 +1479,21 @@ impl CryptoState {
 /// all now — `Connection` is just a handle to `Arc<Inner>`.
 struct Inner {
     /// Per-request routing: msg_id → oneshot sender waiting for its response.
-    waiters: StdMutex<HashMap<MessageId, Waiter>>,
+    waiters: StateLock<HashMap<MessageId, Waiter>>,
     /// How long a request may go unanswered before the sweeper warns, or `None`
     /// to stay silent. Consumers with a legitimately slow server tune or disable
     /// it; see `Connection::set_stale_request_warning`.
-    stale_request_after: StdMutex<Option<std::time::Duration>>,
+    stale_request_after: ValueLock<Option<std::time::Duration>>,
     /// The sweeper's memory of the send side: what lets one sweep tell "the
     /// queue is deep because the link is slow" from "the queue is deep because
     /// nothing is moving" — two states the depth alone cannot separate, and
     /// only one of which is worth waking anyone up for.
-    send_progress: StdMutex<SendProgress>,
+    send_progress: StateLock<SendProgress>,
     /// What the writer task has done since the sweeper last looked.
     send_tally: SendTally,
     /// How long a request may go unanswered before its caller gives up, or
     /// `None` to wait indefinitely. See `Connection::set_response_timeout`.
-    response_timeout: StdMutex<Option<std::time::Duration>>,
+    response_timeout: ValueLock<Option<std::time::Duration>>,
     /// When the server last put a frame on the wire for us, or `None` if it
     /// never has.
     ///
@@ -1488,21 +1506,21 @@ struct Inner {
     /// `None` rather than "the connection's birth" on purpose: a server that
     /// has never said anything has not proven anything, and the deadline
     /// extension must never be granted on an assumption.
-    last_frame_at: StdMutex<Option<std::time::Instant>>,
+    last_frame_at: ValueLock<Option<std::time::Instant>>,
     /// When one of this connection's own loops was last scheduled: the
     /// process's liveness clock, as opposed to the server's.
     ///
     /// Every other clock here measures wall time, which silently assumes we
     /// were running to hear the silence we are measuring. This is the witness
     /// that says whether we were. See [`Inner::forgive_scheduling_stall`].
-    last_scheduled_at: StdMutex<std::time::Instant>,
+    last_scheduled_at: ValueLock<std::time::Instant>,
     /// How much server silence, with work outstanding, triggers an ECHO probe,
     /// or `None` to never probe. See `Connection::set_keepalive`.
-    keepalive_after: StdMutex<Option<Duration>>,
+    keepalive_after: ValueLock<Option<Duration>>,
     /// How long a long-poll request may stay registered with the server before
     /// it is retired for a fresh one, or `None` to keep one forever. See
     /// `Connection::set_long_poll_refresh`.
-    long_poll_refresh: StdMutex<Option<Duration>>,
+    long_poll_refresh: ValueLock<Option<Duration>>,
     /// The server's credit budget. Every send reserves its `CreditCharge`
     /// here before the bytes go out; the receiver task banks the grant off
     /// every frame (orphans included). See `credits.rs`.
@@ -1510,7 +1528,7 @@ struct Inner {
     /// Next message id to allocate. Incremented by caller on send.
     next_message_id: AtomicU64,
     /// Crypto state for signing / encryption.
-    crypto: StdMutex<CryptoState>,
+    crypto: StateLock<CryptoState>,
     /// Set to true when the receiver task exits (transport error / EOF).
     /// New `execute` / `execute_compound` calls short-circuit to
     /// `Err(Disconnected)` once this flips so they don't register waiters
@@ -1529,7 +1547,7 @@ struct Inner {
     /// writer task that drains it. That is what makes a frame built for the
     /// dead session unable to reach the new socket: its queue no longer has a
     /// reader, so the send fails instead of landing on a stranger.
-    write_tx: StdMutex<mpsc::Sender<WriteJob>>,
+    write_tx: ValueLock<mpsc::Sender<WriteJob>>,
     /// MessageIds whose caller went away before the response landed, newest
     /// last, capped at [`ABANDONED_ID_MEMORY`].
     ///
@@ -1539,7 +1557,7 @@ struct Inner {
     /// aborting a copy — so `responses_stray` would fill with routine noise
     /// and stop meaning "protocol anomaly". A late response arrives within one
     /// round trip of the cancellation, so a small ring covers it.
-    abandoned: StdMutex<VecDeque<MessageId>>,
+    abandoned: StateLock<VecDeque<MessageId>>,
     /// Frames handed to the writer task and not yet acked. A gauge for
     /// diagnostics and for the stale-waiter warning, which reports it so a
     /// backlog names itself.
@@ -1555,34 +1573,34 @@ struct Inner {
     write_budget: Arc<Semaphore>,
     /// What `write_budget` holds versus what it should hold. See
     /// [`WriteBudgetUnits`] and `Inner::settle_write_budget`.
-    write_budget_units: StdMutex<WriteBudgetUnits>,
+    write_budget_units: ValueLock<WriteBudgetUnits>,
     /// How long one frame may take to reach the socket before its caller
     /// gives up with [`Error::SendTimeout`], or `None` to wait forever.
-    send_timeout: StdMutex<Option<Duration>>,
+    send_timeout: ValueLock<Option<Duration>>,
     /// Handle for the writer task, aborted with the receiver task when the
     /// last `Connection` clone drops.
-    writer_task: StdMutex<Option<tokio::task::JoinHandle<()>>>,
+    writer_task: ValueLock<Option<tokio::task::JoinHandle<()>>>,
     /// Handle for the ECHO keepalive task. Aborted with the others when the
     /// last `Connection` clone drops.
-    keepalive_task: StdMutex<Option<tokio::task::JoinHandle<()>>>,
+    keepalive_task: ValueLock<Option<tokio::task::JoinHandle<()>>>,
     /// Handle for the background receiver task. Aborted when the last clone
     /// of `Connection` drops (via `Inner`'s `Drop`). The transport's read
     /// half's EOF also stops the task; the abort is a safety net.
-    receiver_task: StdMutex<Option<tokio::task::JoinHandle<()>>>,
+    receiver_task: ValueLock<Option<tokio::task::JoinHandle<()>>>,
     /// Handle for the stale-request sweeper. Held so a revival can retire the
     /// old one instead of accumulating a sweeper per generation — the sweeper
     /// exits on `disconnected`, and a revival clears that flag.
-    sweeper_task: StdMutex<Option<tokio::task::JoinHandle<()>>>,
+    sweeper_task: ValueLock<Option<tokio::task::JoinHandle<()>>>,
 
     /// How to dial a fresh socket and re-authenticate on it, or `None` when
     /// the consumer has not armed auto-reconnect. See [`SessionReviver`].
-    reviver: StdMutex<Option<Arc<dyn SessionReviver>>>,
+    reviver: ValueLock<Option<Arc<dyn SessionReviver>>>,
     /// Serializes revival attempts, so a pipeline of 32 callers that all
     /// discover the same dead session dials once rather than 32 times.
     revive_lock: tokio::sync::Mutex<()>,
     /// Bounds on a revival: attempts, backoff, and the total wall clock it may
     /// consume. See [`ReconnectPolicy`].
-    reconnect_policy: StdMutex<ReconnectPolicy>,
+    reconnect_policy: ValueLock<ReconnectPolicy>,
     /// Successful revivals. Doubles as the "did somebody else already fix
     /// this while I queued for the lock" check, which is why it is bumped only
     /// on success.
@@ -1594,10 +1612,10 @@ struct Inner {
     /// back — 32 × 60 s of stall, which is the unbounded hang again wearing a
     /// different hat. Inside the cooldown the stored verdict is returned at
     /// once. See [`ReconnectPolicy::failure_cooldown`].
-    last_revive_failure: StdMutex<Option<(Instant, Error)>>,
+    last_revive_failure: StateLock<Option<(Instant, Error)>>,
     /// Called on every reconnect lifecycle event, if a consumer asked to be
     /// told. See [`Connection::on_reconnect`].
-    reconnect_observer: StdMutex<Option<ReconnectObserver>>,
+    reconnect_observer: ValueLock<Option<ReconnectObserver>>,
     /// The session id this connection had before it was revived, or `0`.
     ///
     /// SESSION_SETUP carries it as `PreviousSessionId` (MS-SMB2 § 2.2.5), which
@@ -1614,7 +1632,7 @@ struct Inner {
     /// A consumer still holding the *old* `Session` would otherwise activate
     /// share encryption with keys the current server has never seen, and every
     /// frame after that fails to decrypt.
-    session: StdMutex<Option<Arc<crate::client::Session>>>,
+    session: ValueLock<Option<Arc<crate::client::Session>>>,
 
     /// This connection's identity to the server: chosen when the connection
     /// is built, and unchanged for its whole life, revivals included
@@ -1652,9 +1670,9 @@ struct Inner {
     /// from scratch, and a rebooted server may come back with a smaller
     /// `MaxWriteSize` or a different dialect. Keeping the first negotiation's
     /// numbers would size every chunk against a server that no longer exists.
-    params: StdMutex<Option<NegotiatedParams>>,
+    params: ValueLock<Option<NegotiatedParams>>,
     /// Estimated round-trip time measured during negotiate.
-    estimated_rtt: StdMutex<Option<Duration>>,
+    estimated_rtt: ValueLock<Option<Duration>>,
     /// Whether compression is active on this connection (negotiated).
     compression_enabled: AtomicBool,
     /// Whether the client wants compression (from config).
@@ -1662,16 +1680,16 @@ struct Inner {
     /// Preauth integrity hash (for SMB 3.1.1 key derivation). Mutated during
     /// negotiate and session setup; both happen on one task before any clone
     /// is expected to observe it.
-    preauth_hasher: StdMutex<PreauthHasher>,
+    preauth_hasher: StateLock<PreauthHasher>,
     /// Tree IDs that have DFS capability (auto-set `SMB2_FLAGS_DFS_OPERATIONS`).
-    dfs_trees: StdMutex<HashSet<TreeId>>,
+    dfs_trees: StateLock<HashSet<TreeId>>,
     /// An IPC$ tree kept open for DFS referrals.
     ///
     /// MS-SMB2 § 3.2.4.20.3 lets a referral ride any existing tree connect and
     /// only asks for IPC$ when there is none, so holding one turns every
     /// referral after the first from three frames into one. Erased with the
     /// rest of the session on a revival, because the tree id belongs to it.
-    ipc_tree: StdMutex<Option<TreeId>>,
+    ipc_tree: ValueLock<Option<TreeId>>,
     /// Which tree each oplocked handle belongs to.
     ///
     /// Only durable opens take an oplock, and only so the server will grant
@@ -1680,7 +1698,7 @@ struct Inner {
     /// one the open belongs to (MS-SMB2 § 2.2.24.1) — and an unacknowledged
     /// break makes the *other* client wait out the server's break timeout,
     /// which is around 35 s on both Samba and Windows.
-    oplock_trees: StdMutex<HashMap<FileId, TreeId>>,
+    oplock_trees: StateLock<HashMap<FileId, TreeId>>,
     /// Counters for diagnostics. Snapshotted via [`Inner::metrics_snapshot`].
     /// Survives connection teardown — counters are read off the still-alive
     /// `Arc<Inner>` after the receiver task has exited.
@@ -1696,79 +1714,83 @@ impl Inner {
     /// frames complete — which is why every reserve calls this before asking for
     /// permits, rather than `set_write_budget` doing it once and hoping.
     fn settle_write_budget(&self) -> u32 {
-        let mut units = self.write_budget_units.lock().unwrap();
-        // `std::cmp::Ordering` spelled out: `Ordering` in this module is the
-        // atomic one.
-        match units.issued.cmp(&units.target) {
-            std::cmp::Ordering::Less => {
-                let grow = units.target - units.issued;
-                self.write_budget.add_permits(grow as usize);
-                units.issued = units.target;
+        self.write_budget_units.update(|mut units| {
+            // `std::cmp::Ordering` spelled out: `Ordering` in this module is the
+            // atomic one.
+            match units.issued.cmp(&units.target) {
+                std::cmp::Ordering::Less => {
+                    let grow = units.target - units.issued;
+                    self.write_budget.add_permits(grow as usize);
+                    units.issued = units.target;
+                }
+                std::cmp::Ordering::Greater => {
+                    let shrink = units.issued - units.target;
+                    let taken = self.write_budget.forget_permits(shrink as usize);
+                    units.issued -= u32::try_from(taken).unwrap_or(u32::MAX);
+                }
+                std::cmp::Ordering::Equal => {}
             }
-            std::cmp::Ordering::Greater => {
-                let shrink = units.issued - units.target;
-                let taken = self.write_budget.forget_permits(shrink as usize);
-                units.issued -= u32::try_from(taken).unwrap_or(u32::MAX);
-            }
-            std::cmp::Ordering::Equal => {}
-        }
-        units.target
+            (units, units.target)
+        })
     }
 
-    fn new(write_tx: mpsc::Sender<WriteJob>, server_name: String) -> Self {
-        Self {
-            waiters: StdMutex::new(HashMap::new()),
-            stale_request_after: StdMutex::new(Some(STALE_WAITER_AFTER)),
-            send_progress: StdMutex::new(SendProgress {
-                wire_bytes_sent: 0,
-                last_progress: Instant::now(),
-                last_sweep: Instant::now(),
-            }),
+    fn new(write_tx: mpsc::Sender<WriteJob>, server_name: String) -> Result<Self> {
+        Ok(Self {
+            waiters: StateLock::new("connection waiter map", HashMap::new()),
+            stale_request_after: ValueLock::new(Some(STALE_WAITER_AFTER)),
+            send_progress: StateLock::new(
+                "connection send progress",
+                SendProgress {
+                    wire_bytes_sent: 0,
+                    last_progress: Instant::now(),
+                    last_sweep: Instant::now(),
+                },
+            ),
             send_tally: SendTally::default(),
-            response_timeout: StdMutex::new(Some(RESPONSE_TIMEOUT)),
-            last_frame_at: StdMutex::new(None),
-            last_scheduled_at: StdMutex::new(std::time::Instant::now()),
-            keepalive_after: StdMutex::new(Some(KEEPALIVE_AFTER)),
-            long_poll_refresh: StdMutex::new(Some(LONG_POLL_REFRESH)),
+            response_timeout: ValueLock::new(Some(RESPONSE_TIMEOUT)),
+            last_frame_at: ValueLock::new(None),
+            last_scheduled_at: ValueLock::new(std::time::Instant::now()),
+            keepalive_after: ValueLock::new(Some(KEEPALIVE_AFTER)),
+            long_poll_refresh: ValueLock::new(Some(LONG_POLL_REFRESH)),
             credits: CreditPool::new(),
             next_message_id: AtomicU64::new(0),
-            crypto: StdMutex::new(CryptoState::new()),
+            crypto: StateLock::new("connection crypto state", CryptoState::new()),
             disconnected: AtomicBool::new(false),
-            write_tx: StdMutex::new(write_tx),
-            abandoned: StdMutex::new(VecDeque::new()),
+            write_tx: ValueLock::new(write_tx),
+            abandoned: StateLock::new("connection abandoned-request ring", VecDeque::new()),
             send_queue_depth: AtomicUsize::new(0),
             write_budget: Arc::new(Semaphore::new(
                 budget_units(DEFAULT_WRITE_BUDGET_BYTES) as usize
             )),
-            write_budget_units: StdMutex::new(WriteBudgetUnits {
+            write_budget_units: ValueLock::new(WriteBudgetUnits {
                 issued: budget_units(DEFAULT_WRITE_BUDGET_BYTES),
                 target: budget_units(DEFAULT_WRITE_BUDGET_BYTES),
             }),
-            send_timeout: StdMutex::new(Some(SEND_TIMEOUT)),
-            writer_task: StdMutex::new(None),
-            keepalive_task: StdMutex::new(None),
-            receiver_task: StdMutex::new(None),
-            sweeper_task: StdMutex::new(None),
-            reviver: StdMutex::new(None),
+            send_timeout: ValueLock::new(Some(SEND_TIMEOUT)),
+            writer_task: ValueLock::new(None),
+            keepalive_task: ValueLock::new(None),
+            receiver_task: ValueLock::new(None),
+            sweeper_task: ValueLock::new(None),
+            reviver: ValueLock::new(None),
             revive_lock: tokio::sync::Mutex::new(()),
-            reconnect_policy: StdMutex::new(ReconnectPolicy::default()),
+            reconnect_policy: ValueLock::new(ReconnectPolicy::default()),
             revivals: AtomicU64::new(0),
-            last_revive_failure: StdMutex::new(None),
-            reconnect_observer: StdMutex::new(None),
+            last_revive_failure: StateLock::new("connection revival verdict", None),
+            reconnect_observer: ValueLock::new(None),
             previous_session_id: AtomicU64::new(0),
-            session: StdMutex::new(None),
-            client_guid: random_guid(),
+            session: ValueLock::new(None),
+            client_guid: random_guid()?,
             server_name,
-            params: StdMutex::new(None),
-            estimated_rtt: StdMutex::new(None),
+            params: ValueLock::new(None),
+            estimated_rtt: ValueLock::new(None),
             compression_enabled: AtomicBool::new(false),
             compression_requested: AtomicBool::new(true),
-            preauth_hasher: StdMutex::new(PreauthHasher::new()),
-            dfs_trees: StdMutex::new(HashSet::new()),
-            ipc_tree: StdMutex::new(None),
-            oplock_trees: StdMutex::new(HashMap::new()),
+            preauth_hasher: StateLock::new("connection preauth hash", PreauthHasher::new()),
+            dfs_trees: StateLock::new("connection DFS tree set", HashSet::new()),
+            ipc_tree: ValueLock::new(None),
+            oplock_trees: StateLock::new("connection oplock map", HashMap::new()),
             metrics: Metrics::default(),
-        }
+        })
     }
 
     /// Send raw wire bytes through the transport and bump the
@@ -1790,7 +1812,7 @@ impl Inner {
         // revival may swap it underneath us, and enqueuing into the retired
         // queue is exactly right — that frame belongs to the dead session and
         // must not reach the new socket.
-        let write_tx = self.write_tx.lock().unwrap().clone();
+        let write_tx = self.write_tx.cloned();
         self.send_queue_depth.fetch_add(1, Ordering::Relaxed);
         let enqueued = write_tx.send(job).await;
         if enqueued.is_err() {
@@ -1834,9 +1856,9 @@ impl Inner {
     /// which is what makes it the right witness — a writer parked mid-frame
     /// moves nothing, and neither does this counter — and also why the verdict
     /// needs [`stall_tolerance`] rather than "did it move since last time".
-    fn observe_send_side(&self, now: Instant, tolerance: Duration) -> SendSideReading {
+    fn observe_send_side(&self, now: Instant, tolerance: Duration) -> Result<SendSideReading> {
         let sent = self.metrics.wire_bytes_sent.load(Ordering::Relaxed);
-        let mut progress = self.send_progress.lock().unwrap();
+        let mut progress = self.send_progress.lock()?;
         if sent != progress.wire_bytes_sent {
             progress.wire_bytes_sent = sent;
             progress.last_progress = now;
@@ -1844,7 +1866,7 @@ impl Inner {
         let silent_for = now.saturating_duration_since(progress.last_progress);
         let window = now.saturating_duration_since(progress.last_sweep);
         progress.last_sweep = now;
-        SendSideReading {
+        Ok(SendSideReading {
             state: if silent_for >= tolerance {
                 SendSide::Stalled
             } else {
@@ -1852,22 +1874,23 @@ impl Inner {
             },
             silent_for,
             window,
-        }
+        })
     }
 
     /// Note that `msg_id`'s bytes have reached the transport.
     ///
     /// Also restarts the response deadline: the clock measures the server's
     /// silence, and the server has only now been asked.
-    fn mark_sent(&self, msg_ids: &[MessageId]) {
+    fn mark_sent(&self, msg_ids: &[MessageId]) -> Result<()> {
         let now = std::time::Instant::now();
-        let mut waiters = self.waiters.lock().unwrap();
+        let mut waiters = self.waiters.lock()?;
         for id in msg_ids {
             if let Some(w) = waiters.get_mut(id) {
                 w.sent_at = Some(now);
                 w.last_activity = now;
             }
         }
+        Ok(())
     }
 
     /// Reserve `charge` credits for a request that is about to be sent.
@@ -1895,7 +1918,7 @@ impl Inner {
         if self.credits.is_closed() || self.disconnected.load(Ordering::Acquire) {
             return Err(Error::Disconnected);
         }
-        if self.waiters.lock().unwrap().is_empty() {
+        if self.waiters.lock()?.is_empty() {
             // Every credit the server will ever return rides on a response,
             // and there is no request outstanding to carry one.
             return Err(self.starvation(charge, Duration::ZERO));
@@ -1933,7 +1956,7 @@ impl Inner {
                     };
                 }
                 Either::Right((_, still_reserving)) => {
-                    let nothing_outstanding = self.waiters.lock().unwrap().is_empty();
+                    let nothing_outstanding = self.waiters.lock()?.is_empty();
                     if nothing_outstanding || std::time::Instant::now() >= deadline {
                         self.metrics
                             .credit_starvations
@@ -1948,14 +1971,16 @@ impl Inner {
 
     /// Record that the server put a frame on the wire just now.
     fn note_server_spoke(&self) {
-        *self.last_frame_at.lock().unwrap() = Some(std::time::Instant::now());
+        self.last_frame_at.set(Some(std::time::Instant::now()));
     }
 
     /// How long since the server last said anything, or `None` if it never
     /// has.
     fn server_silent_for(&self) -> Option<Duration> {
         let now = std::time::Instant::now();
-        (*self.last_frame_at.lock().unwrap()).map(|t| now.saturating_duration_since(t))
+        self.last_frame_at
+            .get()
+            .map(|t| now.saturating_duration_since(t))
     }
 
     /// How long the wire has been quiet while the server had something to
@@ -1972,17 +1997,20 @@ impl Inner {
     /// would measure the wrong side of the wire — the send deadline owns that
     /// case, and conflating the two is the misdiagnosis the `sent_at` split
     /// exists to prevent.
-    fn quiet_for(&self) -> Option<Duration> {
+    fn quiet_for(&self) -> Result<Option<Duration>> {
         let now = std::time::Instant::now();
         let oldest_sent = {
-            let waiters = self.waiters.lock().unwrap();
-            waiters.values().filter_map(|w| w.sent_at).min()?
+            let waiters = self.waiters.lock()?;
+            waiters.values().filter_map(|w| w.sent_at).min()
         };
-        let reference = match *self.last_frame_at.lock().unwrap() {
+        let Some(oldest_sent) = oldest_sent else {
+            return Ok(None);
+        };
+        let reference = match self.last_frame_at.get() {
             Some(spoke) => spoke.max(oldest_sent),
             None => oldest_sent,
         };
-        Some(now.saturating_duration_since(reference))
+        Ok(Some(now.saturating_duration_since(reference)))
     }
 
     /// Freeze every liveness clock across a stretch this PROCESS spent
@@ -2016,28 +2044,34 @@ impl Inner {
     /// restart with them, and a server that really is dead is declared dead
     /// one budget later. Suppressing the verdict instead would trade a false
     /// death for a permanent hang.
-    fn forgive_scheduling_stall(&self) -> Option<Duration> {
+    fn forgive_scheduling_stall(&self) -> Result<Option<Duration>> {
         // The threshold rides on the probe cadence whether or not probing is
         // armed: "we were not running" is a fact about this process, and
         // `set_keepalive(None)` says nothing about it either way.
-        let after = (*self.keepalive_after.lock().unwrap()).unwrap_or(KEEPALIVE_AFTER);
+        let after = self.keepalive_after.get().unwrap_or(KEEPALIVE_AFTER);
         let now = std::time::Instant::now();
-        let stall = {
-            let mut witness = self.last_scheduled_at.lock().unwrap();
-            let gap = now
-                .saturating_duration_since(*witness)
-                .saturating_sub(Self::keepalive_tick(after));
-            *witness = now;
-            (gap >= after).then_some(gap)
-        }?;
+        let witness = self.last_scheduled_at.replace(now);
+        let gap = now
+            .saturating_duration_since(witness)
+            .saturating_sub(Self::keepalive_tick(after));
+        if gap < after {
+            return Ok(None);
+        }
+        let stall = gap;
         // Shifting forward, rather than resetting to now, keeps whatever the
         // clocks legitimately read BEFORE the stall: a request the server had
         // already owed us for 10 s is still 10 s overdue afterwards.
         let shift = |t: &mut std::time::Instant| *t = t.checked_add(stall).unwrap_or(now);
-        if let Some(spoke) = self.last_frame_at.lock().unwrap().as_mut() {
-            shift(spoke);
-        }
-        for waiter in self.waiters.lock().unwrap().values_mut() {
+        self.last_frame_at.update(|spoke| {
+            (
+                spoke.map(|mut t| {
+                    shift(&mut t);
+                    t
+                }),
+                (),
+            )
+        });
+        for waiter in self.waiters.lock()?.values_mut() {
             shift(&mut waiter.registered_at);
             shift(&mut waiter.last_activity);
             if let Some(sent) = waiter.sent_at.as_mut() {
@@ -2055,7 +2089,7 @@ impl Inner {
              machine). Nothing can be concluded about the server from silence nobody was \
              listening to, so every liveness clock on this connection moves forward with it"
         );
-        Some(stall)
+        Ok(Some(stall))
     }
 
     /// How often the keepalive loop wakes to check the liveness clock.
@@ -2078,7 +2112,7 @@ impl Inner {
     /// clock, a stale reading means "quiet connection", not "dead server", and
     /// a fresh one is luck rather than evidence.
     fn liveness_is_proven(&self) -> bool {
-        let Some(after) = *self.keepalive_after.lock().unwrap() else {
+        let Some(after) = self.keepalive_after.get() else {
             return false;
         };
         match self.server_silent_for() {
@@ -2118,10 +2152,14 @@ impl Inner {
     /// burns its own deadline one at a time — exactly what
     /// `declare_unresponsive` exists to replace. The premise is weaker there
     /// than the doc above claims; the verdict is still the useful one.
-    fn unresponsive_for(&self) -> Option<Duration> {
-        let after = (*self.keepalive_after.lock().unwrap())?;
-        let quiet = self.quiet_for()?;
-        (quiet >= after * LIVENESS_WINDOW_PROBES).then_some(quiet)
+    fn unresponsive_for(&self) -> Result<Option<Duration>> {
+        let Some(after) = self.keepalive_after.get() else {
+            return Ok(None);
+        };
+        let Some(quiet) = self.quiet_for()? else {
+            return Ok(None);
+        };
+        Ok((quiet >= after * LIVENESS_WINDOW_PROBES).then_some(quiet))
     }
 
     /// How long ago `msg_id`'s frame reached the wire, or `None` if it is no
@@ -2132,31 +2170,31 @@ impl Inner {
     /// which an interim STATUS_PENDING restarts — a long poll gets exactly one
     /// of those, right at the start, and a clock that restarted there would
     /// measure the same thing while claiming to measure registration age.
-    fn waiter_sent_age(&self, msg_id: MessageId) -> Option<Duration> {
+    fn waiter_sent_age(&self, msg_id: MessageId) -> Result<Option<Duration>> {
         let now = std::time::Instant::now();
-        self.waiters
-            .lock()
-            .unwrap()
+        Ok(self
+            .waiters
+            .lock()?
             .get(&msg_id)
             .and_then(|w| w.sent_at)
-            .map(|t| now.saturating_duration_since(t))
+            .map(|t| now.saturating_duration_since(t)))
     }
 
     /// The `AsyncId` the server assigned `msg_id`, if it has sent an interim
     /// STATUS_PENDING for it.
-    fn async_id_for(&self, msg_id: MessageId) -> Option<u64> {
-        self.waiters.lock().unwrap().get(&msg_id)?.async_id
+    fn async_id_for(&self, msg_id: MessageId) -> Result<Option<u64>> {
+        Ok(self.waiters.lock()?.get(&msg_id).and_then(|w| w.async_id))
     }
 
     /// How long `msg_id` has gone without a sign of life, or `None` if it is
     /// no longer outstanding (its response has been routed).
-    fn waiter_idle_for(&self, msg_id: MessageId) -> Option<Duration> {
+    fn waiter_idle_for(&self, msg_id: MessageId) -> Result<Option<Duration>> {
         let now = std::time::Instant::now();
-        self.waiters
-            .lock()
-            .unwrap()
+        Ok(self
+            .waiters
+            .lock()?
             .get(&msg_id)
-            .map(|w| now.saturating_duration_since(w.last_activity))
+            .map(|w| now.saturating_duration_since(w.last_activity)))
     }
 
     fn starvation(&self, charge: u16, waited: Duration) -> Error {
@@ -2308,16 +2346,16 @@ impl Drop for Inner {
         // Last `Arc<Inner>` dropping: abort both background tasks if still
         // alive. The writer would also stop on its own once `write_tx` drops,
         // but not while it is parked inside a send.
-        if let Some(handle) = self.receiver_task.lock().unwrap().take() {
+        if let Some(handle) = self.receiver_task.take() {
             handle.abort();
         }
-        if let Some(handle) = self.writer_task.lock().unwrap().take() {
+        if let Some(handle) = self.writer_task.take() {
             handle.abort();
         }
-        if let Some(handle) = self.keepalive_task.lock().unwrap().take() {
+        if let Some(handle) = self.keepalive_task.take() {
             handle.abort();
         }
-        if let Some(handle) = self.sweeper_task.lock().unwrap().take() {
+        if let Some(handle) = self.sweeper_task.take() {
             handle.abort();
         }
     }
@@ -2347,15 +2385,20 @@ pub struct Connection {
 
 impl Connection {
     /// Create a connection from an existing transport (for testing with mock).
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Internal`] if the operating system's random source cannot
+    /// produce the connection's client GUID.
     pub fn from_transport(
         sender: Box<dyn TransportSend>,
         receiver: Box<dyn TransportReceive>,
         server_name: impl Into<String>,
-    ) -> Self {
+    ) -> Result<Self> {
         let (write_tx, write_rx) = mpsc::channel(WRITE_QUEUE_DEPTH);
-        let inner = Arc::new(Inner::new(write_tx, server_name.into()));
+        let inner = Arc::new(Inner::new(write_tx, server_name.into())?);
         spawn_plumbing(&inner, sender, receiver, write_rx);
-        Self { inner }
+        Ok(Self { inner })
     }
 
     /// Connect to an SMB server over TCP.
@@ -2383,11 +2426,11 @@ impl Connection {
         let transport = TcpTransport::connect_with(addr, opts).await?;
         info!("connection: connected to {}", addr);
         let transport = Arc::new(transport);
-        Ok(Self::from_transport(
+        Self::from_transport(
             Box::new(Arc::clone(&transport)),
             Box::new(transport),
             server_name,
-        ))
+        )
     }
 
     /// Perform the SMB2 NEGOTIATE exchange.
@@ -2398,7 +2441,7 @@ impl Connection {
         let mut negotiate_contexts = vec![
             NegotiateContext::PreauthIntegrity {
                 hash_algorithms: vec![HASH_ALGORITHM_SHA512],
-                salt: generate_salt(),
+                salt: generate_salt()?,
             },
             NegotiateContext::Encryption {
                 ciphers: vec![
@@ -2446,7 +2489,7 @@ impl Connection {
         let req_bytes = pack_message(&header, &request);
 
         // Update preauth hash with request bytes.
-        self.inner.preauth_hasher.lock().unwrap().update(&req_bytes);
+        self.inner.preauth_hasher.lock()?.update(&req_bytes);
 
         let mut guard = self.register_waiter(msg_id, Command::Negotiate)?;
 
@@ -2455,13 +2498,13 @@ impl Connection {
             .send_and_count(&req_bytes, Command::Negotiate)
             .await?;
         reservation.commit();
-        self.inner.mark_sent(&[msg_id]);
+        self.inner.mark_sent(&[msg_id])?;
 
         let frame = guard.recv().await?;
-        *self.inner.estimated_rtt.lock().unwrap() = Some(rtt_start.elapsed());
+        self.inner.estimated_rtt.set(Some(rtt_start.elapsed()));
 
         // Preauth hash update with response bytes.
-        self.inner.preauth_hasher.lock().unwrap().update(&frame.raw);
+        self.inner.preauth_hasher.lock()?.update(&frame.raw);
 
         let resp_header = &frame.header;
         if !resp_header.is_response() {
@@ -2545,7 +2588,7 @@ impl Connection {
         // Overwrites: a revived connection renegotiates from scratch on a
         // fresh socket, and the numbers it comes back with are the only ones
         // that describe the server we are now talking to.
-        *self.inner.params.lock().unwrap() = Some(NegotiatedParams {
+        self.inner.params.set(Some(NegotiatedParams {
             dialect: resp.dialect_revision,
             max_read_size: resp.max_read_size,
             max_write_size: resp.max_write_size,
@@ -2556,7 +2599,7 @@ impl Connection {
             gmac_negotiated,
             cipher,
             compression_supported,
-        });
+        }));
 
         info!(
             "negotiate: dialect={}, signing_required={}, capabilities={:?}",
@@ -2564,8 +2607,13 @@ impl Connection {
         );
         debug!(
             "negotiate: max_read={}, max_write={}, max_transact={}, server_guid={:?}, cipher={:?}, gmac={}, compression={}",
-            resp.max_read_size, resp.max_write_size, resp.max_transact_size,
-            resp.server_guid, cipher, gmac_negotiated, compression_enabled
+            resp.max_read_size,
+            resp.max_write_size,
+            resp.max_transact_size,
+            resp.server_guid,
+            cipher,
+            gmac_negotiated,
+            compression_enabled
         );
 
         Ok(())
@@ -2573,7 +2621,7 @@ impl Connection {
 
     /// Get the estimated round-trip time.
     pub fn estimated_rtt(&self) -> Option<Duration> {
-        *self.inner.estimated_rtt.lock().unwrap()
+        self.inner.estimated_rtt.get()
     }
 
     /// Get the negotiated parameters, or `None` before NEGOTIATE has run.
@@ -2582,7 +2630,7 @@ impl Connection {
     /// replaced whenever the connection is revived on a fresh socket; every
     /// field is a plain scalar, so the copy costs nothing.
     pub fn params(&self) -> Option<NegotiatedParams> {
-        self.inner.params.lock().unwrap().clone()
+        self.inner.params.cloned()
     }
 
     /// Get a clone of the preauth hasher's current state.
@@ -2593,8 +2641,12 @@ impl Connection {
     /// their own session-specific updates into it without disturbing the
     /// shared connection-level hasher. Returning an owned clone is ~a few
     /// hundred bytes of SHA-512 state; cheaper than the actual KDF it feeds.
-    pub fn preauth_hasher(&self) -> PreauthHasher {
-        self.inner.preauth_hasher.lock().unwrap().clone()
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Internal`] if an earlier panic poisoned the hasher.
+    pub fn preauth_hasher(&self) -> Result<PreauthHasher> {
+        Ok(self.inner.preauth_hasher.lock()?.clone())
     }
 
     /// Run a closure with a mutable borrow of the preauth hasher.
@@ -2603,53 +2655,90 @@ impl Connection {
     /// naked `&mut PreauthHasher` can no longer be handed out. Closure-based
     /// access keeps the lock scoped to the caller's update.
     #[doc(hidden)] // unused outside the crate; kept for crate-internal parity.
-    pub fn with_preauth_hasher_mut<R>(&self, f: impl FnOnce(&mut PreauthHasher) -> R) -> R {
-        let mut h = self.inner.preauth_hasher.lock().unwrap();
-        f(&mut h)
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Internal`] if an earlier panic poisoned the hasher.
+    pub fn with_preauth_hasher_mut<R>(&self, f: impl FnOnce(&mut PreauthHasher) -> R) -> Result<R> {
+        let mut h = self.inner.preauth_hasher.lock()?;
+        Ok(f(&mut h))
     }
 
     /// Set the session ID.
-    pub fn set_session_id(&mut self, id: SessionId) {
-        self.inner.crypto.lock().unwrap().session_id = id;
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Internal`] if an earlier panic poisoned the connection's
+    /// crypto state.
+    pub fn set_session_id(&mut self, id: SessionId) -> Result<()> {
+        self.inner.crypto.lock()?.session_id = id;
+        Ok(())
     }
 
     /// Get the current session ID.
-    pub fn session_id(&self) -> SessionId {
-        self.inner.crypto.lock().unwrap().session_id
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Internal`] if an earlier panic poisoned the connection's
+    /// crypto state.
+    pub fn session_id(&self) -> Result<SessionId> {
+        Ok(self.inner.crypto.lock()?.session_id)
     }
 
     /// Activate signing with the given key and algorithm.
-    pub fn activate_signing(&mut self, key: Vec<u8>, algorithm: SigningAlgorithm) {
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Internal`] if an earlier panic poisoned the connection's
+    /// crypto state.
+    pub fn activate_signing(&mut self, key: Vec<u8>, algorithm: SigningAlgorithm) -> Result<()> {
         debug!(
             "signing: activated, algo={:?}, key_len={}",
             algorithm,
             key.len()
         );
-        let mut c = self.inner.crypto.lock().unwrap();
+        let mut c = self.inner.crypto.lock()?;
         c.signing_key = Some(key);
         c.signing_algorithm = Some(algorithm);
         c.should_sign = true;
+        Ok(())
     }
 
     /// Activate encryption with the given keys and cipher.
-    pub fn activate_encryption(&mut self, enc_key: Vec<u8>, dec_key: Vec<u8>, cipher: Cipher) {
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Internal`] if an earlier panic poisoned the connection's
+    /// crypto state.
+    pub fn activate_encryption(
+        &mut self,
+        enc_key: Vec<u8>,
+        dec_key: Vec<u8>,
+        cipher: Cipher,
+    ) -> Result<()> {
         debug!(
             "encryption: activated, cipher={:?}, enc_key_len={}, dec_key_len={}",
             cipher,
             enc_key.len(),
             dec_key.len()
         );
-        let mut c = self.inner.crypto.lock().unwrap();
+        let mut c = self.inner.crypto.lock()?;
         c.encryption_key = Some(enc_key);
         c.decryption_key = Some(dec_key);
         c.encryption_cipher = Some(cipher);
         c.nonce_gen = Some(NonceGenerator::new());
         c.should_encrypt = true;
+        Ok(())
     }
 
     /// Whether encryption is active on this connection.
-    pub fn should_encrypt(&self) -> bool {
-        self.inner.crypto.lock().unwrap().should_encrypt
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Internal`] if an earlier panic poisoned the connection's
+    /// crypto state.
+    pub fn should_encrypt(&self) -> Result<bool> {
+        Ok(self.inner.crypto.lock()?.should_encrypt)
     }
 
     /// Credits on hand: granted by the server and not yet spent on a request
@@ -2808,20 +2897,20 @@ impl Connection {
         header.message_id = msg_id;
         header.credits = self.inner.credits.request_for(charge);
         header.credit_charge = CreditCharge(charge);
-        header.session_id = self.session_id();
+        header.session_id = self.session_id()?;
         if let Some(tid) = tree_id {
             header.tree_id = Some(tid);
         }
 
         let (should_sign, should_encrypt) = {
-            let c = self.inner.crypto.lock().unwrap();
+            let c = self.inner.crypto.lock()?;
             (c.should_sign, c.should_encrypt)
         };
 
         if should_sign && !should_encrypt {
             header.flags.set_signed();
         }
-        if self.should_set_dfs_flag(tree_id) {
+        if self.should_set_dfs_flag(tree_id)? {
             header.flags |= HeaderFlags::new(HeaderFlags::DFS_OPERATIONS);
         }
 
@@ -2837,14 +2926,13 @@ impl Connection {
             }
         } else {
             if should_sign {
-                let c = self.inner.crypto.lock().unwrap();
-                if let (Some(key), Some(algo)) = (&c.signing_key, &c.signing_algorithm) {
-                    if let Err(e) =
+                let c = self.inner.crypto.lock()?;
+                if let (Some(key), Some(algo)) = (&c.signing_key, &c.signing_algorithm)
+                    && let Err(e) =
                         signing::sign_message(&mut msg_bytes, key, *algo, msg_id.0, false)
-                    {
-                        drop(c);
-                        return Err(e);
-                    }
+                {
+                    drop(c);
+                    return Err(e);
                 }
             }
             msg_bytes
@@ -2852,7 +2940,7 @@ impl Connection {
 
         self.inner.send_and_count(&wire_bytes, command).await?;
         reservation.commit();
-        self.inner.mark_sent(&[msg_id]);
+        self.inner.mark_sent(&[msg_id])?;
         // TRACE, not DEBUG: per-request frame plumbing. Fires for every request, so at
         // DEBUG it floods a consumer during high-throughput ops (e.g. a recursive
         // directory scan). Lifecycle/errors stay at DEBUG. See AGENTS.md § Logging.
@@ -2917,20 +3005,20 @@ impl Connection {
         header.message_id = msg_id;
         header.credits = self.inner.credits.request_for(charge);
         header.credit_charge = CreditCharge(charge);
-        header.session_id = self.session_id();
+        header.session_id = self.session_id()?;
         if let Some(tid) = tree_id {
             header.tree_id = Some(tid);
         }
 
         let (should_sign, should_encrypt) = {
-            let c = self.inner.crypto.lock().unwrap();
+            let c = self.inner.crypto.lock()?;
             (c.should_sign, c.should_encrypt)
         };
 
         if should_sign && !should_encrypt {
             header.flags.set_signed();
         }
-        if self.should_set_dfs_flag(tree_id) {
+        if self.should_set_dfs_flag(tree_id)? {
             header.flags |= HeaderFlags::new(HeaderFlags::DFS_OPERATIONS);
         }
 
@@ -2952,35 +3040,40 @@ impl Connection {
             }
         } else {
             if should_sign {
-                let c = self.inner.crypto.lock().unwrap();
-                if let (Some(key), Some(algo)) = (&c.signing_key, &c.signing_algorithm) {
-                    if let Err(e) =
+                let c = self.inner.crypto.lock()?;
+                if let (Some(key), Some(algo)) = (&c.signing_key, &c.signing_algorithm)
+                    && let Err(e) =
                         signing::sign_message(&mut msg_bytes, key, *algo, msg_id.0, false)
-                    {
-                        drop(c);
-                        return Err(e);
-                    }
+                {
+                    drop(c);
+                    return Err(e);
                 }
             }
-            if self.compression_enabled() && msg_bytes.len() > Header::SIZE {
-                if let Some(compressed) = compress_message(&msg_bytes, Header::SIZE) {
-                    let framed = build_compressed_frame(&compressed);
-                    match self.inner.send_and_count(&framed, command).await {
-                        Ok(()) => {
-                            reservation.commit();
-                            self.inner.mark_sent(&[msg_id]);
-                            // TRACE: per-request frame plumbing (see execute_cap above).
-                            trace!(
-                                "execute: cmd={:?}, msg_id={}, credit_charge={}, tree_id={:?}, signed={}, compressed {}->{} bytes",
-                                command, msg_id.0, charge, tree_id, should_sign,
-                                msg_bytes.len(), framed.len()
-                            );
-                            return self.await_response(guard, command).await;
-                        }
-                        Err(e) => {
-                            self.remove_waiter(msg_id);
-                            return Err(e);
-                        }
+            if self.compression_enabled()
+                && msg_bytes.len() > Header::SIZE
+                && let Some(compressed) = compress_message(&msg_bytes, Header::SIZE)
+            {
+                let framed = build_compressed_frame(&compressed);
+                match self.inner.send_and_count(&framed, command).await {
+                    Ok(()) => {
+                        reservation.commit();
+                        self.inner.mark_sent(&[msg_id])?;
+                        // TRACE: per-request frame plumbing (see execute_cap above).
+                        trace!(
+                            "execute: cmd={:?}, msg_id={}, credit_charge={}, tree_id={:?}, signed={}, compressed {}->{} bytes",
+                            command,
+                            msg_id.0,
+                            charge,
+                            tree_id,
+                            should_sign,
+                            msg_bytes.len(),
+                            framed.len()
+                        );
+                        return self.await_response(guard, command).await;
+                    }
+                    Err(e) => {
+                        self.remove_waiter(msg_id);
+                        return Err(e);
                     }
                 }
             }
@@ -2992,11 +3085,17 @@ impl Connection {
             return Err(e);
         }
         reservation.commit();
-        self.inner.mark_sent(&[msg_id]);
+        self.inner.mark_sent(&[msg_id])?;
         // TRACE: per-request frame plumbing (see execute_cap above).
         trace!(
             "execute: cmd={:?}, msg_id={}, credit_charge={}, tree_id={:?}, signed={}, encrypted={}, len={}",
-            command, msg_id.0, charge, tree_id, should_sign, should_encrypt, wire_bytes.len()
+            command,
+            msg_id.0,
+            charge,
+            tree_id,
+            should_sign,
+            should_encrypt,
+            wire_bytes.len()
         );
         self.await_response(guard, command).await
     }
@@ -3076,20 +3175,20 @@ impl Connection {
         header.message_id = msg_id;
         header.credits = self.inner.credits.request_for(charge);
         header.credit_charge = CreditCharge(charge);
-        header.session_id = self.session_id();
+        header.session_id = self.session_id()?;
         if let Some(tid) = tree_id {
             header.tree_id = Some(tid);
         }
 
         let (should_sign, should_encrypt) = {
-            let c = self.inner.crypto.lock().unwrap();
+            let c = self.inner.crypto.lock()?;
             (c.should_sign, c.should_encrypt)
         };
 
         if should_sign && !should_encrypt {
             header.flags.set_signed();
         }
-        if self.should_set_dfs_flag(tree_id) {
+        if self.should_set_dfs_flag(tree_id)? {
             header.flags |= HeaderFlags::new(HeaderFlags::DFS_OPERATIONS);
         }
 
@@ -3104,32 +3203,37 @@ impl Connection {
             }
         } else {
             if should_sign {
-                let c = self.inner.crypto.lock().unwrap();
-                if let (Some(key), Some(algo)) = (&c.signing_key, &c.signing_algorithm) {
-                    if let Err(e) =
+                let c = self.inner.crypto.lock()?;
+                if let (Some(key), Some(algo)) = (&c.signing_key, &c.signing_algorithm)
+                    && let Err(e) =
                         signing::sign_message(&mut msg_bytes, key, *algo, msg_id.0, false)
-                    {
-                        drop(c);
-                        return Err(e);
-                    }
+                {
+                    drop(c);
+                    return Err(e);
                 }
             }
-            if self.compression_enabled() && msg_bytes.len() > Header::SIZE {
-                if let Some(compressed) = compress_message(&msg_bytes, Header::SIZE) {
-                    let framed = build_compressed_frame(&compressed);
-                    match self.inner.send_and_count(&framed, command).await {
-                        Ok(()) => {
-                            reservation.commit();
-                            trace!(
-                                "dispatch: cmd={:?}, msg_id={}, credit_charge={}, tree_id={:?}, signed={}, compressed {}->{} bytes",
-                                command, msg_id.0, charge, tree_id, should_sign,
-                                msg_bytes.len(), framed.len()
-                            );
-                            self.inner.mark_sent(&[msg_id]);
-                            return Ok(guard);
-                        }
-                        Err(e) => return Err(e),
+            if self.compression_enabled()
+                && msg_bytes.len() > Header::SIZE
+                && let Some(compressed) = compress_message(&msg_bytes, Header::SIZE)
+            {
+                let framed = build_compressed_frame(&compressed);
+                match self.inner.send_and_count(&framed, command).await {
+                    Ok(()) => {
+                        reservation.commit();
+                        trace!(
+                            "dispatch: cmd={:?}, msg_id={}, credit_charge={}, tree_id={:?}, signed={}, compressed {}->{} bytes",
+                            command,
+                            msg_id.0,
+                            charge,
+                            tree_id,
+                            should_sign,
+                            msg_bytes.len(),
+                            framed.len()
+                        );
+                        self.inner.mark_sent(&[msg_id])?;
+                        return Ok(guard);
                     }
+                    Err(e) => return Err(e),
                 }
             }
             msg_bytes
@@ -3137,10 +3241,16 @@ impl Connection {
 
         self.inner.send_and_count(&wire_bytes, command).await?;
         reservation.commit();
-        self.inner.mark_sent(&[msg_id]);
+        self.inner.mark_sent(&[msg_id])?;
         trace!(
             "dispatch: cmd={:?}, msg_id={}, credit_charge={}, tree_id={:?}, signed={}, encrypted={}, len={}",
-            command, msg_id.0, charge, tree_id, should_sign, should_encrypt, wire_bytes.len()
+            command,
+            msg_id.0,
+            charge,
+            tree_id,
+            should_sign,
+            should_encrypt,
+            wire_bytes.len()
         );
         Ok(guard)
     }
@@ -3226,7 +3336,9 @@ impl Connection {
             // `Session::setup` on this connection would otherwise be left with
             // a keepalive that had silently retired.
             Ok(Err(e)) => {
-                debug!("keepalive: the server answered the probe with an error, which still proves it is processing requests: {e}");
+                debug!(
+                    "keepalive: the server answered the probe with an error, which still proves it is processing requests: {e}"
+                );
                 ProbeOutcome::Alive
             }
             Err(_elapsed) => {
@@ -3294,7 +3406,7 @@ impl Connection {
         }
 
         let (should_sign, should_encrypt) = {
-            let c = self.inner.crypto.lock().unwrap();
+            let c = self.inner.crypto.lock()?;
             (c.should_sign, c.should_encrypt)
         };
 
@@ -3310,7 +3422,7 @@ impl Connection {
             .reserve_credits(total_charge, ops[0].command)
             .await?;
 
-        let session_id = self.session_id();
+        let session_id = self.session_id()?;
         let mut message_ids: Vec<MessageId> = Vec::with_capacity(ops.len());
         let mut sub_requests: Vec<Vec<u8>> = Vec::with_capacity(ops.len());
 
@@ -3331,7 +3443,7 @@ impl Connection {
             if should_sign && !should_encrypt {
                 header.flags.set_signed();
             }
-            if self.should_set_dfs_flag(op.tree_id) {
+            if self.should_set_dfs_flag(op.tree_id)? {
                 header.flags |= HeaderFlags::new(HeaderFlags::DFS_OPERATIONS);
             }
 
@@ -3356,7 +3468,7 @@ impl Connection {
         }
 
         if should_sign && !should_encrypt {
-            let c = self.inner.crypto.lock().unwrap();
+            let c = self.inner.crypto.lock()?;
             if let (Some(key), Some(algo)) = (&c.signing_key, &c.signing_algorithm) {
                 for (i, sub_req) in sub_requests.iter_mut().enumerate() {
                     signing::sign_message(sub_req, key, *algo, message_ids[i].0, false)?;
@@ -3392,7 +3504,7 @@ impl Connection {
         };
         send_result?;
         reservation.commit();
-        self.inner.mark_sent(&message_ids);
+        self.inner.mark_sent(&message_ids)?;
 
         // TRACE: per-request frame plumbing (see execute_cap above).
         trace!(
@@ -3454,14 +3566,15 @@ impl Connection {
         //
         // Not an error: nothing is wrong, the request being cancelled died
         // with its session and the server has already forgotten it.
-        if generation != self.generation() || self.session_id() == SessionId(0) {
+        let no_session = self.session_id()? == SessionId(0);
+        if generation != self.generation() || no_session {
             debug!(
                 "send_cancel: skipping the CANCEL for msg_id={} -- it belongs to \
                  generation {} and the connection is on {}{}",
                 original_msg_id.0,
                 generation,
                 self.generation(),
-                if self.session_id() == SessionId(0) {
+                if no_session {
                     " with no session established"
                 } else {
                     ""
@@ -3476,10 +3589,10 @@ impl Connection {
             .fetch_add(1, Ordering::Relaxed);
 
         let (should_sign, should_encrypt) = {
-            let c = self.inner.crypto.lock().unwrap();
+            let c = self.inner.crypto.lock()?;
             (c.should_sign, c.should_encrypt)
         };
-        let session_id = self.session_id();
+        let session_id = self.session_id()?;
 
         let mut header = Header::new_request(Command::Cancel);
         header.message_id = original_msg_id;
@@ -3506,12 +3619,11 @@ impl Connection {
                 .await?;
             trace!(
                 "send_cancel: msg_id={}, async_id={:?}, encrypted",
-                original_msg_id.0,
-                async_id
+                original_msg_id.0, async_id
             );
         } else {
             if should_sign {
-                let c = self.inner.crypto.lock().unwrap();
+                let c = self.inner.crypto.lock()?;
                 if let (Some(key), Some(algo)) = (&c.signing_key, &c.signing_algorithm) {
                     // `is_cancel = true`: the AES-GMAC nonce carries a bit for
                     // it (MS-SMB2 § 3.1.4.1), and a server negotiating GMAC
@@ -3526,9 +3638,7 @@ impl Connection {
                 .await?;
             trace!(
                 "send_cancel: msg_id={}, async_id={:?}, signed={}",
-                original_msg_id.0,
-                async_id,
-                should_sign
+                original_msg_id.0, async_id, should_sign
             );
         }
         Ok(())
@@ -3536,7 +3646,7 @@ impl Connection {
 
     /// Encrypt plaintext into a TRANSFORM_HEADER + ciphertext frame.
     fn encrypt_bytes(&self, plaintext: &[u8]) -> Result<Vec<u8>> {
-        let mut c = self.inner.crypto.lock().unwrap();
+        let mut c = self.inner.crypto.lock()?;
         let enc_key = c
             .encryption_key
             .as_ref()
@@ -3550,7 +3660,7 @@ impl Connection {
             .nonce_gen
             .as_mut()
             .ok_or_else(|| Error::invalid_data("encryption active but no nonce generator"))?
-            .next(cipher);
+            .next(cipher)?;
         drop(c);
 
         let (transform_header, ciphertext) =
@@ -3570,18 +3680,28 @@ impl Connection {
     }
 
     /// Register a tree as DFS-enabled.
-    pub fn register_dfs_tree(&mut self, tree_id: TreeId) {
-        self.inner.dfs_trees.lock().unwrap().insert(tree_id);
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Internal`] if an earlier panic poisoned the DFS tree set.
+    pub fn register_dfs_tree(&mut self, tree_id: TreeId) -> Result<()> {
+        self.inner.dfs_trees.lock()?.insert(tree_id);
+        Ok(())
     }
 
     /// Deregister a tree from DFS tracking.
-    pub fn deregister_dfs_tree(&mut self, tree_id: TreeId) {
-        self.inner.dfs_trees.lock().unwrap().remove(&tree_id);
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Internal`] if an earlier panic poisoned the DFS tree set.
+    pub fn deregister_dfs_tree(&mut self, tree_id: TreeId) -> Result<()> {
+        self.inner.dfs_trees.lock()?.remove(&tree_id);
+        Ok(())
     }
 
     /// The IPC$ tree this connection keeps open for DFS referrals, if any.
     pub(crate) fn cached_ipc_tree(&self) -> Option<TreeId> {
-        *self.inner.ipc_tree.lock().unwrap()
+        self.inner.ipc_tree.get()
     }
 
     /// Remember (or, with `None`, forget) the IPC$ tree for DFS referrals.
@@ -3589,11 +3709,14 @@ impl Connection {
     /// Forget it the moment the server says the tree is gone: a cached id the
     /// session no longer has turns every later referral into the same error.
     pub(crate) fn set_cached_ipc_tree(&self, tree_id: Option<TreeId>) {
-        *self.inner.ipc_tree.lock().unwrap() = tree_id;
+        self.inner.ipc_tree.set(tree_id);
     }
 
-    fn should_set_dfs_flag(&self, tree_id: Option<TreeId>) -> bool {
-        tree_id.is_some_and(|id| self.inner.dfs_trees.lock().unwrap().contains(&id))
+    fn should_set_dfs_flag(&self, tree_id: Option<TreeId>) -> Result<bool> {
+        Ok(match tree_id {
+            Some(id) => self.inner.dfs_trees.lock()?.contains(&id),
+            None => false,
+        })
     }
 
     /// Allocate `charge` consecutive MessageIds and return the first.
@@ -3628,7 +3751,7 @@ impl Connection {
     /// `fan_error_to_waiters` sets `disconnected = true` under the
     /// same lock, making the two paths strictly ordered.
     fn register_waiter(&self, msg_id: MessageId, command: Command) -> Result<WaiterGuard> {
-        let mut waiters = self.inner.waiters.lock().unwrap();
+        let mut waiters = self.inner.waiters.lock()?;
         if self.inner.disconnected.load(Ordering::Acquire) {
             return Err(Error::Disconnected);
         }
@@ -3666,20 +3789,25 @@ impl Connection {
     /// [`ConnectionDiagnostics::outstanding`](crate::client::diagnostics::ConnectionDiagnostics)
     /// itself and doesn't want the log line.
     pub fn set_stale_request_warning(&self, after: Option<std::time::Duration>) {
-        *self.inner.stale_request_after.lock().unwrap() = after;
+        self.inner.stale_request_after.set(after);
     }
 
     /// Requests sent and not yet answered, oldest first.
     ///
     /// The same data the sweeper warns from, for consumers that would rather
     /// render it than read logs.
-    pub fn outstanding_requests(&self) -> Vec<crate::client::diagnostics::OutstandingRequest> {
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Internal`] if an earlier panic poisoned the waiter map.
+    pub fn outstanding_requests(
+        &self,
+    ) -> Result<Vec<crate::client::diagnostics::OutstandingRequest>> {
         let now = std::time::Instant::now();
         let mut out: Vec<_> = self
             .inner
             .waiters
-            .lock()
-            .unwrap()
+            .lock()?
             .iter()
             .map(|(id, w)| crate::client::diagnostics::OutstandingRequest {
                 command: w.command,
@@ -3690,7 +3818,7 @@ impl Connection {
             })
             .collect();
         out.sort_by_key(|r| std::cmp::Reverse(r.age));
-        out
+        Ok(out)
     }
 
     /// Await a response, giving up if the server goes silent.
@@ -3722,7 +3850,7 @@ impl Connection {
         command: Command,
     ) -> Result<Frame> {
         let msg_id = guard.msg_id();
-        let timeout = *self.inner.response_timeout.lock().unwrap();
+        let timeout = self.inner.response_timeout.get();
         let Some(timeout) = timeout else {
             return guard.recv().await;
         };
@@ -3737,9 +3865,11 @@ impl Connection {
                 .await?
             {
                 LongPollOutcome::Answered(frame) => Ok(frame),
-                LongPollOutcome::RefreshDue { .. } => unreachable!(
-                    "the refresh is switched off on this path, so nothing can ask for one"
-                ),
+                // The refresh is switched off on this path, so nothing can
+                // ask for one; if it ever did, the waiter is already gone.
+                LongPollOutcome::RefreshDue { .. } => Err(Error::Internal {
+                    what: "long poll asked for a refresh with refreshing switched off",
+                }),
             };
         }
         // Bounded even when the connection is healthy: "alive" is a reason for
@@ -3763,10 +3893,10 @@ impl Connection {
                     // came back late because nothing was scheduled has to be
                     // taken off every clock first, or this request is about to
                     // be timed out over silence nobody was listening to.
-                    self.inner.forgive_scheduling_stall();
+                    self.inner.forgive_scheduling_stall()?;
                     // `None` means the response has been routed and the next
                     // poll will produce it — never a timeout.
-                    if let Some(idle) = self.inner.waiter_idle_for(msg_id) {
+                    if let Some(idle) = self.inner.waiter_idle_for(msg_id)? {
                         if idle < timeout {
                             continue;
                         }
@@ -3789,7 +3919,7 @@ impl Connection {
                         // the waiters map: `quiet_for` measures from the
                         // oldest outstanding request, so a lone waiter that
                         // deregisters first takes the evidence with it.
-                        let verdict = self.inner.unresponsive_for();
+                        let verdict = self.inner.unresponsive_for()?;
                         self.remove_waiter(msg_id);
                         self.inner
                             .metrics
@@ -3828,8 +3958,8 @@ impl Connection {
         guard: WaiterGuard,
         command: Command,
     ) -> Result<LongPollOutcome> {
-        let budget = *self.inner.response_timeout.lock().unwrap();
-        let refresh = *self.inner.long_poll_refresh.lock().unwrap();
+        let budget = self.inner.response_timeout.get();
+        let refresh = self.inner.long_poll_refresh.get();
         self.await_long_poll(guard, command, budget, refresh).await
     }
 
@@ -3885,19 +4015,21 @@ impl Connection {
             // Same reason as in `await_response`: a tick this loop spent
             // unscheduled is not silence the server owes an answer for, and
             // this is the loop that would otherwise convict it.
-            self.inner.forgive_scheduling_stall();
+            self.inner.forgive_scheduling_stall()?;
             // The response has been routed and the next poll will produce
             // it — never a timeout.
-            if self.inner.waiter_idle_for(msg_id).is_none() {
+            if self.inner.waiter_idle_for(msg_id)?.is_none() {
                 continue;
             }
             // The same verdict an ordinary request's deadline reaches, on the
             // connection's clock instead of the request's, and held to the
             // response deadline's budget rather than to the shorter window that
             // merely withholds an extension.
-            if let Some(quiet) =
-                budget.and_then(|b| self.inner.unresponsive_for().filter(|q| *q >= b))
-            {
+            let unresponsive = match budget {
+                Some(b) => self.inner.unresponsive_for()?.filter(|q| *q >= b),
+                None => None,
+            };
+            if let Some(quiet) = unresponsive {
                 self.remove_waiter(msg_id);
                 self.inner
                     .metrics
@@ -3905,9 +4037,11 @@ impl Connection {
                     .fetch_add(1, Ordering::Relaxed);
                 return Err(self.declare_unresponsive(quiet, command, msg_id));
             }
-            let Some(registered_for) =
-                refresh.and_then(|r| self.inner.waiter_sent_age(msg_id).filter(|age| *age >= r))
-            else {
+            let registered_for = match refresh {
+                Some(r) => self.inner.waiter_sent_age(msg_id)?.filter(|age| *age >= r),
+                None => None,
+            };
+            let Some(registered_for) = registered_for else {
                 continue;
             };
             // One last look before walking away. A response that landed in the
@@ -3917,7 +4051,7 @@ impl Connection {
             if let Some(frame) = guard.try_recv() {
                 return frame.map(LongPollOutcome::Answered);
             }
-            let async_id = guard.async_id();
+            let async_id = guard.async_id()?;
             let generation = guard.generation();
             // Dropping the guard deregisters the waiter, so a response that
             // arrives after this counts as late-after-drop rather than as a
@@ -3970,18 +4104,15 @@ impl Connection {
         msg_id: MessageId,
     ) -> Error {
         let err = Error::ServerUnresponsive { silent_for };
+        let failed = fan_error_to_waiters(&self.inner, &err);
         warn!(
             "the server has put nothing on the wire for {:?} while work was outstanding and every \
              ECHO probe went unanswered; declaring the session dead (waiting on cmd={:?}, \
              msg_id={}) and failing {} other waiter(s). Reconnecting is the recovery and it is \
              automatic; if this repeats against one server, it is wedging sessions instead of \
              closing them, so restart its SMB service or check the path to it",
-            silent_for,
-            command,
-            msg_id.0,
-            self.inner.waiters.lock().unwrap().len()
+            silent_for, command, msg_id.0, failed
         );
-        fan_error_to_waiters(&self.inner, &err);
         err
     }
 
@@ -4000,7 +4131,7 @@ impl Connection {
     /// stays open from hanging a caller forever. Pass `None` only if your
     /// application imposes its own deadline.
     pub fn set_response_timeout(&self, after: Option<Duration>) {
-        *self.inner.response_timeout.lock().unwrap() = after;
+        self.inner.response_timeout.set(after);
     }
 
     /// How long one frame may take to reach the socket before its caller
@@ -4021,7 +4152,7 @@ impl Connection {
     /// leaves a partial frame on the wire, so the stream can't be resynced.
     /// `None` restores the old unbounded behavior.
     pub fn set_send_timeout(&self, after: Option<Duration>) {
-        *self.inner.send_timeout.lock().unwrap() = after;
+        self.inner.send_timeout.set(after);
     }
 
     /// How many bytes of WRITE payload may be outstanding across the whole
@@ -4066,7 +4197,10 @@ impl Connection {
     /// and a budget set low enough to slow one down mostly costs you the
     /// pipelining that makes this crate worth using.
     pub fn set_write_budget(&self, bytes: u64) {
-        self.inner.write_budget_units.lock().unwrap().target = budget_units(bytes);
+        let target = budget_units(bytes);
+        self.inner
+            .write_budget_units
+            .update(|units| (WriteBudgetUnits { target, ..units }, ()));
         self.inner.settle_write_budget();
     }
 
@@ -4075,7 +4209,7 @@ impl Connection {
     /// [`set_write_budget`](Self::set_write_budget).
     #[must_use]
     pub fn write_budget(&self) -> u64 {
-        u64::from(self.inner.write_budget_units.lock().unwrap().target) * WRITE_BUDGET_UNIT
+        u64::from(self.inner.write_budget_units.get().target) * WRITE_BUDGET_UNIT
     }
 
     /// Reserve write budget for `bytes`, waiting until it is free.
@@ -4163,7 +4297,7 @@ impl Connection {
     /// this decides how patient a deadline is, that decides whether a dead
     /// session is re-dialed. Neither switches the other on.
     pub fn set_keepalive(&self, after: Option<Duration>) {
-        *self.inner.keepalive_after.lock().unwrap() = after;
+        self.inner.keepalive_after.set(after);
     }
 
     /// How long one long-poll request (CHANGE_NOTIFY) may stay registered with
@@ -4196,13 +4330,13 @@ impl Connection {
     /// and each cycle is one more handover an event can slip through. `None`
     /// suits a consumer that re-creates its own watchers periodically.
     pub fn set_long_poll_refresh(&self, after: Option<Duration>) {
-        *self.inner.long_poll_refresh.lock().unwrap() = after;
+        self.inner.long_poll_refresh.set(after);
     }
 
     /// The current long-poll refresh interval. See
     /// [`set_long_poll_refresh`](Self::set_long_poll_refresh).
     pub fn long_poll_refresh(&self) -> Option<Duration> {
-        *self.inner.long_poll_refresh.lock().unwrap()
+        self.inner.long_poll_refresh.get()
     }
 
     /// Frames handed to the writer task and not yet written.
@@ -4223,27 +4357,25 @@ impl Connection {
     /// [`reconnect_if_needed`](Self::reconnect_if_needed) is a no-op that
     /// reports [`Error::Disconnected`].
     pub fn set_reviver(&self, reviver: Option<Arc<dyn SessionReviver>>) {
-        *self.inner.reviver.lock().unwrap() = reviver;
+        self.inner.reviver.set(reviver);
     }
 
     /// Whether a reviver is installed.
     pub fn can_reconnect(&self) -> bool {
-        self.inner.reviver.lock().unwrap().is_some()
+        self.inner.reviver.cloned().is_some()
     }
 
     /// Note that `file_id` holds an oplock on `tree_id`, so a break
     /// notification can be acknowledged on the right tree.
-    pub(crate) fn register_oplock(&self, file_id: FileId, tree_id: TreeId) {
-        self.inner
-            .oplock_trees
-            .lock()
-            .unwrap()
-            .insert(file_id, tree_id);
+    pub(crate) fn register_oplock(&self, file_id: FileId, tree_id: TreeId) -> Result<()> {
+        self.inner.oplock_trees.lock()?.insert(file_id, tree_id);
+        Ok(())
     }
 
     /// Drop the oplock bookkeeping for a handle that is being closed.
-    pub(crate) fn forget_oplock(&self, file_id: FileId) {
-        self.inner.oplock_trees.lock().unwrap().remove(&file_id);
+    pub(crate) fn forget_oplock(&self, file_id: FileId) -> Result<()> {
+        self.inner.oplock_trees.lock()?.remove(&file_id);
+        Ok(())
     }
 
     /// The session id this connection had before its last revival, or `0` if
@@ -4263,7 +4395,7 @@ impl Connection {
         // The old session is superseded; announcing it again on a later setup
         // would point at something twice-dead.
         self.inner.previous_session_id.store(0, Ordering::Release);
-        *self.inner.session.lock().unwrap() = Some(Arc::new(session.snapshot()));
+        self.inner.session.set(Some(Arc::new(session.snapshot())));
     }
 
     /// The session currently established on this connection, or `None` before
@@ -4272,17 +4404,17 @@ impl Connection {
     /// ❌ Don't cache this across a possible reconnect: a revival replaces it,
     /// and the previous session's keys decrypt nothing.
     pub fn current_session(&self) -> Option<Arc<crate::client::Session>> {
-        self.inner.session.lock().unwrap().clone()
+        self.inner.session.cloned()
     }
 
     /// Replace the bounds on a revival. See [`ReconnectPolicy`].
     pub fn set_reconnect_policy(&self, policy: ReconnectPolicy) {
-        *self.inner.reconnect_policy.lock().unwrap() = policy;
+        self.inner.reconnect_policy.set(policy);
     }
 
     /// The bounds currently in force.
     pub fn reconnect_policy(&self) -> ReconnectPolicy {
-        *self.inner.reconnect_policy.lock().unwrap()
+        self.inner.reconnect_policy.get()
     }
 
     /// Be told about every reconnect as it happens.
@@ -4291,7 +4423,7 @@ impl Connection {
     /// and must not call back into this connection: sending from inside it
     /// deadlocks against the revival lock. Forward to a channel and return.
     pub fn on_reconnect(&self, observer: Option<ReconnectObserver>) {
-        *self.inner.reconnect_observer.lock().unwrap() = observer;
+        self.inner.reconnect_observer.set(observer);
     }
 
     /// Whether the connection is currently torn down.
@@ -4348,18 +4480,20 @@ impl Connection {
         if !self.is_disconnected() {
             return Ok(());
         }
-        if let Some(verdict) = self.recent_revive_failure() {
+        if let Some(verdict) = self.recent_revive_failure()? {
             return Err(verdict);
         }
         self.revive().await
     }
 
     /// The stored verdict of a recent failed revival, if it still stands.
-    fn recent_revive_failure(&self) -> Option<Error> {
+    fn recent_revive_failure(&self) -> Result<Option<Error>> {
         let cooldown = self.reconnect_policy().failure_cooldown;
-        let held = self.inner.last_revive_failure.lock().unwrap();
-        let (at, err) = held.as_ref()?;
-        (at.elapsed() < cooldown).then(|| match err {
+        let held = self.inner.last_revive_failure.lock()?;
+        let Some((at, err)) = held.as_ref() else {
+            return Ok(None);
+        };
+        Ok((at.elapsed() < cooldown).then(|| match err {
             Error::ReconnectFailed {
                 attempts,
                 waited,
@@ -4372,14 +4506,14 @@ impl Connection {
                 reason: reason.clone(),
             },
             _ => Error::Disconnected,
-        })
+        }))
     }
 
     /// Dial, install, and re-authenticate, under one hard wall-clock bound.
     ///
     /// Called with the revival lock held.
     async fn revive(&self) -> Result<()> {
-        let Some(reviver) = self.inner.reviver.lock().unwrap().clone() else {
+        let Some(reviver) = self.inner.reviver.cloned() else {
             return Err(Error::Disconnected);
         };
         let policy = self.reconnect_policy();
@@ -4404,7 +4538,7 @@ impl Connection {
             Ok(Ok(attempts)) => {
                 let took = started.elapsed();
                 self.inner.revivals.fetch_add(1, Ordering::Release);
-                *self.inner.last_revive_failure.lock().unwrap() = None;
+                *self.inner.last_revive_failure.lock()? = None;
                 self.inner
                     .metrics
                     .reconnects_succeeded
@@ -4486,7 +4620,7 @@ impl Connection {
     /// One attempt: fresh socket, wiped state, new session.
     async fn revive_once(&self, reviver: &Arc<dyn SessionReviver>) -> Result<()> {
         let (sender, receiver) = reviver.dial().await?;
-        self.install_transport(sender, receiver);
+        self.install_transport(sender, receiver)?;
         let mut conn = self.clone();
         reviver.reauthenticate(&mut conn).await
     }
@@ -4503,11 +4637,14 @@ impl Connection {
     ///    and stale signing keys make every frame fail verification.
     /// 3. Rebuild the plumbing.
     /// 4. Clear `disconnected` LAST, which is what reopens the gate.
+    ///
+    /// State poisoned by an earlier panic is not reset: the revival fails with
+    /// [`Error::Internal`] and the connection stays dead.
     fn install_transport(
         &self,
         sender: Box<dyn TransportSend>,
         receiver: Box<dyn TransportReceive>,
-    ) {
+    ) -> Result<()> {
         let inner = &self.inner;
 
         // Anything still registered was asked of a server that is gone.
@@ -4518,21 +4655,21 @@ impl Connection {
         {
             // Captured before the wipe: the next SESSION_SETUP announces it so
             // the server can tie the new session to the old one.
-            let mut crypto = inner.crypto.lock().unwrap();
+            let mut crypto = inner.crypto.lock()?;
             inner
                 .previous_session_id
                 .store(crypto.session_id.0, Ordering::Release);
             *crypto = CryptoState::new();
         }
-        *inner.preauth_hasher.lock().unwrap() = PreauthHasher::new();
-        *inner.params.lock().unwrap() = None;
-        *inner.session.lock().unwrap() = None;
-        *inner.last_frame_at.lock().unwrap() = None;
-        *inner.estimated_rtt.lock().unwrap() = None;
-        inner.abandoned.lock().unwrap().clear();
-        inner.dfs_trees.lock().unwrap().clear();
-        *inner.ipc_tree.lock().unwrap() = None;
-        inner.oplock_trees.lock().unwrap().clear();
+        *inner.preauth_hasher.lock()? = PreauthHasher::new();
+        inner.params.set(None);
+        inner.session.set(None);
+        inner.last_frame_at.set(None);
+        inner.estimated_rtt.set(None);
+        inner.abandoned.lock()?.clear();
+        inner.dfs_trees.lock()?.clear();
+        inner.ipc_tree.set(None);
+        inner.oplock_trees.lock()?.clear();
         inner.compression_enabled.store(false, Ordering::Release);
         // ❌ `send_queue_depth` is deliberately NOT reset: a caller parked
         // between its increment and its decrement would underflow the gauge
@@ -4543,7 +4680,7 @@ impl Connection {
         // the first sweep after a revival call the fresh connection wedged.
         {
             let now = Instant::now();
-            let mut progress = inner.send_progress.lock().unwrap();
+            let mut progress = inner.send_progress.lock()?;
             progress.wire_bytes_sent = inner.metrics.wire_bytes_sent.load(Ordering::Relaxed);
             progress.last_progress = now;
             progress.last_sweep = now;
@@ -4551,10 +4688,11 @@ impl Connection {
         inner.send_tally.drain();
 
         let (write_tx, write_rx) = mpsc::channel(WRITE_QUEUE_DEPTH);
-        *inner.write_tx.lock().unwrap() = write_tx;
+        inner.write_tx.set(write_tx);
         spawn_plumbing(inner, sender, receiver, write_rx);
 
         inner.disconnected.store(false, Ordering::Release);
+        Ok(())
     }
 
     /// Tear the connection down: every waiter told, every new send refused.
@@ -4581,15 +4719,23 @@ impl Connection {
             .reconnects_failed
             .fetch_add(1, Ordering::Relaxed);
         error!("reconnect: gave up after {attempts} attempt(s) in {took:?}: {reason}");
-        *self.inner.last_revive_failure.lock().unwrap() = Some((
-            Instant::now(),
-            Error::ReconnectFailed {
-                attempts,
-                waited: took,
-                cause: cause.kind(),
-                reason: reason.clone(),
-            },
-        ));
+        match self.inner.last_revive_failure.lock() {
+            Ok(mut verdict) => {
+                *verdict = Some((
+                    Instant::now(),
+                    Error::ReconnectFailed {
+                        attempts,
+                        waited: took,
+                        cause: cause.kind(),
+                        reason: reason.clone(),
+                    },
+                ));
+            }
+            // The cooldown cannot be recorded, and the connection state is
+            // untrusted anyway: report that, not a revival that might be
+            // retried.
+            Err(poisoned) => return poisoned,
+        }
         self.announce(ReconnectEvent::Failed {
             attempts,
             took,
@@ -4600,21 +4746,23 @@ impl Connection {
 
     /// Hand an event to the consumer's observer, if there is one.
     fn announce(&self, event: ReconnectEvent) {
-        let observer = self.inner.reconnect_observer.lock().unwrap().clone();
+        let observer = self.inner.reconnect_observer.cloned();
         if let Some(observer) = observer {
             observer(event);
         }
     }
 
     /// Remove a waiter from the map (used on send error).
+    ///
+    /// Removal is teardown, so it proceeds on a poisoned map.
     fn remove_waiter(&self, msg_id: MessageId) {
-        self.inner.waiters.lock().unwrap().remove(&msg_id);
+        self.inner.waiters.lock_for_teardown().remove(&msg_id);
         trace!("remove_waiter: msg_id={}", msg_id.0);
     }
 
     #[cfg(test)]
     pub(crate) fn set_test_params(&mut self, params: NegotiatedParams) {
-        *self.inner.params.lock().unwrap() = Some(params);
+        self.inner.params.set(Some(params));
     }
 
     #[cfg(test)]
@@ -4649,7 +4797,13 @@ impl Connection {
     /// `dfs_trees`, and `estimated_rtt` locks one at a time, in that
     /// order, and only as long as it takes to copy primitives out. No
     /// lock is held across an `.await`.
-    pub fn diagnostics(&self) -> crate::client::diagnostics::ConnectionDiagnostics {
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Internal`] if an earlier panic poisoned connection state:
+    /// a snapshot of state that cannot be trusted would look plausible and
+    /// be wrong.
+    pub fn diagnostics(&self) -> Result<crate::client::diagnostics::ConnectionDiagnostics> {
         use crate::client::diagnostics::{
             CompressionInfo, ConnectionDiagnostics, CreditInfo, EncryptionInfo, NegotiatedSummary,
             SigningInfo,
@@ -4657,7 +4811,7 @@ impl Connection {
 
         // ── 1. crypto lock: signing / encryption snapshot ────────────────
         let (signing, encryption) = {
-            let c = self.inner.crypto.lock().unwrap();
+            let c = self.inner.crypto.lock()?;
             (
                 SigningInfo {
                     active: c.should_sign,
@@ -4671,20 +4825,13 @@ impl Connection {
         };
 
         // ── 2. waiters lock: in-flight count ────────────────────────────
-        let in_flight = self.inner.waiters.lock().unwrap().len();
+        let in_flight = self.inner.waiters.lock()?.len();
 
         // ── 3. dfs_trees lock: cloned snapshot ──────────────────────────
-        let dfs_trees: Vec<TreeId> = self
-            .inner
-            .dfs_trees
-            .lock()
-            .unwrap()
-            .iter()
-            .copied()
-            .collect();
+        let dfs_trees: Vec<TreeId> = self.inner.dfs_trees.lock()?.iter().copied().collect();
 
         // ── 4. estimated_rtt lock: cloned snapshot ──────────────────────
-        let rtt_estimate = *self.inner.estimated_rtt.lock().unwrap();
+        let rtt_estimate = self.inner.estimated_rtt.get();
 
         // Wait-free reads.
         let credits = CreditInfo {
@@ -4712,7 +4859,7 @@ impl Connection {
             compression_supported: p.compression_supported,
         });
 
-        ConnectionDiagnostics {
+        Ok(ConnectionDiagnostics {
             server: self.inner.server_name.clone(),
             negotiated,
             credits,
@@ -4724,8 +4871,8 @@ impl Connection {
             dfs_trees,
             session: None, // populated by SmbClient when assembling the full tree
             metrics: self.metrics(),
-            outstanding: self.outstanding_requests(),
-        }
+            outstanding: self.outstanding_requests()?,
+        })
     }
 }
 
@@ -4746,8 +4893,7 @@ async fn receiver_loop(transport_recv: Box<dyn TransportReceive>, weak: Weak<Inn
             Ok(bytes) => bytes,
             Err(e) => {
                 debug!("receiver_loop: transport error: {}, shutting down", e);
-                let count = inner.waiters.lock().unwrap().len();
-                fan_error_to_waiters(&inner, &e);
+                let count = fan_error_to_waiters(&inner, &e);
                 // Idle teardown (no in-flight requests) is routine: the server
                 // or OS reaps a session that's been quiet long enough. Real
                 // disconnects with pending waiters stay at WARN because they
@@ -4774,10 +4920,7 @@ async fn receiver_loop(transport_recv: Box<dyn TransportReceive>, weak: Weak<Inn
         // processing requests, which is the only thing this clock claims.
         inner.note_server_spoke();
         trace!("receiver_loop: received {} bytes", raw.len());
-        trace!(
-            "receiver_loop: tick, waiters={}",
-            inner.waiters.lock().unwrap().len()
-        );
+        trace!("receiver_loop: tick");
 
         // Decrypt if TRANSFORM_HEADER. Per P3.4 / decision E6: on an
         // unrecoverable frame error (decrypt auth tag mismatch, decompress
@@ -4799,8 +4942,7 @@ async fn receiver_loop(transport_recv: Box<dyn TransportReceive>, weak: Weak<Inn
                         "receiver_loop: decrypt failed: {}; tearing down connection",
                         e
                     );
-                    let count = inner.waiters.lock().unwrap().len();
-                    fan_error_to_waiters(&inner, &e);
+                    let count = fan_error_to_waiters(&inner, &e);
                     warn!(
                         "receiver_loop: exiting after fan-error to {} waiters",
                         count
@@ -4825,8 +4967,7 @@ async fn receiver_loop(transport_recv: Box<dyn TransportReceive>, weak: Weak<Inn
                         "receiver_loop: decompress failed: {}; tearing down connection",
                         e
                     );
-                    let count = inner.waiters.lock().unwrap().len();
-                    fan_error_to_waiters(&inner, &e);
+                    let count = fan_error_to_waiters(&inner, &e);
                     warn!(
                         "receiver_loop: exiting after fan-error to {} waiters",
                         count
@@ -4850,8 +4991,7 @@ async fn receiver_loop(transport_recv: Box<dyn TransportReceive>, weak: Weak<Inn
                     "receiver_loop: malformed frame: {}; tearing down connection",
                     e
                 );
-                let count = inner.waiters.lock().unwrap().len();
-                fan_error_to_waiters(&inner, &e);
+                let count = fan_error_to_waiters(&inner, &e);
                 warn!(
                     "receiver_loop: exiting after fan-error to {} waiters",
                     count
@@ -4884,8 +5024,7 @@ async fn receiver_loop(transport_recv: Box<dyn TransportReceive>, weak: Weak<Inn
                         "receiver_loop: sub-frame parse failed: {}; tearing down connection",
                         e
                     );
-                    let count = inner.waiters.lock().unwrap().len();
-                    fan_error_to_waiters(&inner, &e);
+                    let count = fan_error_to_waiters(&inner, &e);
                     warn!(
                         "receiver_loop: exiting after fan-error to {} waiters",
                         count
@@ -4900,7 +5039,14 @@ async fn receiver_loop(transport_recv: Box<dyn TransportReceive>, weak: Weak<Inn
         }
 
         for (msg_id, result) in routable {
-            let maybe_tx = inner.waiters.lock().unwrap().remove(&msg_id).map(|w| w.tx);
+            let maybe_tx = match inner.waiters.lock() {
+                Ok(mut waiters) => waiters.remove(&msg_id).map(|w| w.tx),
+                Err(e) => {
+                    warn!("receiver_loop: {e}; tearing down connection");
+                    fan_error_to_waiters(&inner, &e);
+                    return;
+                }
+            };
             match maybe_tx {
                 Some(tx) => {
                     let was_err = result.is_err();
@@ -4910,9 +5056,7 @@ async fn receiver_loop(transport_recv: Box<dyn TransportReceive>, weak: Weak<Inn
                     match &result {
                         Ok(frame) => trace!(
                             "recv: routed msg_id={}, status={:?}, cmd={:?}",
-                            msg_id.0,
-                            frame.header.status,
-                            frame.header.command
+                            msg_id.0, frame.header.status, frame.header.command
                         ),
                         Err(e) => debug!("recv: routed error msg_id={}, err={}", msg_id.0, e),
                     }
@@ -4950,12 +5094,14 @@ async fn receiver_loop(transport_recv: Box<dyn TransportReceive>, weak: Weak<Inn
                     // a request whose caller gave up (routine — consumers
                     // cancel), versus a frame for an id we never had
                     // outstanding (a protocol anomaly worth looking at).
-                    let was_abandoned = inner
-                        .abandoned
-                        .lock()
-                        .unwrap()
-                        .iter()
-                        .any(|id| *id == msg_id);
+                    let was_abandoned = match inner.abandoned.lock() {
+                        Ok(abandoned) => abandoned.iter().any(|id| *id == msg_id),
+                        Err(e) => {
+                            warn!("receiver_loop: {e}; tearing down connection");
+                            fan_error_to_waiters(&inner, &e);
+                            return;
+                        }
+                    };
                     if was_abandoned {
                         inner
                             .metrics
@@ -5052,12 +5198,7 @@ fn prepare_sub_frame(sub: &[u8], was_encrypted: bool, inner: &Inner) -> Result<S
                 &sub[Header::SIZE..],
             ));
             if let Ok(brk) = parsed {
-                let tree = inner
-                    .oplock_trees
-                    .lock()
-                    .unwrap()
-                    .get(&brk.file_id)
-                    .copied();
+                let tree = inner.oplock_trees.lock()?.get(&brk.file_id).copied();
                 if let Some(tree_id) = tree {
                     return Ok(SubFrameAction::AckOplockBreak(brk, tree_id));
                 }
@@ -5083,7 +5224,7 @@ fn prepare_sub_frame(sub: &[u8], was_encrypted: bool, inner: &Inner) -> Result<S
         // "Still working on it" is a sign of life: restart the caller's
         // response deadline (MS-SMB2 § 3.2.5.1.5). Without this, a legitimately
         // slow operation the server has acknowledged would be timed out.
-        if let Some(waiter) = inner.waiters.lock().unwrap().get_mut(&header.message_id) {
+        if let Some(waiter) = inner.waiters.lock()?.get_mut(&header.message_id) {
             waiter.last_activity = std::time::Instant::now();
             // Remember the id a CANCEL for this request will have to carry
             // (MS-SMB2 § 3.2.4.24). The interim response is the only place the
@@ -5094,21 +5235,20 @@ fn prepare_sub_frame(sub: &[u8], was_encrypted: bool, inner: &Inner) -> Result<S
         }
         trace!(
             "recv: STATUS_PENDING (interim), cmd={:?}, msg_id={}",
-            header.command,
-            header.message_id.0
+            header.command, header.message_id.0
         );
         return Ok(SubFrameAction::Skip);
     }
 
     // Verify signature if signing is active and not encrypted.
     let (should_sign, signing_key, signing_algorithm) = {
-        let c = inner.crypto.lock().unwrap();
+        let c = inner.crypto.lock()?;
         (c.should_sign, c.signing_key.clone(), c.signing_algorithm)
     };
     if should_sign && !was_encrypted && sub.len() >= Header::SIZE {
-        let flags = u32::from_le_bytes(sub[16..20].try_into().unwrap());
+        let flags = crate::bytes::le_u32(sub, 16, "SMB2 header truncated")?;
         let is_signed = (flags & HeaderFlags::SIGNED) != 0;
-        let status = u32::from_le_bytes(sub[8..12].try_into().unwrap());
+        let status = crate::bytes::le_u32(sub, 8, "SMB2 header truncated")?;
         let is_pending = status == NtStatus::PENDING.0;
         if is_signed && !is_pending {
             // The `is_cancel` bit is part of the AES-GMAC nonce (MS-SMB2
@@ -5117,20 +5257,19 @@ fn prepare_sub_frame(sub: &[u8], was_encrypted: bool, inner: &Inner) -> Result<S
             // the error response a server sends when it REJECTS a cancel — the
             // one frame that says the cancel did not take.
             let is_cancel = header.command == Command::Cancel;
-            if let (Some(key), Some(algo)) = (signing_key, signing_algorithm) {
-                if let Err(e) =
+            if let (Some(key), Some(algo)) = (signing_key, signing_algorithm)
+                && let Err(e) =
                     signing::verify_signature(sub, &key, algo, header.message_id.0, is_cancel)
-                {
-                    inner
-                        .metrics
-                        .signature_failures
-                        .fetch_add(1, Ordering::Relaxed);
-                    warn!(
-                        "recv: sub-frame produced error for msg_id={}, reason=signature verify failed: {}",
-                        header.message_id.0, e
-                    );
-                    return Ok(SubFrameAction::Route(header.message_id, Err(e)));
-                }
+            {
+                inner
+                    .metrics
+                    .signature_failures
+                    .fetch_add(1, Ordering::Relaxed);
+                warn!(
+                    "recv: sub-frame produced error for msg_id={}, reason=signature verify failed: {}",
+                    header.message_id.0, e
+                );
+                return Ok(SubFrameAction::Route(header.message_id, Err(e)));
             }
         }
     }
@@ -5176,18 +5315,24 @@ fn prepare_sub_frame(sub: &[u8], was_encrypted: bool, inner: &Inner) -> Result<S
 /// either "still alive → insert succeeds" or "dead → insert rejected",
 /// never "inserted but already drained" (which would leave the caller
 /// hanging on `rx.await`).
-fn fan_error_to_waiters(inner: &Inner, e: &Error) {
+///
+/// Teardown, so it proceeds on a poisoned map: a poisoned connection must
+/// still fail its callers rather than leave them parked. Returns how many
+/// waiters were failed.
+fn fan_error_to_waiters(inner: &Inner, e: &Error) -> usize {
     let drained: Vec<(MessageId, Waiter)> = {
-        let mut waiters = inner.waiters.lock().unwrap();
+        let mut waiters = inner.waiters.lock_for_teardown();
         inner.disconnected.store(true, Ordering::Release);
         waiters.drain().collect()
     };
     // Sends parked on credits are waiting for a grant that can no longer
     // arrive. Wake them now instead of letting each burn its full deadline.
     inner.credits.close();
+    let count = drained.len();
     for (_id, waiter) in drained {
         let _ = waiter.tx.send(Err(clone_err_for_waiters(e)));
     }
+    count
 }
 
 /// Best-effort error clone: `Error` isn't `Clone` (Io holds std::io::Error),
@@ -5203,12 +5348,14 @@ fn clone_err_for_waiters(e: &Error) -> Error {
         Error::ServerUnresponsive { silent_for } => Error::ServerUnresponsive {
             silent_for: *silent_for,
         },
+        // Untrusted state is not a dead link: reconnecting will not help.
+        Error::Internal { what } => Error::Internal { what },
         _ => Error::Disconnected,
     }
 }
 
 fn decrypt_frame(data: &[u8], inner: &Inner) -> Result<Vec<u8>> {
-    let c = inner.crypto.lock().unwrap();
+    let c = inner.crypto.lock()?;
     let dec_key = c
         .decryption_key
         .as_ref()
@@ -5255,7 +5402,7 @@ pub(crate) fn split_compound(data: &[u8]) -> Result<Vec<Vec<u8>>> {
         }
 
         // Parse NextCommand directly from header bytes 20..24.
-        let next_cmd = u32::from_le_bytes(data[offset + 20..offset + 24].try_into().unwrap());
+        let next_cmd = crate::bytes::le_u32(data, offset + 20, "SMB2 header truncated")?;
         let sub_end = if next_cmd > 0 {
             offset + next_cmd as usize
         } else {
@@ -5296,23 +5443,25 @@ pub(crate) fn pack_message(header: &Header, body: &dyn Pack) -> Vec<u8> {
 /// Used for the client GUID at negotiate and for the `CreateGuid` that proves
 /// ownership of a durable handle. ❌ It must stay unpredictable: a guessable
 /// `CreateGuid` would let another client on the same server claim our open.
-pub(crate) fn random_guid() -> Guid {
+///
+/// A failing random source is an error, never a weaker GUID.
+pub(crate) fn random_guid() -> Result<Guid> {
     let mut bytes = [0u8; 16];
-    getrandom::fill(&mut bytes).expect("failed to generate random GUID");
-    Guid {
+    crate::sync::fill_random(&mut bytes)?;
+    Ok(Guid {
         data1: u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
         data2: u16::from_le_bytes([bytes[4], bytes[5]]),
         data3: u16::from_le_bytes([bytes[6], bytes[7]]),
         data4: [
             bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15],
         ],
-    }
+    })
 }
 
-fn generate_salt() -> Vec<u8> {
+fn generate_salt() -> Result<Vec<u8>> {
     let mut salt = vec![0u8; 32];
-    getrandom::fill(&mut salt).expect("failed to generate random salt");
-    salt
+    crate::sync::fill_random(&mut salt)?;
+    Ok(salt)
 }
 
 fn build_compressed_frame(compressed: &CompressedMessage) -> Vec<u8> {
@@ -5386,7 +5535,7 @@ impl<T: TransportReceive> TransportReceive for Arc<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::msg::negotiate::{NegotiateContext, HASH_ALGORITHM_SHA512};
+    use crate::msg::negotiate::{HASH_ALGORITHM_SHA512, NegotiateContext};
     use crate::transport::MockTransport;
     use crate::types::flags::HeaderFlags;
 
@@ -5394,6 +5543,39 @@ mod tests {
     /// by wiring up `NextCommand` offsets and 8-byte-padding each sub
     /// except the last. Used by compound execute tests below.
     use crate::client::test_helpers::build_compound_response_frame;
+
+    /// Upstream unwrapped every connection lock, so one panic while a lock was
+    /// held turned every later call on the connection into a panic. Now a
+    /// poisoned lock is `Error::Internal` for callers that would have read the
+    /// state, while teardown still reaches parked waiters.
+    #[tokio::test]
+    async fn a_poisoned_connection_refuses_with_internal_instead_of_panicking() {
+        let mock = Arc::new(MockTransport::new());
+        let conn =
+            Connection::from_transport(Box::new(mock.clone()), Box::new(mock.clone()), "test")
+                .unwrap();
+        let mut parked = conn.register_waiter(MessageId(7), Command::Read).unwrap();
+
+        let inner = Arc::clone(&conn.inner);
+        let poisoned = std::thread::spawn(move || {
+            let _crypto = inner.crypto.lock().unwrap();
+            let _waiters = inner.waiters.lock().unwrap();
+            panic!("poison the connection state");
+        })
+        .join();
+        assert!(poisoned.is_err());
+
+        assert!(matches!(conn.session_id(), Err(Error::Internal { .. })));
+        assert!(matches!(conn.should_encrypt(), Err(Error::Internal { .. })));
+        assert!(matches!(conn.diagnostics(), Err(Error::Internal { .. })));
+        assert!(matches!(
+            conn.register_waiter(MessageId(8), Command::Read),
+            Err(Error::Internal { .. })
+        ));
+
+        conn.mark_dead();
+        assert!(matches!(parked.recv().await, Err(Error::Disconnected)));
+    }
 
     #[tokio::test]
     async fn last_connection_clone_releases_idle_tcp_transport() {
@@ -5467,7 +5649,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.negotiate().await.unwrap();
 
         let params = conn.params().unwrap();
@@ -5495,7 +5678,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.negotiate().await.unwrap();
 
         // Server granted 32 credits, minus 1 consumed for our request.
@@ -5541,7 +5725,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         // The server's entire window is four credits, and no response is ever
         // queued, so nothing replenishes it.
         conn.set_credits(4);
@@ -5580,7 +5765,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_credits(2);
         conn.set_credit_wait_timeout(std::time::Duration::from_millis(300));
 
@@ -5636,7 +5822,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_credits(512);
         conn.set_response_timeout(Some(std::time::Duration::from_millis(200)));
 
@@ -5655,7 +5842,7 @@ mod tests {
         );
         assert_eq!(conn.metrics().response_timeouts, 1);
         assert!(
-            conn.outstanding_requests().is_empty(),
+            conn.outstanding_requests().unwrap().is_empty(),
             "the abandoned request must not leak a waiter"
         );
     }
@@ -5671,7 +5858,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_credits(512);
         conn.set_response_timeout(Some(std::time::Duration::from_millis(300)));
 
@@ -5745,7 +5933,8 @@ mod tests {
             }),
             Box::new(Arc::clone(&mock)),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_credits(512);
         conn.set_response_timeout(Some(deadline));
         conn.set_send_timeout(None); // the send side is not what's under test
@@ -5788,7 +5977,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
 
         // One holder takes the lot: this stands in for the frames a few busy
         // FileWriters already have launched and unacknowledged.
@@ -5820,7 +6010,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         assert_eq!(conn.write_budget(), DEFAULT_WRITE_BUDGET_BYTES);
 
         // 32 MiB is a LAN default. On 10 GbE it is ~25 ms of buffer, so a
@@ -5857,7 +6048,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
 
         // Budget already spent by frames on the wire: their bytes are committed,
         // so a reduction cannot claw them back and must not pretend to.
@@ -5890,7 +6082,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
 
         // A consumer is free to ask for a budget below a single `MaxWriteSize`
         // frame. Refusing the frame would wedge the writer forever, so the frame
@@ -5917,7 +6110,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
 
         // A server may negotiate a `MaxWriteSize` above the budget. Asking a
         // semaphore for more permits than it will ever hold waits FOREVER, so
@@ -6051,7 +6245,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_credits(512);
         conn.set_response_timeout(Some(std::time::Duration::from_millis(100)));
 
@@ -6086,7 +6281,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_credits(1);
         // Deliberately long: passing this test means the fast path fired, not
         // that the deadline did.
@@ -6126,7 +6322,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_credits(2);
 
         let holder = conn.clone();
@@ -6177,7 +6374,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         assert_eq!(conn.next_message_id(), 0);
         conn.negotiate().await.unwrap();
         assert_eq!(conn.next_message_id(), 1);
@@ -6193,10 +6391,11 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
-        let initial_hash = *conn.preauth_hasher().value();
+        )
+        .unwrap();
+        let initial_hash = *conn.preauth_hasher().unwrap().value();
         conn.negotiate().await.unwrap();
-        assert_ne!(conn.preauth_hasher().value(), &initial_hash);
+        assert_ne!(conn.preauth_hasher().unwrap().value(), &initial_hash);
     }
 
     #[tokio::test]
@@ -6228,7 +6427,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         let result = conn.negotiate().await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("MaxReadSize"));
@@ -6242,7 +6442,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         // A negotiated connection has a credit window; NEGOTIATE's response is
         // what opens it. Without staging one, nothing below can be sent.
         conn.set_credits(512);
@@ -6272,15 +6473,17 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         // A negotiated connection has a credit window; NEGOTIATE's response is
         // what opens it. Without staging one, nothing below can be sent.
         conn.set_credits(512);
 
         // Activate signing.
         let key = vec![0xAA; 16];
-        conn.activate_signing(key, SigningAlgorithm::HmacSha256);
-        conn.set_session_id(SessionId(0x1234));
+        conn.activate_signing(key, SigningAlgorithm::HmacSha256)
+            .unwrap();
+        conn.set_session_id(SessionId(0x1234)).unwrap();
 
         use crate::msg::tree_disconnect::TreeDisconnectRequest;
         let body = TreeDisconnectRequest;
@@ -6313,7 +6516,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.negotiate().await.unwrap();
 
         let params = conn.params().unwrap();
@@ -6332,7 +6536,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.negotiate().await.unwrap();
 
         // Verify the sent request contains all 5 dialects.
@@ -6354,7 +6559,7 @@ mod tests {
 
     use crate::msg::negotiate::COMPRESSION_LZ4;
     use crate::msg::transform::{
-        CompressionTransformHeader, COMPRESSION_ALGORITHM_LZ4, COMPRESSION_PROTOCOL_ID,
+        COMPRESSION_ALGORITHM_LZ4, COMPRESSION_PROTOCOL_ID, CompressionTransformHeader,
         SMB2_COMPRESSION_FLAG_NONE,
     };
 
@@ -6401,7 +6606,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.negotiate().await.unwrap();
 
         let params = conn.params().unwrap();
@@ -6419,7 +6625,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.negotiate().await.unwrap();
 
         let params = conn.params().unwrap();
@@ -6437,7 +6644,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_compression_requested(false);
         conn.negotiate().await.unwrap();
 
@@ -6457,7 +6665,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         // compression_requested defaults to true.
         conn.negotiate().await.unwrap();
 
@@ -6487,7 +6696,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_compression_requested(false);
         conn.negotiate().await.unwrap();
 
@@ -6540,10 +6750,12 @@ mod tests {
 
         let result = decompress_response(&frame);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("unsupported compression algorithm"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("unsupported compression algorithm")
+        );
     }
 
     #[test]
@@ -6616,11 +6828,15 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
+        )
+        .unwrap();
+        assert!(
+            conn.outstanding_requests().unwrap().is_empty(),
+            "idle connection"
         );
-        assert!(conn.outstanding_requests().is_empty(), "idle connection");
 
         let _rx = conn.register_waiter(MessageId(7), Command::Write).unwrap();
-        let outstanding = conn.outstanding_requests();
+        let outstanding = conn.outstanding_requests().unwrap();
 
         assert_eq!(outstanding.len(), 1);
         assert_eq!(outstanding[0].command, Command::Write);
@@ -6636,21 +6852,22 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         let _rx = conn.register_waiter(MessageId(1), Command::Read).unwrap();
 
         // Silenced: the sweeper must not consider anything stale.
         conn.set_stale_request_warning(None);
-        assert!(conn.inner.stale_request_after.lock().unwrap().is_none());
+        assert!(conn.inner.stale_request_after.get().is_none());
 
         // Retuned: a zero threshold means everything outstanding is stale, which
         // is the boundary a consumer with a fast server would pick.
         conn.set_stale_request_warning(Some(Duration::from_millis(0)));
         assert_eq!(
-            *conn.inner.stale_request_after.lock().unwrap(),
+            conn.inner.stale_request_after.get(),
             Some(Duration::from_millis(0))
         );
-        sweep_connection(&conn.inner); // must not panic, and must consider it
+        sweep_connection(&conn.inner).unwrap(); // must not panic, and must consider it
     }
 
     /// A parked long poll is never reported as a stalled request.
@@ -6668,7 +6885,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         let _watch = conn
             .register_waiter(MessageId(1), Command::ChangeNotify)
             .unwrap();
@@ -6676,7 +6894,7 @@ mod tests {
 
         // Zero threshold: everything outstanding is old enough to be called
         // out, so only the classification can keep the long poll out.
-        let split = classify_outstanding(&conn.inner, Duration::from_millis(0));
+        let split = classify_outstanding(&conn.inner, Duration::from_millis(0)).unwrap();
 
         assert_eq!(
             split.queued.iter().map(|q| q.command).collect::<Vec<_>>(),
@@ -6897,7 +7115,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         let tolerance = Duration::from_secs(20);
         let t0 = Instant::now();
 
@@ -6906,7 +7125,7 @@ mod tests {
             .wire_bytes_sent
             .fetch_add(1024, Ordering::Relaxed);
         assert_eq!(
-            conn.inner.observe_send_side(t0, tolerance).state,
+            conn.inner.observe_send_side(t0, tolerance).unwrap().state,
             SendSide::Draining,
             "a frame reached the socket"
         );
@@ -6914,6 +7133,7 @@ mod tests {
         assert_eq!(
             conn.inner
                 .observe_send_side(t0 + tolerance + Duration::from_secs(1), tolerance)
+                .unwrap()
                 .state,
             SendSide::Stalled,
             "and then nothing did, for longer than one frame may take"
@@ -6926,6 +7146,7 @@ mod tests {
         assert_eq!(
             conn.inner
                 .observe_send_side(t0 + tolerance + Duration::from_secs(2), tolerance)
+                .unwrap()
                 .state,
             SendSide::Draining,
             "one frame getting out clears the verdict"
@@ -6950,14 +7171,15 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         let tolerance = stall_tolerance(Some(SEND_TIMEOUT));
         let start = Instant::now();
 
         // A 1 MiB frame crawling out at 60 KB/s: ~17 s each, so most sweeps see
         // no completion at all, and the send deadline tolerates every one of
         // them.
-        let per_frame = Duration::from_millis(17_000);
+        let per_frame = Duration::from_secs(17);
         assert!(
             per_frame < SEND_TIMEOUT,
             "the premise: this link is inside what the send deadline accepts"
@@ -6979,7 +7201,7 @@ mod tests {
                     .fetch_add(1_048_576, Ordering::Relaxed);
             }
             assert_eq!(
-                conn.inner.observe_send_side(now, tolerance).state,
+                conn.inner.observe_send_side(now, tolerance).unwrap().state,
                 SendSide::Draining,
                 "a link the send deadline accepts must never read as a wedge \
                  (at {:?} into the transfer)",
@@ -7033,11 +7255,16 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         let guard = conn
             .register_waiter(MessageId(5), Command::ChangeNotify)
             .unwrap();
-        assert_eq!(guard.async_id(), None, "nothing has been told to us yet");
+        assert_eq!(
+            guard.async_id().unwrap(),
+            None,
+            "nothing has been told to us yet"
+        );
 
         let mut h = Header::new_request(Command::ChangeNotify);
         h.flags.set_response();
@@ -7054,12 +7281,12 @@ mod tests {
         );
 
         assert_eq!(
-            guard.async_id(),
+            guard.async_id().unwrap(),
             Some(0xFEED_FACE_DEAD_BEEF),
             "the interim STATUS_PENDING is the only frame that ever states the AsyncId"
         );
         assert_eq!(
-            conn.outstanding_requests()[0].async_id,
+            conn.outstanding_requests().unwrap()[0].async_id,
             Some(0xFEED_FACE_DEAD_BEEF),
             "and a consumer driving send_cancel itself has to be able to read it"
         );
@@ -7076,14 +7303,16 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_credits(10);
 
         // Activate encryption with a key that WON'T match what the
         // malformed frame was "encrypted" with — decrypt will fail auth.
         let enc_key = vec![0x42; 16];
         let dec_key = vec![0x99; 16]; // deliberately wrong decryption key
-        conn.activate_encryption(enc_key, dec_key, Cipher::Aes128Gcm);
+        conn.activate_encryption(enc_key, dec_key, Cipher::Aes128Gcm)
+            .unwrap();
 
         // Register a waiter manually so we can inject a bad frame without
         // racing with a real send.
@@ -7103,7 +7332,7 @@ mod tests {
         frame.extend_from_slice(&0u16.to_le_bytes()); // reserved
         frame.extend_from_slice(&1u16.to_le_bytes()); // flags (Encrypted)
         frame.extend_from_slice(&0xDEADu64.to_le_bytes()); // session_id
-                                                           // Garbage ciphertext — will fail GCM auth on decrypt.
+        // Garbage ciphertext — will fail GCM auth on decrypt.
         frame.extend_from_slice(&[0xAAu8; 64]);
         mock.queue_response(frame);
 
@@ -7138,8 +7367,9 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
-        conn.set_session_id(SessionId(0x1234));
+        )
+        .unwrap();
+        conn.set_session_id(SessionId(0x1234)).unwrap();
 
         // The generation the ids came from is not the one on the wire now, so
         // the request they name died with its session.
@@ -7167,13 +7397,14 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         // A revival wipes the session id and re-negotiates; `revivals` only
         // ticks once the whole thing has succeeded, so the generation still
         // matches while the handshake is in flight. This is the state a
         // reconnecting connection is in for the whole of NEGOTIATE and
         // SESSION_SETUP.
-        conn.set_session_id(SessionId(0));
+        conn.set_session_id(SessionId(0)).unwrap();
 
         let generation = conn.generation();
         conn.send_cancel(MessageId(1), None, generation)
@@ -7197,7 +7428,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_next_message_id(10);
         conn.set_credits(5);
 
@@ -7219,8 +7451,9 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
-        conn.set_session_id(SessionId(0xAAAA));
+        )
+        .unwrap();
+        conn.set_session_id(SessionId(0xAAAA)).unwrap();
 
         conn.send_cancel(MessageId(42), None, conn.generation())
             .await
@@ -7251,8 +7484,9 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
-        conn.set_session_id(SessionId(0xBBBB));
+        )
+        .unwrap();
+        conn.set_session_id(SessionId(0xBBBB)).unwrap();
 
         let async_id = 0x1234_5678_9ABC_DEF0u64;
         conn.send_cancel(MessageId(99), Some(async_id), conn.generation())
@@ -7280,11 +7514,13 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
 
         let key = vec![0xCC; 16];
-        conn.activate_signing(key, SigningAlgorithm::HmacSha256);
-        conn.set_session_id(SessionId(0xDDDD));
+        conn.activate_signing(key, SigningAlgorithm::HmacSha256)
+            .unwrap();
+        conn.set_session_id(SessionId(0xDDDD)).unwrap();
 
         conn.send_cancel(MessageId(50), None, conn.generation())
             .await
@@ -7320,10 +7556,12 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         let key = vec![0xCC; 16];
-        conn.activate_signing(key.clone(), SigningAlgorithm::AesGmac);
-        conn.set_session_id(SessionId(0xDDDD));
+        conn.activate_signing(key.clone(), SigningAlgorithm::AesGmac)
+            .unwrap();
+        conn.set_session_id(SessionId(0xDDDD)).unwrap();
 
         conn.send_cancel(MessageId(50), Some(0x77), conn.generation())
             .await
@@ -7364,9 +7602,11 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         let key = vec![0xAB; 16];
-        conn.activate_signing(key.clone(), SigningAlgorithm::AesGmac);
+        conn.activate_signing(key.clone(), SigningAlgorithm::AesGmac)
+            .unwrap();
         let _guard = conn.register_waiter(MessageId(9), Command::Cancel).unwrap();
 
         let mut h = Header::new_request(Command::Cancel);
@@ -7414,7 +7654,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_test_params(NegotiatedParams {
             dialect: Dialect::Smb3_1_1,
             max_read_size: 65536,
@@ -7427,7 +7668,7 @@ mod tests {
             cipher: Some(Cipher::Aes128Gcm),
             compression_supported: false,
         });
-        conn.set_session_id(SessionId(1));
+        conn.set_session_id(SessionId(1)).unwrap();
         conn.set_credits(5);
 
         let _ = tokio::time::timeout(
@@ -7453,13 +7694,15 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
 
-        assert!(!conn.should_encrypt());
+        assert!(!conn.should_encrypt().unwrap());
 
-        conn.activate_encryption(vec![0x42; 16], vec![0x42; 16], Cipher::Aes128Gcm);
+        conn.activate_encryption(vec![0x42; 16], vec![0x42; 16], Cipher::Aes128Gcm)
+            .unwrap();
 
-        assert!(conn.should_encrypt());
+        assert!(conn.should_encrypt().unwrap());
     }
 
     // ── DFS flag tests ─────────────────────────────────────────────────
@@ -7472,11 +7715,12 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_credits(256);
 
         let tree_id = TreeId(7);
-        conn.register_dfs_tree(tree_id);
+        conn.register_dfs_tree(tree_id).unwrap();
 
         use crate::msg::echo::EchoRequest;
         let body = EchoRequest;
@@ -7506,7 +7750,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_credits(256);
 
         use crate::msg::echo::EchoRequest;
@@ -7534,12 +7779,13 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_credits(256);
 
         let tree_id = TreeId(7);
-        conn.register_dfs_tree(tree_id);
-        conn.deregister_dfs_tree(tree_id);
+        conn.register_dfs_tree(tree_id).unwrap();
+        conn.deregister_dfs_tree(tree_id).unwrap();
 
         use crate::msg::echo::EchoRequest;
         let body = EchoRequest;
@@ -7576,17 +7822,23 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
 
         // Mutate shared state on the original.
         original.set_credits(42);
-        original.set_session_id(SessionId(0x1234_5678_9ABC_DEF0));
+        original
+            .set_session_id(SessionId(0x1234_5678_9ABC_DEF0))
+            .unwrap();
         original.set_next_message_id(100);
 
         // Clone and verify the clone sees the same shared state.
         let cloned = original.clone();
         assert_eq!(cloned.credits(), 42);
-        assert_eq!(cloned.session_id(), SessionId(0x1234_5678_9ABC_DEF0));
+        assert_eq!(
+            cloned.session_id().unwrap(),
+            SessionId(0x1234_5678_9ABC_DEF0)
+        );
         assert_eq!(cloned.next_message_id(), 100);
         assert_eq!(cloned.server_name(), "test-server");
 
@@ -7627,7 +7879,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         // A negotiated connection has a credit window; NEGOTIATE's response is
         // what opens it. Without staging one, nothing below can be sent.
         conn.set_credits(512);
@@ -7686,7 +7939,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_credits(512);
 
         // Spawn into a JoinSet so a timeout-side panic can introspect
@@ -7798,7 +8052,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_credits(512);
 
         // Spawn 5 tasks. Each allocates its own MessageId in submission
@@ -7894,7 +8149,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_credits(512);
 
         let c = conn.clone();
@@ -7952,7 +8208,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         // A negotiated connection has a credit window; NEGOTIATE's response is
         // what opens it. Without staging one, nothing below can be sent.
         original.set_credits(512);
@@ -7992,7 +8249,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         original.set_credits(9);
 
         let cloned = original.clone();
@@ -8065,7 +8323,8 @@ mod send_path_liveness_tests {
             Box::new(StallingSend::new(Arc::clone(&mock), 0)),
             Box::new(Arc::clone(&mock)),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_credits(64);
         conn.set_send_timeout(Some(Duration::from_millis(150)));
 
@@ -8092,7 +8351,8 @@ mod send_path_liveness_tests {
             Box::new(StallingSend::new(Arc::clone(&mock), 1)),
             Box::new(Arc::clone(&mock)),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_credits(512);
         conn.set_send_timeout(Some(Duration::from_millis(150)));
 
@@ -8117,12 +8377,12 @@ mod send_path_liveness_tests {
         }
 
         assert!(
-            conn.outstanding_requests().is_empty(),
+            conn.outstanding_requests().unwrap().is_empty(),
             "a connection torn down by a send timeout leaves no waiters behind"
         );
     }
 
-    /// `outstanding_requests()` has to say which side of the wire a request is
+    /// `outstanding_requests().unwrap()` has to say which side of the wire a request is
     /// on. Reporting a never-sent request as "sent and unanswered" is what
     /// pointed three investigations at the server.
     #[tokio::test]
@@ -8132,7 +8392,8 @@ mod send_path_liveness_tests {
             Box::new(StallingSend::new(Arc::clone(&mock), 0)),
             Box::new(Arc::clone(&mock)),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_credits(64);
         conn.set_send_timeout(None); // park; we want to observe the state
 
@@ -8140,7 +8401,7 @@ mod send_path_liveness_tests {
         let task = tokio::spawn(async move { c.execute(Command::Echo, &EchoRequest, None).await });
 
         let outstanding = wait_for(|| {
-            let o = conn.outstanding_requests();
+            let o = conn.outstanding_requests().unwrap();
             (!o.is_empty()).then_some(o)
         })
         .await;
@@ -8163,7 +8424,8 @@ mod send_path_liveness_tests {
             Box::new(Arc::clone(&mock)),
             Box::new(Arc::clone(&mock)),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_credits(512);
 
         // Nothing is ever queued as a response, so every one of these is
@@ -8175,13 +8437,19 @@ mod send_path_liveness_tests {
                 c.execute(Command::Echo, &EchoRequest, None).await
             }));
         }
-        wait_for(|| (conn.outstanding_requests().len() == 12).then_some(())).await;
+        wait_for(|| (conn.outstanding_requests().unwrap().len() == 12).then_some(())).await;
 
         for task in &tasks {
             task.abort();
         }
 
-        wait_for(|| conn.outstanding_requests().is_empty().then_some(())).await;
+        wait_for(|| {
+            conn.outstanding_requests()
+                .unwrap()
+                .is_empty()
+                .then_some(())
+        })
+        .await;
     }
 
     /// Same for a compound: every sub-op registers a waiter, so every sub-op
@@ -8193,7 +8461,8 @@ mod send_path_liveness_tests {
             Box::new(Arc::clone(&mock)),
             Box::new(Arc::clone(&mock)),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_credits(512);
 
         let c = conn.clone();
@@ -8205,10 +8474,16 @@ mod send_path_liveness_tests {
             ])
             .await
         });
-        wait_for(|| (conn.outstanding_requests().len() == 3).then_some(())).await;
+        wait_for(|| (conn.outstanding_requests().unwrap().len() == 3).then_some(())).await;
 
         task.abort();
-        wait_for(|| conn.outstanding_requests().is_empty().then_some(())).await;
+        wait_for(|| {
+            conn.outstanding_requests()
+                .unwrap()
+                .is_empty()
+                .then_some(())
+        })
+        .await;
     }
 
     /// A link that stalls and recovers must NOT be cut off.
@@ -8230,7 +8505,8 @@ mod send_path_liveness_tests {
             }),
             Box::new(Arc::clone(&mock)),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_credits(64);
         conn.set_send_timeout(Some(Duration::from_secs(30)));
 
@@ -8316,8 +8592,9 @@ fn acknowledge_oplock_break(
          client isn't left waiting out the server's break timeout",
         brk.oplock_level, brk.file_id
     );
-    // The handle keeps working; it just stops being resumable.
-    inner.oplock_trees.lock().unwrap().remove(&brk.file_id);
+    // The handle keeps working; it just stops being resumable. Forgetting
+    // the mapping is teardown, so it proceeds on a poisoned map.
+    inner.oplock_trees.lock_for_teardown().remove(&brk.file_id);
 
     let conn = Connection {
         inner: Arc::clone(inner),

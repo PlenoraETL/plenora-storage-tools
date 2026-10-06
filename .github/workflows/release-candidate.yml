@@ -117,6 +117,11 @@ jobs:
   linux:
     needs: dependencies
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -135,6 +140,35 @@ jobs:
             update-ca-certificates
             python3 scripts/run_logged.py .fixtures/evidence/qualify-linux.log python3 scripts/qualify_target.py "dist/$version/x86_64-unknown-linux-gnu"
           '
+      - name: Locate the distributed files of this build
+        id: built
+        shell: bash
+        run: |
+          version="$(python3 scripts/release_version.py)"
+          folder="dist/$version/x86_64-unknown-linux-gnu"
+          test -f "$folder/plenora-storage-$version-x86_64-unknown-linux-gnu.tar.gz"
+          test -f "$folder/plenora-storage-$version-source.tar.gz"
+          test -f "$folder/storage-sbom.cdx.json"
+          test "$(find "$folder" -maxdepth 1 -name 'plenora_storage-*.whl' | wc -l)" -eq 1
+          echo "folder=$folder" >> "$GITHUB_OUTPUT"
+          echo "archive=$folder/plenora-storage-$version-x86_64-unknown-linux-gnu.tar.gz" >> "$GITHUB_OUTPUT"
+      # This job compiled these bytes, so its provenance is a build claim; the
+      # release workflow only verifies it before publishing the same digests.
+      - name: Attest build provenance of the distributed files
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            ${{ steps.built.outputs.archive }}
+            ${{ steps.built.outputs.folder }}/plenora_storage-*.whl
+            ${{ steps.built.outputs.folder }}/plenora-storage-*-source.tar.gz
+      - name: Attest the SBOM of the distributed files
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            ${{ steps.built.outputs.archive }}
+            ${{ steps.built.outputs.folder }}/plenora_storage-*.whl
+            ${{ steps.built.outputs.folder }}/plenora-storage-*-source.tar.gz
+          sbom-path: ${{ steps.built.outputs.folder }}/storage-sbom.cdx.json
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -156,6 +190,11 @@ jobs:
   windows:
     needs: dependencies
     runs-on: windows-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -179,6 +218,35 @@ jobs:
           Copy-Item target/release-readiness/extended-regressions.json dist/$version/x86_64-pc-windows-msvc/
           Copy-Item target/release-readiness/results.json dist/$version/x86_64-pc-windows-msvc/cli-regressions.json
           python scripts/verify_release.py dist/$version
+      - name: Locate the distributed files of this build
+        id: built
+        shell: bash
+        run: |
+          version="$(python scripts/release_version.py)"
+          folder="dist/$version/x86_64-pc-windows-msvc"
+          test -f "$folder/plenora-storage-$version-x86_64-pc-windows-msvc.zip"
+          test -f "$folder/plenora-storage-$version-source.tar.gz"
+          test -f "$folder/storage-sbom.cdx.json"
+          test "$(find "$folder" -maxdepth 1 -name 'plenora_storage-*.whl' | wc -l)" -eq 1
+          echo "folder=$folder" >> "$GITHUB_OUTPUT"
+          echo "archive=$folder/plenora-storage-$version-x86_64-pc-windows-msvc.zip" >> "$GITHUB_OUTPUT"
+      # This job compiled these bytes, so its provenance is a build claim; the
+      # release workflow only verifies it before publishing the same digests.
+      - name: Attest build provenance of the distributed files
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            ${{ steps.built.outputs.archive }}
+            ${{ steps.built.outputs.folder }}/plenora_storage-*.whl
+            ${{ steps.built.outputs.folder }}/plenora-storage-*-source.tar.gz
+      - name: Attest the SBOM of the distributed files
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            ${{ steps.built.outputs.archive }}
+            ${{ steps.built.outputs.folder }}/plenora_storage-*.whl
+            ${{ steps.built.outputs.folder }}/plenora-storage-*-source.tar.gz
+          sbom-path: ${{ steps.built.outputs.folder }}/storage-sbom.cdx.json
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

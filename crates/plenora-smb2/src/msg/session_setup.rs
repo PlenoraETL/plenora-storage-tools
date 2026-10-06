@@ -5,11 +5,11 @@
 //! (for example, SPNEGO/NTLM) and the response carries the server's reply token
 //! along with session flags.
 
+use crate::Error;
 use crate::error::Result;
 use crate::msg::header::Header;
 use crate::pack::{Pack, ReadCursor, Unpack, WriteCursor};
 use crate::types::flags::{Capabilities, SecurityMode};
-use crate::Error;
 
 // ── Session setup request flags ────────────────────────────────────────
 

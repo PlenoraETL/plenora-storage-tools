@@ -44,6 +44,7 @@ class PublicationTests(unittest.TestCase):
                 names.append(f'plenora-storage-{version}-{target}' + ('.zip' if 'windows' in target else '.tar.gz'))
                 wheel = f'wheel-{target}.whl'
                 names.append(wheel)
+                names.extend(publication.target_documents(version, target).values())
                 platforms.append(dict(target=target, wheel=wheel, wheel_sha256=hashlib.sha256(b'artifact').hexdigest()))
             for name in names:
                 (root / name).write_bytes(b'artifact')
@@ -68,6 +69,12 @@ class PublicationTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     publication.check_files(root)
                 del index['files']['extra']
+                sbom = publication.target_documents(version, publication.TARGETS[1])['storage-sbom.cdx.json']
+                del index['files'][sbom]
+                index_path.write_text(json.dumps(index))
+                with self.assertRaises(ValueError):
+                    publication.check_files(root)
+                index['files'][sbom] = publication.digest(root / sbom)
                 receipt['status'] = 'RUNNING'
                 receipt_path.write_text(json.dumps(receipt))
                 index['files'][receipt_path.name] = publication.digest(receipt_path)
@@ -102,3 +109,12 @@ class PublicationTests(unittest.TestCase):
                   return_value=json.dumps({'isDraft': False, 'tagName': 'v1.0.0'})):
             with self.assertRaises(ValueError):
                 publication.draft('v1.0.0')
+
+    def test_each_target_publishes_its_own_sbom_and_adoption_manifest(self):
+        version = workspace_version().native
+        names = {name for target in publication.TARGETS
+                 for name in publication.target_documents(version, target).values()}
+        self.assertEqual(len(names), 2 * len(publication.TARGETS))
+        for name in names:
+            self.assertEqual(Path(name).name, name)
+            self.assertTrue(name.startswith(f'plenora-storage-{version}-'))

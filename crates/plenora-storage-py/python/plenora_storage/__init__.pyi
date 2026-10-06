@@ -18,6 +18,7 @@ class PlenoraError(Exception):
     remote_effect: str
     retry: dict[str, Any]
     provider: str | None
+    execution_id: str | None
     details: dict[str, Any]
     message: str
     def __init__(self, document: Mapping[str, Any]) -> None: ...

@@ -257,3 +257,32 @@ fn tls_ca_pem_may_be_omitted_but_not_null() {
         .is_err()
     );
 }
+
+/// Case 9e of the common runtime matrix: a proved publication whose metadata
+/// cannot be read back is `committed` in `cleanup` and is never retried,
+/// because repeating the request would publish again.
+#[test]
+fn unavailable_metadata_after_publication_is_committed_and_never_retried() {
+    let error = super::committed_verification_error();
+    assert_eq!(
+        error.remote_effect,
+        plenora_storage_core::RemoteEffect::Committed
+    );
+    assert_eq!(error.phase, plenora_storage_core::ErrorPhase::Cleanup);
+    assert_eq!(error.retry, plenora_storage_core::RetryDisposition::Never);
+}
+
+/// A committed object whose size differs from the transferred bytes remains
+/// to be reconciled.
+#[test]
+fn committed_size_mismatch_requires_recovery() {
+    let error = super::committed_mismatch_error();
+    assert_eq!(
+        error.remote_effect,
+        plenora_storage_core::RemoteEffect::Committed
+    );
+    assert_eq!(
+        error.retry,
+        plenora_storage_core::RetryDisposition::RequiresRecovery
+    );
+}

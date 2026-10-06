@@ -21,6 +21,16 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def target_documents(version, target):
+    """SBOM and contract adoption manifest of one target, under public names.
+
+    Each target build produces its own: both list that target's artifact digests.
+    """
+    prefix = f'plenora-storage-{version}-{target}'
+    return {'storage-sbom.cdx.json': prefix + '.sbom.cdx.json',
+            'adoption-manifest-v4.json': prefix + '.adoption-manifest-v4.json'}
+
+
 def check_tag(tag):
     require(tag == 'v' + workspace_version().native, 'tag differs from workspace version')
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
@@ -90,6 +100,7 @@ def check_files(directory):
         target = platform['target']
         expected.add(f'plenora-storage-{version}-{target}' + ('.zip' if 'windows' in target else '.tar.gz'))
         expected.add(platform['wheel'])
+        expected.update(target_documents(version, target).values())
         require(index['files'].get(platform['wheel']) == platform['wheel_sha256'], 'publication wheel differs from receipt')
     require(set(index['files']) == expected, 'publication asset inventory differs')
     return index
@@ -111,6 +122,13 @@ def prepare(archive, output, tag):
             cli = folder / f'plenora-storage-{version}-{target}{extension}'
             wheels = list(folder.glob('plenora_storage-*.whl'))
             require(len(wheels) == 1, 'expected one qualified wheel per target')
+            manifest = json.loads((folder / 'release-manifest.json').read_text())
+            built = {artifact['name']: artifact['sha256'] for artifact in manifest['artifacts']}
+            for name, public in target_documents(version, target).items():
+                # qualify_release.py checked these digests; the copy must keep them.
+                require(built.get(name) == digest(folder / name), 'target document is not a qualified artifact')
+                shutil.copyfile(folder / name, output / public)
+                names.append(public)
             for path in [cli, wheels[0], folder / f'plenora-storage-{version}-source.tar.gz']:
                 destination = output / path.name
                 if destination.exists():

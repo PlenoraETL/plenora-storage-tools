@@ -7,7 +7,7 @@ name = "plenora-storage"
 version = "3.0.0"
 description = "Provider-neutral storage SDK backed by the Plenora Rust engine"
 requires-python = ">=3.10"
-license = { text = "MIT OR Apache-2.0" }
+license = { text = "Proprietary" }
 readme = "README.md"
 authors = [{ name = "PlenoraETL contributors" }]
 

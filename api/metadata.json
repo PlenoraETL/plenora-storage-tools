@@ -30,6 +30,7 @@
     "contracts/upstream/capabilities-v2.schema.json": "c3982782dcf9afe1e1a21e87292e73cf17feac742d1cf0bcb9cbc38d9480c450",
     "contracts/upstream/cli-envelope-v2.schema.json": "e2210f179e24190ea85d1c82b5cacc2429ea7ba3505bbc47395e638236db19ea",
     "contracts/upstream/error-v1.schema.json": "164a0c580080d93ee1a020e7e33b651fe46950a4133e9bd8c044daa64cb9b914",
+    "contracts/upstream/proposed/runtime-probe-v1.schema.json": "d80b1a340e736794abc88a1abdf531ed08a136fc0fbb91dd2e39d7328a3e05be",
     "contracts/upstream/runtime-vector-v1.schema.json": "b5e38f0bee134240bbecffcb9f79e9051d27dcdfe90c0af467ef571528521ef8"
   },
   "edition": "2024",
@@ -46,7 +47,9 @@
         "name": "smb2",
         "path": "src/lib.rs"
       },
-      "rust_version": "1.92"
+      "rust_version": {
+        "workspace": true
+      }
     },
     "plenora-storage-cli": {
       "features": {
@@ -283,10 +286,10 @@
     }
   },
   "python_requires": ">=3.10",
-  "rust_version": "1.92",
+  "rust_version": "1.98",
   "schema_version": 1,
   "upstream_contracts": {
     "repository": "https://github.com/PlenoraETL/plenora-contracts.git",
-    "revision": "f811f21f072b34896efdb6e110bee34d756153df"
+    "revision": "1e902dfaab5819c1d9ce785878d5b26dbeae48b3"
   }
 }

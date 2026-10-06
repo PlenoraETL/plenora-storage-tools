@@ -8,7 +8,7 @@ macro_rules! nt_status_codes {
     (
         $(
             $(#[$meta:meta])*
-            $name:ident = $value:expr, $display:expr;
+            $name:ident = $value:expr_2021, $display:expr_2021;
         )*
     ) => {
         impl NtStatus {

@@ -27,7 +27,7 @@ use async_trait::async_trait;
 use tokio::sync::Notify;
 
 use crate::client::connection::{
-    pack_message, Connection, ReconnectEvent, ReconnectPolicy, SessionReviver,
+    Connection, ReconnectEvent, ReconnectPolicy, SessionReviver, pack_message,
 };
 use crate::error::{Error, Result};
 use crate::msg::echo::EchoResponse;
@@ -348,12 +348,13 @@ fn connect(server: &Arc<ScriptedServer>) -> Connection {
         Box::new(Arc::clone(server)),
         Box::new(Arc::clone(server)),
         "scripted-server",
-    );
+    )
+    .unwrap();
     conn.set_credits(512);
     // A connection past SESSION_SETUP has a session id, and some paths read it
     // as the answer to "is there a session on this wire at all" -- a CANCEL
     // refuses to go out without one.
-    conn.set_session_id(SessionId(0x5E55));
+    conn.set_session_id(SessionId(0x5E55)).unwrap();
     conn.set_response_timeout(Some(BASE_DEADLINE));
     conn.set_keepalive(Some(KEEPALIVE));
     conn
@@ -548,7 +549,7 @@ async fn a_server_that_dies_mid_transfer_is_declared_dead_and_every_waiter_told(
         "the probes are what separate this from an ordinary stalled request"
     );
     assert!(
-        conn.diagnostics().disconnected,
+        conn.diagnostics().unwrap().disconnected,
         "a session declared dead must be marked dead, so nothing new parks on it"
     );
 }
@@ -719,9 +720,11 @@ async fn a_request_with_no_liveness_evidence_gets_the_plain_deadline() {
     conn.set_keepalive(None);
 
     // A healthy exchange, so the liveness clock is as fresh as it ever gets.
-    assert!(finish(spawn_write(&conn), "the warm-up write")
-        .await
-        .is_ok());
+    assert!(
+        finish(spawn_write(&conn), "the warm-up write")
+            .await
+            .is_ok()
+    );
 
     server.set_answer(Answer::Nothing);
     let outcome = finish(spawn_write(&conn), "the write").await;
@@ -795,7 +798,7 @@ async fn a_long_poll_with_the_keepalive_off_is_never_given_up_on() {
         "a long poll was given up on with nothing but silence to go on"
     );
     assert_eq!(server.echo_count(), 0, "the keepalive was turned off");
-    assert!(!conn.diagnostics().disconnected);
+    assert!(!conn.diagnostics().unwrap().disconnected);
     watching.abort();
 }
 
@@ -840,7 +843,7 @@ async fn a_stall_on_our_side_is_not_blamed_on_a_server_that_kept_answering() {
         !watching.is_finished(),
         "a server that answered everything was declared dead because WE stopped running"
     );
-    assert!(!conn.diagnostics().disconnected);
+    assert!(!conn.diagnostics().unwrap().disconnected);
     assert!(
         conn.metrics().scheduling_stalls >= 1,
         "the stall has to be recognized as ours, not waited out by luck"
@@ -1097,7 +1100,7 @@ async fn a_probe_the_server_answers_with_an_error_still_counts_as_alive() {
         "an answered probe is an answered probe, whatever status it carried"
     );
     assert!(
-        !conn.diagnostics().disconnected,
+        !conn.diagnostics().unwrap().disconnected,
         "the session was torn down over a server that was demonstrably talking"
     );
     assert!(
@@ -1214,7 +1217,7 @@ impl SessionReviver for BouncingNas {
             });
         }
         conn.set_credits(512);
-        conn.set_session_id(SessionId(0xBEEF));
+        conn.set_session_id(SessionId(0xBEEF)).unwrap();
         Ok(())
     }
 }
@@ -1267,9 +1270,11 @@ async fn a_write_that_died_with_the_server_succeeds_once_the_connection_is_reviv
     let conn = connect_to(&nas);
     let events = watch_events(&conn);
 
-    assert!(finish(spawn_write(&conn), "the warm-up write")
-        .await
-        .is_ok());
+    assert!(
+        finish(spawn_write(&conn), "the warm-up write")
+            .await
+            .is_ok()
+    );
 
     nas.goes_away();
     let stranded = finish(spawn_write(&conn), "the stranded write").await;
@@ -1328,9 +1333,11 @@ async fn a_frame_built_for_the_dead_session_cannot_reach_the_new_socket() {
     let nas = BouncingNas::new(Answer::Everything);
     let conn = connect_to(&nas);
 
-    assert!(finish(spawn_write(&conn), "the warm-up write")
-        .await
-        .is_ok());
+    assert!(
+        finish(spawn_write(&conn), "the warm-up write")
+            .await
+            .is_ok()
+    );
     nas.goes_away();
     let _ = finish(spawn_write(&conn), "the stranded write").await;
 
@@ -1339,9 +1346,11 @@ async fn a_frame_built_for_the_dead_session_cannot_reach_the_new_socket() {
         .await
         .expect("the revival hung")
         .expect("revival");
-    assert!(finish(spawn_write(&conn), "the retried write")
-        .await
-        .is_ok());
+    assert!(
+        finish(spawn_write(&conn), "the retried write")
+            .await
+            .is_ok()
+    );
 
     assert_eq!(
         nas.generation(0).seen.lock().unwrap().len(),
@@ -1369,14 +1378,18 @@ async fn a_revival_leaves_no_state_belonging_to_the_dead_session() {
     // Stage state that must not survive: signing keys, DFS trees, a message-id
     // sequence well past zero, and a wide-open credit window.
     let mut staged = conn.clone();
-    staged.activate_signing(
-        vec![0xAB; 16],
-        crate::crypto::signing::SigningAlgorithm::AesCmac,
+    staged
+        .activate_signing(
+            vec![0xAB; 16],
+            crate::crypto::signing::SigningAlgorithm::AesCmac,
+        )
+        .unwrap();
+    staged.register_dfs_tree(TreeId(7)).unwrap();
+    assert!(
+        finish(spawn_write(&conn), "the warm-up write")
+            .await
+            .is_ok()
     );
-    staged.register_dfs_tree(TreeId(7));
-    assert!(finish(spawn_write(&conn), "the warm-up write")
-        .await
-        .is_ok());
     assert!(conn.next_message_id() > 0);
 
     nas.goes_away();
@@ -1392,7 +1405,7 @@ async fn a_revival_leaves_no_state_belonging_to_the_dead_session() {
         "message ids restart with the session; a gap makes the server drop us"
     );
     assert_eq!(
-        conn.session_id(),
+        conn.session_id().unwrap(),
         SessionId(0xBEEF),
         "the session id must be the new session's, not the dead one's"
     );
@@ -1400,7 +1413,7 @@ async fn a_revival_leaves_no_state_belonging_to_the_dead_session() {
         conn.params().is_none(),
         "negotiated sizes belong to the server we were talking to, not this one"
     );
-    let d = conn.diagnostics();
+    let d = conn.diagnostics().unwrap();
     assert!(
         !d.signing.active,
         "signing keys derived from a dead session verify nothing"
@@ -1420,18 +1433,22 @@ async fn a_revived_connection_can_still_detect_the_next_death() {
     let nas = BouncingNas::new(Answer::Everything);
     let conn = connect_to(&nas);
 
-    assert!(finish(spawn_write(&conn), "the warm-up write")
-        .await
-        .is_ok());
+    assert!(
+        finish(spawn_write(&conn), "the warm-up write")
+            .await
+            .is_ok()
+    );
     nas.goes_away();
     let _ = finish(spawn_write(&conn), "the stranded write").await;
     tokio::time::timeout(TEST_BUDGET, conn.reconnect_if_needed())
         .await
         .expect("the revival hung")
         .expect("revival");
-    assert!(finish(spawn_write(&conn), "the retried write")
-        .await
-        .is_ok());
+    assert!(
+        finish(spawn_write(&conn), "the retried write")
+            .await
+            .is_ok()
+    );
 
     let probes_before = conn.metrics().keepalive_probes_sent;
     nas.goes_away(); // the second generation dies too
@@ -1551,9 +1568,11 @@ async fn a_pipeline_that_all_notices_the_same_death_dials_once() {
     let nas = BouncingNas::new(Answer::Everything);
     let conn = connect_to(&nas);
 
-    assert!(finish(spawn_write(&conn), "the warm-up write")
-        .await
-        .is_ok());
+    assert!(
+        finish(spawn_write(&conn), "the warm-up write")
+            .await
+            .is_ok()
+    );
     nas.goes_away();
 
     let stranded: Vec<_> = (0..32).map(|_| spawn_write(&conn)).collect();
@@ -2186,7 +2205,7 @@ impl SessionReviver for Nas {
             compression_supported: false,
         });
         conn.set_credits(512);
-        conn.set_session_id(SessionId(0xBEEF));
+        conn.set_session_id(SessionId(0xBEEF)).unwrap();
         Ok(())
     }
 }
@@ -2205,7 +2224,8 @@ fn a_share() -> Tree {
 /// Connect to `nas`, armed to reconnect, negotiated as SMB 3.1.1.
 async fn attach(nas: &Arc<Nas>) -> Connection {
     let mut conn =
-        Connection::from_transport(Box::new(nas.current()), Box::new(nas.current()), "nas");
+        Connection::from_transport(Box::new(nas.current()), Box::new(nas.current()), "nas")
+            .unwrap();
     conn.set_response_timeout(Some(BASE_DEADLINE));
     conn.set_keepalive(Some(KEEPALIVE));
     conn.set_reviver(Some(Arc::clone(nas) as Arc<dyn SessionReviver>));
