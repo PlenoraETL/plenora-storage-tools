@@ -32,6 +32,43 @@ pub enum EncryptionType {
     Rc4Hmac = 23,
 }
 
+impl EncryptionType {
+    /// Key length in bytes that this etype defines (RFC 3962, RFC 4757).
+    #[must_use]
+    pub const fn key_len(self) -> usize {
+        match self {
+            Self::Aes256CtsHmacSha196 => 32,
+            Self::Aes128CtsHmacSha196 | Self::Rc4Hmac => 16,
+        }
+    }
+}
+
+/// Rejects a key whose length differs from what its declared etype defines.
+///
+/// Keys and their etypes arrive from KDC replies, AP-REPs and credential
+/// caches. The cipher must be chosen from the declared etype, never from the
+/// key length: a 16-byte key declared AES-256 used to run as AES-128.
+pub(crate) fn check_key_for_etype(key: &[u8], etype: EncryptionType) -> Result<(), Error> {
+    if key.len() == etype.key_len() {
+        Ok(())
+    } else {
+        Err(Error::invalid_data(
+            "Kerberos key length does not match its declared encryption type",
+        ))
+    }
+}
+
+/// A key received with its etype code (EncryptionKey `keytype`), validated:
+/// the etype must be supported and the key must have that etype's length.
+pub(crate) fn received_key(
+    keytype: i32,
+    keyvalue: Vec<u8>,
+) -> Result<(EncryptionType, Vec<u8>), Error> {
+    let etype = etype_from_i32(keytype)?;
+    check_key_for_etype(&keyvalue, etype)?;
+    Ok((etype, keyvalue))
+}
+
 // ---------------------------------------------------------------------------
 // String-to-Key: password → encryption key
 // ---------------------------------------------------------------------------
@@ -374,12 +411,15 @@ pub fn decrypt_rc4_hmac(key: &[u8], usage: u32, ciphertext: &[u8]) -> Result<Vec
 /// # Errors
 ///
 /// [`Error::InvalidData`] for an AES etype whose key is not 16 or 32 bytes.
+///
+/// The key must have the length `etype` defines.
 pub fn compute_checksum(
     key: &[u8],
     usage: u32,
     data: &[u8],
     etype: EncryptionType,
 ) -> Result<Vec<u8>, Error> {
+    check_key_for_etype(key, etype)?;
     match etype {
         EncryptionType::Aes128CtsHmacSha196 | EncryptionType::Aes256CtsHmacSha196 => {
             // Derive the checksum key Kc for this usage.
@@ -719,6 +759,7 @@ pub(crate) fn kerberos_encrypt(
     plaintext: &[u8],
     etype: EncryptionType,
 ) -> Result<Vec<u8>, Error> {
+    check_key_for_etype(base_key, etype)?;
     match etype {
         EncryptionType::Aes128CtsHmacSha196 | EncryptionType::Aes256CtsHmacSha196 => {
             // Derive Ke (encryption key) and Ki (integrity key).
@@ -757,6 +798,7 @@ pub(crate) fn kerberos_decrypt(
     ciphertext: &[u8],
     etype: EncryptionType,
 ) -> Result<Vec<u8>, Error> {
+    check_key_for_etype(base_key, etype)?;
     match etype {
         EncryptionType::Aes128CtsHmacSha196 | EncryptionType::Aes256CtsHmacSha196 => {
             // HMAC-SHA1-96 is 12 bytes, appended to the ciphertext.
@@ -838,6 +880,38 @@ pub(crate) fn generate_random_key(etype: EncryptionType) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A 16-byte key declared AES-256 used to be accepted and run as
+    /// AES-128, because the AES helpers chose the cipher from the key length.
+    /// The declared etype decides; a mismatch is malformed input.
+    #[test]
+    fn a_key_whose_length_contradicts_its_etype_is_rejected() {
+        let invalid = |r: Result<Vec<u8>, Error>| matches!(r, Err(Error::InvalidData { .. }));
+        let short = [7u8; 16];
+        let long = [7u8; 32];
+        let aes256 = EncryptionType::Aes256CtsHmacSha196;
+        let aes128 = EncryptionType::Aes128CtsHmacSha196;
+        let rc4 = EncryptionType::Rc4Hmac;
+        assert!(invalid(kerberos_encrypt(&short, 1, b"data", aes256)));
+        assert!(invalid(kerberos_decrypt(&short, 1, &[0u8; 48], aes256)));
+        assert!(invalid(compute_checksum(&short, 6, b"body", aes256)));
+        assert!(invalid(kerberos_encrypt(&long, 1, b"data", aes128)));
+        assert!(invalid(kerberos_encrypt(&long, 1, b"data", rc4)));
+        assert!(invalid(kerberos_decrypt(&long, 1, &[0u8; 48], rc4)));
+        assert!(matches!(
+            received_key(18, short.to_vec()),
+            Err(Error::InvalidData { .. })
+        ));
+        assert!(matches!(
+            received_key(99, short.to_vec()),
+            Err(Error::Auth { .. })
+        ));
+        assert_eq!(received_key(17, short.to_vec()).unwrap().0, aes128);
+        assert_eq!(received_key(18, long.to_vec()).unwrap().0, aes256);
+        // Matching lengths still round-trip.
+        let ct = kerberos_encrypt(&long, 3, b"payload", aes256).unwrap();
+        assert_eq!(kerberos_decrypt(&long, 3, &ct, aes256).unwrap(), b"payload");
+    }
 
     /// The session key's length comes from the KDC's reply. An AES etype with
     /// a key that is neither 16 nor 32 bytes used to reach `panic!` inside the

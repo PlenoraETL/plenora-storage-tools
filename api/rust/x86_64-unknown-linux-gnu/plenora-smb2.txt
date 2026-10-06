@@ -302,6 +302,8 @@ pub enum smb2::auth::kerberos::crypto::EncryptionType
 pub smb2::auth::kerberos::crypto::EncryptionType::Aes128CtsHmacSha196 = 17
 pub smb2::auth::kerberos::crypto::EncryptionType::Aes256CtsHmacSha196 = 18
 pub smb2::auth::kerberos::crypto::EncryptionType::Rc4Hmac = 23
+impl smb2::auth::kerberos::crypto::EncryptionType
+pub const fn smb2::auth::kerberos::crypto::EncryptionType::key_len(self) -> usize
 impl core::clone::Clone for smb2::auth::kerberos::crypto::EncryptionType
 pub fn smb2::auth::kerberos::crypto::EncryptionType::clone(&self) -> smb2::auth::kerberos::crypto::EncryptionType
 impl core::cmp::Eq for smb2::auth::kerberos::crypto::EncryptionType

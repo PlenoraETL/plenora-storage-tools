@@ -14,8 +14,8 @@ use log::{debug, trace};
 use std::time::Duration;
 
 use crate::auth::kerberos::crypto::{
-    EncryptionType, compute_checksum, etype_from_i32, kerberos_decrypt, kerberos_encrypt,
-    string_to_key_aes, string_to_key_rc4,
+    EncryptionType, check_key_for_etype, compute_checksum, etype_from_i32, kerberos_decrypt,
+    kerberos_encrypt, received_key, string_to_key_aes, string_to_key_rc4,
 };
 use crate::auth::kerberos::kdc::{KdcConfig, send_to_kdc};
 use crate::auth::kerberos::messages::{
@@ -226,6 +226,7 @@ impl KerberosAuthenticator {
 
         // Determine the etype from the session key.
         let etype = etype_from_code(cred.key_etype as i32)?;
+        check_key_for_etype(&cred.key_data, etype)?;
         self.etype = etype;
 
         self.service_ticket = Some(ticket);
@@ -243,6 +244,7 @@ impl KerberosAuthenticator {
         let ticket = crate::auth::kerberos::messages::parse_ticket(&cred.ticket)?;
 
         let etype = etype_from_code(cred.key_etype as i32)?;
+        check_key_for_etype(&cred.key_data, etype)?;
         self.etype = etype;
 
         self.tgt = Some(ticket);
@@ -430,8 +432,14 @@ impl KerberosAuthenticator {
             enc_kdc_rep.key.keyvalue.len()
         );
 
+        // The AS session key carries its own etype, which may differ from
+        // the one protecting this reply; everything after this point uses
+        // the session key, so its declared etype is the one that counts.
+        let (session_etype, session_key) =
+            received_key(enc_kdc_rep.key.keytype, enc_kdc_rep.key.keyvalue)?;
+        self.etype = session_etype;
         self.tgt = Some(as_rep.ticket);
-        self.as_session_key = Some(enc_kdc_rep.key.keyvalue);
+        self.as_session_key = Some(session_key);
 
         Ok(())
     }
@@ -560,6 +568,14 @@ impl KerberosAuthenticator {
             )));
         }
 
+        // The enc-part is protected with the AS session key, so it must be
+        // declared with that key's etype.
+        if etype_from_i32(tgs_rep.enc_part.etype)? != self.etype {
+            return Err(Error::invalid_data(
+                "TGS-REP enc-part etype differs from the AS session key's etype",
+            ));
+        }
+
         // Decrypt the enc-part with the AS session key.
         // Try key usage 8 first (session key), fall back to 9 (subkey).
         let enc_part_plain = match kerberos_decrypt(
@@ -595,22 +611,15 @@ impl KerberosAuthenticator {
             tgs_rep.ticket.raw_bytes.as_ref().map(|b| b.len())
         );
 
-        // Use the session key's actual etype for Authenticator encryption.
-        let tgs_key_etype = match enc_kdc_rep.key.keytype {
-            18 => EncryptionType::Aes256CtsHmacSha196,
-            17 => EncryptionType::Aes128CtsHmacSha196,
-            23 => EncryptionType::Rc4Hmac,
-            other => {
-                return Err(Error::Auth {
-                    message: format!("TGS session key has unsupported etype {other}"),
-                });
-            }
-        };
+        // Use the session key's actual etype for Authenticator encryption;
+        // its length must match that etype.
+        let (tgs_key_etype, tgs_key) =
+            received_key(enc_kdc_rep.key.keytype, enc_kdc_rep.key.keyvalue)?;
         self.etype = tgs_key_etype;
 
         self.service_ticket = Some(tgs_rep.ticket);
-        self.tgs_session_key = Some(enc_kdc_rep.key.keyvalue.clone());
-        self.session_key = Some(enc_kdc_rep.key.keyvalue);
+        self.tgs_session_key = Some(tgs_key.clone());
+        self.session_key = Some(tgs_key);
 
         Ok(())
     }
@@ -749,16 +758,14 @@ impl KerberosAuthenticator {
                     message: "No session key available to decrypt AP-REP".to_string(),
                 })?;
 
-                let etype = match ap_rep.enc_part.etype {
-                    18 => EncryptionType::Aes256CtsHmacSha196,
-                    17 => EncryptionType::Aes128CtsHmacSha196,
-                    23 => EncryptionType::Rc4Hmac,
-                    other => {
-                        return Err(Error::Auth {
-                            message: format!("AP-REP: unsupported etype {other}"),
-                        });
-                    }
-                };
+                let etype = etype_from_i32(ap_rep.enc_part.etype)?;
+                // The AP-REP is protected with our session key, so its
+                // declared etype must be that key's etype.
+                if etype != self.etype {
+                    return Err(Error::invalid_data(
+                        "AP-REP etype differs from the session key's etype",
+                    ));
+                }
 
                 let plain = kerberos_decrypt(
                     current_key,
@@ -775,7 +782,10 @@ impl KerberosAuthenticator {
                         server_subkey.keytype,
                         server_subkey.keyvalue.len()
                     );
-                    self.session_key = Some(server_subkey.keyvalue);
+                    let (subkey_etype, subkey) =
+                        received_key(server_subkey.keytype, server_subkey.keyvalue)?;
+                    self.etype = subkey_etype;
+                    self.session_key = Some(subkey);
                 } else {
                     trace!("kerberos: AP-REP has no server subkey");
                 }
@@ -1216,6 +1226,153 @@ mod tests {
         encode_pa_enc_timestamp,
     };
     use crate::auth::spnego::OID_NTLMSSP;
+
+    // ── Received keys must match their declared etype ────────────────
+
+    fn authenticator_with(session_key: Vec<u8>, etype: EncryptionType) -> KerberosAuthenticator {
+        let mut auth = KerberosAuthenticator::new(KerberosCredentials {
+            username: "user".to_string(),
+            password: "password".to_string(),
+            realm: "EXAMPLE.COM".to_string(),
+            kdc_address: "kdc.example.com".to_string(),
+        });
+        auth.session_key = Some(session_key);
+        auth.etype = etype;
+        auth
+    }
+
+    /// KRB_AP_REP token (`02 00` + APPLICATION [15]) carrying `enc_part`.
+    fn ap_rep_token(enc_part: &EncryptedData) -> Vec<u8> {
+        let pvno = der_context(0, &der_integer(5));
+        let msg_type = der_context(1, &der_integer(15));
+        let enc = der_context(2, &encode_encrypted_data_raw(enc_part));
+        let mut token = vec![0x02, 0x00];
+        token.extend_from_slice(&der_tlv(0x6f, &der_sequence(&[&pvno, &msg_type, &enc])));
+        token
+    }
+
+    /// EncAPRepPart (APPLICATION [27]) with only a server subkey.
+    fn enc_ap_rep_part_with_subkey(keytype: i32, keyvalue: &[u8]) -> Vec<u8> {
+        let key = der_sequence(&[
+            &der_context(0, &der_integer(keytype)),
+            &der_context(1, &der_octet_string(keyvalue)),
+        ]);
+        der_tlv(0x7b, &der_sequence(&[&der_context(2, &key)]))
+    }
+
+    /// The AP-REP is protected with our session key, so a different declared
+    /// etype cannot be honoured: RC4 and AES-128 keys are both 16 bytes, so
+    /// the length check alone would not catch it.
+    #[test]
+    fn an_ap_rep_declaring_another_etype_than_the_session_key_is_rejected() {
+        let mut auth = authenticator_with(vec![9u8; 16], EncryptionType::Rc4Hmac);
+        let token = ap_rep_token(&EncryptedData {
+            etype: 17,
+            kvno: None,
+            cipher: vec![0u8; 48],
+        });
+        assert!(matches!(
+            auth.process_mutual_auth_token(&token),
+            Err(Error::InvalidData { .. })
+        ));
+    }
+
+    /// A server subkey declared AES-256 but only 16 bytes long used to replace
+    /// the session key as is.
+    #[test]
+    fn a_server_subkey_whose_length_contradicts_its_etype_is_rejected() {
+        let session_key = generate_random_key(EncryptionType::Aes256CtsHmacSha196);
+        let mut auth = authenticator_with(session_key.clone(), EncryptionType::Aes256CtsHmacSha196);
+        let cipher = kerberos_encrypt(
+            &session_key,
+            12,
+            &enc_ap_rep_part_with_subkey(18, &[5u8; 16]),
+            EncryptionType::Aes256CtsHmacSha196,
+        )
+        .unwrap();
+        let token = ap_rep_token(&EncryptedData {
+            etype: 18,
+            kvno: None,
+            cipher,
+        });
+        assert!(matches!(
+            auth.process_mutual_auth_token(&token),
+            Err(Error::InvalidData { .. })
+        ));
+        assert_eq!(auth.session_key(), Some(session_key.as_slice()));
+
+        // A subkey whose length matches its etype is adopted with that etype.
+        let subkey = generate_random_key(EncryptionType::Aes128CtsHmacSha196);
+        let cipher = kerberos_encrypt(
+            &session_key,
+            12,
+            &enc_ap_rep_part_with_subkey(17, &subkey),
+            EncryptionType::Aes256CtsHmacSha196,
+        )
+        .unwrap();
+        let token = ap_rep_token(&EncryptedData {
+            etype: 18,
+            kvno: None,
+            cipher,
+        });
+        auth.process_mutual_auth_token(&token).unwrap();
+        assert_eq!(auth.session_key(), Some(subkey.as_slice()));
+        assert_eq!(auth.etype, EncryptionType::Aes128CtsHmacSha196);
+    }
+
+    /// A credential-cache entry declaring AES-256 with a 16-byte key.
+    #[test]
+    fn a_ccache_key_whose_length_contradicts_its_etype_is_rejected() {
+        use crate::auth::kerberos::ccache::{CcacheCredential, CcachePrincipal};
+
+        let realm = der_tlv(0x1b, b"EXAMPLE.COM");
+        let sname = der_sequence(&[
+            &der_context(0, &der_integer(2)),
+            &der_context(1, &der_sequence(&[&der_tlv(0x1b, b"krbtgt")])),
+        ]);
+        let enc = encode_encrypted_data_raw(&EncryptedData {
+            etype: 18,
+            kvno: Some(1),
+            cipher: vec![0u8; 32],
+        });
+        let ticket = der_tlv(
+            0x61,
+            &der_sequence(&[
+                &der_context(0, &der_integer(5)),
+                &der_context(1, &realm),
+                &der_context(2, &sname),
+                &der_context(3, &enc),
+            ]),
+        );
+        let principal = CcachePrincipal {
+            name_type: 1,
+            realm: "EXAMPLE.COM".to_string(),
+            components: vec!["user".to_string()],
+        };
+        let credential = |key_data: Vec<u8>| CcacheCredential {
+            client: principal.clone(),
+            server: principal.clone(),
+            key_etype: 18,
+            key_data,
+            authtime: 0,
+            starttime: 0,
+            endtime: 0,
+            renew_till: 0,
+            ticket: ticket.clone(),
+        };
+        let mut auth = authenticator_with(Vec::new(), EncryptionType::Rc4Hmac);
+        assert!(matches!(
+            auth.load_tgt_from_ccache(&credential(vec![1u8; 16])),
+            Err(Error::InvalidData { .. })
+        ));
+        assert!(matches!(
+            auth.load_service_ticket_from_ccache(&credential(vec![1u8; 16])),
+            Err(Error::InvalidData { .. })
+        ));
+        auth.load_tgt_from_ccache(&credential(vec![1u8; 32]))
+            .unwrap();
+        assert_eq!(auth.etype, EncryptionType::Aes256CtsHmacSha196);
+    }
 
     // ── Time formatting tests ────────────────────────────────────────
 

@@ -10,14 +10,14 @@ numero non misura copertura o maturità. I file contengono le firme complete.
 
 | Target | Crate | Righe API |
 | --- | --- | --- |
-| `x86_64-pc-windows-msvc` | [plenora-smb2](../api/rust/x86_64-pc-windows-msvc/plenora-smb2.txt) | 28091 |
+| `x86_64-pc-windows-msvc` | [plenora-smb2](../api/rust/x86_64-pc-windows-msvc/plenora-smb2.txt) | 28093 |
 | `x86_64-pc-windows-msvc` | [plenora-storage-core](../api/rust/x86_64-pc-windows-msvc/plenora-storage-core.txt) | 5690 |
 | `x86_64-pc-windows-msvc` | [plenora-storage-engine](../api/rust/x86_64-pc-windows-msvc/plenora-storage-engine.txt) | 210 |
 | `x86_64-pc-windows-msvc` | [plenora-storage-ftp](../api/rust/x86_64-pc-windows-msvc/plenora-storage-ftp.txt) | 307 |
 | `x86_64-pc-windows-msvc` | [plenora-storage-providers](../api/rust/x86_64-pc-windows-msvc/plenora-storage-providers.txt) | 1131 |
 | `x86_64-pc-windows-msvc` | [plenora-storage-s3](../api/rust/x86_64-pc-windows-msvc/plenora-storage-s3.txt) | 215 |
 | `x86_64-pc-windows-msvc` | [plenora-storage-sftp](../api/rust/x86_64-pc-windows-msvc/plenora-storage-sftp.txt) | 203 |
-| `x86_64-unknown-linux-gnu` | [plenora-smb2](../api/rust/x86_64-unknown-linux-gnu/plenora-smb2.txt) | 28091 |
+| `x86_64-unknown-linux-gnu` | [plenora-smb2](../api/rust/x86_64-unknown-linux-gnu/plenora-smb2.txt) | 28093 |
 | `x86_64-unknown-linux-gnu` | [plenora-storage-core](../api/rust/x86_64-unknown-linux-gnu/plenora-storage-core.txt) | 5690 |
 | `x86_64-unknown-linux-gnu` | [plenora-storage-engine](../api/rust/x86_64-unknown-linux-gnu/plenora-storage-engine.txt) | 209 |
 | `x86_64-unknown-linux-gnu` | [plenora-storage-ftp](../api/rust/x86_64-unknown-linux-gnu/plenora-storage-ftp.txt) | 307 |
