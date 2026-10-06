@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Make the plenora-smb2 KDC UDP-to-TCP fallback test deterministic: the exchange takes the UDP and TCP endpoints separately internally (`send_to_kdc` still uses one address for both), so the test binds its two mock servers on independent ephemeral ports instead of retrying to find one port free for both protocols, which failed intermittently on Windows (WSAEACCES).
+
 ## 3.0.0 — 2026-10-06
 
 Major release: rejects inputs accepted by 2.1 and changes public Rust signatures; see `docs/migration-3.0.md`.

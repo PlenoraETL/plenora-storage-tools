@@ -67,20 +67,32 @@ fn resolve_address(address: &str) -> String {
 pub async fn send_to_kdc(config: &KdcConfig, message: &[u8]) -> Result<Vec<u8>> {
     let addr = resolve_address(&config.address);
     trace!("kdc: sending {} bytes to {}", message.len(), addr);
+    send_udp_then_tcp(&addr, &addr, message, config.timeout).await
+}
 
+/// The UDP-first exchange of [`send_to_kdc`], with the TCP fallback endpoint
+/// given separately. A KDC serves both on one address; the split lets tests
+/// bind the two mock servers on independent ephemeral ports instead of
+/// hoping one port is free for both protocols.
+async fn send_udp_then_tcp(
+    udp_addr: &str,
+    tcp_addr: &str,
+    message: &[u8],
+    timeout: Duration,
+) -> Result<Vec<u8>> {
     // Try UDP first.
-    match send_udp(&addr, message, config.timeout).await {
+    match send_udp(udp_addr, message, timeout).await {
         Ok(response) => {
             if is_response_too_big(&response) {
                 debug!("kdc: got KRB_ERR_RESPONSE_TOO_BIG, retrying with TCP");
-                send_tcp(&addr, message, config.timeout).await
+                send_tcp(tcp_addr, message, timeout).await
             } else {
                 Ok(response)
             }
         }
         Err(e) => {
             warn!("kdc: UDP failed ({}), falling back to TCP", e);
-            send_tcp(&addr, message, config.timeout).await
+            send_tcp(tcp_addr, message, timeout).await
         }
     }
 }
@@ -804,43 +816,13 @@ mod tests {
 
     #[tokio::test]
     async fn send_to_kdc_udp_too_big_falls_back_to_tcp() {
-        // Set up a UDP server that returns KRB_ERR_RESPONSE_TOO_BIG
-        // and a TCP server that returns a real response. The fallback
-        // path uses one `KdcConfig.address`, so both servers must share
-        // a port.
-        //
-        // Bind TCP first (more restrictive) and then UDP to its port.
-        // On Windows Server, the OS port allocator can hand out an
-        // ephemeral port that's in an excluded range for the other
-        // protocol (WSAEACCES / 10013). Retry a few times if so;
-        // a fresh `:0` lottery picks a different port each attempt.
-        let (udp_server, tcp_listener) = {
-            let mut last_err: Option<std::io::Error> = None;
-            let mut bound = None;
-            for _ in 0..10 {
-                let tcp = match TcpListener::bind("127.0.0.1:0").await {
-                    Ok(l) => l,
-                    Err(e) => {
-                        last_err = Some(e);
-                        continue;
-                    }
-                };
-                let port = tcp.local_addr().unwrap().port();
-                match UdpSocket::bind(format!("127.0.0.1:{port}")).await {
-                    Ok(udp) => {
-                        bound = Some((udp, tcp));
-                        break;
-                    }
-                    Err(e) => {
-                        last_err = Some(e);
-                        // TCP listener drops here; try a new port.
-                    }
-                }
-            }
-            bound.unwrap_or_else(|| {
-                panic!("could not co-bind UDP+TCP on a shared loopback port in 10 attempts: {last_err:?}")
-            })
-        };
+        // A UDP server that returns KRB_ERR_RESPONSE_TOO_BIG and a TCP
+        // server that returns a real response, each on its own ephemeral
+        // port: `send_udp_then_tcp` takes the two endpoints separately, so
+        // no shared port has to be free for both protocols.
+        let udp_server = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let tcp_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let tcp_addr = tcp_listener.local_addr().unwrap();
         let udp_addr = udp_server.local_addr().unwrap();
 
         let udp_task = tokio::spawn(async move {
@@ -867,12 +849,13 @@ mod tests {
             stream.flush().await.unwrap();
         });
 
-        let config = KdcConfig {
-            address: udp_addr.to_string(),
-            timeout: Duration::from_secs(5),
-        };
-
-        let result = send_to_kdc(&config, b"as-req-large").await;
+        let result = send_udp_then_tcp(
+            &udp_addr.to_string(),
+            &tcp_addr.to_string(),
+            b"as-req-large",
+            Duration::from_secs(5),
+        )
+        .await;
         assert!(result.is_ok(), "send_to_kdc failed: {:?}", result.err());
         assert_eq!(result.unwrap(), b"tcp-kdc-response");
 
