@@ -40,6 +40,7 @@ Major release: rejects inputs accepted by 2.1 and changes public Rust signatures
   - a deadline already expired at admission is `timeout`/`validate`/`none` with retry `never` instead of `safe`, on every surface (P).
 - A proved S3, SFTP or FTP publication whose metadata cannot be read back is `committed`/`cleanup` with retry `never` instead of `requires_recovery` (P); an FTP object published or downloaded with a size different from the transferred bytes keeps `requires_recovery` under the new code `FTP_COMMITTED_SIZE_MISMATCH`.
 - **Breaking (MSRV):** raise the Rust toolchain to 1.98.1 and the declared minimum (`rust-version`) to 1.98, aligned with the other Plenora libraries; Docker images use `rust:1.98.1-bookworm` pinned by digest. API snapshots are regenerated with 1.98.1: the differences are auto-trait and std path rendering only, not crate signatures.
+- Give both CycloneDX inventories a `serialNumber` (a UUID derived from the SHA-256 of the inventory, so it is deterministic and changes with the content). `actions/attest` requires it: without it the first 3.0.0 release candidate was refused as "Unsupported SBOM format".
 
 ## 2.1.0 — 2026-09-30
 

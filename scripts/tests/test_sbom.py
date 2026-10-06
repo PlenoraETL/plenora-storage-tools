@@ -61,6 +61,31 @@ class SBOMTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 sbom.verify(document, [artifact])
 
+    def test_sboms_carry_the_fields_sbom_attestation_requires(self):
+        # actions/attest accepts a CycloneDX document only with bomFormat,
+        # serialNumber and specVersion; without serialNumber it refuses it as
+        # "Unsupported SBOM format" and the release candidate fails.
+        import re
+        pattern = re.compile(r'urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}')
+        for document in (sbom.render(), sbom.render_qualification()):
+            self.assertTrue(document['bomFormat'] and document['specVersion'] and document['serialNumber'])
+            self.assertRegex(document['serialNumber'], pattern)
+        self.assertNotEqual(sbom.render()['serialNumber'], sbom.render_qualification()['serialNumber'])
+
+    def test_serial_number_is_deterministic_and_follows_the_content(self):
+        with tempfile.TemporaryDirectory() as directory:
+            artifact = Path(directory) / 'artifact.bin'
+            artifact.write_bytes(b'qualified')
+            first = sbom.render([artifact])
+            self.assertEqual(first['serialNumber'], sbom.render([artifact])['serialNumber'])
+            artifact.write_bytes(b'changed')
+            self.assertNotEqual(first['serialNumber'], sbom.render([artifact])['serialNumber'])
+            forged = copy.deepcopy(first)
+            forged['serialNumber'] = 'urn:uuid:00000000-0000-8000-8000-000000000000'
+            artifact.write_bytes(b'qualified')
+            with self.assertRaises(ValueError):
+                sbom.verify(forged, [artifact])
+
     def test_official_cyclonedx_schema(self):
         schema = json.loads((sbom.ROOT / 'scripts/schemas/bom-1.6.schema.json').read_text())
         jsonschema.Draft7Validator(schema).validate(sbom.render())

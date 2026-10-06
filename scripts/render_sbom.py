@@ -24,6 +24,25 @@ def package_ref(package):
     return f'cargo:{package["name"]}@{package["version"]}:{source}'
 
 
+def with_serial_number(document):
+    """Adds the CycloneDX `serialNumber` that SBOM attestation requires.
+
+    The URN is a UUID version 8 derived from the SHA-256 of the canonical
+    document without it: the same inventory always gets the same serial, and
+    any change to components, dependencies or artifact digests gets a new one.
+    Nothing random or time-dependent enters the inventory.
+    """
+    canonical = json.dumps(document, sort_keys=True, separators=(',', ':')).encode()
+    raw = bytearray(hashlib.sha256(canonical).digest()[:16])
+    raw[6] = (raw[6] & 0x0F) | 0x80
+    raw[8] = (raw[8] & 0x3F) | 0x80
+    value = raw.hex()
+    uuid = f'{value[:8]}-{value[8:12]}-{value[12:16]}-{value[16:20]}-{value[20:]}'
+    return {'bomFormat': document['bomFormat'], 'specVersion': document['specVersion'],
+            'serialNumber': 'urn:uuid:' + uuid,
+            **{key: value for key, value in document.items() if key not in {'bomFormat', 'specVersion'}}}
+
+
 def render(artifacts=(), *, lockfile='Cargo.lock'):
     workspace = tomllib.loads((ROOT / 'Cargo.toml').read_text())['workspace']
     packages = tomllib.loads((ROOT / lockfile).read_text())['package']
@@ -70,7 +89,7 @@ def render(artifacts=(), *, lockfile='Cargo.lock'):
     if lockfile != 'Cargo.lock':
         root_ref += ':' + quote(lockfile, safe='')
     dependencies.append({'ref': root_ref, 'dependsOn': sorted(refs | set(artifact_refs))})
-    return {'bomFormat': 'CycloneDX', 'specVersion': '1.6', 'version': 1,
+    return with_serial_number({'bomFormat': 'CycloneDX', 'specVersion': '1.6', 'version': 1,
             'metadata': {'component': {'type': 'application', 'bom-ref': root_ref,
                                       'name': 'plenora-storage-tools', 'version': version},
                          'properties': [{'name': 'plenora:inventory:scope',
@@ -78,7 +97,7 @@ def render(artifacts=(), *, lockfile='Cargo.lock'):
                                         {'name': 'plenora:lockfile:path', 'value': lockfile},
                                         {'name': 'plenora:lockfile:sha256', 'value': digest(ROOT / lockfile)}]},
             'components': sorted(components, key=lambda value: value['bom-ref']),
-            'dependencies': sorted(dependencies, key=lambda value: value['ref'])}
+            'dependencies': sorted(dependencies, key=lambda value: value['ref'])})
 
 
 def verify(document, artifacts=()):
@@ -125,14 +144,14 @@ def render_qualification():
     if len({c['bom-ref'] for c in components}) != len(components):
         raise ValueError('duplicate qualification dependency identity')
     dependencies.append({'ref': root_ref, 'dependsOn': sorted(roots)})
-    return {'bomFormat': 'CycloneDX', 'specVersion': '1.6', 'version': 1,
+    return with_serial_number({'bomFormat': 'CycloneDX', 'specVersion': '1.6', 'version': 1,
             'metadata': {'component': {'type': 'application', 'bom-ref': root_ref,
                                       'name': 'plenora-storage-qualification', 'version': version},
                          'properties': [{'name': 'plenora:inventory:scope',
                                          'value': 'Auxiliary Cargo lock graphs and declared Python pins; Python transitives, installed environments, OS, native system libraries and externally installed Rust tools excluded'},
                                         *properties]},
             'components': sorted(components, key=lambda value: value['bom-ref']),
-            'dependencies': sorted(dependencies, key=lambda value: value['ref'])}
+            'dependencies': sorted(dependencies, key=lambda value: value['ref'])})
 
 
 def verify_qualification(document):
