@@ -239,17 +239,37 @@ impl<'a> FileDownload<'a> {
 
     /// Consume the download and collect all data with a progress callback.
     ///
+    /// The file size comes from the server, so the whole-file buffer is
+    /// bounded by `max_bytes`: a declared size above it, or a server sending
+    /// more than that, fails with [`Error::DeclaredSizeOverLimit`] before the
+    /// memory is reserved. Use [`next_chunk`](Self::next_chunk) to stream a
+    /// file of any size.
+    ///
     /// Return `ControlFlow::Break(())` from the callback to cancel the download.
     /// Cancellation returns `Error::Cancelled`.
-    pub async fn collect_with_progress<F>(mut self, mut on_progress: F) -> Result<Vec<u8>>
+    pub async fn collect_with_progress<F>(
+        mut self,
+        max_bytes: u64,
+        mut on_progress: F,
+    ) -> Result<Vec<u8>>
     where
         F: FnMut(Progress) -> ControlFlow<()>,
     {
-        let mut data = Vec::with_capacity(self.file_size as usize);
+        let mut data = match buffer_for_declared_size(self.file_size, max_bytes) {
+            Ok(data) => data,
+            Err(error) => {
+                // Best-effort close: the refusal is the error to report.
+                let _ = self.close().await;
+                return Err(error);
+            }
+        };
 
         while let Some(result) = self.next_chunk().await {
             let chunk = result?;
-            data.extend_from_slice(&chunk);
+            if let Err(error) = append_within_limit(&mut data, &chunk, max_bytes) {
+                let _ = self.close().await;
+                return Err(error);
+            }
 
             if let ControlFlow::Break(()) = on_progress(self.progress()) {
                 // Best-effort close before returning.
@@ -261,16 +281,11 @@ impl<'a> FileDownload<'a> {
         Ok(data)
     }
 
-    /// Consume the download and collect all data into a `Vec<u8>`.
-    pub async fn collect(mut self) -> Result<Vec<u8>> {
-        let mut data = Vec::with_capacity(self.file_size as usize);
-
-        while let Some(result) = self.next_chunk().await {
-            let chunk = result?;
-            data.extend_from_slice(&chunk);
-        }
-
-        Ok(data)
+    /// Consume the download and collect all data into a `Vec<u8>`, bounded by
+    /// `max_bytes` as in [`collect_with_progress`](Self::collect_with_progress).
+    pub async fn collect(self, max_bytes: u64) -> Result<Vec<u8>> {
+        self.collect_with_progress(max_bytes, |_| ControlFlow::Continue(()))
+            .await
     }
 
     /// Close the file handle. Only sends CLOSE once.
@@ -281,6 +296,47 @@ impl<'a> FileDownload<'a> {
         self.done = true;
         self.tree.close_handle(self.conn, self.file_id).await
     }
+}
+
+/// Reserves the buffer of a whole-file read whose size the server declared.
+///
+/// The size is checked against the caller's `limit` before any memory is
+/// reserved, and the reservation itself is fallible: a size the process
+/// cannot hold is an error, never an abort.
+pub(crate) fn buffer_for_declared_size(size: u64, limit: u64) -> Result<Vec<u8>> {
+    if size > limit {
+        return Err(Error::DeclaredSizeOverLimit { size, limit });
+    }
+    let capacity = usize::try_from(size)
+        .map_err(|_| Error::Io(std::io::Error::from(std::io::ErrorKind::OutOfMemory)))?;
+    let mut data = Vec::new();
+    data.try_reserve_exact(capacity)
+        .map_err(|_| Error::Io(std::io::Error::from(std::io::ErrorKind::OutOfMemory)))?;
+    Ok(data)
+}
+
+/// [`buffer_for_declared_size`], filled with zeros for reads that place
+/// chunks by offset.
+pub(crate) fn zeroed_buffer_for_declared_size(size: u64, limit: u64) -> Result<Vec<u8>> {
+    let mut data = buffer_for_declared_size(size, limit)?;
+    // The capacity was reserved for exactly `size` bytes, so this does not
+    // allocate again.
+    data.resize(data.capacity(), 0);
+    Ok(data)
+}
+
+/// Appends a received chunk unless the total would exceed `limit`: a server
+/// may send more than it declared, and the declared-size check alone would
+/// then let the buffer grow without bound.
+fn append_within_limit(data: &mut Vec<u8>, chunk: &[u8], limit: u64) -> Result<()> {
+    let total = (data.len() as u64).saturating_add(chunk.len() as u64);
+    if total > limit {
+        return Err(Error::DeclaredSizeOverLimit { size: total, limit });
+    }
+    data.try_reserve(chunk.len())
+        .map_err(|_| Error::Io(std::io::Error::from(std::io::ErrorKind::OutOfMemory)))?;
+    data.extend_from_slice(chunk);
+    Ok(())
 }
 
 impl Drop for FileDownload<'_> {
@@ -1315,6 +1371,41 @@ mod tests {
 
     // ── FileWriter tests ───────────────────────────────────────────────
 
+    #[test]
+    fn declared_size_buffer_is_bounded_and_fallible() {
+        assert!(matches!(
+            buffer_for_declared_size(11, 10),
+            Err(Error::DeclaredSizeOverLimit {
+                size: 11,
+                limit: 10
+            })
+        ));
+        let data = buffer_for_declared_size(10, 10).unwrap();
+        assert!(data.is_empty() && data.capacity() >= 10);
+        assert_eq!(
+            zeroed_buffer_for_declared_size(10, 10).unwrap(),
+            vec![0; 10]
+        );
+        // A size the process cannot address is an error, not an abort.
+        match buffer_for_declared_size(u64::MAX, u64::MAX) {
+            Err(Error::Io(error)) => {
+                assert_eq!(error.kind(), std::io::ErrorKind::OutOfMemory);
+            }
+            other => panic!("expected an out-of-memory error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn appending_past_the_limit_is_refused_without_growing() {
+        let mut data = vec![1, 2];
+        assert!(matches!(
+            append_within_limit(&mut data, &[3, 4], 3),
+            Err(Error::DeclaredSizeOverLimit { size: 4, limit: 3 })
+        ));
+        assert_eq!(data, [1, 2]);
+        append_within_limit(&mut data, &[3], 3).unwrap();
+        assert_eq!(data, [1, 2, 3]);
+    }
     #[tokio::test]
     async fn file_writer_at_offset_writes_from_given_position() {
         use crate::msg::header::Header;

@@ -5523,8 +5523,8 @@ pub mod smb2::client::stream
 pub struct smb2::client::stream::FileDownload<'a>
 impl<'a> smb2::client::stream::FileDownload<'a>
 pub fn smb2::client::stream::FileDownload<'a>::bytes_received(&self) -> u64
-pub async fn smb2::client::stream::FileDownload<'a>::collect(self) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::stream::FileDownload<'a>::collect_with_progress<F>(self, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
+pub async fn smb2::client::stream::FileDownload<'a>::collect(self, max_bytes: u64) -> smb2::error::Result<alloc::vec::Vec<u8>>
+pub async fn smb2::client::stream::FileDownload<'a>::collect_with_progress<F>(self, max_bytes: u64, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
 pub fn smb2::client::stream::FileDownload<'a>::new(tree: &'a smb2::client::tree::Tree, conn: &'a mut smb2::client::connection::Connection, file_id: smb2::types::FileId, file_size: u64, chunk_size: u32) -> Self
 pub async fn smb2::client::stream::FileDownload<'a>::next_chunk(&mut self) -> core::option::Option<smb2::error::Result<alloc::vec::Vec<u8>>>
 pub fn smb2::client::stream::FileDownload<'a>::progress(&self) -> smb2::client::stream::Progress
@@ -6576,8 +6576,8 @@ pub async fn smb2::client::tree::Tree::open_file_readwrite(&self, conn: &mut smb
 pub async fn smb2::client::tree::Tree::read_file(&self, conn: &mut smb2::client::connection::Connection, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
 pub async fn smb2::client::tree::Tree::read_file_compound(&self, conn: &mut smb2::client::connection::Connection, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
 pub async fn smb2::client::tree::Tree::read_file_compound_sized(&self, conn: &mut smb2::client::connection::Connection, path: &str, expected_size: u64) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::tree::Tree::read_file_pipelined(&self, conn: &mut smb2::client::connection::Connection, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::tree::Tree::read_file_pipelined_with_progress<F>(&self, conn: &mut smb2::client::connection::Connection, path: &str, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
+pub async fn smb2::client::tree::Tree::read_file_pipelined(&self, conn: &mut smb2::client::connection::Connection, path: &str, max_bytes: u64) -> smb2::error::Result<alloc::vec::Vec<u8>>
+pub async fn smb2::client::tree::Tree::read_file_pipelined_with_progress<F>(&self, conn: &mut smb2::client::connection::Connection, path: &str, max_bytes: u64, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
 pub async fn smb2::client::tree::Tree::rename(&self, conn: &mut smb2::client::connection::Connection, from: &str, to: &str) -> smb2::error::Result<()>
 pub async fn smb2::client::tree::Tree::rename_files(&self, conn: &mut smb2::client::connection::Connection, renames: &[(&str, &str)]) -> alloc::vec::Vec<smb2::error::Result<()>>
 pub async fn smb2::client::tree::Tree::stat(&self, conn: &mut smb2::client::connection::Connection, path: &str) -> smb2::error::Result<smb2::client::tree::FileInfo>
@@ -8986,8 +8986,8 @@ pub type smb2::client::diagnostics::EncryptionInfo::Output = T
 pub struct smb2::client::FileDownload<'a>
 impl<'a> smb2::client::stream::FileDownload<'a>
 pub fn smb2::client::stream::FileDownload<'a>::bytes_received(&self) -> u64
-pub async fn smb2::client::stream::FileDownload<'a>::collect(self) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::stream::FileDownload<'a>::collect_with_progress<F>(self, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
+pub async fn smb2::client::stream::FileDownload<'a>::collect(self, max_bytes: u64) -> smb2::error::Result<alloc::vec::Vec<u8>>
+pub async fn smb2::client::stream::FileDownload<'a>::collect_with_progress<F>(self, max_bytes: u64, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
 pub fn smb2::client::stream::FileDownload<'a>::new(tree: &'a smb2::client::tree::Tree, conn: &'a mut smb2::client::connection::Connection, file_id: smb2::types::FileId, file_size: u64, chunk_size: u32) -> Self
 pub async fn smb2::client::stream::FileDownload<'a>::next_chunk(&mut self) -> core::option::Option<smb2::error::Result<alloc::vec::Vec<u8>>>
 pub fn smb2::client::stream::FileDownload<'a>::progress(&self) -> smb2::client::stream::Progress
@@ -10733,8 +10733,8 @@ pub async fn smb2::client::SmbClient::open_file_reader(&self, tree: &smb2::clien
 pub fn smb2::client::SmbClient::params(&self) -> core::option::Option<smb2::client::connection::NegotiatedParams>
 pub async fn smb2::client::SmbClient::read_file(&mut self, tree: &mut smb2::client::tree::Tree, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
 pub async fn smb2::client::SmbClient::read_file_compound(&mut self, tree: &mut smb2::client::tree::Tree, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::SmbClient::read_file_pipelined(&mut self, tree: &mut smb2::client::tree::Tree, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::SmbClient::read_file_with_progress<F>(&mut self, tree: &mut smb2::client::tree::Tree, path: &str, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
+pub async fn smb2::client::SmbClient::read_file_pipelined(&mut self, tree: &mut smb2::client::tree::Tree, path: &str, max_bytes: u64) -> smb2::error::Result<alloc::vec::Vec<u8>>
+pub async fn smb2::client::SmbClient::read_file_with_progress<F>(&mut self, tree: &mut smb2::client::tree::Tree, path: &str, max_bytes: u64, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
 pub async fn smb2::client::SmbClient::reconnect(&mut self) -> smb2::error::Result<()>
 pub async fn smb2::client::SmbClient::rename(&mut self, tree: &mut smb2::client::tree::Tree, from: &str, to: &str) -> smb2::error::Result<()>
 pub async fn smb2::client::SmbClient::rename_files(&mut self, tree: &mut smb2::client::tree::Tree, renames: &[(&str, &str)]) -> alloc::vec::Vec<smb2::error::Result<()>>
@@ -10859,8 +10859,8 @@ pub async fn smb2::client::tree::Tree::open_file_readwrite(&self, conn: &mut smb
 pub async fn smb2::client::tree::Tree::read_file(&self, conn: &mut smb2::client::connection::Connection, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
 pub async fn smb2::client::tree::Tree::read_file_compound(&self, conn: &mut smb2::client::connection::Connection, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
 pub async fn smb2::client::tree::Tree::read_file_compound_sized(&self, conn: &mut smb2::client::connection::Connection, path: &str, expected_size: u64) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::tree::Tree::read_file_pipelined(&self, conn: &mut smb2::client::connection::Connection, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::tree::Tree::read_file_pipelined_with_progress<F>(&self, conn: &mut smb2::client::connection::Connection, path: &str, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
+pub async fn smb2::client::tree::Tree::read_file_pipelined(&self, conn: &mut smb2::client::connection::Connection, path: &str, max_bytes: u64) -> smb2::error::Result<alloc::vec::Vec<u8>>
+pub async fn smb2::client::tree::Tree::read_file_pipelined_with_progress<F>(&self, conn: &mut smb2::client::connection::Connection, path: &str, max_bytes: u64, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
 pub async fn smb2::client::tree::Tree::rename(&self, conn: &mut smb2::client::connection::Connection, from: &str, to: &str) -> smb2::error::Result<()>
 pub async fn smb2::client::tree::Tree::rename_files(&self, conn: &mut smb2::client::connection::Connection, renames: &[(&str, &str)]) -> alloc::vec::Vec<smb2::error::Result<()>>
 pub async fn smb2::client::tree::Tree::stat(&self, conn: &mut smb2::client::connection::Connection, path: &str) -> smb2::error::Result<smb2::client::tree::FileInfo>
@@ -11763,6 +11763,9 @@ pub smb2::error::Error::CreditStarvation
 pub smb2::error::Error::CreditStarvation::available: u16
 pub smb2::error::Error::CreditStarvation::needed: u16
 pub smb2::error::Error::CreditStarvation::waited: core::time::Duration
+pub smb2::error::Error::DeclaredSizeOverLimit
+pub smb2::error::Error::DeclaredSizeOverLimit::limit: u64
+pub smb2::error::Error::DeclaredSizeOverLimit::size: u64
 pub smb2::error::Error::DfsNoReachableTarget
 pub smb2::error::Error::DfsNoReachableTarget::namespace: alloc::string::String
 pub smb2::error::Error::DfsNoReachableTarget::source: alloc::boxed::Box<smb2::error::Error>
@@ -23408,6 +23411,9 @@ pub smb2::Error::CreditStarvation
 pub smb2::Error::CreditStarvation::available: u16
 pub smb2::Error::CreditStarvation::needed: u16
 pub smb2::Error::CreditStarvation::waited: core::time::Duration
+pub smb2::Error::DeclaredSizeOverLimit
+pub smb2::Error::DeclaredSizeOverLimit::limit: u64
+pub smb2::Error::DeclaredSizeOverLimit::size: u64
 pub smb2::Error::DfsNoReachableTarget
 pub smb2::Error::DfsNoReachableTarget::namespace: alloc::string::String
 pub smb2::Error::DfsNoReachableTarget::source: alloc::boxed::Box<smb2::error::Error>
@@ -25443,8 +25449,8 @@ pub type smb2::client::diagnostics::EncryptionInfo::Output = T
 pub struct smb2::FileDownload<'a>
 impl<'a> smb2::client::stream::FileDownload<'a>
 pub fn smb2::client::stream::FileDownload<'a>::bytes_received(&self) -> u64
-pub async fn smb2::client::stream::FileDownload<'a>::collect(self) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::stream::FileDownload<'a>::collect_with_progress<F>(self, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
+pub async fn smb2::client::stream::FileDownload<'a>::collect(self, max_bytes: u64) -> smb2::error::Result<alloc::vec::Vec<u8>>
+pub async fn smb2::client::stream::FileDownload<'a>::collect_with_progress<F>(self, max_bytes: u64, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
 pub fn smb2::client::stream::FileDownload<'a>::new(tree: &'a smb2::client::tree::Tree, conn: &'a mut smb2::client::connection::Connection, file_id: smb2::types::FileId, file_size: u64, chunk_size: u32) -> Self
 pub async fn smb2::client::stream::FileDownload<'a>::next_chunk(&mut self) -> core::option::Option<smb2::error::Result<alloc::vec::Vec<u8>>>
 pub fn smb2::client::stream::FileDownload<'a>::progress(&self) -> smb2::client::stream::Progress
@@ -27757,8 +27763,8 @@ pub async fn smb2::client::SmbClient::open_file_reader(&self, tree: &smb2::clien
 pub fn smb2::client::SmbClient::params(&self) -> core::option::Option<smb2::client::connection::NegotiatedParams>
 pub async fn smb2::client::SmbClient::read_file(&mut self, tree: &mut smb2::client::tree::Tree, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
 pub async fn smb2::client::SmbClient::read_file_compound(&mut self, tree: &mut smb2::client::tree::Tree, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::SmbClient::read_file_pipelined(&mut self, tree: &mut smb2::client::tree::Tree, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::SmbClient::read_file_with_progress<F>(&mut self, tree: &mut smb2::client::tree::Tree, path: &str, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
+pub async fn smb2::client::SmbClient::read_file_pipelined(&mut self, tree: &mut smb2::client::tree::Tree, path: &str, max_bytes: u64) -> smb2::error::Result<alloc::vec::Vec<u8>>
+pub async fn smb2::client::SmbClient::read_file_with_progress<F>(&mut self, tree: &mut smb2::client::tree::Tree, path: &str, max_bytes: u64, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
 pub async fn smb2::client::SmbClient::reconnect(&mut self) -> smb2::error::Result<()>
 pub async fn smb2::client::SmbClient::rename(&mut self, tree: &mut smb2::client::tree::Tree, from: &str, to: &str) -> smb2::error::Result<()>
 pub async fn smb2::client::SmbClient::rename_files(&mut self, tree: &mut smb2::client::tree::Tree, renames: &[(&str, &str)]) -> alloc::vec::Vec<smb2::error::Result<()>>
@@ -27883,8 +27889,8 @@ pub async fn smb2::client::tree::Tree::open_file_readwrite(&self, conn: &mut smb
 pub async fn smb2::client::tree::Tree::read_file(&self, conn: &mut smb2::client::connection::Connection, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
 pub async fn smb2::client::tree::Tree::read_file_compound(&self, conn: &mut smb2::client::connection::Connection, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
 pub async fn smb2::client::tree::Tree::read_file_compound_sized(&self, conn: &mut smb2::client::connection::Connection, path: &str, expected_size: u64) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::tree::Tree::read_file_pipelined(&self, conn: &mut smb2::client::connection::Connection, path: &str) -> smb2::error::Result<alloc::vec::Vec<u8>>
-pub async fn smb2::client::tree::Tree::read_file_pipelined_with_progress<F>(&self, conn: &mut smb2::client::connection::Connection, path: &str, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
+pub async fn smb2::client::tree::Tree::read_file_pipelined(&self, conn: &mut smb2::client::connection::Connection, path: &str, max_bytes: u64) -> smb2::error::Result<alloc::vec::Vec<u8>>
+pub async fn smb2::client::tree::Tree::read_file_pipelined_with_progress<F>(&self, conn: &mut smb2::client::connection::Connection, path: &str, max_bytes: u64, on_progress: F) -> smb2::error::Result<alloc::vec::Vec<u8>> where F: core::ops::function::FnMut(smb2::client::stream::Progress) -> core::ops::control_flow::ControlFlow<()>
 pub async fn smb2::client::tree::Tree::rename(&self, conn: &mut smb2::client::connection::Connection, from: &str, to: &str) -> smb2::error::Result<()>
 pub async fn smb2::client::tree::Tree::rename_files(&self, conn: &mut smb2::client::connection::Connection, renames: &[(&str, &str)]) -> alloc::vec::Vec<smb2::error::Result<()>>
 pub async fn smb2::client::tree::Tree::stat(&self, conn: &mut smb2::client::connection::Connection, path: &str) -> smb2::error::Result<smb2::client::tree::FileInfo>

@@ -173,7 +173,7 @@ For large file I/O, use the pipelined variants which fill the credit window:
 ```rust
 # async fn example(client: &mut smb2::SmbClient, share: &mut smb2::Tree) -> Result<(), smb2::Error> {
     // Pipelined I/O with sliding window for large files
-    let data = client.read_file_pipelined(&mut share, "big_file.iso").await?;
+    let data = client.read_file_pipelined(&mut share, "big_file.iso", 8 << 30).await?; // at most 8 GiB in memory
     client.write_file_pipelined(&mut share, "copy.iso", &data).await?;
     # Ok(())
     #
