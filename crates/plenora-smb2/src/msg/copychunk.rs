@@ -18,9 +18,9 @@
 //! These structs are the wire layer only. The high-level, batching client API
 //! lives in [`client::copy`](crate::client::copy).
 
+use crate::Error;
 use crate::error::Result;
 use crate::pack::{Pack, ReadCursor, Unpack, WriteCursor};
-use crate::Error;
 
 /// Length in bytes of a server-side copy resume key (MS-SMB2 2.2.32.3).
 pub const RESUME_KEY_LEN: usize = 24;

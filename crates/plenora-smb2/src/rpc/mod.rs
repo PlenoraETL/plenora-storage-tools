@@ -16,10 +16,10 @@
 
 pub mod srvsvc;
 
+use crate::Error;
 use crate::error::Result;
 use crate::pack::guid::Guid;
 use crate::pack::{Pack, ReadCursor, WriteCursor};
-use crate::Error;
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -509,7 +509,7 @@ mod tests {
         // Result entry
         w.write_u16_le(result); // Result
         w.write_u16_le(0); // Reason
-                           // Transfer syntax (16 bytes UUID + 4 bytes version)
+        // Transfer syntax (16 bytes UUID + 4 bytes version)
         NDR_UUID.pack(&mut w);
         w.write_u32_le(NDR_VERSION);
 

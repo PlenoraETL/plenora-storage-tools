@@ -10,8 +10,10 @@ use std::time::{Duration, Instant};
 
 use log::{debug, info, trace, warn};
 
+use crate::Error;
+use crate::bytes::{le_i64, le_u32, le_u64};
 use crate::client::connection::{
-    reserve_write_budget_or_drain, CompoundOp, Connection, Frame, WriteBudgetStep,
+    CompoundOp, Connection, Frame, WriteBudgetStep, reserve_write_budget_or_drain,
 };
 use crate::client::credits;
 use crate::client::stream::{FileDownload, Progress};
@@ -31,12 +33,11 @@ use crate::msg::tree_connect::{TreeConnectRequest, TreeConnectRequestFlags, Tree
 use crate::msg::tree_disconnect::TreeDisconnectRequest;
 use crate::msg::write::{WriteRequest, WriteResponse};
 use crate::pack::{FileTime, ReadCursor, Unpack};
-use crate::types::flags::FileAccessMask;
-use crate::types::status::NtStatus;
 #[cfg(test)]
 use crate::types::MessageId;
+use crate::types::flags::FileAccessMask;
+use crate::types::status::NtStatus;
 use crate::types::{Command, CreditCharge, FileId, OplockLevel, TreeId};
-use crate::Error;
 
 /// Maximum number of requests to keep in flight during pipelining.
 ///
@@ -307,13 +308,13 @@ impl Tree {
             // mistake a redirect for a namespace.
             if frame.header.status == NtStatus::BAD_NETWORK_NAME {
                 let mut cursor = ReadCursor::new(&frame.body);
-                if let Ok(err) = crate::msg::header::ErrorResponse::unpack(&mut cursor) {
-                    if err.is_share_redirect() {
-                        debug!("tree: {share_name} was redirected to another cluster node");
-                        return Err(Error::ShareRedirected {
-                            share: share_name.to_string(),
-                        });
-                    }
+                if let Ok(err) = crate::msg::header::ErrorResponse::unpack(&mut cursor)
+                    && err.is_share_redirect()
+                {
+                    debug!("tree: {share_name} was redirected to another cluster node");
+                    return Err(Error::ShareRedirected {
+                        share: share_name.to_string(),
+                    });
                 }
             }
             return Err(Error::Protocol {
@@ -341,7 +342,7 @@ impl Tree {
         debug!("tree: is_dfs={}, encrypt_data={}", is_dfs, encrypt_data);
 
         if is_dfs {
-            conn.register_dfs_tree(tree_id);
+            conn.register_dfs_tree(tree_id)?;
         }
 
         Ok(Tree {
@@ -543,9 +544,7 @@ impl Tree {
         let requested = expected_size.min(max_read as u64).max(1) as u32;
         trace!(
             "tree: read_file_compound path={}, requested={}, max_read={}",
-            normalized,
-            requested,
-            max_read
+            normalized, requested, max_read
         );
 
         // Build CREATE request (same params as open_file).
@@ -714,8 +713,7 @@ impl Tree {
     pub async fn disconnect(&self, conn: &mut Connection) -> Result<()> {
         trace!(
             "tree: disconnecting share={}, tree_id={}",
-            self.share_name,
-            self.tree_id
+            self.share_name, self.tree_id
         );
         let body = TreeDisconnectRequest;
         let frame = conn
@@ -729,7 +727,7 @@ impl Tree {
             });
         }
 
-        conn.deregister_dfs_tree(self.tree_id);
+        conn.deregister_dfs_tree(self.tree_id)?;
 
         info!(
             "tree: disconnected share={}, tree_id={}",
@@ -930,7 +928,9 @@ impl Tree {
             });
         }
         if basic_header.status == NtStatus::BUFFER_OVERFLOW {
-            warn!("recv: STATUS_BUFFER_OVERFLOW on FileBasicInformation, response data may be truncated");
+            warn!(
+                "recv: STATUS_BUFFER_OVERFLOW on FileBasicInformation, response data may be truncated"
+            );
         }
 
         // Parse FileBasicInformation.
@@ -945,11 +945,10 @@ impl Tree {
             )));
         }
 
-        let created = FileTime(u64::from_le_bytes(basic_buf[0..8].try_into().unwrap()));
-        let accessed = FileTime(u64::from_le_bytes(basic_buf[8..16].try_into().unwrap()));
-        let modified = FileTime(u64::from_le_bytes(basic_buf[16..24].try_into().unwrap()));
-        let _change_time = u64::from_le_bytes(basic_buf[24..32].try_into().unwrap());
-        let file_attributes = u32::from_le_bytes(basic_buf[32..36].try_into().unwrap());
+        let created = FileTime(le_u64(basic_buf, 0, "FileBasicInformation truncated")?);
+        let accessed = FileTime(le_u64(basic_buf, 8, "FileBasicInformation truncated")?);
+        let modified = FileTime(le_u64(basic_buf, 16, "FileBasicInformation truncated")?);
+        let file_attributes = le_u32(basic_buf, 32, "FileBasicInformation truncated")?;
 
         // Check second QUERY_INFO (standard). If it failed, issue standalone CLOSE.
         if !std_header.status.is_success_or_partial() {
@@ -966,7 +965,9 @@ impl Tree {
             });
         }
         if std_header.status == NtStatus::BUFFER_OVERFLOW {
-            warn!("recv: STATUS_BUFFER_OVERFLOW on FileStandardInformation, response data may be truncated");
+            warn!(
+                "recv: STATUS_BUFFER_OVERFLOW on FileStandardInformation, response data may be truncated"
+            );
         }
 
         // Parse FileStandardInformation.
@@ -981,10 +982,7 @@ impl Tree {
             )));
         }
 
-        let _allocation_size = u64::from_le_bytes(std_buf[0..8].try_into().unwrap());
-        let end_of_file = u64::from_le_bytes(std_buf[8..16].try_into().unwrap());
-        let _number_of_links = u32::from_le_bytes(std_buf[16..20].try_into().unwrap());
-        let _delete_pending = std_buf[20];
+        let end_of_file = le_u64(std_buf, 8, "FileStandardInformation truncated")?;
         let is_directory_byte = std_buf[21];
 
         let is_directory =
@@ -1000,8 +998,7 @@ impl Tree {
 
         trace!(
             "tree: stat done, size={}, is_dir={}",
-            end_of_file,
-            is_directory
+            end_of_file, is_directory
         );
         Ok(FileInfo {
             size: end_of_file,
@@ -1138,7 +1135,9 @@ impl Tree {
             });
         }
         if query_header.status == NtStatus::BUFFER_OVERFLOW {
-            warn!("recv: STATUS_BUFFER_OVERFLOW on FileFsFullSizeInformation, response data may be truncated");
+            warn!(
+                "recv: STATUS_BUFFER_OVERFLOW on FileFsFullSizeInformation, response data may be truncated"
+            );
         }
 
         // Parse the FileFsFullSizeInformation response.
@@ -1153,11 +1152,11 @@ impl Tree {
             )));
         }
 
-        let total_allocation_units = i64::from_le_bytes(buf[0..8].try_into().unwrap()) as u64;
-        let caller_available_units = i64::from_le_bytes(buf[8..16].try_into().unwrap()) as u64;
-        let actual_available_units = i64::from_le_bytes(buf[16..24].try_into().unwrap()) as u64;
-        let sectors_per_unit = u32::from_le_bytes(buf[24..28].try_into().unwrap());
-        let bytes_per_sector = u32::from_le_bytes(buf[28..32].try_into().unwrap());
+        let total_allocation_units = le_i64(buf, 0, "FileFsFullSizeInformation truncated")? as u64;
+        let caller_available_units = le_i64(buf, 8, "FileFsFullSizeInformation truncated")? as u64;
+        let actual_available_units = le_i64(buf, 16, "FileFsFullSizeInformation truncated")? as u64;
+        let sectors_per_unit = le_u32(buf, 24, "FileFsFullSizeInformation truncated")?;
+        let bytes_per_sector = le_u32(buf, 28, "FileFsFullSizeInformation truncated")?;
 
         let bytes_per_unit = sectors_per_unit as u64 * bytes_per_sector as u64;
         let total_bytes = total_allocation_units * bytes_per_unit;
@@ -1174,9 +1173,7 @@ impl Tree {
 
         trace!(
             "tree: fs_info done, total={}, free={}, total_free={}",
-            total_bytes,
-            free_bytes,
-            total_free_bytes
+            total_bytes, free_bytes, total_free_bytes
         );
         Ok(FsInfo {
             total_bytes,
@@ -1196,8 +1193,7 @@ impl Tree {
         let to_normalized = normalize_path(to);
         trace!(
             "tree: rename (compound) from={} to={}",
-            from_normalized,
-            to_normalized
+            from_normalized, to_normalized
         );
 
         // Build CREATE request with DELETE access (required for rename).
@@ -1550,7 +1546,12 @@ impl Tree {
         let total_chunks = file_size.div_ceil(chunk_size as u64) as usize;
         trace!(
             "tree: read_file_pipelined path={}, size={}, chunk_size={}, credit_charge={}, total_chunks={}, credits={}",
-            path, file_size, chunk_size, credit_charge, total_chunks, conn.credits()
+            path,
+            file_size,
+            chunk_size,
+            credit_charge,
+            total_chunks,
+            conn.credits()
         );
 
         let start = std::time::Instant::now();
@@ -1757,7 +1758,12 @@ impl Tree {
         let total_chunks = data.len().div_ceil(chunk_size as usize);
         trace!(
             "tree: write_file_pipelined path={}, len={}, chunk_size={}, credit_charge={}, total_chunks={}, credits={}",
-            normalized, data.len(), chunk_size, credit_charge, total_chunks, conn.credits()
+            normalized,
+            data.len(),
+            chunk_size,
+            credit_charge,
+            total_chunks,
+            conn.credits()
         );
 
         let start = std::time::Instant::now();
@@ -2487,9 +2493,7 @@ impl Tree {
         for e in &entries {
             trace!(
                 "tree: dir_entry name={}, size={}, is_dir={}",
-                e.name,
-                e.size,
-                e.is_directory
+                e.name, e.size, e.is_directory
             );
         }
         Ok(QueryStepOutcome::Entries { entries, bytes })
@@ -3150,7 +3154,7 @@ impl Tree {
         // A no-op for the handles that never held an oplock, which is nearly
         // all of them. Done before the CLOSE so a break arriving in the gap
         // isn't acknowledged on a handle that is on its way out.
-        conn.forget_oplock(file_id);
+        conn.forget_oplock(file_id)?;
         let req = CloseRequest { flags: 0, file_id };
 
         let frame = conn
@@ -7390,9 +7394,12 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn_primary.set_test_params(params);
-        conn_primary.set_session_id(crate::types::SessionId(0x1234));
+        conn_primary
+            .set_session_id(crate::types::SessionId(0x1234))
+            .unwrap();
         conn_primary.set_credits(512);
         let mut conn_secondary = conn_primary.clone();
 

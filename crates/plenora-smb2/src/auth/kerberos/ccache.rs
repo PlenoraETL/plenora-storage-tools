@@ -377,19 +377,25 @@ mod tests {
         assert_eq!(svc.unwrap().key_data, (16u8..32).collect::<Vec<_>>());
 
         // Case-insensitive hostname.
-        assert!(ccache
-            .find_service_ticket("cifs", "SERVER.TEST.LOCAL", "TEST.LOCAL")
-            .is_some());
+        assert!(
+            ccache
+                .find_service_ticket("cifs", "SERVER.TEST.LOCAL", "TEST.LOCAL")
+                .is_some()
+        );
 
         // Wrong hostname.
-        assert!(ccache
-            .find_service_ticket("cifs", "other.test.local", "TEST.LOCAL")
-            .is_none());
+        assert!(
+            ccache
+                .find_service_ticket("cifs", "other.test.local", "TEST.LOCAL")
+                .is_none()
+        );
 
         // Wrong service.
-        assert!(ccache
-            .find_service_ticket("ldap", "server.test.local", "TEST.LOCAL")
-            .is_none());
+        assert!(
+            ccache
+                .find_service_ticket("ldap", "server.test.local", "TEST.LOCAL")
+                .is_none()
+        );
     }
 
     #[test]
@@ -415,10 +421,12 @@ mod tests {
         let data = [0x05, 0x02]; // v2
         let result = parse_ccache(&data);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("unsupported version"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("unsupported version")
+        );
     }
 
     #[test]
@@ -431,7 +439,7 @@ mod tests {
     fn empty_credentials_list() {
         // A valid ccache with just a version + principal + no credentials
         let mut data = vec![0x05, 0x04, 0x00, 0x00]; // v4, no header
-                                                     // Principal: type=1, components=1, realm="R", component="u"
+        // Principal: type=1, components=1, realm="R", component="u"
         data.extend_from_slice(&[0, 0, 0, 1]); // name_type
         data.extend_from_slice(&[0, 0, 0, 1]); // num_components
         data.extend_from_slice(&[0, 0, 0, 1]); // realm length

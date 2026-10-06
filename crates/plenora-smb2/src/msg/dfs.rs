@@ -3,10 +3,10 @@
 //! These types are packed into the input/output buffers of an IOCTL request
 //! with `ctl_code = FSCTL_DFS_GET_REFERRALS`.
 
+use crate::Error;
 use crate::error::Result;
 use crate::pack::{Pack, ReadCursor, Unpack, WriteCursor};
 use crate::types::flags::impl_flags;
-use crate::Error;
 use std::ops::{BitAnd, BitOr, BitOrAssign};
 
 // ── ReqGetDfsReferral ─────────────────────────────────────────────────

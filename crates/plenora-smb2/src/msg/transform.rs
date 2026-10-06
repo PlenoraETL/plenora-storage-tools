@@ -4,10 +4,10 @@
 //! These headers wrap (encrypted or compressed) SMB2 messages. They are NOT
 //! SMB2 messages themselves -- they precede the actual message data.
 
+use crate::Error;
 use crate::error::Result;
 use crate::pack::{Pack, ReadCursor, Unpack, WriteCursor};
 use crate::types::SessionId;
-use crate::Error;
 
 // ── Transform header protocol IDs ──────────────────────────────────────
 

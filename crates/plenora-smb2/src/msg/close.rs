@@ -4,10 +4,10 @@
 //! The response optionally returns file attributes if the
 //! `SMB2_CLOSE_FLAG_POSTQUERY_ATTRIB` flag was set.
 
+use crate::Error;
 use crate::error::Result;
 use crate::pack::{FileTime, Pack, ReadCursor, Unpack, WriteCursor};
 use crate::types::FileId;
-use crate::Error;
 
 /// Close flag: request that the server returns file attributes in the response.
 pub const SMB2_CLOSE_FLAG_POSTQUERY_ATTRIB: u16 = 0x0001;

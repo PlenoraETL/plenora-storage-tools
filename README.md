@@ -132,6 +132,7 @@ La console MinIO è esposta su `http://localhost:9001`; l'API S3 è esposta su
 ```powershell
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+python scripts/check_anti_panic.py
 cargo test --workspace --all-targets --locked
 ```
 

@@ -25,17 +25,17 @@ use std::time::{Duration, Instant};
 
 use log::{debug, trace};
 
+use crate::Error;
 use crate::client::connection::Connection;
 use crate::error::Result;
 use crate::msg::dfs::{ReferralHeaderFlags, ReqGetDfsReferral, RespGetDfsReferral};
 use crate::msg::ioctl::{
-    IoctlRequest, IoctlResponse, FSCTL_DFS_GET_REFERRALS, SMB2_0_IOCTL_IS_FSCTL,
+    FSCTL_DFS_GET_REFERRALS, IoctlRequest, IoctlResponse, SMB2_0_IOCTL_IS_FSCTL,
 };
 use crate::msg::tree_connect::{TreeConnectRequest, TreeConnectRequestFlags, TreeConnectResponse};
 use crate::pack::{Pack, ReadCursor, Unpack, WriteCursor};
 use crate::types::status::NtStatus;
 use crate::types::{Command, FileId, TreeId};
-use crate::Error;
 
 /// Output buffer a referral asks for first (8 KiB).
 ///
@@ -450,17 +450,15 @@ impl DfsResolver {
     /// Without this a failover is forgotten as soon as it succeeds, and every
     /// later lookup walks the dead target again.
     pub(crate) fn note_target_worked(&mut self, resolved: &ResolvedPath) {
-        if let Some(entry) = self.cache.get_mut(&resolved.cache_key) {
-            if resolved.target_index < entry.targets.len()
-                && entry.target_hint != resolved.target_index
-            {
-                trace!(
-                    "dfs: target hint for {:?} moves to {}",
-                    entry.dfs_path_prefix,
-                    resolved.target_index
-                );
-                entry.target_hint = resolved.target_index;
-            }
+        if let Some(entry) = self.cache.get_mut(&resolved.cache_key)
+            && resolved.target_index < entry.targets.len()
+            && entry.target_hint != resolved.target_index
+        {
+            trace!(
+                "dfs: target hint for {:?} moves to {}",
+                entry.dfs_path_prefix, resolved.target_index
+            );
+            entry.target_hint = resolved.target_index;
         }
     }
 

@@ -13,8 +13,8 @@ pub mod guid;
 pub use filetime::FileTime;
 pub use guid::Guid;
 
-use crate::error::Result;
 use crate::Error;
+use crate::error::Result;
 
 /// Trait for types that can serialize themselves into binary format.
 pub trait Pack: Send + Sync {

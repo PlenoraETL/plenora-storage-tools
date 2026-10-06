@@ -12,8 +12,9 @@ use std::sync::Arc;
 
 use log::{debug, trace};
 
+use crate::Error;
 use crate::client::connection::{
-    reserve_write_budget_or_drain, Connection, Frame, WriteBudgetStep,
+    Connection, Frame, WriteBudgetStep, reserve_write_budget_or_drain,
 };
 use crate::client::credits;
 use crate::client::tree::Tree;
@@ -23,7 +24,6 @@ use crate::msg::write::{WriteRequest, WriteResponse};
 use crate::pack::{ReadCursor, Unpack};
 use crate::types::status::NtStatus;
 use crate::types::{Command, FileId};
-use crate::Error;
 
 /// Maximum number of pipelined write requests in flight.
 /// Matches `MAX_PIPELINE_WINDOW` in `tree.rs`.
@@ -224,10 +224,10 @@ impl<'a> FileDownload<'a> {
                         self.bytes_received += resp.data.len() as u64;
 
                         // If this was the last chunk, close the handle.
-                        if self.bytes_received >= self.file_size {
-                            if let Err(e) = self.close().await {
-                                return Some(Err(e));
-                            }
+                        if self.bytes_received >= self.file_size
+                            && let Err(e) = self.close().await
+                        {
+                            return Some(Err(e));
                         }
 
                         Some(Ok(resp.data))
@@ -836,8 +836,7 @@ pub async fn open_file_writer_at(
 ) -> Result<FileWriter> {
     trace!(
         "stream: open_file_writer_at path={} offset={}",
-        path,
-        offset
+        path, offset
     );
 
     let file_id = tree.open_file_for_write_at(&mut conn, path).await?;

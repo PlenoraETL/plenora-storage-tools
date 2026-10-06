@@ -50,13 +50,13 @@ use std::time::Duration;
 
 use log::{debug, info, trace};
 
+use crate::Error;
 use crate::client::dfs::DfsResolver;
 use crate::error::{ErrorKind, Result};
 use crate::pack::Unpack;
 use crate::rpc::srvsvc::ShareInfo;
-use crate::types::status::NtStatus;
 use crate::types::FileId;
-use crate::Error;
+use crate::types::status::NtStatus;
 
 /// Configuration for an SMB client connection.
 #[derive(Debug, Clone)]
@@ -248,18 +248,18 @@ impl connection::SessionReviver for ClientReviver {
 /// and a DFS target share is exactly as entitled to it as the one the caller
 /// named. Falls back to AES-128-CCM when the server sent no encryption
 /// negotiate context, the same fallback session-level encryption makes.
-fn activate_share_encryption(conn: &mut Connection, session: &Session, tree: &Tree) {
-    if !tree.encrypt_data || conn.should_encrypt() {
-        return;
+fn activate_share_encryption(conn: &mut Connection, session: &Session, tree: &Tree) -> Result<()> {
+    if !tree.encrypt_data || conn.should_encrypt()? {
+        return Ok(());
     }
     let (Some(enc_key), Some(dec_key)) = (&session.encryption_key, &session.decryption_key) else {
-        return;
+        return Ok(());
     };
     let cipher = conn
         .params()
         .and_then(|p| p.cipher)
         .unwrap_or(crate::crypto::encryption::Cipher::Aes128Ccm);
-    conn.activate_encryption(enc_key.clone(), dec_key.clone(), cipher);
+    conn.activate_encryption(enc_key.clone(), dec_key.clone(), cipher)
 }
 
 /// How many referrals one connect may follow before we call it a loop.
@@ -418,15 +418,15 @@ impl SmbClient {
     /// activates share encryption from these keys, and the previous session's
     /// keys decrypt nothing — every frame afterwards fails.
     fn refresh_session(&mut self) {
-        if let Some(current) = self.conn.current_session() {
-            if current.session_id != self.session.session_id {
-                debug!(
-                    "smb_client: adopting session {} established by a reconnect \
+        if let Some(current) = self.conn.current_session()
+            && current.session_id != self.session.session_id
+        {
+            debug!(
+                "smb_client: adopting session {} established by a reconnect \
                      (was {})",
-                    current.session_id, self.session.session_id
-                );
-                self.session = current;
-            }
+                current.session_id, self.session.session_id
+            );
+            self.session = current;
         }
     }
 
@@ -487,7 +487,7 @@ impl SmbClient {
         let refusal = match Tree::connect(&mut self.conn, share_name).await {
             Ok(mut tree) => {
                 tree.server = self.primary_server.clone();
-                activate_share_encryption(&mut self.conn, &self.session, &tree);
+                activate_share_encryption(&mut self.conn, &self.session, &tree)?;
                 return Ok(tree);
             }
             Err(err) => err,
@@ -810,7 +810,12 @@ impl SmbClient {
     /// short: eventually consistent, snapshot survives connection
     /// teardown, per-connection counters reset on
     /// [`Self::reconnect`], client-level counters survive.
-    pub fn diagnostics(&self) -> crate::client::diagnostics::Diagnostics {
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Internal`] if an earlier panic poisoned the state of one of
+    /// the connections.
+    pub fn diagnostics(&self) -> Result<crate::client::diagnostics::Diagnostics> {
         use crate::client::diagnostics::{
             ClientInfo, ClientMetricsSnapshot, Diagnostics, SessionDiagnostics,
         };
@@ -835,25 +840,25 @@ impl SmbClient {
             signing_algorithm: s.signing_algorithm,
         };
 
-        let mut primary = self.conn.diagnostics();
+        let mut primary = self.conn.diagnostics()?;
         primary.session = Some(session_for(&self.session));
 
         let extra_connections = self
             .extra_connections
             .values()
             .map(|entry| {
-                let mut d = entry.conn.diagnostics();
+                let mut d = entry.conn.diagnostics()?;
                 d.session = Some(session_for(&entry.session));
-                d
+                Ok(d)
             })
-            .collect();
+            .collect::<Result<_>>()?;
 
-        Diagnostics {
+        Ok(Diagnostics {
             client,
             primary,
             extra_connections,
             dfs_cache: self.dfs_resolver.cache_entries(),
-        }
+        })
     }
 
     /// Get a mutable reference to the underlying connection.
@@ -922,13 +927,15 @@ impl SmbClient {
         // We inline the connection lookup to avoid borrowing both
         // `self.dfs_resolver` and `self` (via connection_for_tree)
         // at the same time.
+        // Same answer as `connection_for_tree`: the DFS target's connection is
+        // gone (a reconnect drops them), so the caller connects the share again.
         let conn = if tree.server == self.primary_server {
             &mut self.conn
         } else {
             &mut self
                 .extra_connections
                 .get_mut(&tree.server)
-                .expect("no connection for tree server")
+                .ok_or(Error::Disconnected)?
                 .conn
         };
         let resolved_list = self.dfs_resolver.resolve(conn, &unc_path).await?;
@@ -1040,7 +1047,7 @@ impl SmbClient {
             self.refresh_session();
             let mut tree = Tree::connect(&mut self.conn, share).await?;
             tree.server = target_addr.to_string();
-            activate_share_encryption(&mut self.conn, &self.session, &tree);
+            activate_share_encryption(&mut self.conn, &self.session, &tree)?;
             return Ok(tree);
         }
 
@@ -1050,7 +1057,7 @@ impl SmbClient {
             .ok_or_else(|| Error::invalid_data("DFS: no connection for target"))?;
         let mut tree = Tree::connect(&mut entry.conn, share).await?;
         tree.server = target_addr.to_string();
-        activate_share_encryption(&mut entry.conn, &entry.session, &tree);
+        activate_share_encryption(&mut entry.conn, &entry.session, &tree)?;
         Ok(tree)
     }
 
@@ -1886,7 +1893,7 @@ mod tests {
     use crate::client::connection::pack_message;
     use crate::client::test_helpers::build_tree_connect_response;
     use crate::msg::header::Header;
-    use crate::msg::negotiate::{NegotiateContext, NegotiateResponse, HASH_ALGORITHM_SHA512};
+    use crate::msg::negotiate::{HASH_ALGORITHM_SHA512, NegotiateContext, NegotiateResponse};
     use crate::msg::session_setup::{SessionFlags, SessionSetupResponse};
     use crate::msg::tree_connect::ShareType;
     use crate::pack::Guid;
@@ -2015,7 +2022,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
 
         conn.negotiate().await.unwrap();
 
@@ -2612,9 +2620,11 @@ mod tests {
         let mut orphan = orphan;
         let results = client.stat_files(&mut orphan, &["a.txt", "b.txt"]).await;
         assert_eq!(results.len(), 2);
-        assert!(results
-            .iter()
-            .all(|r| matches!(r, Err(Error::Disconnected))));
+        assert!(
+            results
+                .iter()
+                .all(|r| matches!(r, Err(Error::Disconnected)))
+        );
     }
 
     /// `recover_tree` revives the DFS target's own connection and
@@ -2655,9 +2665,11 @@ mod tests {
             "tree re-established on the new session"
         );
         assert_eq!(tree.server, "dfs-target:445", "still routed to the target");
-        assert!(!client.extra_connections["dfs-target:445"]
-            .conn
-            .is_disconnected());
+        assert!(
+            !client.extra_connections["dfs-target:445"]
+                .conn
+                .is_disconnected()
+        );
         // The primary was not touched.
         assert_eq!(client.session().session_id, SessionId(0x77));
     }
@@ -2686,7 +2698,8 @@ mod tests {
         assert!(
             client.extra_connections["dfs-target:445"]
                 .conn
-                .should_encrypt(),
+                .should_encrypt()
+                .unwrap(),
             "a DFS target share flagged SMB2_SHAREFLAG_ENCRYPT_DATA must be encrypted"
         );
     }
@@ -2704,9 +2717,12 @@ mod tests {
         target_mock.queue_response(build_tree_connect_response(TreeId(5), ShareType::Disk));
         client.ensure_tree("dfs-target:445", "plain").await.unwrap();
 
-        assert!(!client.extra_connections["dfs-target:445"]
-            .conn
-            .should_encrypt());
+        assert!(
+            !client.extra_connections["dfs-target:445"]
+                .conn
+                .should_encrypt()
+                .unwrap()
+        );
     }
 
     /// Without keys there is nothing to encrypt with, and silently pretending
@@ -2730,8 +2746,8 @@ mod tests {
             dfs_origin: None,
         };
 
-        activate_share_encryption(client.connection_mut(), &keyless, &tree);
-        assert!(!client.connection_mut().should_encrypt());
+        activate_share_encryption(client.connection_mut(), &keyless, &tree).unwrap();
+        assert!(!client.connection_mut().should_encrypt().unwrap());
     }
 
     #[tokio::test]
@@ -2876,7 +2892,7 @@ mod tests {
              connection"
         );
         assert_eq!(held.generation(), 1, "and know it is on a new session");
-        assert_eq!(held.session_id(), SessionId(0x2222));
+        assert_eq!(held.session_id().unwrap(), SessionId(0x2222));
     }
 
     #[tokio::test]
@@ -3061,7 +3077,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.negotiate().await.unwrap();
         let session = Session::setup(&mut conn, "user", "pass", "").await.unwrap();
 

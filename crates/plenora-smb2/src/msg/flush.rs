@@ -5,10 +5,10 @@
 //! named pipe, the operation completes once all written data has been
 //! consumed by a reader.
 
+use crate::Error;
 use crate::error::Result;
 use crate::pack::{Pack, ReadCursor, Unpack, WriteCursor};
 use crate::types::FileId;
-use crate::Error;
 
 /// SMB2 FLUSH request (spec section 2.2.17).
 ///

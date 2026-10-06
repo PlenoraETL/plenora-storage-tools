@@ -11,12 +11,12 @@
 //! such as preauthentication integrity, encryption, compression, and
 //! signing algorithms.
 
+use crate::Error;
 use crate::error::Result;
 use crate::msg::header::Header;
 use crate::pack::{Guid, Pack, ReadCursor, Unpack, WriteCursor};
-use crate::types::flags::{Capabilities, SecurityMode};
 use crate::types::Dialect;
-use crate::Error;
+use crate::types::flags::{Capabilities, SecurityMode};
 
 // ── Negotiate context type constants ───────────────────────────────────
 
@@ -342,7 +342,7 @@ impl Pack for NegotiateRequest {
             // NegotiateContextOffset (4) -- will be backpatched
             let ctx_offset_pos = cursor.position();
             cursor.write_u32_le(0); // placeholder
-                                    // NegotiateContextCount (2)
+            // NegotiateContextCount (2)
             cursor.write_u16_le(self.negotiate_contexts.len() as u16);
             // Reserved2 (2)
             cursor.write_u16_le(0);

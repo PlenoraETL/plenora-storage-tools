@@ -7,6 +7,7 @@
 //! computed over the raw wire bytes of NEGOTIATE and SESSION_SETUP exchanges,
 //! which feeds into the KDF as the "context" parameter.
 
+use crate::Error;
 use crate::types::Dialect;
 use digest::{Digest, KeyInit};
 use hmac::{Hmac, Mac};
@@ -27,12 +28,24 @@ type HmacSha256 = Hmac<Sha256>;
 /// * `context` - Context string or preauth hash (including null terminator for
 ///   string contexts).
 /// * `key_length_bits` - Desired output key length in bits (128 or 256).
-pub fn sp800_108_kdf(key: &[u8], label: &[u8], context: &[u8], key_length_bits: u32) -> Vec<u8> {
+///
+/// # Errors
+///
+/// [`Error::Internal`] if HMAC-SHA256 rejects the key, which the primitive
+/// never does for any key length.
+pub fn sp800_108_kdf(
+    key: &[u8],
+    label: &[u8],
+    context: &[u8],
+    key_length_bits: u32,
+) -> Result<Vec<u8>, Error> {
     let iterations = key_length_bits.div_ceil(256);
     let mut result = Vec::with_capacity((iterations * 32) as usize);
 
     for i in 1..=iterations {
-        let mut mac = HmacSha256::new_from_slice(key).expect("HMAC-SHA256 accepts any key length");
+        let mut mac = HmacSha256::new_from_slice(key).map_err(|_| Error::Internal {
+            what: "HMAC-SHA256 rejected a key although HMAC accepts any key length",
+        })?;
 
         // counter (32-bit big-endian)
         mac.update(&i.to_be_bytes());
@@ -49,7 +62,7 @@ pub fn sp800_108_kdf(key: &[u8], label: &[u8], context: &[u8], key_length_bits: 
     }
 
     result.truncate((key_length_bits / 8) as usize);
-    result
+    Ok(result)
 }
 
 /// Derived session keys for signing, encryption, and decryption.
@@ -69,31 +82,35 @@ pub struct DerivedKeys {
 /// For SMB 3.1.1, the context is the preauthentication integrity hash value
 /// (64 bytes from SHA-512).
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics if `dialect` is SMB 3.1.1 and `preauth_hash` is `None`.
-/// Panics if `dialect` is not in the SMB 3.x family.
+/// [`Error::InvalidData`] if `dialect` is not in the SMB 3.x family, or if
+/// it is SMB 3.1.1 and `preauth_hash` is `None`.
 pub fn derive_session_keys(
     session_key: &[u8],
     dialect: Dialect,
     preauth_hash: Option<&[u8; 64]>,
     key_length_bits: u32,
-) -> DerivedKeys {
-    assert!(
-        matches!(
-            dialect,
-            Dialect::Smb3_0 | Dialect::Smb3_0_2 | Dialect::Smb3_1_1
-        ),
-        "Key derivation is only applicable for the SMB 3.x dialect family"
-    );
+) -> Result<DerivedKeys, Error> {
+    if !matches!(
+        dialect,
+        Dialect::Smb3_0 | Dialect::Smb3_0_2 | Dialect::Smb3_1_1
+    ) {
+        return Err(Error::invalid_data(
+            "key derivation is only applicable for the SMB 3.x dialect family",
+        ));
+    }
 
     let (signing_label, signing_context): (&[u8], &[u8]);
     let (enc_label, enc_context): (&[u8], &[u8]);
     let (dec_label, dec_context): (&[u8], &[u8]);
 
     if dialect == Dialect::Smb3_1_1 {
-        let hash = preauth_hash
-            .expect("SMB 3.1.1 requires a preauthentication integrity hash for key derivation");
+        let hash = preauth_hash.ok_or_else(|| {
+            Error::invalid_data(
+                "SMB 3.1.1 requires a preauthentication integrity hash for key derivation",
+            )
+        })?;
         // SMB 3.1.1 labels include null terminator (matches smb-rs and
         // the MS-SMB2 spec's Label field definitions)
         signing_label = b"SMBSigningKey\0";
@@ -112,11 +129,11 @@ pub fn derive_session_keys(
         dec_context = b"ServerOut\0";
     }
 
-    DerivedKeys {
-        signing_key: sp800_108_kdf(session_key, signing_label, signing_context, key_length_bits),
-        encryption_key: sp800_108_kdf(session_key, enc_label, enc_context, key_length_bits),
-        decryption_key: sp800_108_kdf(session_key, dec_label, dec_context, key_length_bits),
-    }
+    Ok(DerivedKeys {
+        signing_key: sp800_108_kdf(session_key, signing_label, signing_context, key_length_bits)?,
+        encryption_key: sp800_108_kdf(session_key, enc_label, enc_context, key_length_bits)?,
+        decryption_key: sp800_108_kdf(session_key, dec_label, dec_context, key_length_bits)?,
+    })
 }
 
 /// Running hash over negotiate and session-setup exchange bytes.
@@ -176,6 +193,21 @@ impl Clone for PreauthHasher {
 mod tests {
     use super::*;
 
+    /// Both used to be `assert!`/`expect` panics reachable from the
+    /// negotiated dialect; they are refused with an error now.
+    #[test]
+    fn key_derivation_outside_its_preconditions_is_an_error_not_a_panic() {
+        let key = [0u8; 16];
+        assert!(matches!(
+            derive_session_keys(&key, Dialect::Smb3_1_1, None, 128),
+            Err(Error::InvalidData { .. })
+        ));
+        assert!(matches!(
+            derive_session_keys(&key, Dialect::Smb2_1, None, 128),
+            Err(Error::InvalidData { .. })
+        ));
+    }
+
     // ========================================================================
     // SP800-108 KDF tests
     // ========================================================================
@@ -183,14 +215,14 @@ mod tests {
     #[test]
     fn kdf_128_bit_output_is_16_bytes() {
         let key = [0xAA; 16];
-        let result = sp800_108_kdf(&key, b"label\0", b"context\0", 128);
+        let result = sp800_108_kdf(&key, b"label\0", b"context\0", 128).unwrap();
         assert_eq!(result.len(), 16);
     }
 
     #[test]
     fn kdf_256_bit_output_is_32_bytes() {
         let key = [0xBB; 16];
-        let result = sp800_108_kdf(&key, b"label\0", b"context\0", 256);
+        let result = sp800_108_kdf(&key, b"label\0", b"context\0", 256).unwrap();
         assert_eq!(result.len(), 32);
     }
 
@@ -199,8 +231,8 @@ mod tests {
         let key = [0x42; 16];
         let label = b"TestLabel\0";
         let context = b"TestContext\0";
-        let r1 = sp800_108_kdf(&key, label, context, 128);
-        let r2 = sp800_108_kdf(&key, label, context, 128);
+        let r1 = sp800_108_kdf(&key, label, context, 128).unwrap();
+        let r2 = sp800_108_kdf(&key, label, context, 128).unwrap();
         assert_eq!(r1, r2);
     }
 
@@ -208,8 +240,8 @@ mod tests {
     fn kdf_different_labels_produce_different_keys() {
         let key = [0x42; 16];
         let context = b"ctx\0";
-        let k1 = sp800_108_kdf(&key, b"LabelA\0", context, 128);
-        let k2 = sp800_108_kdf(&key, b"LabelB\0", context, 128);
+        let k1 = sp800_108_kdf(&key, b"LabelA\0", context, 128).unwrap();
+        let k2 = sp800_108_kdf(&key, b"LabelB\0", context, 128).unwrap();
         assert_ne!(k1, k2);
     }
 
@@ -217,8 +249,8 @@ mod tests {
     fn kdf_different_contexts_produce_different_keys() {
         let key = [0x42; 16];
         let label = b"label\0";
-        let k1 = sp800_108_kdf(&key, label, b"ContextA\0", 128);
-        let k2 = sp800_108_kdf(&key, label, b"ContextB\0", 128);
+        let k1 = sp800_108_kdf(&key, label, b"ContextA\0", 128).unwrap();
+        let k2 = sp800_108_kdf(&key, label, b"ContextB\0", 128).unwrap();
         assert_ne!(k1, k2);
     }
 
@@ -226,8 +258,8 @@ mod tests {
     fn kdf_different_session_keys_produce_different_derived_keys() {
         let label = b"SMB2AESCMAC\0";
         let context = b"SmbSign\0";
-        let k1 = sp800_108_kdf(&[0x11; 16], label, context, 128);
-        let k2 = sp800_108_kdf(&[0x22; 16], label, context, 128);
+        let k1 = sp800_108_kdf(&[0x11; 16], label, context, 128).unwrap();
+        let k2 = sp800_108_kdf(&[0x22; 16], label, context, 128).unwrap();
         assert_ne!(k1, k2);
     }
 
@@ -252,7 +284,7 @@ mod tests {
         let full = mac.finalize().into_bytes();
         let expected = &full[..16];
 
-        let result = sp800_108_kdf(&key, label, context, 128);
+        let result = sp800_108_kdf(&key, label, context, 128).unwrap();
         assert_eq!(result.as_slice(), expected);
     }
 
@@ -275,7 +307,7 @@ mod tests {
         // 256 bits = 32 bytes = exactly one HMAC-SHA256 block, so only one
         // iteration is needed. But let's verify with the formula:
         // ceil(256 / 256) = 1 iteration. So 256-bit also needs just one.
-        let result = sp800_108_kdf(&key, label, context, 256);
+        let result = sp800_108_kdf(&key, label, context, 256).unwrap();
         assert_eq!(result.len(), 32);
         assert_eq!(result.as_slice(), block1.as_slice());
     }
@@ -287,40 +319,40 @@ mod tests {
     #[test]
     fn derive_keys_smb3_0_uses_legacy_labels() {
         let session_key = [0x42; 16];
-        let keys = derive_session_keys(&session_key, Dialect::Smb3_0, None, 128);
+        let keys = derive_session_keys(&session_key, Dialect::Smb3_0, None, 128).unwrap();
 
         // Verify each key matches what we'd get calling KDF directly with the
         // SMB 3.0 label/context pairs.
         assert_eq!(
             keys.signing_key,
-            sp800_108_kdf(&session_key, b"SMB2AESCMAC\0", b"SmbSign\0", 128)
+            sp800_108_kdf(&session_key, b"SMB2AESCMAC\0", b"SmbSign\0", 128).unwrap()
         );
         assert_eq!(
             keys.encryption_key,
-            sp800_108_kdf(&session_key, b"SMB2AESCCM\0", b"ServerIn \0", 128)
+            sp800_108_kdf(&session_key, b"SMB2AESCCM\0", b"ServerIn \0", 128).unwrap()
         );
         assert_eq!(
             keys.decryption_key,
-            sp800_108_kdf(&session_key, b"SMB2AESCCM\0", b"ServerOut\0", 128)
+            sp800_108_kdf(&session_key, b"SMB2AESCCM\0", b"ServerOut\0", 128).unwrap()
         );
     }
 
     #[test]
     fn derive_keys_smb3_0_2_uses_legacy_labels() {
         let session_key = [0x42; 16];
-        let keys = derive_session_keys(&session_key, Dialect::Smb3_0_2, None, 128);
+        let keys = derive_session_keys(&session_key, Dialect::Smb3_0_2, None, 128).unwrap();
 
         assert_eq!(
             keys.signing_key,
-            sp800_108_kdf(&session_key, b"SMB2AESCMAC\0", b"SmbSign\0", 128)
+            sp800_108_kdf(&session_key, b"SMB2AESCMAC\0", b"SmbSign\0", 128).unwrap()
         );
         assert_eq!(
             keys.encryption_key,
-            sp800_108_kdf(&session_key, b"SMB2AESCCM\0", b"ServerIn \0", 128)
+            sp800_108_kdf(&session_key, b"SMB2AESCCM\0", b"ServerIn \0", 128).unwrap()
         );
         assert_eq!(
             keys.decryption_key,
-            sp800_108_kdf(&session_key, b"SMB2AESCCM\0", b"ServerOut\0", 128)
+            sp800_108_kdf(&session_key, b"SMB2AESCCM\0", b"ServerOut\0", 128).unwrap()
         );
     }
 
@@ -328,19 +360,20 @@ mod tests {
     fn derive_keys_smb3_1_1_uses_new_labels_with_preauth_hash() {
         let session_key = [0x42; 16];
         let preauth_hash = [0xAB; 64];
-        let keys = derive_session_keys(&session_key, Dialect::Smb3_1_1, Some(&preauth_hash), 128);
+        let keys =
+            derive_session_keys(&session_key, Dialect::Smb3_1_1, Some(&preauth_hash), 128).unwrap();
 
         assert_eq!(
             keys.signing_key,
-            sp800_108_kdf(&session_key, b"SMBSigningKey\0", &preauth_hash, 128)
+            sp800_108_kdf(&session_key, b"SMBSigningKey\0", &preauth_hash, 128).unwrap()
         );
         assert_eq!(
             keys.encryption_key,
-            sp800_108_kdf(&session_key, b"SMBC2SCipherKey\0", &preauth_hash, 128)
+            sp800_108_kdf(&session_key, b"SMBC2SCipherKey\0", &preauth_hash, 128).unwrap()
         );
         assert_eq!(
             keys.decryption_key,
-            sp800_108_kdf(&session_key, b"SMBS2CCipherKey\0", &preauth_hash, 128)
+            sp800_108_kdf(&session_key, b"SMBS2CCipherKey\0", &preauth_hash, 128).unwrap()
         );
     }
 
@@ -348,7 +381,8 @@ mod tests {
     fn derive_keys_smb3_1_1_256_bit() {
         let session_key = [0x42; 16];
         let preauth_hash = [0xCD; 64];
-        let keys = derive_session_keys(&session_key, Dialect::Smb3_1_1, Some(&preauth_hash), 256);
+        let keys =
+            derive_session_keys(&session_key, Dialect::Smb3_1_1, Some(&preauth_hash), 256).unwrap();
 
         assert_eq!(keys.signing_key.len(), 32);
         assert_eq!(keys.encryption_key.len(), 32);
@@ -358,7 +392,7 @@ mod tests {
     #[test]
     fn derive_keys_all_three_are_different() {
         let session_key = [0x42; 16];
-        let keys = derive_session_keys(&session_key, Dialect::Smb3_0, None, 128);
+        let keys = derive_session_keys(&session_key, Dialect::Smb3_0, None, 128).unwrap();
 
         assert_ne!(keys.signing_key, keys.encryption_key);
         assert_ne!(keys.signing_key, keys.decryption_key);
@@ -369,14 +403,14 @@ mod tests {
     #[should_panic(expected = "preauthentication integrity hash")]
     fn derive_keys_smb3_1_1_panics_without_preauth_hash() {
         let session_key = [0x42; 16];
-        derive_session_keys(&session_key, Dialect::Smb3_1_1, None, 128);
+        derive_session_keys(&session_key, Dialect::Smb3_1_1, None, 128).unwrap();
     }
 
     #[test]
     #[should_panic(expected = "SMB 3.x dialect family")]
     fn derive_keys_panics_for_smb2() {
         let session_key = [0x42; 16];
-        derive_session_keys(&session_key, Dialect::Smb2_0_2, None, 128);
+        derive_session_keys(&session_key, Dialect::Smb2_0_2, None, 128).unwrap();
     }
 
     // ========================================================================
@@ -512,7 +546,8 @@ mod tests {
             Dialect::Smb3_1_1,
             Some(session_hasher.value()),
             128,
-        );
+        )
+        .unwrap();
 
         // Keys should all be 16 bytes and different from each other
         assert_eq!(keys.signing_key.len(), 16);

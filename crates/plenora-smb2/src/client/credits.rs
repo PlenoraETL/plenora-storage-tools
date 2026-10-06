@@ -28,8 +28,10 @@
 //! everything currently in flight invisible, and concurrent senders each read
 //! the same "plenty available" number and pile on.
 
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+
+use crate::sync::ValueLock;
 use std::time::Duration;
 
 use tokio::sync::{AcquireError, Semaphore};
@@ -92,13 +94,13 @@ pub(crate) const DEFAULT_CREDIT_WAIT: Duration = Duration::from_secs(30);
 /// the caller (see `Inner::reserve_credits`), so a server that stops granting
 /// produces an error rather than a wait that never ends.
 pub(crate) struct CreditPool {
-    /// The live budget. Behind a `Mutex<Arc<..>>` rather than owned outright
+    /// The live budget. Behind a `ValueLock<Arc<..>>` rather than owned outright
     /// because a closed `Semaphore` can never reopen (tokio makes closing
     /// terminal), and a connection revived in place needs a budget again.
     /// [`reset`](Self::reset) swaps in a fresh one; whoever still holds the old
     /// `Arc` is parked on a generation that is never coming back and sees
     /// `Err` from the close that killed it.
-    permits: Mutex<Arc<Semaphore>>,
+    permits: ValueLock<Arc<Semaphore>>,
     /// The reserve deadline in milliseconds, tunable per connection.
     wait_ms: AtomicU64,
 }
@@ -114,14 +116,14 @@ impl CreditPool {
     /// instead and put a frame on the wire the server funded nothing for.
     pub(crate) fn new() -> Self {
         Self {
-            permits: Mutex::new(Arc::new(Semaphore::new(0))),
+            permits: ValueLock::new(Arc::new(Semaphore::new(0))),
             wait_ms: AtomicU64::new(DEFAULT_CREDIT_WAIT.as_millis() as u64),
         }
     }
 
     /// The budget as of right now.
     fn current(&self) -> Arc<Semaphore> {
-        Arc::clone(&self.permits.lock().unwrap())
+        self.permits.cloned()
     }
 
     /// Throw the spent budget away and start again from empty, the way a
@@ -133,7 +135,7 @@ impl CreditPool {
     /// them over would let the first burst after a reconnect out-spend the
     /// server exactly the way the original wedge did.
     pub(crate) fn reset(&self) {
-        *self.permits.lock().unwrap() = Arc::new(Semaphore::new(0));
+        self.permits.set(Arc::new(Semaphore::new(0)));
     }
 
     /// Credits on hand: granted by the server and not reserved by a request.
