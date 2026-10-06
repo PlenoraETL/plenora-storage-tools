@@ -4394,8 +4394,8 @@ impl<T> typenum::type_operators::Same for plenora_storage_core::PutRequest
 pub type plenora_storage_core::PutRequest::Output = T
 pub struct plenora_storage_core::RuntimeBinding<'a>
 impl<'a> plenora_storage_core::RuntimeBinding<'a>
-pub async fn plenora_storage_core::RuntimeBinding<'a>::invoke(&self, invocation: plenora_storage_core::RuntimeInvocation, cancellation: plenora_storage_core::CancellationToken) -> plenora_storage_core::RuntimeResultEnvelope
-pub async fn plenora_storage_core::RuntimeBinding<'a>::invoke_json(&self, invocation: serde_json::value::Value, cancellation: plenora_storage_core::CancellationToken) -> plenora_storage_core::RuntimeResultEnvelope
+pub async fn plenora_storage_core::RuntimeBinding<'a>::invoke(&self, invocation: plenora_storage_core::RuntimeInvocation, cancellation: plenora_storage_core::CancellationToken) -> plenora_storage_core::StorageResult<plenora_storage_core::RuntimeResultEnvelope>
+pub async fn plenora_storage_core::RuntimeBinding<'a>::invoke_json(&self, invocation: serde_json::value::Value, cancellation: plenora_storage_core::CancellationToken) -> plenora_storage_core::StorageResult<plenora_storage_core::RuntimeResultEnvelope>
 pub const fn plenora_storage_core::RuntimeBinding<'a>::new(engine: &'a plenora_storage_core::Engine, artifacts: &'a dyn plenora_storage_core::ArtifactResolver, secrets: &'a dyn plenora_storage_core::SecretResolver) -> Self
 impl<'a> core::marker::Freeze for plenora_storage_core::RuntimeBinding<'a>
 impl<'a> core::marker::Send for plenora_storage_core::RuntimeBinding<'a>

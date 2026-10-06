@@ -10,8 +10,8 @@ use serde_json::Value;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
 use crate::runtime_admission::{
-    CountingSink, parse_version, result_identity, route_error, runtime_control,
-    sink_failure_outcome, validate_grammar, validate_runtime_route,
+    CountingSink, new_result_message_id, parse_version, result_identity, route_error,
+    runtime_control, sink_failure_outcome, validate_grammar, validate_runtime_route,
 };
 use crate::{
     ArtifactReference, ArtifactSinkReference, CancellationToken, CopyInput, DeleteInput, Engine,
@@ -351,11 +351,15 @@ impl<'a> RuntimeBinding<'a> {
     /// that is not a JSON string or a `null` control is a `protocol` rejection
     /// before invocation (RT-016, RT-017), whose metadata reflects only the
     /// well-formed routing values the request carried (RT-019).
+    ///
+    /// # Errors
+    /// Fails only when no new result identity can be drawn from the random
+    /// source (RT-020), before anything is invoked.
     pub async fn invoke_json(
         &self,
         invocation: Value,
         cancellation: CancellationToken,
-    ) -> RuntimeResultEnvelope {
+    ) -> StorageResult<RuntimeResultEnvelope> {
         let metadata = invocation.get("metadata");
         let text = |key: &str| {
             metadata
@@ -363,14 +367,15 @@ impl<'a> RuntimeBinding<'a> {
                 .and_then(Value::as_str)
         };
         let identity = result_identity(
+            new_result_message_id()?,
             text("plenora.message.id"),
             text("plenora.capability.operation"),
             text("plenora.operation.version"),
             text("plenora.trace.correlation_id"),
         );
         match serde_json::from_value::<RuntimeInvocation>(invocation) {
-            Ok(invocation) => self.invoke(invocation, cancellation).await,
-            Err(_) => error_envelope(
+            Ok(invocation) => Ok(self.respond(invocation, identity, cancellation).await),
+            Err(_) => Ok(error_envelope(
                 identity,
                 &StorageError::new(
                     ErrorCategory::Protocol,
@@ -380,23 +385,37 @@ impl<'a> RuntimeBinding<'a> {
                     "RUNTIME_ENVELOPE_INVALID",
                     "runtime envelope lacks a reserved key or carries a non-string value",
                 ),
-            ),
+            )),
         }
     }
 
     /// Validate and dispatch an invocation, returning a correlated success or redacted error envelope.
+    ///
+    /// # Errors
+    /// Fails only when no new result identity can be drawn from the random
+    /// source (RT-020), before anything is invoked.
     pub async fn invoke(
         &self,
         invocation: RuntimeInvocation,
         cancellation: CancellationToken,
-    ) -> RuntimeResultEnvelope {
+    ) -> StorageResult<RuntimeResultEnvelope> {
         let request = &invocation.metadata;
         let identity = result_identity(
+            new_result_message_id()?,
             Some(&request.message_id),
             Some(&request.operation),
             Some(&request.operation_version),
             Some(&request.correlation_id),
         );
+        Ok(self.respond(invocation, identity, cancellation).await)
+    }
+
+    async fn respond(
+        &self,
+        invocation: RuntimeInvocation,
+        identity: RuntimeResultMetadata,
+        cancellation: CancellationToken,
+    ) -> RuntimeResultEnvelope {
         match self.invoke_inner(&invocation, cancellation).await {
             Ok((descriptor, payload)) => RuntimeResultEnvelope {
                 content_type: descriptor.content_type.to_owned(),
@@ -479,16 +498,15 @@ impl<'a> RuntimeBinding<'a> {
                 // the open reports the ambiguous one the resolver may have
                 // produced.
                 control.check(ErrorPhase::Prepare, false)?;
-                let mut sink = CountingSink {
-                    inner: control
+                let mut sink = CountingSink::new(
+                    control
                         .run(
                             self.artifacts.open_sink(&input.artifact_sink),
                             ErrorPhase::Prepare,
                             true,
                         )
                         .await?,
-                    delivered: 0,
-                };
+                );
                 let result = self
                     .engine
                     .get(&input.connection, &input.request, &mut sink, &control)

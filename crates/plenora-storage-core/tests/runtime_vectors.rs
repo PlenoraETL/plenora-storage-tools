@@ -20,11 +20,11 @@ use jsonschema::{Retrieve, Uri};
 use plenora_storage_core::{
     ArtifactReference, ArtifactResolver, ArtifactSink, ArtifactSinkReference, ArtifactSource,
     CancellationToken, CopyRequest, DeleteRequest, DeleteResult, ERROR_CONTENT_TYPE,
-    ERROR_CONTRACT, Engine, EngineConfig, ExecutionId, GetRequest, ObjectMetadata,
-    OperationContext, ProviderCapabilities, ProviderConnection, ProviderListRequest,
-    ProviderListResult, PutRequest, RUNTIME_OPERATIONS, RuntimeBinding, RuntimeInvocation,
-    RuntimeResultEnvelope, SecretResolver, StatRequest, StorageError, StorageProvider,
-    StorageResult, TestResult, TransferResult,
+    ERROR_CONTRACT, Engine, EngineConfig, ErrorCategory, ErrorPhase, ExecutionId, GetRequest,
+    ObjectMetadata, OperationContext, ProviderCapabilities, ProviderConnection,
+    ProviderListRequest, ProviderListResult, PutRequest, RUNTIME_OPERATIONS, RemoteEffect,
+    RetryDisposition, RuntimeBinding, RuntimeInvocation, RuntimeResultEnvelope, SecretResolver,
+    StatRequest, StorageError, StorageProvider, StorageResult, TestResult, TransferResult,
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -322,10 +322,20 @@ impl StorageProvider for ScriptedS3 {
         self.calls.record("get");
         assert_eq!(request.key, "incoming/vector.bin");
         if self.failing {
-            sink.write_all(&[0x5a; PARTIAL_BYTES])
+            // The host sink accepts a prefix and then fails; the provider
+            // reports the write failure with its own code, as a real adapter.
+            sink.write_all(&[0x5a; VECTOR_BYTES])
                 .await
-                .expect("memory sink");
-            return Err(fixture_error("storage-get-partial-error.json"));
+                .expect_err("the failing host sink rejects the rest");
+            return Err(StorageError::new(
+                ErrorCategory::Io,
+                ErrorPhase::Write,
+                RemoteEffect::Unknown,
+                RetryDisposition::RequiresRecovery,
+                "SCRIPTED_SINK_WRITE_FAILED",
+                "scripted sink write failed",
+            )
+            .with_provider(self.id()));
         }
         sink.write_all(&[0x5a; VECTOR_BYTES])
             .await
@@ -401,7 +411,8 @@ fn fixture_error(name: &str) -> StorageError {
     error
 }
 
-struct MemoryWriter(Arc<Mutex<Vec<u8>>>);
+/// In-memory host sink; with a limit it accepts that many bytes and then fails.
+struct MemoryWriter(Arc<Mutex<Vec<u8>>>, Option<usize>);
 
 impl AsyncWrite for MemoryWriter {
     fn poll_write(
@@ -409,8 +420,19 @@ impl AsyncWrite for MemoryWriter {
         _: &mut Context<'_>,
         bytes: &[u8],
     ) -> Poll<std::io::Result<usize>> {
-        self.0.lock().expect("sink lock").extend_from_slice(bytes);
-        Poll::Ready(Ok(bytes.len()))
+        let mut sink = self.0.lock().expect("sink lock");
+        let accepted = self.1.map_or(bytes.len(), |limit| {
+            bytes.len().min(limit - sink.len().min(limit))
+        });
+        let full = accepted == 0 && !bytes.is_empty();
+        if !full {
+            sink.extend_from_slice(&bytes[..accepted]);
+        }
+        drop(sink);
+        if full {
+            return Poll::Ready(Err(std::io::Error::other("host sink is full")));
+        }
+        Poll::Ready(Ok(accepted))
     }
 
     fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<std::io::Result<()>> {
@@ -444,6 +466,7 @@ impl AsyncRead for MemoryReader {
 struct Host {
     calls: Arc<Calls>,
     sink: Arc<Mutex<Vec<u8>>>,
+    sink_limit: Option<usize>,
 }
 
 #[async_trait]
@@ -457,7 +480,7 @@ impl ArtifactResolver for Host {
     async fn open_sink(&self, sink: &ArtifactSinkReference) -> StorageResult<ArtifactSink> {
         self.calls.record("open_sink");
         assert_eq!(sink.reference, GET_SINK);
-        Ok(Box::pin(MemoryWriter(self.sink.clone())))
+        Ok(Box::pin(MemoryWriter(self.sink.clone(), self.sink_limit)))
     }
 }
 
@@ -498,6 +521,7 @@ fn scripted_with(failing: bool, put_error: Option<StorageError>) -> (Engine, Hos
         Host {
             calls,
             sink: Arc::default(),
+            sink_limit: failing.then_some(PARTIAL_BYTES),
         },
     )
 }
@@ -506,6 +530,7 @@ async fn invoke(engine: &Engine, host: &Host, request: RuntimeInvocation) -> Run
     RuntimeBinding::new(engine, host, host)
         .invoke(request, CancellationToken::new())
         .await
+        .expect("result identity")
 }
 
 /// RT-012: the result is a new message whose causation is the request and
@@ -695,9 +720,9 @@ async fn put_request_vector_maps_to_the_put_unknown_error_vector() {
     assert_eq!(host.calls.take(), ["authorize", "open_source", "put"]);
 }
 
-/// A get that fails after part of the transfer reached the host sink reports
-/// the fixture's `partial`/`never`: the remote object is not mutated by a get,
-/// and the sink holds a known, unfinalized prefix.
+/// A host sink that accepts part of the transfer and then fails yields the
+/// fixture exactly: `STORAGE_GET_SINK_PARTIAL`, `io`/`write`/`partial`/`never`,
+/// whatever code the provider gave the write failure.
 #[tokio::test]
 async fn get_request_vector_maps_to_the_get_partial_error_vector() {
     let (engine, host) = failing_fixture();
@@ -1153,7 +1178,8 @@ async fn proposed_rejection_probes_produce_their_expected_results() {
         let request = mutated(&base, &probe["mutation"]);
         let result = RuntimeBinding::new(&engine, &host, &host)
             .invoke_json(request.clone(), CancellationToken::new())
-            .await;
+            .await
+            .expect("result identity");
         assert_eq!(
             result.content_type, probe["expected"]["content_type"],
             "{name}"

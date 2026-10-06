@@ -44,8 +44,8 @@ anticipato esplicitano queste limitazioni, come previsto dal profilo.
 `plenora.message.causation_id` accettano solo UUID minuscoli con trattini.
 Un'identità invalida produce `protocol`/`validate`/`none`/`never` prima di
 qualunque resolver o provider. Il risultato, di successo o d'errore, è un
-messaggio nuovo (RT-012): `plenora.message.id` è un UUID versione 8 derivato
-con SHA-256 dall'identità della richiesta, `plenora.message.causation_id` è
+messaggio nuovo (RT-012): `plenora.message.id` è un UUID versione 4 tratto
+dalla sorgente casuale del sistema operativo, mai derivato dalla richiesta, `plenora.message.causation_id` è
 l'identità della richiesta se canonica, e la correlazione è quella della
 richiesta. Un'identità non canonica non viene né riflessa né sostituita: la
 chiave corrispondente del risultato è omessa. L'host è responsabile della
@@ -113,14 +113,14 @@ propone di ratificare e che non sono ancora normative. Il codice le segnala.
 | Capability, versione, operazione, versione d'operazione o input contract ben formati ma non annunciati, content type non annunciato | `unsupported`, codice `RUNTIME_ROUTE_UNSUPPORTED` | N (ERR-002, RT-004, RT-011) per operazioni e versioni; P per gli altri |
 | Chiave riservata assente, non stringa o fuori grammatica (`01`, `+1`, `1` numerico, maiuscole, UUID tra graffe) | `protocol`, codice `RUNTIME_ROUTE_INVALID`, `RUNTIME_IDENTITY_INVALID` o, per l'envelope, `RUNTIME_ENVELOPE_INVALID`; mai normalizzata | D (rifiuto, RT-012); P (categoria, RT-017) |
 | Metadati del risultato di rifiuto | operazione, versione d'operazione e correlazione copiate byte per byte solo se ben formate, altrimenti omesse (mai `"0"`, `storage.unknown` o l'UUID nil) | P (RT-019) |
-| Identità del risultato | `message.id` nuovo (UUID versione 8 derivato dalla richiesta); correlazione della richiesta | N (RT-012) |
+| Identità del risultato | `message.id` nuovo (UUID versione 4 casuale; sorgente non disponibile: `RUNTIME_RESULT_IDENTITY_UNAVAILABLE` prima dell'invocazione, mai un panic); correlazione della richiesta | N (RT-012) |
 | Causazione del risultato | `message.id` della richiesta, se canonico; mai la causazione della richiesta | P (RT-020) |
 | Deadline | ogni grafia RFC 3339 di UTC (`Z`/`z`, `+00:00`, `T`/`t`, frazioni); offset diverso da zero e `-00:00` rifiutati con `protocol`; lo spazio al posto di `T`, fuori dalla grammatica RFC 3339, rifiutato | N (UTC); D (`-00:00`); P (grafie accettate, RT-021) |
 | Deadline già scaduta (`deadline <= now`) | `timeout` (N), `validate` e `none` (D), `never` (P) | N, D, P |
 | Deadline anche nel payload | i contratti di input storage non hanno una deadline: `invalid_configuration`/`validate`/`none`/`never` anche a valori uguali | P (RT-023) |
 | Chiave di idempotenza | solo `plenora.execution.idempotency_key` (N); presente: `unsupported`, codice `RUNTIME_CONTROL_UNSUPPORTED` (N rifiuto, D categoria, RT-006); vuota o `null`: `protocol` (P, RT-022) | N, D, P |
 | Chiavi `plenora.*` non riservate | ignorate | N (§9) |
-| Get fallito dopo byte consegnati al sink | `partial`/`never` | D (fixture `storage-get-partial-error`) |
+| Get fallito dopo byte consegnati al sink | `partial`/`never`; se è il sink a fallire dopo un prefisso, codice `STORAGE_GET_SINK_PARTIAL` per ogni provider (`Engine::get`) | D (fixture `storage-get-partial-error`) |
 | Get fallito con sink aperto e nessun byte consegnato | `unknown`/`requires_recovery` | N (ERR-004) per `unknown`; P (ERR-014) per `requires_recovery` |
 | Pubblicazione provata, metadati non rileggibili (S3, SFTP, FTP) | `committed`/`cleanup`/`never`: nessun residuo, un nuovo tentativo ripubblicherebbe | P (ERR-015) |
 | Pubblicazione FTP con dimensione diversa dai byte trasferiti | `committed`/`cleanup`/`requires_recovery`, codice `FTP_COMMITTED_SIZE_MISMATCH` | P (ERR-015) |

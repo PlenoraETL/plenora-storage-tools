@@ -488,7 +488,8 @@ async fn runtime_binding_executes_all_seven_operations_and_artifacts() {
             ),
             CancellationToken::new(),
         )
-        .await;
+        .await
+        .expect("result identity");
     assert_success(&test, "plenora-storage-test-output-v1");
     assert_eq!(test.payload["reachable"], true);
 
@@ -510,7 +511,8 @@ async fn runtime_binding_executes_all_seven_operations_and_artifacts() {
             ),
             CancellationToken::new(),
         )
-        .await;
+        .await
+        .expect("result identity");
     assert_success(&put, "plenora-storage-put-output-v1");
     assert_eq!(
         put.payload["artifact"]["sha256"],
@@ -527,7 +529,8 @@ async fn runtime_binding_executes_all_seven_operations_and_artifacts() {
             ),
             CancellationToken::new(),
         )
-        .await;
+        .await
+        .expect("result identity");
     assert_success(&stat, "plenora-storage-stat-output-v1");
 
     let list = binding
@@ -538,7 +541,8 @@ async fn runtime_binding_executes_all_seven_operations_and_artifacts() {
             ),
             CancellationToken::new(),
         )
-        .await;
+        .await
+        .expect("result identity");
     assert_success(&list, "plenora-storage-list-output-v1");
     assert_eq!(list.payload["objects"].as_array().map(Vec::len), Some(1));
 
@@ -555,7 +559,8 @@ async fn runtime_binding_executes_all_seven_operations_and_artifacts() {
             ),
             CancellationToken::new(),
         )
-        .await;
+        .await
+        .expect("result identity");
     assert_success(&get, "plenora-storage-get-output-v1");
     assert_eq!(artifacts.sink_bytes("artifact://sink/runtime"), bytes);
 
@@ -574,7 +579,8 @@ async fn runtime_binding_executes_all_seven_operations_and_artifacts() {
             ),
             CancellationToken::new(),
         )
-        .await;
+        .await
+        .expect("result identity");
     assert_success(&copy, "plenora-storage-copy-output-v1");
 
     let delete = binding
@@ -585,7 +591,8 @@ async fn runtime_binding_executes_all_seven_operations_and_artifacts() {
             ),
             CancellationToken::new(),
         )
-        .await;
+        .await
+        .expect("result identity");
     assert_success(&delete, "plenora-storage-delete-output-v1");
     assert_eq!(delete.payload["deleted"], true);
 }
@@ -600,7 +607,10 @@ async fn runtime_payload_security_violations_fail_closed() {
         json!({"schema_version": 1, "connection": {"provider": "memory", "config_contract": "x", "config": {"Password": "inline"}, "credential_ref": "secret://storage/test"}}),
     );
     assert_error(
-        &binding.invoke(inline, CancellationToken::new()).await,
+        &binding
+            .invoke(inline, CancellationToken::new())
+            .await
+            .expect("result identity"),
         "RUNTIME_PAYLOAD_SECURITY_VIOLATION",
     );
     let local = invocation(
@@ -608,7 +618,10 @@ async fn runtime_payload_security_violations_fail_closed() {
         json!({"schema_version": 1, "connection": connection(), "key": "a", "artifact_sink": {"reference": "C:\\private\\a.bin", "overwrite": false, "metadata": {"content_type": null, "size": null, "sha256": null}}}),
     );
     assert_error(
-        &binding.invoke(local, CancellationToken::new()).await,
+        &binding
+            .invoke(local, CancellationToken::new())
+            .await
+            .expect("result identity"),
         "RUNTIME_PAYLOAD_SECURITY_VIOLATION",
     );
 }
@@ -635,7 +648,10 @@ async fn runtime_uuids_are_canonical_and_causation_is_preserved() {
                 1 => request.metadata.correlation_id = invalid.to_owned(),
                 _ => request.metadata.causation_id = Some(invalid.to_owned()),
             }
-            let result = binding.invoke(request, CancellationToken::new()).await;
+            let result = binding
+                .invoke(request, CancellationToken::new())
+                .await
+                .expect("result identity");
             assert_eq!(result.payload["code"], "RUNTIME_IDENTITY_INVALID");
             assert_eq!(result.payload["category"], "protocol");
             assert_eq!(result.payload["remote_effect"], "none");
@@ -659,7 +675,8 @@ async fn runtime_uuids_are_canonical_and_causation_is_preserved() {
     );
     let result = binding
         .invoke(valid.clone(), CancellationToken::new())
-        .await;
+        .await
+        .expect("result identity");
     assert_success(&result, "plenora-storage-test-output-v1");
     // RT-012: the result is a new message caused by the request. The request's
     // own causation is not copied: it is not the result's direct cause.
@@ -671,11 +688,16 @@ async fn runtime_uuids_are_canonical_and_causation_is_preserved() {
     );
     let again = binding
         .invoke(valid.clone(), CancellationToken::new())
-        .await;
-    assert_eq!(again.metadata.message_id, result.metadata.message_id);
+        .await
+        .expect("result identity");
+    // Every result is a new message, even for a repeated request.
+    assert_ne!(again.metadata.message_id, result.metadata.message_id);
     let mut other = valid.clone();
     other.metadata.message_id = "44444444-4444-4444-8444-444444444444".to_owned();
-    let other = binding.invoke(other, CancellationToken::new()).await;
+    let other = binding
+        .invoke(other, CancellationToken::new())
+        .await
+        .expect("result identity");
     assert_ne!(other.metadata.message_id, result.metadata.message_id);
     let mut alternate = serialized;
     let metadata = alternate["metadata"].as_object_mut().unwrap();
@@ -709,7 +731,10 @@ async fn runtime_deadline_and_cancellation_preserve_ambiguous_remote_effect() {
 
     let pre_cancelled = CancellationToken::new();
     pre_cancelled.cancel();
-    let result = binding.invoke(slow(), pre_cancelled).await;
+    let result = binding
+        .invoke(slow(), pre_cancelled)
+        .await
+        .expect("result identity");
     assert_error_effect(&result, "CANCELLED", "none", "safe");
 
     let cancelled = CancellationToken::new();
@@ -718,12 +743,16 @@ async fn runtime_deadline_and_cancellation_preserve_ambiguous_remote_effect() {
         tokio::time::sleep(Duration::from_millis(25)).await;
         cancel_after_start.cancel();
     });
+    let result = result.expect("result identity");
     assert_error_effect(&result, "CANCELLED", "unknown", "requires_recovery");
 
     // Expired before invocation: the same message would expire again.
     let mut expired = slow();
     expired.metadata.deadline = Some("2000-01-01T00:00:00Z".to_owned());
-    let result = binding.invoke(expired, CancellationToken::new()).await;
+    let result = binding
+        .invoke(expired, CancellationToken::new())
+        .await
+        .expect("result identity");
     assert_error_effect(&result, "TIMEOUT", "none", "never");
     assert_eq!(result.payload["phase"], "validate");
 
@@ -733,7 +762,10 @@ async fn runtime_deadline_and_cancellation_preserve_ambiguous_remote_effect() {
             .format(&Rfc3339)
             .expect("format deadline"),
     );
-    let result = binding.invoke(future, CancellationToken::new()).await;
+    let result = binding
+        .invoke(future, CancellationToken::new())
+        .await
+        .expect("result identity");
     assert_error_effect(&result, "TIMEOUT", "unknown", "requires_recovery");
 }
 
@@ -750,7 +782,8 @@ async fn runtime_serializes_terminal_provider_errors_as_plenora_error_v1() {
             ),
             CancellationToken::new(),
         )
-        .await;
+        .await
+        .expect("result identity");
     assert_error(&result, "OBJECT_NOT_FOUND");
     assert_eq!(result.metadata.output_contract, ERROR_CONTRACT);
 }
@@ -782,6 +815,7 @@ async fn list_cursor_is_opaque_bounded_and_scoped_to_connection_and_parameters()
             binding
                 .invoke(request, CancellationToken::new())
                 .await
+                .expect("result identity")
                 .content_type,
             JSON_CONTENT_TYPE
         );
@@ -842,7 +876,8 @@ async fn a_locally_invalid_get_never_touches_the_artifact_sink() {
             ),
             CancellationToken::new(),
         )
-        .await;
+        .await
+        .expect("result identity");
     assert_error(&unknown_provider, "UNSUPPORTED");
     assert!(!artifacts.has_sink("artifact://sink/untouched"));
 }
@@ -869,7 +904,8 @@ async fn missing_get_preserves_the_effect_of_overwriting_an_artifact() {
             ),
             CancellationToken::new(),
         )
-        .await;
+        .await
+        .expect("result identity");
     assert_error(&response, "OBJECT_NOT_FOUND");
     assert!(artifacts.sink_bytes(reference).is_empty());
     assert_eq!(response.payload["remote_effect"], "unknown");
@@ -1007,7 +1043,10 @@ async fn runtime_metadata_null_is_rejected_not_read_as_absent() {
         present.metadata.deadline.as_deref(),
         Some("2999-01-01T00:00:00Z")
     );
-    let result = binding.invoke(present, CancellationToken::new()).await;
+    let result = binding
+        .invoke(present, CancellationToken::new())
+        .await
+        .expect("result identity");
     assert_success(&result, "plenora-storage-test-output-v1");
 
     let mut idempotent = omitted;
@@ -1073,7 +1112,10 @@ async fn runtime_deadline_accepts_utc_and_rejects_other_offsets() {
     ] {
         let mut request = base.clone();
         request.metadata.deadline = Some(accepted.to_owned());
-        let result = binding.invoke(request, CancellationToken::new()).await;
+        let result = binding
+            .invoke(request, CancellationToken::new())
+            .await
+            .expect("result identity");
         assert_success(&result, "plenora-storage-test-output-v1");
     }
     for rejected in [
@@ -1087,7 +1129,10 @@ async fn runtime_deadline_accepts_utc_and_rejects_other_offsets() {
     ] {
         let mut request = base.clone();
         request.metadata.deadline = Some(rejected.to_owned());
-        let result = binding.invoke(request, CancellationToken::new()).await;
+        let result = binding
+            .invoke(request, CancellationToken::new())
+            .await
+            .expect("result identity");
         assert_eq!(result.payload["category"], "protocol", "{rejected}");
         assert_error_effect(&result, "RUNTIME_ROUTE_INVALID", "none", "never");
         assert_eq!(result.payload["phase"], "validate", "{rejected}");
@@ -1111,7 +1156,10 @@ async fn runtime_unreserved_metadata_keys_are_ignored() {
     request["metadata"]["plenora.future.option"] = json!("value");
     let parsed = serde_json::from_value::<RuntimeInvocation>(request.clone()).unwrap();
     assert_eq!(parsed, base);
-    let result = binding.invoke_json(request, CancellationToken::new()).await;
+    let result = binding
+        .invoke_json(request, CancellationToken::new())
+        .await
+        .expect("result identity");
     assert_success(&result, "plenora-storage-test-output-v1");
 }
 
@@ -1129,7 +1177,10 @@ async fn runtime_deadline_in_the_payload_is_rejected() {
                "deadline": "2999-01-01T00:00:00Z"}),
     );
     request.metadata.deadline = Some("2999-01-01T00:00:00Z".to_owned());
-    let result = binding.invoke(request, CancellationToken::new()).await;
+    let result = binding
+        .invoke(request, CancellationToken::new())
+        .await
+        .expect("result identity");
     assert_error_effect(&result, "RUNTIME_PAYLOAD_INVALID", "none", "never");
     assert_eq!(result.payload["category"], "invalid_configuration");
     assert_eq!(result.payload["phase"], "validate");
@@ -1188,7 +1239,8 @@ async fn runtime_routes_are_unsupported_or_protocol_before_invocation() {
         }
         let result = binding
             .invoke(route.clone(), CancellationToken::new())
-            .await;
+            .await
+            .expect("result identity");
         let probe = format!("{field}={value:?}");
         assert_eq!(result.payload["category"], category, "{probe}");
         assert_eq!(result.payload["phase"], "validate", "{probe}");
@@ -1216,4 +1268,35 @@ async fn runtime_routes_are_unsupported_or_protocol_before_invocation() {
             "{probe}"
         );
     }
+}
+
+/// RT-020: a result identity never derives from the request. Two malformed
+/// requests that both lack `plenora.message.id` still get distinct, canonical,
+/// non-empty result identities, and no causation.
+#[tokio::test]
+async fn requests_without_identity_get_distinct_result_identities() {
+    let engine = engine();
+    let artifacts = MemoryArtifacts::default();
+    let binding = RuntimeBinding::new(&engine, &artifacts, &TestSecrets);
+    let mut request = serde_json::to_value(invocation(
+        "storage.test",
+        json!({"schema_version": 1, "connection": connection()}),
+    ))
+    .unwrap();
+    request["metadata"]
+        .as_object_mut()
+        .unwrap()
+        .remove("plenora.message.id");
+    let mut identities = Vec::new();
+    for _ in 0..2 {
+        let result = binding
+            .invoke_json(request.clone(), CancellationToken::new())
+            .await
+            .expect("result identity");
+        assert_eq!(result.payload["code"], "RUNTIME_ENVELOPE_INVALID");
+        assert_canonical_uuid(&result.metadata.message_id);
+        assert!(result.metadata.causation_id.is_none());
+        identities.push(result.metadata.message_id);
+    }
+    assert_ne!(identities[0], identities[1]);
 }

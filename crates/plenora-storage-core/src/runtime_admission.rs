@@ -8,12 +8,11 @@ use std::{
     time::Instant,
 };
 
-use sha2::{Digest, Sha256};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use tokio::io::AsyncWrite;
 
 use crate::{
-    ArtifactSink, CAPABILITY_NAME, CancellationToken, ErrorCategory, ErrorPhase, ExecutionControl,
+    CAPABILITY_NAME, CancellationToken, ErrorCategory, ErrorPhase, ExecutionControl,
     RUNTIME_BINDING_VERSION, RUNTIME_OPERATIONS, RemoteEffect, RetryDisposition,
     RuntimeOperationDescriptor, RuntimeRequestMetadata, RuntimeResultMetadata, RuntimeRoute,
     StorageError, StorageResult, runtime::ERROR_CONTRACT,
@@ -193,30 +192,43 @@ fn canonical_uuid(value: &str) -> bool {
         })
 }
 
-/// The result's message identity: a version 8 UUID (RFC 9562) derived from
-/// SHA-256 of the request's message identity, as received. It is canonical,
-/// differs from the request identity and is stable for the same request; the
-/// host keeps request identities unique.
-fn result_message_id(request_message_id: &str) -> String {
-    let digest = Sha256::new()
-        .chain_update(b"plenora.storage-tools/runtime-result\0")
-        .chain_update(request_message_id.as_bytes())
-        .finalize();
+/// RT-020: a new message identity for a result, a version 4 UUID (RFC 9562)
+/// from the operating system's random source. It never depends on the request,
+/// so two requests, even without a usable identity, never share a result
+/// identity.
+///
+/// # Errors
+/// An unavailable random source is an `internal` error before invocation: no
+/// result can be identified, and nothing has started.
+pub fn new_result_message_id() -> StorageResult<String> {
+    result_message_id_from(getrandom::fill)
+}
+
+fn result_message_id_from(
+    fill: impl FnOnce(&mut [u8]) -> Result<(), getrandom::Error>,
+) -> StorageResult<String> {
     let mut bytes = [0_u8; 16];
-    for (target, source) in bytes.iter_mut().zip(digest.iter()) {
-        *target = *source;
-    }
-    bytes[6] = (bytes[6] & 0x0f) | 0x80;
+    fill(&mut bytes).map_err(|_| {
+        StorageError::new(
+            ErrorCategory::Internal,
+            ErrorPhase::Validate,
+            RemoteEffect::None,
+            RetryDisposition::Safe,
+            "RUNTIME_RESULT_IDENTITY_UNAVAILABLE",
+            "the random source for a runtime result identity is unavailable",
+        )
+    })?;
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
     let hex = hex::encode(bytes);
-    format!(
+    Ok(format!(
         "{}-{}-{}-{}-{}",
         &hex[0..8],
         &hex[8..12],
         &hex[12..16],
         &hex[16..20],
         &hex[20..32]
-    )
+    ))
 }
 
 /// `^[1-9][0-9]*$`, the version grammar of the runtime vector schema.
@@ -284,22 +296,55 @@ fn is_media_type(value: &str) -> bool {
         .is_some_and(|(kind, subtype)| token(kind) && token(subtype))
 }
 
-/// Host sink that counts the bytes it accepted, so a failed get can state
-/// whether part of the transfer reached the sink.
-pub struct CountingSink {
-    pub inner: ArtifactSink,
+/// Sink wrapper that records the bytes the sink accepted and whether the sink
+/// itself failed, so a failed get can state what reached the sink.
+pub struct CountingSink<W> {
+    pub inner: W,
     pub delivered: u64,
+    pub failed: bool,
 }
 
-impl AsyncWrite for CountingSink {
+impl<W> CountingSink<W> {
+    pub const fn new(inner: W) -> Self {
+        Self {
+            inner,
+            delivered: 0,
+            failed: false,
+        }
+    }
+
+    /// A get whose sink accepted part of the transfer and then failed is
+    /// `STORAGE_GET_SINK_PARTIAL`, `io`/`write`/`partial`/`never`, whatever
+    /// code the provider gave the write failure.
+    pub fn restate(&self, error: StorageError, provider: &str) -> StorageError {
+        if !(self.failed && self.delivered > 0) {
+            return error;
+        }
+        StorageError::new(
+            ErrorCategory::Io,
+            ErrorPhase::Write,
+            RemoteEffect::Partial,
+            RetryDisposition::Never,
+            "STORAGE_GET_SINK_PARTIAL",
+            "The artifact sink received a partial transfer; automatic retry is not permitted.",
+        )
+        .with_provider(provider)
+    }
+}
+
+impl<W: AsyncWrite + Unpin> AsyncWrite for CountingSink<W> {
     fn poll_write(
         mut self: Pin<&mut Self>,
         context: &mut Context<'_>,
         bytes: &[u8],
     ) -> Poll<std::io::Result<usize>> {
-        let polled = self.inner.as_mut().poll_write(context, bytes);
-        if let Poll::Ready(Ok(written)) = polled {
-            self.delivered = self.delivered.saturating_add(written as u64);
+        let polled = Pin::new(&mut self.inner).poll_write(context, bytes);
+        match &polled {
+            Poll::Ready(Ok(written)) => {
+                self.delivered = self.delivered.saturating_add(*written as u64);
+            }
+            Poll::Ready(Err(_)) => self.failed = true,
+            Poll::Pending => {}
         }
         polled
     }
@@ -308,14 +353,18 @@ impl AsyncWrite for CountingSink {
         mut self: Pin<&mut Self>,
         context: &mut Context<'_>,
     ) -> Poll<std::io::Result<()>> {
-        self.inner.as_mut().poll_flush(context)
+        let polled = Pin::new(&mut self.inner).poll_flush(context);
+        if matches!(polled, Poll::Ready(Err(_))) {
+            self.failed = true;
+        }
+        polled
     }
 
     fn poll_shutdown(
         mut self: Pin<&mut Self>,
         context: &mut Context<'_>,
     ) -> Poll<std::io::Result<()>> {
-        self.inner.as_mut().poll_shutdown(context)
+        Pin::new(&mut self.inner).poll_shutdown(context)
     }
 }
 
@@ -379,6 +428,7 @@ pub fn validate_grammar(
 /// operation, operation version and correlation are copied byte for byte only
 /// when well-formed, and omitted otherwise.
 pub fn result_identity(
+    result_message_id: String,
     message_id: Option<&str>,
     operation: Option<&str>,
     operation_version: Option<&str>,
@@ -388,7 +438,7 @@ pub fn result_identity(
         value.filter(|value| valid(value)).map(str::to_owned)
     };
     RuntimeResultMetadata {
-        message_id: result_message_id(message_id.unwrap_or_default()),
+        message_id: result_message_id,
         causation_id: keep(message_id, canonical_uuid),
         operation: keep(operation, is_operation_selector),
         operation_version: keep(operation_version, canonical_version),
@@ -396,3 +446,7 @@ pub fn result_identity(
         correlation_id: keep(correlation_id, canonical_uuid),
     }
 }
+
+#[cfg(test)]
+#[path = "runtime_admission_tests.rs"]
+mod tests;

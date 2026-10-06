@@ -284,7 +284,9 @@ impl Engine {
     /// Transfer object bytes into a caller-owned sink.
     ///
     /// # Errors
-    /// A failed read/write or interruption may leave bytes in the sink. Callers
+    /// A failed read/write or interruption may leave bytes in the sink. A sink
+    /// that accepts part of the transfer and then fails yields
+    /// `STORAGE_GET_SINK_PARTIAL` (`io`, `write`, `partial`, `never`). Callers
     /// requiring atomic local publication must use staging; this stream API does
     /// not replace or roll back a caller-owned destination.
     pub async fn get<W>(
@@ -299,9 +301,14 @@ impl Engine {
     {
         let provider = self.provider(connection)?;
         validate_object_key(&request.key)?;
-        provider
-            .get(connection, request, sink, &self.context(control))
-            .await
+        // Every provider writes through this wrapper, so a sink that accepts
+        // part of the transfer and then fails is reported the same way by
+        // every provider and surface.
+        let mut sink = crate::runtime_admission::CountingSink::new(sink);
+        let result = provider
+            .get(connection, request, &mut sink, &self.context(control))
+            .await;
+        result.map_err(|error| sink.restate(error, provider.id()))
     }
 
     /// Consume a source once and publish according to the explicit request policy.
