@@ -31,7 +31,11 @@ repository = "https://github.com/PlenoraETL/plenora-storage-tools"
 
 [workspace.dependencies]
 hex = "=0.4.3"
+# Range, not an exact pin (deviation DEP-RANGE-1): the public async provider traits
+# expand through this macro; consumers must resolve the same compatible release.
 async-trait = "0.1.92"
+# Range, not an exact pin (deviation DEP-RANGE-1): `Bytes` crosses the public provider
+# factory boundary; an exact pin would conflict with any consumer on another 1.x patch.
 bytes = "1.12.1"
 clap = { version = "=4.6.7", features = ["derive"] }
 futures-util = "=0.3.34"
@@ -49,7 +53,11 @@ rustls = { version = "=0.23.45", default-features = false }
 quick-xml = { version = "=0.42.0", features = ["serialize"] }
 russh = { version = "=0.63.3", default-features = false, features = ["aws-lc-rs"] }
 russh-sftp = "=3.0.0"
+# Range, not an exact pin (deviation DEP-RANGE-1): public DTOs implement Serde traits
+# that consumers use; an exact pin would force their serde patch.
 serde = { version = "1.0.229", features = ["derive"] }
+# Range, not an exact pin (deviation DEP-RANGE-1): public connection and runtime DTOs
+# expose `serde_json::Value`.
 serde_json = "1.0.151"
 sha2 = "=0.11.0"
 suppaftp = { version = "=12.0.1", default-features = false, features = ["tokio-rustls-aws-lc-rs", "no-log"] }
@@ -59,7 +67,11 @@ cap-std = "=4.0.3"
 smb2 = { package = "plenora-smb2", path = "crates/plenora-smb2", version = "2.1.0" }
 thiserror = "=2.0.20"
 time = { version = "=0.3.55", features = ["formatting", "parsing"] }
+# Range, not an exact pin (deviation DEP-RANGE-1): public source and sink interfaces use
+# Tokio I/O traits and must share the host's Tokio.
 tokio = { version = "1.53.1", features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
+# Range, not an exact pin (deviation DEP-RANGE-1): cancellation must coexist with the
+# host's Tokio utilities.
 tokio-util = { version = "0.7.19", features = ["rt", "io"] }
 url = "=2.5.8"
 

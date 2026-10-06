@@ -72,9 +72,13 @@ La prosa non viene certificata da una ricerca di parole chiave.
 ## Dipendenze e inventari
 
 `python scripts/check_dependencies.py` richiede pin esatti per dipendenze dirette
-private e strumenti Cargo. `scripts/dependency-policy.json` elenca le eccezioni
-compatibili per le dipendenze sul confine Rust pubblico; il lockfile fissa
-comunque la risoluzione usata per build e qualifica. I vincoli upstream del fork
+private e strumenti Cargo. Le sei dipendenze i cui tipi o trait attraversano
+l'API Rust pubblica (`async-trait`, `bytes`, `serde`, `serde_json`, `tokio`,
+`tokio-util`) mantengono un requisito compatibile: è la deviazione dichiarata
+`DEP-RANGE-1`, con regola, ambito, rischio e condizione di rientro in
+`scripts/dependency-policy.json` e la motivazione di ciascuna accanto alla riga
+di `Cargo.toml`; il controllo rifiuta un intervallo senza quella motivazione.
+Il lockfile fissa comunque la risoluzione usata per build, audit e qualifica. I vincoli upstream del fork
 SMB sono conservati e verificati tramite lock, audit, deny e audit del nome
 upstream. I pin non equivalgono alla promessa di essere sempre all'ultima versione.
 
