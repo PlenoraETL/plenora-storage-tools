@@ -5,8 +5,9 @@ pub plenora_storage_core::ArtifactRole::Sink
 pub plenora_storage_core::ArtifactRole::Source
 impl core::clone::Clone for plenora_storage_core::ArtifactRole
 pub fn plenora_storage_core::ArtifactRole::clone(&self) -> plenora_storage_core::ArtifactRole
+impl core::clone::TrivialClone for plenora_storage_core::ArtifactRole
 impl core::cmp::Eq for plenora_storage_core::ArtifactRole
-pub fn plenora_storage_core::ArtifactRole::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::ArtifactRole::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::ArtifactRole
 pub fn plenora_storage_core::ArtifactRole::eq(&self, other: &plenora_storage_core::ArtifactRole) -> bool
 impl core::fmt::Debug for plenora_storage_core::ArtifactRole
@@ -17,6 +18,7 @@ impl core::marker::Freeze for plenora_storage_core::ArtifactRole
 impl core::marker::Send for plenora_storage_core::ArtifactRole
 impl core::marker::Sync for plenora_storage_core::ArtifactRole
 impl core::marker::Unpin for plenora_storage_core::ArtifactRole
+impl core::marker::UnsafeUnpin for plenora_storage_core::ArtifactRole
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::ArtifactRole
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::ArtifactRole
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::ArtifactRole
@@ -104,8 +106,9 @@ pub plenora_storage_core::CapabilityStatus::Available
 pub plenora_storage_core::CapabilityStatus::Experimental
 impl core::clone::Clone for plenora_storage_core::CapabilityStatus
 pub fn plenora_storage_core::CapabilityStatus::clone(&self) -> plenora_storage_core::CapabilityStatus
+impl core::clone::TrivialClone for plenora_storage_core::CapabilityStatus
 impl core::cmp::Eq for plenora_storage_core::CapabilityStatus
-pub fn plenora_storage_core::CapabilityStatus::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::CapabilityStatus::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::CapabilityStatus
 pub fn plenora_storage_core::CapabilityStatus::eq(&self, other: &plenora_storage_core::CapabilityStatus) -> bool
 impl core::fmt::Debug for plenora_storage_core::CapabilityStatus
@@ -118,6 +121,7 @@ impl core::marker::Freeze for plenora_storage_core::CapabilityStatus
 impl core::marker::Send for plenora_storage_core::CapabilityStatus
 impl core::marker::Sync for plenora_storage_core::CapabilityStatus
 impl core::marker::Unpin for plenora_storage_core::CapabilityStatus
+impl core::marker::UnsafeUnpin for plenora_storage_core::CapabilityStatus
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::CapabilityStatus
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::CapabilityStatus
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::CapabilityStatus
@@ -217,8 +221,9 @@ pub plenora_storage_core::ErrorCategory::Transient
 pub plenora_storage_core::ErrorCategory::Unsupported
 impl core::clone::Clone for plenora_storage_core::ErrorCategory
 pub fn plenora_storage_core::ErrorCategory::clone(&self) -> plenora_storage_core::ErrorCategory
+impl core::clone::TrivialClone for plenora_storage_core::ErrorCategory
 impl core::cmp::Eq for plenora_storage_core::ErrorCategory
-pub fn plenora_storage_core::ErrorCategory::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::ErrorCategory::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::ErrorCategory
 pub fn plenora_storage_core::ErrorCategory::eq(&self, other: &plenora_storage_core::ErrorCategory) -> bool
 impl core::fmt::Debug for plenora_storage_core::ErrorCategory
@@ -233,6 +238,7 @@ impl core::marker::Freeze for plenora_storage_core::ErrorCategory
 impl core::marker::Send for plenora_storage_core::ErrorCategory
 impl core::marker::Sync for plenora_storage_core::ErrorCategory
 impl core::marker::Unpin for plenora_storage_core::ErrorCategory
+impl core::marker::UnsafeUnpin for plenora_storage_core::ErrorCategory
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::ErrorCategory
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::ErrorCategory
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::ErrorCategory
@@ -327,8 +333,9 @@ pub plenora_storage_core::ErrorPhase::Validate
 pub plenora_storage_core::ErrorPhase::Write
 impl core::clone::Clone for plenora_storage_core::ErrorPhase
 pub fn plenora_storage_core::ErrorPhase::clone(&self) -> plenora_storage_core::ErrorPhase
+impl core::clone::TrivialClone for plenora_storage_core::ErrorPhase
 impl core::cmp::Eq for plenora_storage_core::ErrorPhase
-pub fn plenora_storage_core::ErrorPhase::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::ErrorPhase::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::ErrorPhase
 pub fn plenora_storage_core::ErrorPhase::eq(&self, other: &plenora_storage_core::ErrorPhase) -> bool
 impl core::fmt::Debug for plenora_storage_core::ErrorPhase
@@ -343,6 +350,7 @@ impl core::marker::Freeze for plenora_storage_core::ErrorPhase
 impl core::marker::Send for plenora_storage_core::ErrorPhase
 impl core::marker::Sync for plenora_storage_core::ErrorPhase
 impl core::marker::Unpin for plenora_storage_core::ErrorPhase
+impl core::marker::UnsafeUnpin for plenora_storage_core::ErrorPhase
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::ErrorPhase
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::ErrorPhase
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::ErrorPhase
@@ -431,8 +439,9 @@ pub plenora_storage_core::PublicationPolicy::AtomicRequired
 pub plenora_storage_core::PublicationPolicy::BestEffort
 impl core::clone::Clone for plenora_storage_core::PublicationPolicy
 pub fn plenora_storage_core::PublicationPolicy::clone(&self) -> plenora_storage_core::PublicationPolicy
+impl core::clone::TrivialClone for plenora_storage_core::PublicationPolicy
 impl core::cmp::Eq for plenora_storage_core::PublicationPolicy
-pub fn plenora_storage_core::PublicationPolicy::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::PublicationPolicy::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::PublicationPolicy
 pub fn plenora_storage_core::PublicationPolicy::eq(&self, other: &plenora_storage_core::PublicationPolicy) -> bool
 impl core::fmt::Debug for plenora_storage_core::PublicationPolicy
@@ -447,6 +456,7 @@ impl core::marker::Freeze for plenora_storage_core::PublicationPolicy
 impl core::marker::Send for plenora_storage_core::PublicationPolicy
 impl core::marker::Sync for plenora_storage_core::PublicationPolicy
 impl core::marker::Unpin for plenora_storage_core::PublicationPolicy
+impl core::marker::UnsafeUnpin for plenora_storage_core::PublicationPolicy
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::PublicationPolicy
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::PublicationPolicy
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::PublicationPolicy
@@ -538,8 +548,9 @@ pub plenora_storage_core::RemoteEffect::RolledBack
 pub plenora_storage_core::RemoteEffect::Unknown
 impl core::clone::Clone for plenora_storage_core::RemoteEffect
 pub fn plenora_storage_core::RemoteEffect::clone(&self) -> plenora_storage_core::RemoteEffect
+impl core::clone::TrivialClone for plenora_storage_core::RemoteEffect
 impl core::cmp::Eq for plenora_storage_core::RemoteEffect
-pub fn plenora_storage_core::RemoteEffect::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::RemoteEffect::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::RemoteEffect
 pub fn plenora_storage_core::RemoteEffect::eq(&self, other: &plenora_storage_core::RemoteEffect) -> bool
 impl core::fmt::Debug for plenora_storage_core::RemoteEffect
@@ -554,6 +565,7 @@ impl core::marker::Freeze for plenora_storage_core::RemoteEffect
 impl core::marker::Send for plenora_storage_core::RemoteEffect
 impl core::marker::Sync for plenora_storage_core::RemoteEffect
 impl core::marker::Unpin for plenora_storage_core::RemoteEffect
+impl core::marker::UnsafeUnpin for plenora_storage_core::RemoteEffect
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::RemoteEffect
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::RemoteEffect
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::RemoteEffect
@@ -648,7 +660,7 @@ pub plenora_storage_core::RetryDisposition::Safe
 impl core::clone::Clone for plenora_storage_core::RetryDisposition
 pub fn plenora_storage_core::RetryDisposition::clone(&self) -> plenora_storage_core::RetryDisposition
 impl core::cmp::Eq for plenora_storage_core::RetryDisposition
-pub fn plenora_storage_core::RetryDisposition::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::RetryDisposition::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::RetryDisposition
 pub fn plenora_storage_core::RetryDisposition::eq(&self, other: &plenora_storage_core::RetryDisposition) -> bool
 impl core::fmt::Debug for plenora_storage_core::RetryDisposition
@@ -662,6 +674,7 @@ impl core::marker::Freeze for plenora_storage_core::RetryDisposition
 impl core::marker::Send for plenora_storage_core::RetryDisposition
 impl core::marker::Sync for plenora_storage_core::RetryDisposition
 impl core::marker::Unpin for plenora_storage_core::RetryDisposition
+impl core::marker::UnsafeUnpin for plenora_storage_core::RetryDisposition
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::RetryDisposition
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::RetryDisposition
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::RetryDisposition
@@ -749,8 +762,9 @@ pub plenora_storage_core::SideEffect::None
 pub plenora_storage_core::SideEffect::Remote
 impl core::clone::Clone for plenora_storage_core::SideEffect
 pub fn plenora_storage_core::SideEffect::clone(&self) -> plenora_storage_core::SideEffect
+impl core::clone::TrivialClone for plenora_storage_core::SideEffect
 impl core::cmp::Eq for plenora_storage_core::SideEffect
-pub fn plenora_storage_core::SideEffect::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::SideEffect::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::SideEffect
 pub fn plenora_storage_core::SideEffect::eq(&self, other: &plenora_storage_core::SideEffect) -> bool
 impl core::fmt::Debug for plenora_storage_core::SideEffect
@@ -763,6 +777,7 @@ impl core::marker::Freeze for plenora_storage_core::SideEffect
 impl core::marker::Send for plenora_storage_core::SideEffect
 impl core::marker::Sync for plenora_storage_core::SideEffect
 impl core::marker::Unpin for plenora_storage_core::SideEffect
+impl core::marker::UnsafeUnpin for plenora_storage_core::SideEffect
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::SideEffect
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::SideEffect
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::SideEffect
@@ -852,8 +867,9 @@ pub plenora_storage_core::Surface::Runtime
 pub plenora_storage_core::Surface::Rust
 impl core::clone::Clone for plenora_storage_core::Surface
 pub fn plenora_storage_core::Surface::clone(&self) -> plenora_storage_core::Surface
+impl core::clone::TrivialClone for plenora_storage_core::Surface
 impl core::cmp::Eq for plenora_storage_core::Surface
-pub fn plenora_storage_core::Surface::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::Surface::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::Surface
 pub fn plenora_storage_core::Surface::eq(&self, other: &plenora_storage_core::Surface) -> bool
 impl core::fmt::Debug for plenora_storage_core::Surface
@@ -868,6 +884,7 @@ impl core::marker::Freeze for plenora_storage_core::Surface
 impl core::marker::Send for plenora_storage_core::Surface
 impl core::marker::Sync for plenora_storage_core::Surface
 impl core::marker::Unpin for plenora_storage_core::Surface
+impl core::marker::UnsafeUnpin for plenora_storage_core::Surface
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::Surface
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::Surface
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::Surface
@@ -960,7 +977,7 @@ pub fn plenora_storage_core::ArtifactMetadata::validate(&self) -> plenora_storag
 impl core::clone::Clone for plenora_storage_core::ArtifactMetadata
 pub fn plenora_storage_core::ArtifactMetadata::clone(&self) -> plenora_storage_core::ArtifactMetadata
 impl core::cmp::Eq for plenora_storage_core::ArtifactMetadata
-pub fn plenora_storage_core::ArtifactMetadata::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::ArtifactMetadata::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::ArtifactMetadata
 pub fn plenora_storage_core::ArtifactMetadata::eq(&self, other: &plenora_storage_core::ArtifactMetadata) -> bool
 impl core::default::Default for plenora_storage_core::ArtifactMetadata
@@ -976,6 +993,7 @@ impl core::marker::Freeze for plenora_storage_core::ArtifactMetadata
 impl core::marker::Send for plenora_storage_core::ArtifactMetadata
 impl core::marker::Sync for plenora_storage_core::ArtifactMetadata
 impl core::marker::Unpin for plenora_storage_core::ArtifactMetadata
+impl core::marker::UnsafeUnpin for plenora_storage_core::ArtifactMetadata
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::ArtifactMetadata
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::ArtifactMetadata
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::ArtifactMetadata
@@ -1066,7 +1084,7 @@ pub fn plenora_storage_core::ArtifactReference::validate(&self) -> plenora_stora
 impl core::clone::Clone for plenora_storage_core::ArtifactReference
 pub fn plenora_storage_core::ArtifactReference::clone(&self) -> plenora_storage_core::ArtifactReference
 impl core::cmp::Eq for plenora_storage_core::ArtifactReference
-pub fn plenora_storage_core::ArtifactReference::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::ArtifactReference::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::ArtifactReference
 pub fn plenora_storage_core::ArtifactReference::eq(&self, other: &plenora_storage_core::ArtifactReference) -> bool
 impl core::fmt::Debug for plenora_storage_core::ArtifactReference
@@ -1080,6 +1098,7 @@ impl core::marker::Freeze for plenora_storage_core::ArtifactReference
 impl core::marker::Send for plenora_storage_core::ArtifactReference
 impl core::marker::Sync for plenora_storage_core::ArtifactReference
 impl core::marker::Unpin for plenora_storage_core::ArtifactReference
+impl core::marker::UnsafeUnpin for plenora_storage_core::ArtifactReference
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::ArtifactReference
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::ArtifactReference
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::ArtifactReference
@@ -1171,7 +1190,7 @@ pub fn plenora_storage_core::ArtifactSinkReference::validate(&self) -> plenora_s
 impl core::clone::Clone for plenora_storage_core::ArtifactSinkReference
 pub fn plenora_storage_core::ArtifactSinkReference::clone(&self) -> plenora_storage_core::ArtifactSinkReference
 impl core::cmp::Eq for plenora_storage_core::ArtifactSinkReference
-pub fn plenora_storage_core::ArtifactSinkReference::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::ArtifactSinkReference::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::ArtifactSinkReference
 pub fn plenora_storage_core::ArtifactSinkReference::eq(&self, other: &plenora_storage_core::ArtifactSinkReference) -> bool
 impl core::fmt::Debug for plenora_storage_core::ArtifactSinkReference
@@ -1185,6 +1204,7 @@ impl core::marker::Freeze for plenora_storage_core::ArtifactSinkReference
 impl core::marker::Send for plenora_storage_core::ArtifactSinkReference
 impl core::marker::Sync for plenora_storage_core::ArtifactSinkReference
 impl core::marker::Unpin for plenora_storage_core::ArtifactSinkReference
+impl core::marker::UnsafeUnpin for plenora_storage_core::ArtifactSinkReference
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::ArtifactSinkReference
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::ArtifactSinkReference
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::ArtifactSinkReference
@@ -1283,6 +1303,7 @@ impl core::marker::Freeze for plenora_storage_core::CancellationToken
 impl core::marker::Send for plenora_storage_core::CancellationToken
 impl core::marker::Sync for plenora_storage_core::CancellationToken
 impl core::marker::Unpin for plenora_storage_core::CancellationToken
+impl core::marker::UnsafeUnpin for plenora_storage_core::CancellationToken
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::CancellationToken
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::CancellationToken
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::CancellationToken
@@ -1375,7 +1396,7 @@ pub fn plenora_storage_core::CapabilityDocument::new(surface: plenora_storage_co
 impl core::clone::Clone for plenora_storage_core::CapabilityDocument
 pub fn plenora_storage_core::CapabilityDocument::clone(&self) -> plenora_storage_core::CapabilityDocument
 impl core::cmp::Eq for plenora_storage_core::CapabilityDocument
-pub fn plenora_storage_core::CapabilityDocument::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::CapabilityDocument::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::CapabilityDocument
 pub fn plenora_storage_core::CapabilityDocument::eq(&self, other: &plenora_storage_core::CapabilityDocument) -> bool
 impl core::fmt::Debug for plenora_storage_core::CapabilityDocument
@@ -1387,6 +1408,7 @@ impl core::marker::Freeze for plenora_storage_core::CapabilityDocument
 impl core::marker::Send for plenora_storage_core::CapabilityDocument
 impl core::marker::Sync for plenora_storage_core::CapabilityDocument
 impl core::marker::Unpin for plenora_storage_core::CapabilityDocument
+impl core::marker::UnsafeUnpin for plenora_storage_core::CapabilityDocument
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::CapabilityDocument
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::CapabilityDocument
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::CapabilityDocument
@@ -1476,7 +1498,7 @@ pub plenora_storage_core::CapabilityInterface::version: u32
 impl core::clone::Clone for plenora_storage_core::CapabilityInterface
 pub fn plenora_storage_core::CapabilityInterface::clone(&self) -> plenora_storage_core::CapabilityInterface
 impl core::cmp::Eq for plenora_storage_core::CapabilityInterface
-pub fn plenora_storage_core::CapabilityInterface::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::CapabilityInterface::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::CapabilityInterface
 pub fn plenora_storage_core::CapabilityInterface::eq(&self, other: &plenora_storage_core::CapabilityInterface) -> bool
 impl core::fmt::Debug for plenora_storage_core::CapabilityInterface
@@ -1488,6 +1510,7 @@ impl core::marker::Freeze for plenora_storage_core::CapabilityInterface
 impl core::marker::Send for plenora_storage_core::CapabilityInterface
 impl core::marker::Sync for plenora_storage_core::CapabilityInterface
 impl core::marker::Unpin for plenora_storage_core::CapabilityInterface
+impl core::marker::UnsafeUnpin for plenora_storage_core::CapabilityInterface
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::CapabilityInterface
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::CapabilityInterface
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::CapabilityInterface
@@ -1576,7 +1599,7 @@ pub plenora_storage_core::CopyInput::schema_version: u32
 impl core::clone::Clone for plenora_storage_core::CopyInput
 pub fn plenora_storage_core::CopyInput::clone(&self) -> plenora_storage_core::CopyInput
 impl core::cmp::Eq for plenora_storage_core::CopyInput
-pub fn plenora_storage_core::CopyInput::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::CopyInput::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::CopyInput
 pub fn plenora_storage_core::CopyInput::eq(&self, other: &plenora_storage_core::CopyInput) -> bool
 impl core::fmt::Debug for plenora_storage_core::CopyInput
@@ -1590,6 +1613,7 @@ impl core::marker::Freeze for plenora_storage_core::CopyInput
 impl core::marker::Send for plenora_storage_core::CopyInput
 impl core::marker::Sync for plenora_storage_core::CopyInput
 impl core::marker::Unpin for plenora_storage_core::CopyInput
+impl core::marker::UnsafeUnpin for plenora_storage_core::CopyInput
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::CopyInput
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::CopyInput
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::CopyInput
@@ -1680,7 +1704,7 @@ pub plenora_storage_core::CopyRequest::source_key: alloc::string::String
 impl core::clone::Clone for plenora_storage_core::CopyRequest
 pub fn plenora_storage_core::CopyRequest::clone(&self) -> plenora_storage_core::CopyRequest
 impl core::cmp::Eq for plenora_storage_core::CopyRequest
-pub fn plenora_storage_core::CopyRequest::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::CopyRequest::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::CopyRequest
 pub fn plenora_storage_core::CopyRequest::eq(&self, other: &plenora_storage_core::CopyRequest) -> bool
 impl core::fmt::Debug for plenora_storage_core::CopyRequest
@@ -1694,6 +1718,7 @@ impl core::marker::Freeze for plenora_storage_core::CopyRequest
 impl core::marker::Send for plenora_storage_core::CopyRequest
 impl core::marker::Sync for plenora_storage_core::CopyRequest
 impl core::marker::Unpin for plenora_storage_core::CopyRequest
+impl core::marker::UnsafeUnpin for plenora_storage_core::CopyRequest
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::CopyRequest
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::CopyRequest
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::CopyRequest
@@ -1785,6 +1810,7 @@ impl core::marker::Freeze for plenora_storage_core::CredentialMaterial
 impl core::marker::Send for plenora_storage_core::CredentialMaterial
 impl core::marker::Sync for plenora_storage_core::CredentialMaterial
 impl core::marker::Unpin for plenora_storage_core::CredentialMaterial
+impl core::marker::UnsafeUnpin for plenora_storage_core::CredentialMaterial
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::CredentialMaterial
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::CredentialMaterial
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::CredentialMaterial
@@ -1867,7 +1893,7 @@ pub plenora_storage_core::DeleteInput::schema_version: u32
 impl core::clone::Clone for plenora_storage_core::DeleteInput
 pub fn plenora_storage_core::DeleteInput::clone(&self) -> plenora_storage_core::DeleteInput
 impl core::cmp::Eq for plenora_storage_core::DeleteInput
-pub fn plenora_storage_core::DeleteInput::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::DeleteInput::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::DeleteInput
 pub fn plenora_storage_core::DeleteInput::eq(&self, other: &plenora_storage_core::DeleteInput) -> bool
 impl core::fmt::Debug for plenora_storage_core::DeleteInput
@@ -1881,6 +1907,7 @@ impl core::marker::Freeze for plenora_storage_core::DeleteInput
 impl core::marker::Send for plenora_storage_core::DeleteInput
 impl core::marker::Sync for plenora_storage_core::DeleteInput
 impl core::marker::Unpin for plenora_storage_core::DeleteInput
+impl core::marker::UnsafeUnpin for plenora_storage_core::DeleteInput
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::DeleteInput
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::DeleteInput
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::DeleteInput
@@ -1969,7 +1996,7 @@ pub plenora_storage_core::DeleteRequest::key: alloc::string::String
 impl core::clone::Clone for plenora_storage_core::DeleteRequest
 pub fn plenora_storage_core::DeleteRequest::clone(&self) -> plenora_storage_core::DeleteRequest
 impl core::cmp::Eq for plenora_storage_core::DeleteRequest
-pub fn plenora_storage_core::DeleteRequest::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::DeleteRequest::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::DeleteRequest
 pub fn plenora_storage_core::DeleteRequest::eq(&self, other: &plenora_storage_core::DeleteRequest) -> bool
 impl core::fmt::Debug for plenora_storage_core::DeleteRequest
@@ -1983,6 +2010,7 @@ impl core::marker::Freeze for plenora_storage_core::DeleteRequest
 impl core::marker::Send for plenora_storage_core::DeleteRequest
 impl core::marker::Sync for plenora_storage_core::DeleteRequest
 impl core::marker::Unpin for plenora_storage_core::DeleteRequest
+impl core::marker::UnsafeUnpin for plenora_storage_core::DeleteRequest
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::DeleteRequest
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::DeleteRequest
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::DeleteRequest
@@ -2071,7 +2099,7 @@ pub plenora_storage_core::DeleteResult::key: alloc::string::String
 impl core::clone::Clone for plenora_storage_core::DeleteResult
 pub fn plenora_storage_core::DeleteResult::clone(&self) -> plenora_storage_core::DeleteResult
 impl core::cmp::Eq for plenora_storage_core::DeleteResult
-pub fn plenora_storage_core::DeleteResult::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::DeleteResult::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::DeleteResult
 pub fn plenora_storage_core::DeleteResult::eq(&self, other: &plenora_storage_core::DeleteResult) -> bool
 impl core::fmt::Debug for plenora_storage_core::DeleteResult
@@ -2085,6 +2113,7 @@ impl core::marker::Freeze for plenora_storage_core::DeleteResult
 impl core::marker::Send for plenora_storage_core::DeleteResult
 impl core::marker::Sync for plenora_storage_core::DeleteResult
 impl core::marker::Unpin for plenora_storage_core::DeleteResult
+impl core::marker::UnsafeUnpin for plenora_storage_core::DeleteResult
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::DeleteResult
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::DeleteResult
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::DeleteResult
@@ -2187,6 +2216,7 @@ impl !core::marker::Freeze for plenora_storage_core::Engine
 impl core::marker::Send for plenora_storage_core::Engine
 impl core::marker::Sync for plenora_storage_core::Engine
 impl core::marker::Unpin for plenora_storage_core::Engine
+impl core::marker::UnsafeUnpin for plenora_storage_core::Engine
 impl !core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::Engine
 impl !core::panic::unwind_safe::UnwindSafe for plenora_storage_core::Engine
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::Engine
@@ -2285,6 +2315,7 @@ impl core::marker::Freeze for plenora_storage_core::EngineConfig
 impl core::marker::Send for plenora_storage_core::EngineConfig
 impl core::marker::Sync for plenora_storage_core::EngineConfig
 impl core::marker::Unpin for plenora_storage_core::EngineConfig
+impl core::marker::UnsafeUnpin for plenora_storage_core::EngineConfig
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::EngineConfig
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::EngineConfig
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::EngineConfig
@@ -2370,6 +2401,7 @@ pub type plenora_storage_core::EngineConfig::Output = T
 pub struct plenora_storage_core::EnvironmentCredentialResolver
 impl core::clone::Clone for plenora_storage_core::EnvironmentCredentialResolver
 pub fn plenora_storage_core::EnvironmentCredentialResolver::clone(&self) -> plenora_storage_core::EnvironmentCredentialResolver
+impl core::clone::TrivialClone for plenora_storage_core::EnvironmentCredentialResolver
 impl core::default::Default for plenora_storage_core::EnvironmentCredentialResolver
 pub fn plenora_storage_core::EnvironmentCredentialResolver::default() -> plenora_storage_core::EnvironmentCredentialResolver
 impl core::fmt::Debug for plenora_storage_core::EnvironmentCredentialResolver
@@ -2381,6 +2413,7 @@ impl core::marker::Freeze for plenora_storage_core::EnvironmentCredentialResolve
 impl core::marker::Send for plenora_storage_core::EnvironmentCredentialResolver
 impl core::marker::Sync for plenora_storage_core::EnvironmentCredentialResolver
 impl core::marker::Unpin for plenora_storage_core::EnvironmentCredentialResolver
+impl core::marker::UnsafeUnpin for plenora_storage_core::EnvironmentCredentialResolver
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::EnvironmentCredentialResolver
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::EnvironmentCredentialResolver
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::EnvironmentCredentialResolver
@@ -2481,6 +2514,7 @@ impl core::marker::Freeze for plenora_storage_core::ExecutionControl
 impl core::marker::Send for plenora_storage_core::ExecutionControl
 impl core::marker::Sync for plenora_storage_core::ExecutionControl
 impl core::marker::Unpin for plenora_storage_core::ExecutionControl
+impl core::marker::UnsafeUnpin for plenora_storage_core::ExecutionControl
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::ExecutionControl
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::ExecutionControl
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::ExecutionControl
@@ -2568,8 +2602,9 @@ pub plenora_storage_core::ExecutionControls::deadline: bool
 pub plenora_storage_core::ExecutionControls::idempotency_key: bool
 impl core::clone::Clone for plenora_storage_core::ExecutionControls
 pub fn plenora_storage_core::ExecutionControls::clone(&self) -> plenora_storage_core::ExecutionControls
+impl core::clone::TrivialClone for plenora_storage_core::ExecutionControls
 impl core::cmp::Eq for plenora_storage_core::ExecutionControls
-pub fn plenora_storage_core::ExecutionControls::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::ExecutionControls::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::ExecutionControls
 pub fn plenora_storage_core::ExecutionControls::eq(&self, other: &plenora_storage_core::ExecutionControls) -> bool
 impl core::fmt::Debug for plenora_storage_core::ExecutionControls
@@ -2582,6 +2617,7 @@ impl core::marker::Freeze for plenora_storage_core::ExecutionControls
 impl core::marker::Send for plenora_storage_core::ExecutionControls
 impl core::marker::Sync for plenora_storage_core::ExecutionControls
 impl core::marker::Unpin for plenora_storage_core::ExecutionControls
+impl core::marker::UnsafeUnpin for plenora_storage_core::ExecutionControls
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::ExecutionControls
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::ExecutionControls
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::ExecutionControls
@@ -2671,7 +2707,7 @@ pub fn plenora_storage_core::ExecutionId::new(value: impl core::convert::Into<al
 impl core::clone::Clone for plenora_storage_core::ExecutionId
 pub fn plenora_storage_core::ExecutionId::clone(&self) -> plenora_storage_core::ExecutionId
 impl core::cmp::Eq for plenora_storage_core::ExecutionId
-pub fn plenora_storage_core::ExecutionId::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::ExecutionId::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::ExecutionId
 pub fn plenora_storage_core::ExecutionId::eq(&self, other: &plenora_storage_core::ExecutionId) -> bool
 impl core::fmt::Debug for plenora_storage_core::ExecutionId
@@ -2685,6 +2721,7 @@ impl core::marker::Freeze for plenora_storage_core::ExecutionId
 impl core::marker::Send for plenora_storage_core::ExecutionId
 impl core::marker::Sync for plenora_storage_core::ExecutionId
 impl core::marker::Unpin for plenora_storage_core::ExecutionId
+impl core::marker::UnsafeUnpin for plenora_storage_core::ExecutionId
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::ExecutionId
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::ExecutionId
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::ExecutionId
@@ -2775,7 +2812,7 @@ pub plenora_storage_core::GetInput::schema_version: u32
 impl core::clone::Clone for plenora_storage_core::GetInput
 pub fn plenora_storage_core::GetInput::clone(&self) -> plenora_storage_core::GetInput
 impl core::cmp::Eq for plenora_storage_core::GetInput
-pub fn plenora_storage_core::GetInput::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::GetInput::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::GetInput
 pub fn plenora_storage_core::GetInput::eq(&self, other: &plenora_storage_core::GetInput) -> bool
 impl core::fmt::Debug for plenora_storage_core::GetInput
@@ -2789,6 +2826,7 @@ impl core::marker::Freeze for plenora_storage_core::GetInput
 impl core::marker::Send for plenora_storage_core::GetInput
 impl core::marker::Sync for plenora_storage_core::GetInput
 impl core::marker::Unpin for plenora_storage_core::GetInput
+impl core::marker::UnsafeUnpin for plenora_storage_core::GetInput
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::GetInput
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::GetInput
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::GetInput
@@ -2876,7 +2914,7 @@ pub plenora_storage_core::GetRequest::key: alloc::string::String
 impl core::clone::Clone for plenora_storage_core::GetRequest
 pub fn plenora_storage_core::GetRequest::clone(&self) -> plenora_storage_core::GetRequest
 impl core::cmp::Eq for plenora_storage_core::GetRequest
-pub fn plenora_storage_core::GetRequest::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::GetRequest::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::GetRequest
 pub fn plenora_storage_core::GetRequest::eq(&self, other: &plenora_storage_core::GetRequest) -> bool
 impl core::fmt::Debug for plenora_storage_core::GetRequest
@@ -2890,6 +2928,7 @@ impl core::marker::Freeze for plenora_storage_core::GetRequest
 impl core::marker::Send for plenora_storage_core::GetRequest
 impl core::marker::Sync for plenora_storage_core::GetRequest
 impl core::marker::Unpin for plenora_storage_core::GetRequest
+impl core::marker::UnsafeUnpin for plenora_storage_core::GetRequest
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::GetRequest
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::GetRequest
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::GetRequest
@@ -2978,7 +3017,7 @@ pub plenora_storage_core::IntegrityMetadata::value: alloc::string::String
 impl core::clone::Clone for plenora_storage_core::IntegrityMetadata
 pub fn plenora_storage_core::IntegrityMetadata::clone(&self) -> plenora_storage_core::IntegrityMetadata
 impl core::cmp::Eq for plenora_storage_core::IntegrityMetadata
-pub fn plenora_storage_core::IntegrityMetadata::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::IntegrityMetadata::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::IntegrityMetadata
 pub fn plenora_storage_core::IntegrityMetadata::eq(&self, other: &plenora_storage_core::IntegrityMetadata) -> bool
 impl core::fmt::Debug for plenora_storage_core::IntegrityMetadata
@@ -2992,6 +3031,7 @@ impl core::marker::Freeze for plenora_storage_core::IntegrityMetadata
 impl core::marker::Send for plenora_storage_core::IntegrityMetadata
 impl core::marker::Sync for plenora_storage_core::IntegrityMetadata
 impl core::marker::Unpin for plenora_storage_core::IntegrityMetadata
+impl core::marker::UnsafeUnpin for plenora_storage_core::IntegrityMetadata
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::IntegrityMetadata
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::IntegrityMetadata
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::IntegrityMetadata
@@ -3081,7 +3121,7 @@ pub plenora_storage_core::ListInput::schema_version: u32
 impl core::clone::Clone for plenora_storage_core::ListInput
 pub fn plenora_storage_core::ListInput::clone(&self) -> plenora_storage_core::ListInput
 impl core::cmp::Eq for plenora_storage_core::ListInput
-pub fn plenora_storage_core::ListInput::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::ListInput::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::ListInput
 pub fn plenora_storage_core::ListInput::eq(&self, other: &plenora_storage_core::ListInput) -> bool
 impl core::fmt::Debug for plenora_storage_core::ListInput
@@ -3095,6 +3135,7 @@ impl core::marker::Freeze for plenora_storage_core::ListInput
 impl core::marker::Send for plenora_storage_core::ListInput
 impl core::marker::Sync for plenora_storage_core::ListInput
 impl core::marker::Unpin for plenora_storage_core::ListInput
+impl core::marker::UnsafeUnpin for plenora_storage_core::ListInput
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::ListInput
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::ListInput
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::ListInput
@@ -3184,7 +3225,7 @@ pub plenora_storage_core::ListRequest::prefix: core::option::Option<alloc::strin
 impl core::clone::Clone for plenora_storage_core::ListRequest
 pub fn plenora_storage_core::ListRequest::clone(&self) -> plenora_storage_core::ListRequest
 impl core::cmp::Eq for plenora_storage_core::ListRequest
-pub fn plenora_storage_core::ListRequest::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::ListRequest::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::ListRequest
 pub fn plenora_storage_core::ListRequest::eq(&self, other: &plenora_storage_core::ListRequest) -> bool
 impl core::default::Default for plenora_storage_core::ListRequest
@@ -3200,6 +3241,7 @@ impl core::marker::Freeze for plenora_storage_core::ListRequest
 impl core::marker::Send for plenora_storage_core::ListRequest
 impl core::marker::Sync for plenora_storage_core::ListRequest
 impl core::marker::Unpin for plenora_storage_core::ListRequest
+impl core::marker::UnsafeUnpin for plenora_storage_core::ListRequest
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::ListRequest
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::ListRequest
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::ListRequest
@@ -3289,7 +3331,7 @@ pub plenora_storage_core::ListResult::truncated: bool
 impl core::clone::Clone for plenora_storage_core::ListResult
 pub fn plenora_storage_core::ListResult::clone(&self) -> plenora_storage_core::ListResult
 impl core::cmp::Eq for plenora_storage_core::ListResult
-pub fn plenora_storage_core::ListResult::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::ListResult::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::ListResult
 pub fn plenora_storage_core::ListResult::eq(&self, other: &plenora_storage_core::ListResult) -> bool
 impl core::fmt::Debug for plenora_storage_core::ListResult
@@ -3303,6 +3345,7 @@ impl core::marker::Freeze for plenora_storage_core::ListResult
 impl core::marker::Send for plenora_storage_core::ListResult
 impl core::marker::Sync for plenora_storage_core::ListResult
 impl core::marker::Unpin for plenora_storage_core::ListResult
+impl core::marker::UnsafeUnpin for plenora_storage_core::ListResult
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::ListResult
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::ListResult
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::ListResult
@@ -3394,7 +3437,7 @@ pub plenora_storage_core::ObjectMetadata::version: core::option::Option<alloc::s
 impl core::clone::Clone for plenora_storage_core::ObjectMetadata
 pub fn plenora_storage_core::ObjectMetadata::clone(&self) -> plenora_storage_core::ObjectMetadata
 impl core::cmp::Eq for plenora_storage_core::ObjectMetadata
-pub fn plenora_storage_core::ObjectMetadata::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::ObjectMetadata::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::ObjectMetadata
 pub fn plenora_storage_core::ObjectMetadata::eq(&self, other: &plenora_storage_core::ObjectMetadata) -> bool
 impl core::fmt::Debug for plenora_storage_core::ObjectMetadata
@@ -3408,6 +3451,7 @@ impl core::marker::Freeze for plenora_storage_core::ObjectMetadata
 impl core::marker::Send for plenora_storage_core::ObjectMetadata
 impl core::marker::Sync for plenora_storage_core::ObjectMetadata
 impl core::marker::Unpin for plenora_storage_core::ObjectMetadata
+impl core::marker::UnsafeUnpin for plenora_storage_core::ObjectMetadata
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::ObjectMetadata
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::ObjectMetadata
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::ObjectMetadata
@@ -3503,7 +3547,7 @@ pub plenora_storage_core::OperationCapability::version: u32
 impl core::clone::Clone for plenora_storage_core::OperationCapability
 pub fn plenora_storage_core::OperationCapability::clone(&self) -> plenora_storage_core::OperationCapability
 impl core::cmp::Eq for plenora_storage_core::OperationCapability
-pub fn plenora_storage_core::OperationCapability::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::OperationCapability::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::OperationCapability
 pub fn plenora_storage_core::OperationCapability::eq(&self, other: &plenora_storage_core::OperationCapability) -> bool
 impl core::fmt::Debug for plenora_storage_core::OperationCapability
@@ -3515,6 +3559,7 @@ impl core::marker::Freeze for plenora_storage_core::OperationCapability
 impl core::marker::Send for plenora_storage_core::OperationCapability
 impl core::marker::Sync for plenora_storage_core::OperationCapability
 impl core::marker::Unpin for plenora_storage_core::OperationCapability
+impl core::marker::UnsafeUnpin for plenora_storage_core::OperationCapability
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::OperationCapability
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::OperationCapability
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::OperationCapability
@@ -3603,6 +3648,7 @@ impl<'a> core::marker::Freeze for plenora_storage_core::OperationContext<'a>
 impl<'a> core::marker::Send for plenora_storage_core::OperationContext<'a>
 impl<'a> core::marker::Sync for plenora_storage_core::OperationContext<'a>
 impl<'a> core::marker::Unpin for plenora_storage_core::OperationContext<'a>
+impl<'a> core::marker::UnsafeUnpin for plenora_storage_core::OperationContext<'a>
 impl<'a> core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::OperationContext<'a>
 impl<'a> core::panic::unwind_safe::UnwindSafe for plenora_storage_core::OperationContext<'a>
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::OperationContext<'a>
@@ -3684,7 +3730,7 @@ pub plenora_storage_core::PayloadCapability::contract: alloc::string::String
 impl core::clone::Clone for plenora_storage_core::PayloadCapability
 pub fn plenora_storage_core::PayloadCapability::clone(&self) -> plenora_storage_core::PayloadCapability
 impl core::cmp::Eq for plenora_storage_core::PayloadCapability
-pub fn plenora_storage_core::PayloadCapability::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::PayloadCapability::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::PayloadCapability
 pub fn plenora_storage_core::PayloadCapability::eq(&self, other: &plenora_storage_core::PayloadCapability) -> bool
 impl core::fmt::Debug for plenora_storage_core::PayloadCapability
@@ -3696,6 +3742,7 @@ impl core::marker::Freeze for plenora_storage_core::PayloadCapability
 impl core::marker::Send for plenora_storage_core::PayloadCapability
 impl core::marker::Sync for plenora_storage_core::PayloadCapability
 impl core::marker::Unpin for plenora_storage_core::PayloadCapability
+impl core::marker::UnsafeUnpin for plenora_storage_core::PayloadCapability
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::PayloadCapability
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::PayloadCapability
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::PayloadCapability
@@ -3785,7 +3832,7 @@ pub plenora_storage_core::ProviderCapabilities::provider: alloc::string::String
 impl core::clone::Clone for plenora_storage_core::ProviderCapabilities
 pub fn plenora_storage_core::ProviderCapabilities::clone(&self) -> plenora_storage_core::ProviderCapabilities
 impl core::cmp::Eq for plenora_storage_core::ProviderCapabilities
-pub fn plenora_storage_core::ProviderCapabilities::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::ProviderCapabilities::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::ProviderCapabilities
 pub fn plenora_storage_core::ProviderCapabilities::eq(&self, other: &plenora_storage_core::ProviderCapabilities) -> bool
 impl core::fmt::Debug for plenora_storage_core::ProviderCapabilities
@@ -3797,6 +3844,7 @@ impl core::marker::Freeze for plenora_storage_core::ProviderCapabilities
 impl core::marker::Send for plenora_storage_core::ProviderCapabilities
 impl core::marker::Sync for plenora_storage_core::ProviderCapabilities
 impl core::marker::Unpin for plenora_storage_core::ProviderCapabilities
+impl core::marker::UnsafeUnpin for plenora_storage_core::ProviderCapabilities
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::ProviderCapabilities
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::ProviderCapabilities
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::ProviderCapabilities
@@ -3888,7 +3936,7 @@ pub fn plenora_storage_core::ProviderConnection::validate(&self) -> plenora_stor
 impl core::clone::Clone for plenora_storage_core::ProviderConnection
 pub fn plenora_storage_core::ProviderConnection::clone(&self) -> plenora_storage_core::ProviderConnection
 impl core::cmp::Eq for plenora_storage_core::ProviderConnection
-pub fn plenora_storage_core::ProviderConnection::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::ProviderConnection::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::ProviderConnection
 pub fn plenora_storage_core::ProviderConnection::eq(&self, other: &plenora_storage_core::ProviderConnection) -> bool
 impl core::fmt::Debug for plenora_storage_core::ProviderConnection
@@ -3902,6 +3950,7 @@ impl core::marker::Freeze for plenora_storage_core::ProviderConnection
 impl core::marker::Send for plenora_storage_core::ProviderConnection
 impl core::marker::Sync for plenora_storage_core::ProviderConnection
 impl core::marker::Unpin for plenora_storage_core::ProviderConnection
+impl core::marker::UnsafeUnpin for plenora_storage_core::ProviderConnection
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::ProviderConnection
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::ProviderConnection
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::ProviderConnection
@@ -3991,7 +4040,7 @@ pub plenora_storage_core::ProviderListRequest::start_after: core::option::Option
 impl core::clone::Clone for plenora_storage_core::ProviderListRequest
 pub fn plenora_storage_core::ProviderListRequest::clone(&self) -> plenora_storage_core::ProviderListRequest
 impl core::cmp::Eq for plenora_storage_core::ProviderListRequest
-pub fn plenora_storage_core::ProviderListRequest::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::ProviderListRequest::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::ProviderListRequest
 pub fn plenora_storage_core::ProviderListRequest::eq(&self, other: &plenora_storage_core::ProviderListRequest) -> bool
 impl core::default::Default for plenora_storage_core::ProviderListRequest
@@ -4003,6 +4052,7 @@ impl core::marker::Freeze for plenora_storage_core::ProviderListRequest
 impl core::marker::Send for plenora_storage_core::ProviderListRequest
 impl core::marker::Sync for plenora_storage_core::ProviderListRequest
 impl core::marker::Unpin for plenora_storage_core::ProviderListRequest
+impl core::marker::UnsafeUnpin for plenora_storage_core::ProviderListRequest
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::ProviderListRequest
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::ProviderListRequest
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::ProviderListRequest
@@ -4091,7 +4141,7 @@ pub plenora_storage_core::ProviderListResult::truncated: bool
 impl core::clone::Clone for plenora_storage_core::ProviderListResult
 pub fn plenora_storage_core::ProviderListResult::clone(&self) -> plenora_storage_core::ProviderListResult
 impl core::cmp::Eq for plenora_storage_core::ProviderListResult
-pub fn plenora_storage_core::ProviderListResult::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::ProviderListResult::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::ProviderListResult
 pub fn plenora_storage_core::ProviderListResult::eq(&self, other: &plenora_storage_core::ProviderListResult) -> bool
 impl core::fmt::Debug for plenora_storage_core::ProviderListResult
@@ -4101,6 +4151,7 @@ impl core::marker::Freeze for plenora_storage_core::ProviderListResult
 impl core::marker::Send for plenora_storage_core::ProviderListResult
 impl core::marker::Sync for plenora_storage_core::ProviderListResult
 impl core::marker::Unpin for plenora_storage_core::ProviderListResult
+impl core::marker::UnsafeUnpin for plenora_storage_core::ProviderListResult
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::ProviderListResult
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::ProviderListResult
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::ProviderListResult
@@ -4190,7 +4241,7 @@ pub plenora_storage_core::PutInput::schema_version: u32
 impl core::clone::Clone for plenora_storage_core::PutInput
 pub fn plenora_storage_core::PutInput::clone(&self) -> plenora_storage_core::PutInput
 impl core::cmp::Eq for plenora_storage_core::PutInput
-pub fn plenora_storage_core::PutInput::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::PutInput::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::PutInput
 pub fn plenora_storage_core::PutInput::eq(&self, other: &plenora_storage_core::PutInput) -> bool
 impl core::fmt::Debug for plenora_storage_core::PutInput
@@ -4204,6 +4255,7 @@ impl core::marker::Freeze for plenora_storage_core::PutInput
 impl core::marker::Send for plenora_storage_core::PutInput
 impl core::marker::Sync for plenora_storage_core::PutInput
 impl core::marker::Unpin for plenora_storage_core::PutInput
+impl core::marker::UnsafeUnpin for plenora_storage_core::PutInput
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::PutInput
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::PutInput
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::PutInput
@@ -4296,7 +4348,7 @@ pub plenora_storage_core::PutRequest::publication_policy: plenora_storage_core::
 impl core::clone::Clone for plenora_storage_core::PutRequest
 pub fn plenora_storage_core::PutRequest::clone(&self) -> plenora_storage_core::PutRequest
 impl core::cmp::Eq for plenora_storage_core::PutRequest
-pub fn plenora_storage_core::PutRequest::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::PutRequest::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::PutRequest
 pub fn plenora_storage_core::PutRequest::eq(&self, other: &plenora_storage_core::PutRequest) -> bool
 impl core::fmt::Debug for plenora_storage_core::PutRequest
@@ -4310,6 +4362,7 @@ impl core::marker::Freeze for plenora_storage_core::PutRequest
 impl core::marker::Send for plenora_storage_core::PutRequest
 impl core::marker::Sync for plenora_storage_core::PutRequest
 impl core::marker::Unpin for plenora_storage_core::PutRequest
+impl core::marker::UnsafeUnpin for plenora_storage_core::PutRequest
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::PutRequest
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::PutRequest
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::PutRequest
@@ -4401,6 +4454,7 @@ impl<'a> core::marker::Freeze for plenora_storage_core::RuntimeBinding<'a>
 impl<'a> core::marker::Send for plenora_storage_core::RuntimeBinding<'a>
 impl<'a> core::marker::Sync for plenora_storage_core::RuntimeBinding<'a>
 impl<'a> core::marker::Unpin for plenora_storage_core::RuntimeBinding<'a>
+impl<'a> core::marker::UnsafeUnpin for plenora_storage_core::RuntimeBinding<'a>
 impl<'a> !core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::RuntimeBinding<'a>
 impl<'a> !core::panic::unwind_safe::UnwindSafe for plenora_storage_core::RuntimeBinding<'a>
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::RuntimeBinding<'a>
@@ -4483,7 +4537,7 @@ pub plenora_storage_core::RuntimeInvocation::payload: serde_json::value::Value
 impl core::clone::Clone for plenora_storage_core::RuntimeInvocation
 pub fn plenora_storage_core::RuntimeInvocation::clone(&self) -> plenora_storage_core::RuntimeInvocation
 impl core::cmp::Eq for plenora_storage_core::RuntimeInvocation
-pub fn plenora_storage_core::RuntimeInvocation::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::RuntimeInvocation::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::RuntimeInvocation
 pub fn plenora_storage_core::RuntimeInvocation::eq(&self, other: &plenora_storage_core::RuntimeInvocation) -> bool
 impl core::fmt::Debug for plenora_storage_core::RuntimeInvocation
@@ -4497,6 +4551,7 @@ impl core::marker::Freeze for plenora_storage_core::RuntimeInvocation
 impl core::marker::Send for plenora_storage_core::RuntimeInvocation
 impl core::marker::Sync for plenora_storage_core::RuntimeInvocation
 impl core::marker::Unpin for plenora_storage_core::RuntimeInvocation
+impl core::marker::UnsafeUnpin for plenora_storage_core::RuntimeInvocation
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::RuntimeInvocation
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::RuntimeInvocation
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::RuntimeInvocation
@@ -4592,8 +4647,9 @@ pub plenora_storage_core::RuntimeOperationDescriptor::side_effect: plenora_stora
 pub plenora_storage_core::RuntimeOperationDescriptor::version: u32
 impl core::clone::Clone for plenora_storage_core::RuntimeOperationDescriptor
 pub fn plenora_storage_core::RuntimeOperationDescriptor::clone(&self) -> plenora_storage_core::RuntimeOperationDescriptor
+impl core::clone::TrivialClone for plenora_storage_core::RuntimeOperationDescriptor
 impl core::cmp::Eq for plenora_storage_core::RuntimeOperationDescriptor
-pub fn plenora_storage_core::RuntimeOperationDescriptor::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::RuntimeOperationDescriptor::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::RuntimeOperationDescriptor
 pub fn plenora_storage_core::RuntimeOperationDescriptor::eq(&self, other: &plenora_storage_core::RuntimeOperationDescriptor) -> bool
 impl core::fmt::Debug for plenora_storage_core::RuntimeOperationDescriptor
@@ -4604,6 +4660,7 @@ impl core::marker::Freeze for plenora_storage_core::RuntimeOperationDescriptor
 impl core::marker::Send for plenora_storage_core::RuntimeOperationDescriptor
 impl core::marker::Sync for plenora_storage_core::RuntimeOperationDescriptor
 impl core::marker::Unpin for plenora_storage_core::RuntimeOperationDescriptor
+impl core::marker::UnsafeUnpin for plenora_storage_core::RuntimeOperationDescriptor
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::RuntimeOperationDescriptor
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::RuntimeOperationDescriptor
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::RuntimeOperationDescriptor
@@ -4700,7 +4757,7 @@ pub plenora_storage_core::RuntimeRequestMetadata::operation_version: alloc::stri
 impl core::clone::Clone for plenora_storage_core::RuntimeRequestMetadata
 pub fn plenora_storage_core::RuntimeRequestMetadata::clone(&self) -> plenora_storage_core::RuntimeRequestMetadata
 impl core::cmp::Eq for plenora_storage_core::RuntimeRequestMetadata
-pub fn plenora_storage_core::RuntimeRequestMetadata::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::RuntimeRequestMetadata::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::RuntimeRequestMetadata
 pub fn plenora_storage_core::RuntimeRequestMetadata::eq(&self, other: &plenora_storage_core::RuntimeRequestMetadata) -> bool
 impl core::fmt::Debug for plenora_storage_core::RuntimeRequestMetadata
@@ -4714,6 +4771,7 @@ impl core::marker::Freeze for plenora_storage_core::RuntimeRequestMetadata
 impl core::marker::Send for plenora_storage_core::RuntimeRequestMetadata
 impl core::marker::Sync for plenora_storage_core::RuntimeRequestMetadata
 impl core::marker::Unpin for plenora_storage_core::RuntimeRequestMetadata
+impl core::marker::UnsafeUnpin for plenora_storage_core::RuntimeRequestMetadata
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::RuntimeRequestMetadata
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::RuntimeRequestMetadata
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::RuntimeRequestMetadata
@@ -4803,7 +4861,7 @@ pub plenora_storage_core::RuntimeResultEnvelope::payload: serde_json::value::Val
 impl core::clone::Clone for plenora_storage_core::RuntimeResultEnvelope
 pub fn plenora_storage_core::RuntimeResultEnvelope::clone(&self) -> plenora_storage_core::RuntimeResultEnvelope
 impl core::cmp::Eq for plenora_storage_core::RuntimeResultEnvelope
-pub fn plenora_storage_core::RuntimeResultEnvelope::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::RuntimeResultEnvelope::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::RuntimeResultEnvelope
 pub fn plenora_storage_core::RuntimeResultEnvelope::eq(&self, other: &plenora_storage_core::RuntimeResultEnvelope) -> bool
 impl core::fmt::Debug for plenora_storage_core::RuntimeResultEnvelope
@@ -4817,6 +4875,7 @@ impl core::marker::Freeze for plenora_storage_core::RuntimeResultEnvelope
 impl core::marker::Send for plenora_storage_core::RuntimeResultEnvelope
 impl core::marker::Sync for plenora_storage_core::RuntimeResultEnvelope
 impl core::marker::Unpin for plenora_storage_core::RuntimeResultEnvelope
+impl core::marker::UnsafeUnpin for plenora_storage_core::RuntimeResultEnvelope
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::RuntimeResultEnvelope
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::RuntimeResultEnvelope
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::RuntimeResultEnvelope
@@ -4909,7 +4968,7 @@ pub plenora_storage_core::RuntimeResultMetadata::output_contract: alloc::string:
 impl core::clone::Clone for plenora_storage_core::RuntimeResultMetadata
 pub fn plenora_storage_core::RuntimeResultMetadata::clone(&self) -> plenora_storage_core::RuntimeResultMetadata
 impl core::cmp::Eq for plenora_storage_core::RuntimeResultMetadata
-pub fn plenora_storage_core::RuntimeResultMetadata::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::RuntimeResultMetadata::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::RuntimeResultMetadata
 pub fn plenora_storage_core::RuntimeResultMetadata::eq(&self, other: &plenora_storage_core::RuntimeResultMetadata) -> bool
 impl core::fmt::Debug for plenora_storage_core::RuntimeResultMetadata
@@ -4923,6 +4982,7 @@ impl core::marker::Freeze for plenora_storage_core::RuntimeResultMetadata
 impl core::marker::Send for plenora_storage_core::RuntimeResultMetadata
 impl core::marker::Sync for plenora_storage_core::RuntimeResultMetadata
 impl core::marker::Unpin for plenora_storage_core::RuntimeResultMetadata
+impl core::marker::UnsafeUnpin for plenora_storage_core::RuntimeResultMetadata
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::RuntimeResultMetadata
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::RuntimeResultMetadata
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::RuntimeResultMetadata
@@ -5015,6 +5075,7 @@ pub plenora_storage_core::RuntimeRoute::operation: &'a str
 pub plenora_storage_core::RuntimeRoute::operation_version: u32
 impl<'a> core::clone::Clone for plenora_storage_core::RuntimeRoute<'a>
 pub fn plenora_storage_core::RuntimeRoute<'a>::clone(&self) -> plenora_storage_core::RuntimeRoute<'a>
+impl<'a> core::clone::TrivialClone for plenora_storage_core::RuntimeRoute<'a>
 impl<'a> core::fmt::Debug for plenora_storage_core::RuntimeRoute<'a>
 pub fn plenora_storage_core::RuntimeRoute<'a>::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl<'a> core::marker::Copy for plenora_storage_core::RuntimeRoute<'a>
@@ -5022,6 +5083,7 @@ impl<'a> core::marker::Freeze for plenora_storage_core::RuntimeRoute<'a>
 impl<'a> core::marker::Send for plenora_storage_core::RuntimeRoute<'a>
 impl<'a> core::marker::Sync for plenora_storage_core::RuntimeRoute<'a>
 impl<'a> core::marker::Unpin for plenora_storage_core::RuntimeRoute<'a>
+impl<'a> core::marker::UnsafeUnpin for plenora_storage_core::RuntimeRoute<'a>
 impl<'a> core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::RuntimeRoute<'a>
 impl<'a> core::panic::unwind_safe::UnwindSafe for plenora_storage_core::RuntimeRoute<'a>
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::RuntimeRoute<'a>
@@ -5111,7 +5173,7 @@ pub plenora_storage_core::StatInput::schema_version: u32
 impl core::clone::Clone for plenora_storage_core::StatInput
 pub fn plenora_storage_core::StatInput::clone(&self) -> plenora_storage_core::StatInput
 impl core::cmp::Eq for plenora_storage_core::StatInput
-pub fn plenora_storage_core::StatInput::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::StatInput::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::StatInput
 pub fn plenora_storage_core::StatInput::eq(&self, other: &plenora_storage_core::StatInput) -> bool
 impl core::fmt::Debug for plenora_storage_core::StatInput
@@ -5125,6 +5187,7 @@ impl core::marker::Freeze for plenora_storage_core::StatInput
 impl core::marker::Send for plenora_storage_core::StatInput
 impl core::marker::Sync for plenora_storage_core::StatInput
 impl core::marker::Unpin for plenora_storage_core::StatInput
+impl core::marker::UnsafeUnpin for plenora_storage_core::StatInput
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::StatInput
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::StatInput
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::StatInput
@@ -5212,7 +5275,7 @@ pub plenora_storage_core::StatRequest::key: alloc::string::String
 impl core::clone::Clone for plenora_storage_core::StatRequest
 pub fn plenora_storage_core::StatRequest::clone(&self) -> plenora_storage_core::StatRequest
 impl core::cmp::Eq for plenora_storage_core::StatRequest
-pub fn plenora_storage_core::StatRequest::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::StatRequest::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::StatRequest
 pub fn plenora_storage_core::StatRequest::eq(&self, other: &plenora_storage_core::StatRequest) -> bool
 impl core::fmt::Debug for plenora_storage_core::StatRequest
@@ -5226,6 +5289,7 @@ impl core::marker::Freeze for plenora_storage_core::StatRequest
 impl core::marker::Send for plenora_storage_core::StatRequest
 impl core::marker::Sync for plenora_storage_core::StatRequest
 impl core::marker::Unpin for plenora_storage_core::StatRequest
+impl core::marker::UnsafeUnpin for plenora_storage_core::StatRequest
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::StatRequest
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::StatRequest
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::StatRequest
@@ -5334,7 +5398,7 @@ pub fn plenora_storage_core::StorageError::with_provider(self, provider: impl co
 impl core::clone::Clone for plenora_storage_core::StorageError
 pub fn plenora_storage_core::StorageError::clone(&self) -> plenora_storage_core::StorageError
 impl core::cmp::Eq for plenora_storage_core::StorageError
-pub fn plenora_storage_core::StorageError::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::StorageError::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::StorageError
 pub fn plenora_storage_core::StorageError::eq(&self, other: &plenora_storage_core::StorageError) -> bool
 impl core::error::Error for plenora_storage_core::StorageError
@@ -5351,6 +5415,7 @@ impl core::marker::Freeze for plenora_storage_core::StorageError
 impl core::marker::Send for plenora_storage_core::StorageError
 impl core::marker::Sync for plenora_storage_core::StorageError
 impl core::marker::Unpin for plenora_storage_core::StorageError
+impl core::marker::UnsafeUnpin for plenora_storage_core::StorageError
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::StorageError
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::StorageError
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::StorageError
@@ -5441,7 +5506,7 @@ pub plenora_storage_core::TestInput::schema_version: u32
 impl core::clone::Clone for plenora_storage_core::TestInput
 pub fn plenora_storage_core::TestInput::clone(&self) -> plenora_storage_core::TestInput
 impl core::cmp::Eq for plenora_storage_core::TestInput
-pub fn plenora_storage_core::TestInput::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::TestInput::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::TestInput
 pub fn plenora_storage_core::TestInput::eq(&self, other: &plenora_storage_core::TestInput) -> bool
 impl core::fmt::Debug for plenora_storage_core::TestInput
@@ -5455,6 +5520,7 @@ impl core::marker::Freeze for plenora_storage_core::TestInput
 impl core::marker::Send for plenora_storage_core::TestInput
 impl core::marker::Sync for plenora_storage_core::TestInput
 impl core::marker::Unpin for plenora_storage_core::TestInput
+impl core::marker::UnsafeUnpin for plenora_storage_core::TestInput
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::TestInput
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::TestInput
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::TestInput
@@ -5543,7 +5609,7 @@ pub plenora_storage_core::TestResult::reachable: bool
 impl core::clone::Clone for plenora_storage_core::TestResult
 pub fn plenora_storage_core::TestResult::clone(&self) -> plenora_storage_core::TestResult
 impl core::cmp::Eq for plenora_storage_core::TestResult
-pub fn plenora_storage_core::TestResult::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::TestResult::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::TestResult
 pub fn plenora_storage_core::TestResult::eq(&self, other: &plenora_storage_core::TestResult) -> bool
 impl core::fmt::Debug for plenora_storage_core::TestResult
@@ -5557,6 +5623,7 @@ impl core::marker::Freeze for plenora_storage_core::TestResult
 impl core::marker::Send for plenora_storage_core::TestResult
 impl core::marker::Sync for plenora_storage_core::TestResult
 impl core::marker::Unpin for plenora_storage_core::TestResult
+impl core::marker::UnsafeUnpin for plenora_storage_core::TestResult
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::TestResult
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::TestResult
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::TestResult
@@ -5649,7 +5716,7 @@ pub plenora_storage_core::TransferResult::version: core::option::Option<alloc::s
 impl core::clone::Clone for plenora_storage_core::TransferResult
 pub fn plenora_storage_core::TransferResult::clone(&self) -> plenora_storage_core::TransferResult
 impl core::cmp::Eq for plenora_storage_core::TransferResult
-pub fn plenora_storage_core::TransferResult::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_core::TransferResult::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_core::TransferResult
 pub fn plenora_storage_core::TransferResult::eq(&self, other: &plenora_storage_core::TransferResult) -> bool
 impl core::fmt::Debug for plenora_storage_core::TransferResult
@@ -5663,6 +5730,7 @@ impl core::marker::Freeze for plenora_storage_core::TransferResult
 impl core::marker::Send for plenora_storage_core::TransferResult
 impl core::marker::Sync for plenora_storage_core::TransferResult
 impl core::marker::Unpin for plenora_storage_core::TransferResult
+impl core::marker::UnsafeUnpin for plenora_storage_core::TransferResult
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::TransferResult
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::TransferResult
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::TransferResult

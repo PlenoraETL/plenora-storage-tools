@@ -100,6 +100,10 @@ struct ParentCreationRace {
     created: bool,
 }
 
+#[allow(
+    clippy::unused_async_trait_impl,
+    reason = "russh-sftp declares the handler methods as async; the test servers keep that shape"
+)]
 impl Handler for ParentCreationRace {
     type Error = StatusCode;
 
@@ -189,6 +193,10 @@ struct InterruptedCommit {
     reached: Arc<tokio::sync::Notify>,
 }
 
+#[allow(
+    clippy::unused_async_trait_impl,
+    reason = "russh-sftp declares the handler methods as async; the test servers keep that shape"
+)]
 impl Handler for InterruptedCommit {
     type Error = StatusCode;
 
@@ -342,6 +350,10 @@ async fn atomic_publication_rejects_a_server_without_posix_rename() {
     );
 }
 
+#[allow(
+    clippy::unused_async_trait_impl,
+    reason = "russh-sftp declares the handler methods as async; the test servers keep that shape"
+)]
 impl Handler for EndlessDirectory {
     type Error = StatusCode;
     fn unimplemented(&self) -> Self::Error {

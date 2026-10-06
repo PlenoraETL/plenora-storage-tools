@@ -7,7 +7,7 @@ pub plenora_storage_s3::S3ConnectionConfig::virtual_hosted_style: bool
 impl core::clone::Clone for plenora_storage_s3::S3ConnectionConfig
 pub fn plenora_storage_s3::S3ConnectionConfig::clone(&self) -> plenora_storage_s3::S3ConnectionConfig
 impl core::cmp::Eq for plenora_storage_s3::S3ConnectionConfig
-pub fn plenora_storage_s3::S3ConnectionConfig::assert_receiver_is_total_eq(&self)
+pub fn plenora_storage_s3::S3ConnectionConfig::assert_fields_are_eq(&self)
 impl core::cmp::PartialEq for plenora_storage_s3::S3ConnectionConfig
 pub fn plenora_storage_s3::S3ConnectionConfig::eq(&self, other: &plenora_storage_s3::S3ConnectionConfig) -> bool
 impl core::fmt::Debug for plenora_storage_s3::S3ConnectionConfig
@@ -19,6 +19,7 @@ impl core::marker::Freeze for plenora_storage_s3::S3ConnectionConfig
 impl core::marker::Send for plenora_storage_s3::S3ConnectionConfig
 impl core::marker::Sync for plenora_storage_s3::S3ConnectionConfig
 impl core::marker::Unpin for plenora_storage_s3::S3ConnectionConfig
+impl core::marker::UnsafeUnpin for plenora_storage_s3::S3ConnectionConfig
 impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_s3::S3ConnectionConfig
 impl core::panic::unwind_safe::UnwindSafe for plenora_storage_s3::S3ConnectionConfig
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_s3::S3ConnectionConfig
@@ -105,8 +106,8 @@ impl<T> core::mem::SizedTypeProperties for plenora_storage_s3::S3ConnectionConfi
 impl<T> either::into_either::IntoEither for plenora_storage_s3::S3ConnectionConfig
 impl<T> serde_core::de::DeserializeOwned for plenora_storage_s3::S3ConnectionConfig where T: for<'de> serde_core::de::Deserialize<'de>
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_s3::S3ConnectionConfig where T: ?core::marker::Sized
-pub fn plenora_storage_s3::S3ConnectionConfig::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
-pub fn plenora_storage_s3::S3ConnectionConfig::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_s3::S3ConnectionConfig::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_s3::S3ConnectionConfig::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
 impl<T> tracing::instrument::Instrument for plenora_storage_s3::S3ConnectionConfig
 impl<T> tracing::instrument::WithSubscriber for plenora_storage_s3::S3ConnectionConfig
 impl<T> typenum::type_operators::Same for plenora_storage_s3::S3ConnectionConfig
@@ -130,6 +131,7 @@ impl core::marker::Freeze for plenora_storage_s3::S3Provider
 impl core::marker::Send for plenora_storage_s3::S3Provider
 impl core::marker::Sync for plenora_storage_s3::S3Provider
 impl core::marker::Unpin for plenora_storage_s3::S3Provider
+impl core::marker::UnsafeUnpin for plenora_storage_s3::S3Provider
 impl !core::panic::unwind_safe::RefUnwindSafe for plenora_storage_s3::S3Provider
 impl !core::panic::unwind_safe::UnwindSafe for plenora_storage_s3::S3Provider
 impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_s3::S3Provider
@@ -205,8 +207,8 @@ pub fn plenora_storage_s3::S3Provider::from(t: T) -> T
 impl<T> core::mem::SizedTypeProperties for plenora_storage_s3::S3Provider
 impl<T> either::into_either::IntoEither for plenora_storage_s3::S3Provider
 impl<T> tower_http::follow_redirect::policy::PolicyExt for plenora_storage_s3::S3Provider where T: ?core::marker::Sized
-pub fn plenora_storage_s3::S3Provider::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
-pub fn plenora_storage_s3::S3Provider::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_s3::S3Provider::and<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+pub fn plenora_storage_s3::S3Provider::or<P, B, E>(self, other: P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
 impl<T> tracing::instrument::Instrument for plenora_storage_s3::S3Provider
 impl<T> tracing::instrument::WithSubscriber for plenora_storage_s3::S3Provider
 impl<T> typenum::type_operators::Same for plenora_storage_s3::S3Provider

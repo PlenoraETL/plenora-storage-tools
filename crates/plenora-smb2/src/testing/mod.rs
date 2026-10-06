@@ -599,6 +599,10 @@ pub struct TestServers {
     profile: Profile,
 }
 
+#[allow(
+    clippy::unused_async_trait_impl,
+    reason = "Upstream public API: start and start_all stay async for callers"
+)]
 impl TestServers {
     /// Start the minimal set: guest + auth containers.
     ///

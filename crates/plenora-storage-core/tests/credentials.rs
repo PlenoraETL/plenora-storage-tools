@@ -5,6 +5,10 @@ use plenora_storage_core::{
 };
 use std::process::Command;
 
+#[allow(
+    clippy::manual_assert_eq,
+    reason = "assert_eq! would print the credential value if the comparison failed"
+)]
 #[test]
 fn credential_resolution_child() {
     let Ok(case) = std::env::var("PLENORA_CREDENTIAL_TEST_CASE") else {

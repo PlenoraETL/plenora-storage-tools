@@ -7179,7 +7179,7 @@ mod tests {
         // A 1 MiB frame crawling out at 60 KB/s: ~17 s each, so most sweeps see
         // no completion at all, and the send deadline tolerates every one of
         // them.
-        let per_frame = Duration::from_millis(17_000);
+        let per_frame = Duration::from_secs(17);
         assert!(
             per_frame < SEND_TIMEOUT,
             "the premise: this link is inside what the send deadline accepts"

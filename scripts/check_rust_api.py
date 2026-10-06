@@ -10,7 +10,7 @@ import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOL = ROOT / 'tools/api-inventory/Cargo.toml'
-RUST_VERSION = '1.92.0'
+RUST_VERSION = '1.98.1'
 
 
 def run(command, **kwargs):
