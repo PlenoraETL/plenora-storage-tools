@@ -187,13 +187,13 @@ impl NtlmAuthenticator {
             &nt_hash,
             &self.credentials.username,
             &self.credentials.domain,
-        );
+        )?;
 
         // Get timestamp from challenge TargetInfo, or use current time
         let timestamp = self.get_timestamp(&challenge);
 
         // Get client challenge
-        let client_challenge = self.get_client_challenge();
+        let client_challenge = self.get_client_challenge()?;
 
         // Check if MsvAvTimestamp is present (determines if MIC is required)
         let has_timestamp = find_av_pair(&challenge.target_info, MSV_AV_TIMESTAMP).is_some();
@@ -205,25 +205,14 @@ impl NtlmAuthenticator {
         let temp = build_temp(timestamp, &client_challenge, &auth_target_info);
 
         // NTProofStr = HMAC_MD5(NTLMv2_Hash, server_challenge + temp)
-        let nt_proof_str = {
-            let mut mac =
-                HmacMd5::new_from_slice(&ntlmv2_hash).expect("HMAC accepts any key length");
-            mac.update(&challenge.server_challenge);
-            mac.update(&temp);
-            mac.finalize().into_bytes().to_vec()
-        };
+        let nt_proof_str = hmac_md5(&ntlmv2_hash, &[&challenge.server_challenge, &temp])?.to_vec();
 
         // NtChallengeResponse = NTProofStr + temp
         let mut nt_challenge_response = nt_proof_str.clone();
         nt_challenge_response.extend_from_slice(&temp);
 
         // SessionBaseKey = HMAC_MD5(NTLMv2_Hash, NTProofStr)
-        let session_base_key = {
-            let mut mac =
-                HmacMd5::new_from_slice(&ntlmv2_hash).expect("HMAC accepts any key length");
-            mac.update(&nt_proof_str);
-            mac.finalize().into_bytes().to_vec()
-        };
+        let session_base_key = hmac_md5(&ntlmv2_hash, &[&nt_proof_str])?.to_vec();
 
         // Key exchange: if KEY_EXCH is negotiated, generate random session key
         let negotiate_flags = challenge.negotiate_flags;
@@ -232,7 +221,7 @@ impl NtlmAuthenticator {
                 || (negotiate_flags & NTLMSSP_NEGOTIATE_SEAL) != 0);
 
         let (exported_session_key, encrypted_random_session_key) = if key_exch {
-            let random_key = self.get_random_session_key();
+            let random_key = self.get_random_session_key()?;
             let encrypted = rc4_encrypt(&session_base_key, &random_key);
             (random_key.to_vec(), encrypted)
         } else {
@@ -244,11 +233,10 @@ impl NtlmAuthenticator {
             vec![0u8; 24]
         } else {
             // LMv2: HMAC_MD5(ntlmv2_hash, server_challenge + client_challenge) + client_challenge
-            let mut mac =
-                HmacMd5::new_from_slice(&ntlmv2_hash).expect("HMAC accepts any key length");
-            mac.update(&challenge.server_challenge);
-            mac.update(&client_challenge);
-            let proof = mac.finalize().into_bytes();
+            let proof = hmac_md5(
+                &ntlmv2_hash,
+                &[&challenge.server_challenge, &client_challenge],
+            )?;
             let mut resp = proof.to_vec();
             resp.extend_from_slice(&client_challenge);
             resp
@@ -276,7 +264,7 @@ impl NtlmAuthenticator {
                 negotiate_bytes,
                 challenge_bytes,
                 &auth_msg,
-            );
+            )?;
 
             let mut patched = auth_msg;
             // MIC is at offset 72 (after signature(8) + type(4) + 6 fields * 8 + flags(4) + version(8))
@@ -309,10 +297,10 @@ impl NtlmAuthenticator {
             return ts;
         }
 
-        if let Some(ts_bytes) = find_av_pair(&challenge.target_info, MSV_AV_TIMESTAMP) {
-            if ts_bytes.len() == 8 {
-                return u64::from_le_bytes(ts_bytes.try_into().unwrap());
-            }
+        if let Some(ts_bytes) = find_av_pair(&challenge.target_info, MSV_AV_TIMESTAMP)
+            && let Ok(ts) = <[u8; 8]>::try_from(ts_bytes.as_slice())
+        {
+            return u64::from_le_bytes(ts);
         }
 
         // Current time as Windows FILETIME (100-ns intervals since 1601-01-01)
@@ -324,15 +312,15 @@ impl NtlmAuthenticator {
     }
 
     /// Get the client challenge (random 8 bytes, or test override).
-    fn get_client_challenge(&self) -> [u8; 8] {
+    fn get_client_challenge(&self) -> Result<[u8; 8], Error> {
         #[cfg(test)]
         if let Some(cc) = self.test_client_challenge {
-            return cc;
+            return Ok(cc);
         }
 
         let mut challenge = [0u8; 8];
-        getrandom::fill(&mut challenge).expect("system RNG failed");
-        challenge
+        crate::sync::fill_random(&mut challenge)?;
+        Ok(challenge)
     }
 
     /// Get the random session key (random 16 bytes, or test override).
@@ -340,15 +328,15 @@ impl NtlmAuthenticator {
     /// This MUST be cryptographically secure -- the ExportedSessionKey
     /// is used for all subsequent signing and encryption. A predictable
     /// key would let an attacker forge messages and decrypt traffic.
-    fn get_random_session_key(&self) -> [u8; 16] {
+    fn get_random_session_key(&self) -> Result<[u8; 16], Error> {
         #[cfg(test)]
         if let Some(rsk) = self.test_random_session_key {
-            return rsk;
+            return Ok(rsk);
         }
 
         let mut key = [0u8; 16];
-        getrandom::fill(&mut key).expect("system RNG failed");
-        key
+        crate::sync::fill_random(&mut key)?;
+        Ok(key)
     }
 }
 
@@ -380,7 +368,7 @@ fn parse_challenge_message(data: &[u8]) -> Result<ChallengeMessage, Error> {
     }
 
     // Verify message type
-    let msg_type = u32::from_le_bytes(data[8..12].try_into().unwrap());
+    let msg_type = le_u32(data, 8)?;
     if msg_type != MSG_TYPE_CHALLENGE {
         return Err(Error::invalid_data(format!(
             "expected CHALLENGE_MESSAGE type 2, got {}",
@@ -392,7 +380,7 @@ fn parse_challenge_message(data: &[u8]) -> Result<ChallengeMessage, Error> {
     // We don't need the target name for authentication, but we parse past it.
 
     // NegotiateFlags at offset 20
-    let negotiate_flags = u32::from_le_bytes(data[20..24].try_into().unwrap());
+    let negotiate_flags = le_u32(data, 20)?;
 
     // ServerChallenge at offset 24 (8 bytes)
     let mut server_challenge = [0u8; 8];
@@ -402,8 +390,8 @@ fn parse_challenge_message(data: &[u8]) -> Result<ChallengeMessage, Error> {
 
     // TargetInfoFields at offset 40: Len(2) + MaxLen(2) + Offset(4)
     let target_info = if data.len() >= 48 {
-        let ti_len = u16::from_le_bytes(data[40..42].try_into().unwrap()) as usize;
-        let ti_offset = u32::from_le_bytes(data[44..48].try_into().unwrap()) as usize;
+        let ti_len = usize::from(le_u16(data, 40)?);
+        let ti_offset = le_u32(data, 44)? as usize;
         if ti_len > 0 && ti_offset + ti_len <= data.len() {
             data[ti_offset..ti_offset + ti_len].to_vec()
         } else {
@@ -429,9 +417,11 @@ fn parse_challenge_message(data: &[u8]) -> Result<ChallengeMessage, Error> {
 fn find_av_pair(target_info: &[u8], av_id: u16) -> Option<Vec<u8>> {
     let mut offset = 0;
     while offset + 4 <= target_info.len() {
-        let id = u16::from_le_bytes(target_info[offset..offset + 2].try_into().unwrap());
-        let len =
-            u16::from_le_bytes(target_info[offset + 2..offset + 4].try_into().unwrap()) as usize;
+        let (Ok(id), Ok(len)) = (le_u16(target_info, offset), le_u16(target_info, offset + 2))
+        else {
+            break;
+        };
+        let len = usize::from(len);
 
         if id == av_id {
             if offset + 4 + len <= target_info.len() {
@@ -455,9 +445,11 @@ fn parse_av_pairs(target_info: &[u8]) -> Vec<(u16, Vec<u8>)> {
     let mut pairs = Vec::new();
     let mut offset = 0;
     while offset + 4 <= target_info.len() {
-        let id = u16::from_le_bytes(target_info[offset..offset + 2].try_into().unwrap());
-        let len =
-            u16::from_le_bytes(target_info[offset + 2..offset + 4].try_into().unwrap()) as usize;
+        let (Ok(id), Ok(len)) = (le_u16(target_info, offset), le_u16(target_info, offset + 2))
+        else {
+            break;
+        };
+        let len = usize::from(len);
 
         if id == MSV_AV_EOL {
             pairs.push((id, Vec::new()));
@@ -502,13 +494,7 @@ fn build_auth_target_info(challenge_target_info: &[u8], has_timestamp: bool) -> 
         let existing_flags = pairs
             .iter()
             .find(|(id, _)| *id == MSV_AV_FLAGS)
-            .map(|(_, v)| {
-                if v.len() >= 4 {
-                    u32::from_le_bytes(v[..4].try_into().unwrap())
-                } else {
-                    0
-                }
-            })
+            .map(|(_, v)| le_u32(v, 0).unwrap_or(0))
             .unwrap_or(0);
         let flags = existing_flags | 0x0000_0002; // MIC present
         result.extend_from_slice(&MSV_AV_FLAGS.to_le_bytes());
@@ -539,7 +525,7 @@ fn compute_nt_hash(password: &str) -> Vec<u8> {
 }
 
 /// Compute the NTLMv2 hash: HMAC_MD5(NT_Hash, uppercase(UTF-16LE(username)) + UTF-16LE(domain)).
-fn compute_ntlmv2_hash(nt_hash: &[u8], username: &str, domain: &str) -> Vec<u8> {
+fn compute_ntlmv2_hash(nt_hash: &[u8], username: &str, domain: &str) -> Result<Vec<u8>, Error> {
     let user_upper: Vec<u8> = username
         .to_uppercase()
         .encode_utf16()
@@ -550,10 +536,7 @@ fn compute_ntlmv2_hash(nt_hash: &[u8], username: &str, domain: &str) -> Vec<u8> 
         .flat_map(|u| u.to_le_bytes())
         .collect();
 
-    let mut mac = HmacMd5::new_from_slice(nt_hash).expect("HMAC accepts any key length");
-    mac.update(&user_upper);
-    mac.update(&domain_unicode);
-    mac.finalize().into_bytes().to_vec()
+    Ok(hmac_md5(nt_hash, &[&user_upper, &domain_unicode])?.to_vec())
 }
 
 /// Build the temp blob for NTLMv2 (section 3.3.2).
@@ -602,13 +585,43 @@ fn compute_mic(
     negotiate_bytes: &[u8],
     challenge_bytes: &[u8],
     authenticate_bytes: &[u8],
-) -> Vec<u8> {
-    let mut mac =
-        HmacMd5::new_from_slice(exported_session_key).expect("HMAC accepts any key length");
-    mac.update(negotiate_bytes);
-    mac.update(challenge_bytes);
-    mac.update(authenticate_bytes);
-    mac.finalize().into_bytes().to_vec()
+) -> Result<[u8; 16], Error> {
+    hmac_md5(
+        exported_session_key,
+        &[negotiate_bytes, challenge_bytes, authenticate_bytes],
+    )
+}
+
+/// HMAC-MD5 over the concatenation of `parts`.
+///
+/// HMAC is defined for keys of any length, so a refused key marks a broken
+/// invariant of the primitive and is reported as [`Error::Internal`].
+fn hmac_md5(key: &[u8], parts: &[&[u8]]) -> Result<[u8; 16], Error> {
+    let mut mac = HmacMd5::new_from_slice(key).map_err(|_| Error::Internal {
+        what: "HMAC rejected a key although HMAC accepts any key length",
+    })?;
+    for part in parts {
+        mac.update(part);
+    }
+    Ok(mac.finalize().into_bytes().into())
+}
+
+/// Little-endian `u16` at `at`, or an error if the message is too short.
+fn le_u16(data: &[u8], at: usize) -> Result<u16, Error> {
+    at.checked_add(2)
+        .and_then(|end| data.get(at..end))
+        .and_then(|b| <[u8; 2]>::try_from(b).ok())
+        .map(u16::from_le_bytes)
+        .ok_or_else(|| Error::invalid_data("NTLM message truncated"))
+}
+
+/// Little-endian `u32` at `at`, or an error if the message is too short.
+fn le_u32(data: &[u8], at: usize) -> Result<u32, Error> {
+    at.checked_add(4)
+        .and_then(|end| data.get(at..end))
+        .and_then(|b| <[u8; 4]>::try_from(b).ok())
+        .map(u32::from_le_bytes)
+        .ok_or_else(|| Error::invalid_data("NTLM message truncated"))
 }
 
 /// Encode a string as UTF-16LE bytes.
@@ -759,7 +772,7 @@ mod tests {
             0x2e, 0x3f,
         ];
         let nt_hash = compute_nt_hash(TEST_PASSWORD);
-        let ntlmv2_hash = compute_ntlmv2_hash(&nt_hash, TEST_USER, TEST_DOMAIN);
+        let ntlmv2_hash = compute_ntlmv2_hash(&nt_hash, TEST_USER, TEST_DOMAIN).unwrap();
         assert_eq!(ntlmv2_hash, expected);
     }
 
@@ -777,7 +790,7 @@ mod tests {
         ];
 
         let nt_hash = compute_nt_hash(TEST_PASSWORD);
-        let ntlmv2_hash = compute_ntlmv2_hash(&nt_hash, TEST_USER, TEST_DOMAIN);
+        let ntlmv2_hash = compute_ntlmv2_hash(&nt_hash, TEST_USER, TEST_DOMAIN).unwrap();
 
         // Build the target info that matches the test vectors:
         // AV_PAIR: MsvAvNbDomainName(2) = "Domain"
@@ -804,7 +817,7 @@ mod tests {
         ];
 
         let nt_hash = compute_nt_hash(TEST_PASSWORD);
-        let ntlmv2_hash = compute_ntlmv2_hash(&nt_hash, TEST_USER, TEST_DOMAIN);
+        let ntlmv2_hash = compute_ntlmv2_hash(&nt_hash, TEST_USER, TEST_DOMAIN).unwrap();
 
         let target_info = build_test_target_info();
         let temp = build_temp(TEST_TIME, &TEST_CLIENT_CHALLENGE, &target_info);
@@ -1279,7 +1292,7 @@ mod tests {
         ];
 
         let nt_hash = compute_nt_hash(TEST_PASSWORD);
-        let ntlmv2_hash = compute_ntlmv2_hash(&nt_hash, TEST_USER, TEST_DOMAIN);
+        let ntlmv2_hash = compute_ntlmv2_hash(&nt_hash, TEST_USER, TEST_DOMAIN).unwrap();
 
         // LMv2: HMAC_MD5(ntlmv2_hash, server_challenge + client_challenge) + client_challenge
         let mut mac = HmacMd5::new_from_slice(&ntlmv2_hash).expect("HMAC accepts any key length");

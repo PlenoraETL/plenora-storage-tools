@@ -44,16 +44,16 @@ use std::fmt;
 
 use log::debug;
 
+use crate::client::SmbClient;
 use crate::client::connection::Connection;
 use crate::client::tree::Tree;
-use crate::client::SmbClient;
 use crate::error::{Error, Result};
 use crate::msg::copychunk::{
-    SrvCopychunk, SrvCopychunkCopy, SrvCopychunkResponse, SrvRequestResumeKeyResponse,
-    RESUME_KEY_LEN,
+    RESUME_KEY_LEN, SrvCopychunk, SrvCopychunkCopy, SrvCopychunkResponse,
+    SrvRequestResumeKeyResponse,
 };
 use crate::msg::ioctl::{
-    IoctlRequest, IoctlResponse, FSCTL_SRV_COPYCHUNK, FSCTL_SRV_REQUEST_RESUME_KEY,
+    FSCTL_SRV_COPYCHUNK, FSCTL_SRV_REQUEST_RESUME_KEY, IoctlRequest, IoctlResponse,
     SMB2_0_IOCTL_IS_FSCTL,
 };
 use crate::pack::{Pack, ReadCursor, Unpack, WriteCursor};
@@ -882,7 +882,7 @@ mod tests {
     async fn copy_file_range_places_chunk_at_requested_offsets() {
         use crate::msg::copychunk::SrvCopychunkCopy;
         use crate::msg::header::Header;
-        use crate::msg::ioctl::{IoctlRequest, FSCTL_SRV_COPYCHUNK};
+        use crate::msg::ioctl::{FSCTL_SRV_COPYCHUNK, IoctlRequest};
 
         let mock = Arc::new(MockTransport::new());
         let src_id = FileId {

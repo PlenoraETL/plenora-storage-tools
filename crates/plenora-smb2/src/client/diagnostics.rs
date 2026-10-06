@@ -753,13 +753,15 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         // Stage the state a real connection holds after NEGOTIATE /
         // SESSION_SETUP / TREE_CONNECT: a fresh pool is empty, and nothing but
         // NEGOTIATE can send out of one, while a CANCEL additionally refuses to
         // go out on a connection with no session id.
         conn.set_credits(512);
-        conn.set_session_id(crate::types::SessionId(0x1234));
+        conn.set_session_id(crate::types::SessionId(0x1234))
+            .unwrap();
         (conn, mock)
     }
 
@@ -899,7 +901,8 @@ mod tests {
             Box::new(plain_mock.clone()),
             Box::new(plain_mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
 
         plain_mock.queue_response(echo_ok(MessageId(999_999)));
 
@@ -927,7 +930,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
 
         let mut h = Header::new_request(Command::OplockBreak);
         h.flags.set_response();
@@ -962,7 +966,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         // A negotiated connection has a credit window; NEGOTIATE's response is
         // what opens it. Without staging one, nothing below can be sent.
         conn.set_credits(512);
@@ -992,7 +997,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         // A negotiated connection has a credit window; NEGOTIATE's response is
         // what opens it. Without staging one, nothing below can be sent.
         conn.set_credits(512);
@@ -1032,10 +1038,12 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         // A CANCEL only goes out on a connection with a live session; without
         // one it is skipped, and a skipped cancel is deliberately not counted.
-        conn.set_session_id(crate::types::SessionId(0x1234));
+        conn.set_session_id(crate::types::SessionId(0x1234))
+            .unwrap();
 
         conn.send_cancel(MessageId(42), None, conn.generation())
             .await
@@ -1140,7 +1148,7 @@ mod tests {
         handle.await.unwrap().unwrap();
 
         let client = fake_client(conn, fake_session());
-        let d = client.diagnostics();
+        let d = client.diagnostics().unwrap();
         let text = format!("{}", d);
         for label in [
             "SMB client",
@@ -1173,7 +1181,7 @@ mod tests {
         handle.await.unwrap().unwrap();
 
         let client = fake_client(conn, fake_session());
-        let d = client.diagnostics();
+        let d = client.diagnostics().unwrap();
 
         let json = serde_json::to_string(&d).expect("serialize");
         let v: serde_json::Value = serde_json::from_str(&json).expect("re-parse");
@@ -1199,7 +1207,7 @@ mod tests {
         // briefly and releases it before returning. Try_lock'ing after
         // the snapshot call must succeed.
         let (conn, mock) = fresh_conn();
-        let _d = conn.diagnostics();
+        let _d = conn.diagnostics().unwrap();
         // We can't reach `inner` from here without crate access; this test
         // lives in-crate so it CAN. The diagnostics module is in
         // `client/`, the connection internals are `pub(crate)`-shaped.
@@ -1207,7 +1215,7 @@ mod tests {
         // above catches it indirectly; this test pins the "no held lock"
         // invariant cheaply.
         for _ in 0..100 {
-            let _ = conn.diagnostics();
+            let _ = conn.diagnostics().unwrap();
         }
         mock.close();
     }
@@ -1221,7 +1229,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         conn.set_credits(512);
 
         // Op A: send, will succeed.

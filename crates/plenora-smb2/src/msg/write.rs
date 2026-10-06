@@ -3,10 +3,10 @@
 //! The WRITE request writes data to a file or named pipe.
 //! The response reports how many bytes were written.
 
+use crate::Error;
 use crate::error::Result;
 use crate::pack::{Pack, ReadCursor, Unpack, WriteCursor};
 use crate::types::FileId;
-use crate::Error;
 
 /// Write flag: server performs write-through (SMB 2.1+).
 pub const SMB2_WRITEFLAG_WRITE_THROUGH: u32 = 0x0000_0001;

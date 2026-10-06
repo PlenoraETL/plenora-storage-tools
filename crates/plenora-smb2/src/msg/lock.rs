@@ -3,10 +3,10 @@
 //! The LOCK request locks or unlocks byte ranges within a file.
 //! Multiple ranges can be locked/unlocked in a single request.
 
+use crate::Error;
 use crate::error::Result;
 use crate::pack::{Pack, ReadCursor, Unpack, WriteCursor};
 use crate::types::FileId;
-use crate::Error;
 
 /// Lock flag: shared lock (allows other readers).
 pub const SMB2_LOCKFLAG_SHARED_LOCK: u32 = 0x0000_0001;

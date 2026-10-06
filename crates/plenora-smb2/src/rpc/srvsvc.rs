@@ -3,9 +3,9 @@
 //! Encodes the NetrShareEnum request (opnum 15) and decodes the response,
 //! extracting share names, types, and comments.
 
+use crate::Error;
 use crate::error::Result;
 use crate::pack::{ReadCursor, WriteCursor};
-use crate::Error;
 
 /// Share type: disk share.
 pub const STYPE_DISKTREE: u32 = 0x0000_0000;

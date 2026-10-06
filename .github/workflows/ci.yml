@@ -31,6 +31,7 @@ jobs:
       - run: python3 scripts/check_test_layout.py
       - run: python3 scripts/check_comments.py
       - run: python3 scripts/check_dependencies.py
+      - run: python3 scripts/check_anti_panic.py
       - run: python3 scripts/code_size.py --check --output target/code-size.json
       - run: python3 scripts/check_rust_docs.py
       - run: python3 scripts/package_source.py
@@ -122,6 +123,7 @@ jobs:
       - run: cargo fetch --locked
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - run: python scripts/check_anti_panic.py
       - run: cargo test --workspace --all-targets --locked
       - run: cargo build --locked -p plenora-storage-cli
       - run: python scripts/release_publication.py smoke-cli --binary target/debug/plenora-storage.exe

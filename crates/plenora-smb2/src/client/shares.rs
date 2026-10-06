@@ -6,6 +6,7 @@
 
 use log::{debug, info, trace};
 
+use crate::Error;
 use crate::client::connection::Connection;
 use crate::error::Result;
 use crate::msg::close::CloseRequest;
@@ -22,7 +23,6 @@ use crate::rpc::srvsvc::{self, ShareInfo};
 use crate::types::flags::FileAccessMask;
 use crate::types::status::NtStatus;
 use crate::types::{Command, FileId, OplockLevel, TreeId};
-use crate::Error;
 
 /// Read buffer size for pipe reads (64 KiB is plenty for share listings).
 const PIPE_READ_BUFFER_SIZE: u32 = 65536;
@@ -316,7 +316,7 @@ async fn tree_disconnect(conn: &mut Connection, tree_id: TreeId) -> Result<()> {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::client::connection::{pack_message, NegotiatedParams};
+    use crate::client::connection::{NegotiatedParams, pack_message};
     use crate::client::test_helpers::{
         build_close_response, build_create_response, build_tree_connect_response, setup_connection,
     };
@@ -729,7 +729,8 @@ pub(crate) mod tests {
         let mock = Arc::new(MockTransport::new());
         mock.enable_auto_rewrite_msg_id();
         let mut conn =
-            Connection::from_transport(Box::new(mock.clone()), Box::new(mock.clone()), "my-nas");
+            Connection::from_transport(Box::new(mock.clone()), Box::new(mock.clone()), "my-nas")
+                .unwrap();
         // A negotiated connection has a credit window; NEGOTIATE's response is
         // what opens it. Without staging one, nothing below can be sent.
         conn.set_credits(512);
@@ -745,7 +746,7 @@ pub(crate) mod tests {
             cipher: None,
             compression_supported: false,
         });
-        conn.set_session_id(SessionId(0x1234));
+        conn.set_session_id(SessionId(0x1234)).unwrap();
 
         queue_share_listing_responses(&mock, &[("share1", STYPE_DISKTREE, "")]);
 

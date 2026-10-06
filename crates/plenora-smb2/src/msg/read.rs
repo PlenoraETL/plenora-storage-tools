@@ -3,10 +3,10 @@
 //! The READ request reads data from a file or named pipe.
 //! The response carries the read data in a variable-length buffer.
 
+use crate::Error;
 use crate::error::Result;
 use crate::pack::{Pack, ReadCursor, Unpack, WriteCursor};
 use crate::types::FileId;
-use crate::Error;
 
 /// Read flag: read data directly from underlying storage (SMB 3.0.2+).
 pub const SMB2_READFLAG_READ_UNBUFFERED: u8 = 0x01;

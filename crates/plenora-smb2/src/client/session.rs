@@ -5,17 +5,17 @@
 
 use log::{debug, info, trace, warn};
 
+use crate::Error;
 use crate::auth::ntlm::{NtlmAuthenticator, NtlmCredentials};
 use crate::client::connection::Connection;
 use crate::crypto::kdf::derive_session_keys;
-use crate::crypto::signing::{algorithm_for_dialect, SigningAlgorithm};
+use crate::crypto::signing::{SigningAlgorithm, algorithm_for_dialect};
 use crate::error::Result;
 use crate::msg::session_setup::{SessionSetupRequest, SessionSetupResponse};
 use crate::pack::{ReadCursor, Unpack};
 use crate::types::flags::{Capabilities, SecurityMode};
 use crate::types::status::NtStatus;
 use crate::types::{Command, Dialect, SessionId};
-use crate::Error;
 
 use crate::msg::session_setup::SessionSetupRequestFlags;
 
@@ -86,7 +86,7 @@ impl Session {
         });
 
         // Clone the preauth hasher for this session (spec: per-session hash).
-        let mut session_hasher = conn.preauth_hasher().clone();
+        let mut session_hasher = conn.preauth_hasher()?;
 
         // ── Round 1: NEGOTIATE_MESSAGE ──
         debug!("session: round 1, sending NTLM negotiate");
@@ -139,7 +139,7 @@ impl Session {
             "session: round 1 complete, status={:?}, session_id={}",
             resp1_header.status, resp1_header.session_id
         );
-        conn.set_session_id(resp1_header.session_id);
+        conn.set_session_id(resp1_header.session_id)?;
 
         // Parse the challenge response.
         let mut cursor1 = ReadCursor::new(&resp1_body);
@@ -195,7 +195,7 @@ impl Session {
         let setup_resp2 = SessionSetupResponse::unpack(&mut cursor2)?;
 
         let session_id = resp2_header.session_id;
-        conn.set_session_id(session_id);
+        conn.set_session_id(session_id)?;
 
         // Get the session key from NTLM.
         let session_key = auth
@@ -220,7 +220,7 @@ impl Session {
         );
         let (signing_key, encryption_key, decryption_key) = match params.dialect {
             Dialect::Smb3_0 | Dialect::Smb3_0_2 => {
-                let keys = derive_session_keys(&session_key, params.dialect, None, 128);
+                let keys = derive_session_keys(&session_key, params.dialect, None, 128)?;
                 (
                     keys.signing_key,
                     Some(keys.encryption_key),
@@ -240,7 +240,7 @@ impl Session {
                     Dialect::Smb3_1_1,
                     Some(session_hasher.value()),
                     key_len_bits,
-                );
+                )?;
                 (
                     keys.signing_key,
                     Some(keys.encryption_key),
@@ -261,7 +261,7 @@ impl Session {
 
         // Activate signing on the connection.
         if should_sign {
-            conn.activate_signing(signing_key.clone(), signing_algorithm);
+            conn.activate_signing(signing_key.clone(), signing_algorithm)?;
         }
 
         // Activate encryption on the connection if the session requires it.
@@ -273,8 +273,8 @@ impl Session {
             let cipher = params
                 .cipher
                 .unwrap_or(crate::crypto::encryption::Cipher::Aes128Ccm);
-            if let (Some(ref enc_key), Some(ref dec_key)) = (&encryption_key, &decryption_key) {
-                conn.activate_encryption(enc_key.clone(), dec_key.clone(), cipher);
+            if let (Some(enc_key), Some(dec_key)) = (&encryption_key, &decryption_key) {
+                conn.activate_encryption(enc_key.clone(), dec_key.clone(), cipher)?;
             } else {
                 warn!(
                     "session: encryption requested but missing keys, \
@@ -372,7 +372,7 @@ impl Session {
         debug!("session: Kerberos auth complete, token_len={}", token.len());
 
         // Clone the preauth hasher for this session.
-        let mut session_hasher = conn.preauth_hasher().clone();
+        let mut session_hasher = conn.preauth_hasher()?;
 
         // Step 2: Send SPNEGO-wrapped AP-REQ in SESSION_SETUP.
         let req = SessionSetupRequest {
@@ -413,7 +413,7 @@ impl Session {
 
         // The server assigned a session ID.
         let session_id = resp_header.session_id;
-        conn.set_session_id(session_id);
+        conn.set_session_id(session_id)?;
 
         let mut cursor = ReadCursor::new(&resp_body);
         let setup_resp = SessionSetupResponse::unpack(&mut cursor)?;
@@ -476,7 +476,7 @@ impl Session {
         // Derive keys for SMB 3.x using the Kerberos session key.
         let (signing_key, encryption_key, decryption_key) = match params.dialect {
             Dialect::Smb3_0 | Dialect::Smb3_0_2 => {
-                let keys = derive_session_keys(&session_key, params.dialect, None, 128);
+                let keys = derive_session_keys(&session_key, params.dialect, None, 128)?;
                 (
                     keys.signing_key,
                     Some(keys.encryption_key),
@@ -494,7 +494,7 @@ impl Session {
                     Dialect::Smb3_1_1,
                     Some(session_hasher.value()),
                     key_len_bits,
-                );
+                )?;
                 (
                     keys.signing_key,
                     Some(keys.encryption_key),
@@ -510,15 +510,15 @@ impl Session {
         let should_encrypt = setup_resp.session_flags.encrypt_data();
 
         if should_sign {
-            conn.activate_signing(signing_key.clone(), signing_algorithm);
+            conn.activate_signing(signing_key.clone(), signing_algorithm)?;
         }
 
         if should_encrypt {
             let cipher = params
                 .cipher
                 .unwrap_or(crate::crypto::encryption::Cipher::Aes128Ccm);
-            if let (Some(ref enc_key), Some(ref dec_key)) = (&encryption_key, &decryption_key) {
-                conn.activate_encryption(enc_key.clone(), dec_key.clone(), cipher);
+            if let (Some(enc_key), Some(dec_key)) = (&encryption_key, &decryption_key) {
+                conn.activate_encryption(enc_key.clone(), dec_key.clone(), cipher)?;
             }
         }
 
@@ -547,7 +547,7 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::client::connection::{pack_message, Connection, NegotiatedParams};
+    use crate::client::connection::{Connection, NegotiatedParams, pack_message};
     use crate::msg::header::Header;
     use crate::msg::session_setup::{SessionFlags, SessionSetupResponse};
     use crate::pack::Guid;
@@ -592,7 +592,7 @@ mod tests {
         buf.extend_from_slice(&0u16.to_le_bytes()); // Len
         buf.extend_from_slice(&0u16.to_le_bytes()); // MaxLen
         buf.extend_from_slice(&56u32.to_le_bytes()); // Offset
-                                                     // NegotiateFlags
+        // NegotiateFlags
         let flags: u32 = 0x0000_0001 // UNICODE
             | 0x0000_0200  // NTLM
             | 0x0008_0000  // EXTENDED_SESSIONSECURITY
@@ -661,7 +661,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
 
         // Set up negotiate params (pretend we already negotiated).
         // We need to call negotiate or set params manually.
@@ -697,7 +698,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         set_test_params(&mut conn, Dialect::Smb2_0_2);
 
         let session = Session::setup(&mut conn, "user", "pass", "").await.unwrap();
@@ -728,7 +730,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         set_test_params(&mut conn, Dialect::Smb2_0_2);
 
         let session = Session::setup(&mut conn, "user", "pass", "").await.unwrap();
@@ -761,7 +764,8 @@ mod tests {
             Box::new(mock.clone()),
             Box::new(mock.clone()),
             "test-server",
-        );
+        )
+        .unwrap();
         set_test_params(&mut conn, Dialect::Smb2_0_2);
 
         let result = Session::setup(&mut conn, "user", "badpass", "").await;

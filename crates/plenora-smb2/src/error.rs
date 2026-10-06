@@ -1,7 +1,7 @@
 //! Error types for the SMB2 library.
 
-use crate::types::status::NtStatus;
 use crate::types::Command;
+use crate::types::status::NtStatus;
 use thiserror::Error;
 
 /// Why a durable handle could not be claimed back.
@@ -375,6 +375,19 @@ pub enum Error {
         /// How long since the server last put any frame on the wire.
         silent_for: std::time::Duration,
     },
+
+    /// A local invariant failed: a lock was poisoned by an earlier panic, the
+    /// operating system's random source failed, or a cryptographic primitive
+    /// rejected parameters that are fixed by construction.
+    ///
+    /// The connection state can no longer be trusted, so the operation is
+    /// refused instead of continuing on a guess. `what` names the invariant
+    /// and never carries data.
+    #[error("internal invariant failed: {what}")]
+    Internal {
+        /// Which invariant failed.
+        what: &'static str,
+    },
 }
 
 impl Error {
@@ -544,6 +557,9 @@ pub enum ErrorKind {
     /// non-breaking, which is how `OBJECT_NAME_INVALID` became
     /// [`InvalidName`](Self::InvalidName).
     Other,
+    /// A local invariant failed (see [`Error::Internal`]); not retryable on
+    /// the same connection.
+    Internal,
 }
 
 impl Error {
@@ -588,6 +604,7 @@ impl Error {
             Error::ReconnectFailed { .. } => ErrorKind::ConnectionLost,
             Error::DurableHandleLost { .. } => ErrorKind::ConnectionLost,
             Error::Protocol { status, .. } => classify_status(*status),
+            Error::Internal { .. } => ErrorKind::Internal,
         }
     }
 }

@@ -248,7 +248,7 @@ impl Tree {
         conn: &mut Connection,
         path: &str,
     ) -> Result<DurableOpen> {
-        let create_guid = crate::client::connection::random_guid();
+        let create_guid = crate::client::connection::random_guid()?;
         // A server below SMB 3.0 has only the v1 contexts, whose reclaim this
         // crate refuses to perform. Asking anyway would buy a batch oplock and
         // its costs in exchange for nothing.
@@ -316,7 +316,7 @@ impl Tree {
                 );
                 // So an oplock break, which arrives with no usable tree id of
                 // its own, can be answered on the right tree.
-                conn.register_oplock(resp.file_id, self.tree_id);
+                conn.register_oplock(resp.file_id, self.tree_id)?;
                 Some(DurableHandle {
                     file_id: resp.file_id,
                     grant,
@@ -447,7 +447,7 @@ impl Tree {
             "durable: {path} reclaimed on the new session; the transfer resumes rather \
              than restarting"
         );
-        conn.register_oplock(resp.file_id, self.tree_id);
+        conn.register_oplock(resp.file_id, self.tree_id)?;
         Ok(DurableHandle {
             file_id: resp.file_id,
             generation: conn.generation(),
@@ -504,7 +504,11 @@ impl Tree {
             frames.get(1).and_then(|f| f.as_ref()),
             frames.get(2).and_then(|f| f.as_ref()),
         );
-        let create = frames.into_iter().next().flatten().expect("checked above");
+        let create = frames
+            .into_iter()
+            .next()
+            .flatten()
+            .ok_or_else(|| Error::invalid_data("compound CREATE produced no response"))?;
         Ok((create, identity))
     }
 }
@@ -1027,7 +1031,7 @@ mod tests {
 mod oplock_break_tests {
     use super::tests::*;
     use super::*;
-    use crate::client::connection::{pack_message, NegotiatedParams};
+    use crate::client::connection::{NegotiatedParams, pack_message};
     use crate::msg::header::Header;
     use crate::msg::oplock_break::OplockBreak;
     use crate::pack::Unpack;
@@ -1044,7 +1048,8 @@ mod oplock_break_tests {
     /// against a send that never happened.
     fn plain_connection(mock: &Arc<MockTransport>) -> Connection {
         let mut conn =
-            Connection::from_transport(Box::new(mock.clone()), Box::new(mock.clone()), "test");
+            Connection::from_transport(Box::new(mock.clone()), Box::new(mock.clone()), "test")
+                .unwrap();
         conn.set_test_params(NegotiatedParams {
             dialect: Dialect::Smb3_1_1,
             max_read_size: 65536,
@@ -1057,7 +1062,7 @@ mod oplock_break_tests {
             cipher: None,
             compression_supported: false,
         });
-        conn.set_session_id(SessionId(1));
+        conn.set_session_id(SessionId(1)).unwrap();
         conn.set_credits(512);
         conn
     }

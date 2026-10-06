@@ -7,9 +7,9 @@
 //! - RFC 4120: The Kerberos Network Authentication Service (V5)
 //! - MS-KILE: Kerberos Protocol Extensions
 
+use crate::Error;
 use crate::auth::der::{der_tlv, parse_der_tlv};
 use crate::auth::kerberos::crypto::EncryptionType;
-use crate::Error;
 
 // ---------------------------------------------------------------------------
 // ASN.1 tag constants
