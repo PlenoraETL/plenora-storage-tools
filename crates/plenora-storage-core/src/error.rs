@@ -120,9 +120,59 @@ pub struct StorageError {
     pub message: String,
     /// Stable provider identifier used for dispatch and capability discovery.
     pub provider: Option<String>,
+    /// Host execution identifier carried by `plenora-error-v1`. This component
+    /// never produces one; a deserialized error keeps the value it carried.
+    /// `null` and an absent key both read as `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_id: Option<ExecutionId>,
     #[serde(default)]
     /// Redacted structured diagnostics; callers constructing errors must sanitize values.
     pub details: BTreeMap<String, Value>,
+}
+
+/// Longest `execution_id` accepted by `plenora-error-v1`, in characters.
+const EXECUTION_ID_MAX_CHARS: usize = 128;
+
+/// Host execution identifier of `plenora-error-v1`: 1 to 128 characters,
+/// counted as Unicode code points like JSON Schema lengths. Construction and
+/// deserialization reject any other length.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(transparent)]
+pub struct ExecutionId(String);
+
+impl ExecutionId {
+    /// Validates an execution identifier.
+    ///
+    /// # Errors
+    /// Returns `invalid_configuration` when the identifier is empty or longer
+    /// than 128 characters; the value is not echoed.
+    pub fn new(value: impl Into<String>) -> StorageResult<Self> {
+        let value = value.into();
+        let length = value.chars().count();
+        if length == 0 || length > EXECUTION_ID_MAX_CHARS {
+            return Err(StorageError::invalid_configuration(
+                "EXECUTION_ID_INVALID",
+                "execution_id must contain 1 to 128 characters",
+            ));
+        }
+        Ok(Self(value))
+    }
+
+    /// The identifier as carried on the wire.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for ExecutionId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Self::new(String::deserialize(deserializer)?)
+            .map_err(|_| serde::de::Error::custom("execution_id must contain 1 to 128 characters"))
+    }
 }
 
 impl StorageError {
@@ -144,6 +194,7 @@ impl StorageError {
             code: code.into(),
             message: message.into(),
             provider: None,
+            execution_id: None,
             details: BTreeMap::new(),
         }
     }
@@ -280,6 +331,10 @@ impl StorageError {
 
     #[must_use]
     /// Classify deadline expiry; an interrupted mutation has unknown effect and requires recovery.
+    ///
+    /// A deadline already expired at admission (`validate`) is never retried:
+    /// the same request carries the same expired deadline. A later expiry
+    /// without a mutation leaves nothing to reconcile and may be retried.
     pub fn timeout(phase: ErrorPhase, mutating: bool) -> Self {
         Self::new(
             ErrorCategory::Timeout,
@@ -291,6 +346,8 @@ impl StorageError {
             },
             if mutating {
                 RetryDisposition::RequiresRecovery
+            } else if phase == ErrorPhase::Validate {
+                RetryDisposition::Never
             } else {
                 RetryDisposition::Safe
             },

@@ -40,6 +40,10 @@ bytes = "1.12.1"
 clap = { version = "=4.6.7", features = ["derive"] }
 futures-util = "=0.3.34"
 jsonschema = { version = "=0.56.0", default-features = false }
+# Operating-system random source for the new message identity of every runtime
+# result (Runtime Binding 1.0 RT-020). Same version already locked through
+# plenora-smb2, so no new crate enters the build.
+getrandom = "=0.4.3"
 object_store = { version = "=0.14.2", default-features = false, features = ["aws"] }
 # Pin HTTP endpoints to the addresses validated by the network policy.
 reqwest = { version = "=0.13.5", default-features = false, features = ["stream"] }

@@ -46,12 +46,16 @@ pub fn buffered_put_limit_error() -> StorageError {
     .with_provider(PROVIDER_ID)
 }
 
+/// The destination is published, but its metadata could not be read back.
+/// Publication is proved and nothing remains to reconcile, while repeating
+/// the request would publish again: `committed`, never retried (case 9e of the
+/// common runtime matrix, pending ratification in `plenora-contracts`).
 pub fn committed_verification_error() -> StorageError {
     StorageError::new(
         ErrorCategory::Execution,
         ErrorPhase::Cleanup,
         RemoteEffect::Committed,
-        RetryDisposition::RequiresRecovery,
+        RetryDisposition::Never,
         "S3_COMMITTED_METADATA_UNAVAILABLE",
         "S3 destination was published but its metadata could not be read back",
     )

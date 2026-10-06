@@ -2664,6 +2664,109 @@ pub fn plenora_storage_core::ExecutionControls::from(t: T) -> T
 impl<T> core::mem::SizedTypeProperties for plenora_storage_core::ExecutionControls
 impl<T> typenum::type_operators::Same for plenora_storage_core::ExecutionControls
 pub type plenora_storage_core::ExecutionControls::Output = T
+pub struct plenora_storage_core::ExecutionId(_)
+impl plenora_storage_core::ExecutionId
+pub fn plenora_storage_core::ExecutionId::as_str(&self) -> &str
+pub fn plenora_storage_core::ExecutionId::new(value: impl core::convert::Into<alloc::string::String>) -> plenora_storage_core::StorageResult<Self>
+impl core::clone::Clone for plenora_storage_core::ExecutionId
+pub fn plenora_storage_core::ExecutionId::clone(&self) -> plenora_storage_core::ExecutionId
+impl core::cmp::Eq for plenora_storage_core::ExecutionId
+pub fn plenora_storage_core::ExecutionId::assert_receiver_is_total_eq(&self)
+impl core::cmp::PartialEq for plenora_storage_core::ExecutionId
+pub fn plenora_storage_core::ExecutionId::eq(&self, other: &plenora_storage_core::ExecutionId) -> bool
+impl core::fmt::Debug for plenora_storage_core::ExecutionId
+pub fn plenora_storage_core::ExecutionId::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for plenora_storage_core::ExecutionId
+impl serde_core::ser::Serialize for plenora_storage_core::ExecutionId
+pub fn plenora_storage_core::ExecutionId::serialize<__S>(&self, __serializer: __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for plenora_storage_core::ExecutionId
+pub fn plenora_storage_core::ExecutionId::deserialize<D>(deserializer: D) -> core::result::Result<Self, <D as serde_core::de::Deserializer>::Error> where D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for plenora_storage_core::ExecutionId
+impl core::marker::Send for plenora_storage_core::ExecutionId
+impl core::marker::Sync for plenora_storage_core::ExecutionId
+impl core::marker::Unpin for plenora_storage_core::ExecutionId
+impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::ExecutionId
+impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::ExecutionId
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::ExecutionId
+pub type plenora_storage_core::ExecutionId::Output = typenum::bit::B1
+pub fn plenora_storage_core::ExecutionId::is_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Greater> for plenora_storage_core::ExecutionId
+pub type plenora_storage_core::ExecutionId::Output = typenum::bit::B0
+pub fn plenora_storage_core::ExecutionId::is_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Less> for plenora_storage_core::ExecutionId
+pub type plenora_storage_core::ExecutionId::Output = typenum::bit::B0
+pub fn plenora_storage_core::ExecutionId::is_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal> for plenora_storage_core::ExecutionId
+pub type plenora_storage_core::ExecutionId::Output = typenum::bit::B1
+pub fn plenora_storage_core::ExecutionId::is_greater_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater> for plenora_storage_core::ExecutionId
+pub type plenora_storage_core::ExecutionId::Output = typenum::bit::B1
+pub fn plenora_storage_core::ExecutionId::is_greater_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less> for plenora_storage_core::ExecutionId
+pub type plenora_storage_core::ExecutionId::Output = typenum::bit::B0
+pub fn plenora_storage_core::ExecutionId::is_greater_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Equal> for plenora_storage_core::ExecutionId
+pub type plenora_storage_core::ExecutionId::Output = typenum::bit::B0
+pub fn plenora_storage_core::ExecutionId::is_greater_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Greater> for plenora_storage_core::ExecutionId
+pub type plenora_storage_core::ExecutionId::Output = typenum::bit::B1
+pub fn plenora_storage_core::ExecutionId::is_greater_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Less> for plenora_storage_core::ExecutionId
+pub type plenora_storage_core::ExecutionId::Output = typenum::bit::B0
+pub fn plenora_storage_core::ExecutionId::is_greater_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Equal> for plenora_storage_core::ExecutionId
+pub type plenora_storage_core::ExecutionId::Output = typenum::bit::B1
+pub fn plenora_storage_core::ExecutionId::is_less_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Greater> for plenora_storage_core::ExecutionId
+pub type plenora_storage_core::ExecutionId::Output = typenum::bit::B0
+pub fn plenora_storage_core::ExecutionId::is_less_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Less> for plenora_storage_core::ExecutionId
+pub type plenora_storage_core::ExecutionId::Output = typenum::bit::B1
+pub fn plenora_storage_core::ExecutionId::is_less_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Equal> for plenora_storage_core::ExecutionId
+pub type plenora_storage_core::ExecutionId::Output = typenum::bit::B0
+pub fn plenora_storage_core::ExecutionId::is_less_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Greater> for plenora_storage_core::ExecutionId
+pub type plenora_storage_core::ExecutionId::Output = typenum::bit::B0
+pub fn plenora_storage_core::ExecutionId::is_less_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Less> for plenora_storage_core::ExecutionId
+pub type plenora_storage_core::ExecutionId::Output = typenum::bit::B1
+pub fn plenora_storage_core::ExecutionId::is_less_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Equal> for plenora_storage_core::ExecutionId
+pub type plenora_storage_core::ExecutionId::Output = typenum::bit::B0
+pub fn plenora_storage_core::ExecutionId::is_not_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Greater> for plenora_storage_core::ExecutionId
+pub type plenora_storage_core::ExecutionId::Output = typenum::bit::B1
+pub fn plenora_storage_core::ExecutionId::is_not_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Less> for plenora_storage_core::ExecutionId
+pub type plenora_storage_core::ExecutionId::Output = typenum::bit::B1
+pub fn plenora_storage_core::ExecutionId::is_not_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Less>>::Output
+impl<T, U> core::convert::Into<U> for plenora_storage_core::ExecutionId where U: core::convert::From<T>
+pub fn plenora_storage_core::ExecutionId::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for plenora_storage_core::ExecutionId where U: core::convert::Into<T>
+pub type plenora_storage_core::ExecutionId::Error = core::convert::Infallible
+pub fn plenora_storage_core::ExecutionId::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for plenora_storage_core::ExecutionId where U: core::convert::TryFrom<T>
+pub type plenora_storage_core::ExecutionId::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn plenora_storage_core::ExecutionId::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for plenora_storage_core::ExecutionId where T: core::clone::Clone
+pub type plenora_storage_core::ExecutionId::Owned = T
+pub fn plenora_storage_core::ExecutionId::clone_into(&self, target: &mut T)
+pub fn plenora_storage_core::ExecutionId::to_owned(&self) -> T
+impl<T> core::any::Any for plenora_storage_core::ExecutionId where T: 'static + ?core::marker::Sized
+pub fn plenora_storage_core::ExecutionId::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for plenora_storage_core::ExecutionId where T: ?core::marker::Sized
+pub fn plenora_storage_core::ExecutionId::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for plenora_storage_core::ExecutionId where T: ?core::marker::Sized
+pub fn plenora_storage_core::ExecutionId::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for plenora_storage_core::ExecutionId where T: core::clone::Clone
+pub unsafe fn plenora_storage_core::ExecutionId::clone_to_uninit(&self, dest: *mut u8)
+impl<T> core::convert::From<T> for plenora_storage_core::ExecutionId
+pub fn plenora_storage_core::ExecutionId::from(t: T) -> T
+impl<T> core::mem::SizedTypeProperties for plenora_storage_core::ExecutionId
+impl<T> serde_core::de::DeserializeOwned for plenora_storage_core::ExecutionId where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> typenum::type_operators::Same for plenora_storage_core::ExecutionId
+pub type plenora_storage_core::ExecutionId::Output = T
 pub struct plenora_storage_core::GetInput
 pub plenora_storage_core::GetInput::artifact_sink: plenora_storage_core::ArtifactSinkReference
 pub plenora_storage_core::GetInput::connection: plenora_storage_core::ProviderConnection
@@ -4291,7 +4394,8 @@ impl<T> typenum::type_operators::Same for plenora_storage_core::PutRequest
 pub type plenora_storage_core::PutRequest::Output = T
 pub struct plenora_storage_core::RuntimeBinding<'a>
 impl<'a> plenora_storage_core::RuntimeBinding<'a>
-pub async fn plenora_storage_core::RuntimeBinding<'a>::invoke(&self, invocation: plenora_storage_core::RuntimeInvocation, cancellation: plenora_storage_core::CancellationToken) -> plenora_storage_core::RuntimeResultEnvelope
+pub async fn plenora_storage_core::RuntimeBinding<'a>::invoke(&self, invocation: plenora_storage_core::RuntimeInvocation, cancellation: plenora_storage_core::CancellationToken) -> plenora_storage_core::StorageResult<plenora_storage_core::RuntimeResultEnvelope>
+pub async fn plenora_storage_core::RuntimeBinding<'a>::invoke_json(&self, invocation: serde_json::value::Value, cancellation: plenora_storage_core::CancellationToken) -> plenora_storage_core::StorageResult<plenora_storage_core::RuntimeResultEnvelope>
 pub const fn plenora_storage_core::RuntimeBinding<'a>::new(engine: &'a plenora_storage_core::Engine, artifacts: &'a dyn plenora_storage_core::ArtifactResolver, secrets: &'a dyn plenora_storage_core::SecretResolver) -> Self
 impl<'a> core::marker::Freeze for plenora_storage_core::RuntimeBinding<'a>
 impl<'a> core::marker::Send for plenora_storage_core::RuntimeBinding<'a>
@@ -4797,10 +4901,10 @@ impl<T> typenum::type_operators::Same for plenora_storage_core::RuntimeResultEnv
 pub type plenora_storage_core::RuntimeResultEnvelope::Output = T
 pub struct plenora_storage_core::RuntimeResultMetadata
 pub plenora_storage_core::RuntimeResultMetadata::causation_id: core::option::Option<alloc::string::String>
-pub plenora_storage_core::RuntimeResultMetadata::correlation_id: alloc::string::String
+pub plenora_storage_core::RuntimeResultMetadata::correlation_id: core::option::Option<alloc::string::String>
 pub plenora_storage_core::RuntimeResultMetadata::message_id: alloc::string::String
-pub plenora_storage_core::RuntimeResultMetadata::operation: alloc::string::String
-pub plenora_storage_core::RuntimeResultMetadata::operation_version: alloc::string::String
+pub plenora_storage_core::RuntimeResultMetadata::operation: core::option::Option<alloc::string::String>
+pub plenora_storage_core::RuntimeResultMetadata::operation_version: core::option::Option<alloc::string::String>
 pub plenora_storage_core::RuntimeResultMetadata::output_contract: alloc::string::String
 impl core::clone::Clone for plenora_storage_core::RuntimeResultMetadata
 pub fn plenora_storage_core::RuntimeResultMetadata::clone(&self) -> plenora_storage_core::RuntimeResultMetadata
@@ -5208,6 +5312,7 @@ pub struct plenora_storage_core::StorageError
 pub plenora_storage_core::StorageError::category: plenora_storage_core::ErrorCategory
 pub plenora_storage_core::StorageError::code: alloc::string::String
 pub plenora_storage_core::StorageError::details: alloc::collections::btree::map::BTreeMap<alloc::string::String, serde_json::value::Value>
+pub plenora_storage_core::StorageError::execution_id: core::option::Option<plenora_storage_core::ExecutionId>
 pub plenora_storage_core::StorageError::message: alloc::string::String
 pub plenora_storage_core::StorageError::phase: plenora_storage_core::ErrorPhase
 pub plenora_storage_core::StorageError::provider: core::option::Option<alloc::string::String>

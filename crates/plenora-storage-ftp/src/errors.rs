@@ -170,14 +170,32 @@ pub fn list_name_error() -> StorageError {
     .with_provider(PROVIDER_ID)
 }
 
+/// The destination is published, but its metadata could not be read back.
+/// Publication is proved and nothing remains to reconcile, while repeating
+/// the request would publish again: `committed`, never retried (case 9e of the
+/// common runtime matrix, pending ratification in `plenora-contracts`).
 pub fn committed_verification_error() -> StorageError {
     StorageError::new(
         ErrorCategory::Execution,
         ErrorPhase::Cleanup,
         RemoteEffect::Committed,
-        RetryDisposition::RequiresRecovery,
+        RetryDisposition::Never,
         "FTP_COMMITTED_METADATA_UNAVAILABLE",
         "FTP destination was published but its metadata could not be read back",
+    )
+    .with_provider(PROVIDER_ID)
+}
+
+/// The published or transferred object does not have the transferred size:
+/// a committed effect that differs from the request remains to be reconciled.
+pub fn committed_mismatch_error() -> StorageError {
+    StorageError::new(
+        ErrorCategory::Execution,
+        ErrorPhase::Cleanup,
+        RemoteEffect::Committed,
+        RetryDisposition::RequiresRecovery,
+        "FTP_COMMITTED_SIZE_MISMATCH",
+        "FTP transfer completed with a size that differs from the transferred bytes",
     )
     .with_provider(PROVIDER_ID)
 }

@@ -1251,6 +1251,7 @@ name = "plenora-storage-core"
 version = "2.1.0"
 dependencies = [
  "async-trait",
+ "getrandom 0.4.3",
  "hex",
  "serde",
  "serde_json",

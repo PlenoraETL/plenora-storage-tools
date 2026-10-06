@@ -11,6 +11,7 @@ mod model;
 mod network;
 mod provider;
 mod runtime;
+mod runtime_admission;
 
 pub use capability::{
     CAPABILITY_ATTRIBUTES_CONTRACT, CAPABILITY_NAME, CAPABILITY_SCHEMA_VERSION, COMPONENT_ID,
@@ -24,7 +25,8 @@ pub use engine::{
     LIST_CURSOR_MAX_BYTES, LIST_CURSOR_TTL_SECONDS,
 };
 pub use error::{
-    ErrorCategory, ErrorPhase, RemoteEffect, RetryDisposition, StorageError, StorageResult,
+    ErrorCategory, ErrorPhase, ExecutionId, RemoteEffect, RetryDisposition, StorageError,
+    StorageResult,
 };
 pub use model::{
     ArtifactMetadata, ArtifactReference, ArtifactSinkReference, CONNECTION_CONFIG_MAX_PROPERTIES,
@@ -41,5 +43,6 @@ pub use runtime::{
     ArtifactResolver, ArtifactRole, ArtifactSink, ArtifactSource, ERROR_CONTENT_TYPE,
     ERROR_CONTRACT, JSON_CONTENT_TYPE, RUNTIME_BINDING_VERSION, RUNTIME_OPERATIONS, RuntimeBinding,
     RuntimeInvocation, RuntimeOperationDescriptor, RuntimeRequestMetadata, RuntimeResultEnvelope,
-    RuntimeResultMetadata, RuntimeRoute, SecretResolver, validate_runtime_route,
+    RuntimeResultMetadata, RuntimeRoute, SecretResolver,
 };
+pub use runtime_admission::validate_runtime_route;
