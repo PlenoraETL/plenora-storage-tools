@@ -1,4 +1,4 @@
-"""Run the real XML/FTP parsers with libFuzzer and preserve reproducible evidence."""
+"""Run the real XML/FTP/SMB parsers with libFuzzer and preserve reproducible evidence."""
 import argparse
 import hashlib
 import json
@@ -12,7 +12,17 @@ import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOLCHAIN = 'nightly-2026-09-20'
-TARGETS = ('s3_xml', 'azure_xml', 'webdav_xml', 'ftp_listing')
+TARGETS = ('s3_xml', 'azure_xml', 'webdav_xml', 'ftp_listing',
+           'smb2_messages', 'spnego_der', 'ntlm_challenge', 'kerberos_messages')
+XML_ROOTS = {'s3_xml': b'ListBucketResult', 'azure_xml': b'EnumerationResults',
+             'webdav_xml': b'multistatus'}
+# Server-controlled lengths that claim more bytes than the frame carries.
+WIRE_BOUNDARIES = {
+    'smb2_messages': b'\xfeSMB\x40\x00' + b'\x00' * 14 + b'\xff\xff\xff\xff' + b'\x00' * 40,
+    'spnego_der': b'\xa1\x83\xff\xff\xff\x30',
+    'ntlm_challenge': b'NTLMSSP\x00\x02\x00\x00\x00' + b'\x00' * 28 + b'\xff' * 8,
+    'kerberos_messages': b'\x6b\x82\xff\xff\x30\x82\xff\xff',
+}
 TRIPLE = 'x86_64-unknown-linux-gnu'
 
 
@@ -35,11 +45,12 @@ def boundary_seeds(target, corpus):
         for size in (32768, 32769):
             (corpus / f'boundary-{size}').write_bytes(b'x' * size)
         (corpus / 'invalid-utf8').write_bytes(b'type=file;size=0; \xff\n')
-    else:
-        root = {'s3_xml': b'ListBucketResult', 'azure_xml': b'EnumerationResults',
-                'webdav_xml': b'multistatus'}[target]
+    elif target in XML_ROOTS:
+        root = XML_ROOTS[target]
         (corpus / 'deep-unknown-elements').write_bytes(
             b'<' + root + b'>' + b'<unknown>' * 512 + b'</unknown>' * 512 + b'</' + root + b'>')
+    else:
+        (corpus / 'overlong-length').write_bytes(WIRE_BOUNDARIES[target])
 
 
 def stats(log, returncode):

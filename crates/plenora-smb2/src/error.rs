@@ -265,7 +265,27 @@ pub enum Error {
         requested: u32,
     },
 
-    /// The server stopped granting credits, so the request could not be sent.
+    /// A whole-file read was refused because the size the server declared for
+    /// the file exceeds the caller's in-memory limit.
+    ///
+    /// [`Tree::read_file_pipelined`](crate::Tree::read_file_pipelined),
+    /// [`Tree::read_file_pipelined_with_progress`](crate::Tree::read_file_pipelined_with_progress)
+    /// and [`FileDownload::collect`](crate::FileDownload::collect)
+    /// return the whole file as one buffer whose size comes from the server.
+    /// They check it against the `max_bytes` the caller passes before
+    /// allocating, so a forged or unexpected size cannot exhaust memory.
+    /// Nothing was read. Use [`FileDownload::next_chunk`](crate::FileDownload::next_chunk)
+    /// or [`FileReader`](crate::FileReader) to stream a file of any size.
+    /// Classifies as [`ErrorKind::TooLarge`].
+    #[error("server declared {size} bytes, more than the {limit}-byte in-memory limit")]
+    DeclaredSizeOverLimit {
+        /// The size in bytes the server declared, or the bytes it has sent so
+        /// far when it sent more than declared.
+        size: u64,
+        /// The caller's limit in bytes.
+        limit: u64,
+    },
+
     ///
     /// Every SMB2 request spends credits from a budget the server grants and
     /// replenishes on each response. This crate never sends beyond that budget
@@ -568,6 +588,7 @@ impl Error {
             // The share exists, on a node this client won't follow to.
             Error::ShareRedirected { .. } => ErrorKind::Unsupported,
             Error::FileTooLargeForSingleRead { .. } => ErrorKind::TooLarge,
+            Error::DeclaredSizeOverLimit { .. } => ErrorKind::TooLarge,
             // A connection whose credits never come back is a dead connection
             // wearing a live socket; consumers already reconnect on TimedOut.
             Error::CreditStarvation { .. } => ErrorKind::TimedOut,

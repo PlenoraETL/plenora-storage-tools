@@ -1214,21 +1214,29 @@ impl SmbClient {
     }
 
     /// Read a file using pipelined I/O (faster for large files).
-    pub async fn read_file_pipelined(&mut self, tree: &mut Tree, path: &str) -> Result<Vec<u8>> {
+    ///
+    /// `max_bytes` bounds the server-declared file size before the whole-file
+    /// buffer is reserved; see [`Tree::read_file_pipelined`].
+    pub async fn read_file_pipelined(
+        &mut self,
+        tree: &mut Tree,
+        path: &str,
+        max_bytes: u64,
+    ) -> Result<Vec<u8>> {
         let result = {
             let conn = self.connection_for_tree(tree)?;
-            tree.read_file_pipelined(conn, path).await
+            tree.read_file_pipelined(conn, path, max_bytes).await
         };
         match result {
             Err(e) if self.should_retry_dfs(&e) => {
                 let new_path = self.handle_dfs_redirect(tree, path).await?;
                 let conn = self.connection_for_tree(tree)?;
-                tree.read_file_pipelined(conn, &new_path).await
+                tree.read_file_pipelined(conn, &new_path, max_bytes).await
             }
             Err(e) if self.session_is_gone(tree, &e) => {
                 self.recover_tree(tree).await?;
                 let conn = self.connection_for_tree(tree)?;
-                tree.read_file_pipelined(conn, path).await
+                tree.read_file_pipelined(conn, path, max_bytes).await
             }
             other => other,
         }
@@ -1665,10 +1673,13 @@ impl SmbClient {
     ///
     /// Uses pipelined I/O for performance, calling `on_progress` after each
     /// chunk is received. Return `ControlFlow::Break(())` to cancel the read.
+    /// `max_bytes` bounds the server-declared file size as in
+    /// [`read_file_pipelined`](Self::read_file_pipelined).
     pub async fn read_file_with_progress<F>(
         &mut self,
         tree: &mut Tree,
         path: &str,
+        max_bytes: u64,
         on_progress: F,
     ) -> Result<Vec<u8>>
     where
@@ -1679,7 +1690,7 @@ impl SmbClient {
         // the operation directly. If DFS redirect is needed, the caller
         // should resolve the tree first using a simpler method.
         let conn = self.connection_for_tree(tree)?;
-        tree.read_file_pipelined_with_progress(conn, path, on_progress)
+        tree.read_file_pipelined_with_progress(conn, path, max_bytes, on_progress)
             .await
     }
 

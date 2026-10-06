@@ -14,6 +14,7 @@ libfuzzer-sys = "=0.4.13"
 plenora-storage-providers = { path = "../crates/plenora-storage-providers", default-features = false, features = ["azure", "webdav"] }
 plenora-storage-ftp = { path = "../crates/plenora-storage-ftp" }
 plenora-storage-s3 = { path = "../crates/plenora-storage-s3" }
+smb2 = { package = "plenora-smb2", path = "../crates/plenora-smb2", features = ["fuzzing"] }
 tokio = { version = "=1.53.1", features = ["rt"] }
 
 [[bin]]
@@ -40,6 +41,35 @@ bench = false
 [[bin]]
 name = "ftp_listing"
 path = "fuzz_targets/ftp_listing.rs"
+test = false
+doc = false
+bench = false
+
+
+[[bin]]
+name = "smb2_messages"
+path = "fuzz_targets/smb2_messages.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "spnego_der"
+path = "fuzz_targets/spnego_der.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ntlm_challenge"
+path = "fuzz_targets/ntlm_challenge.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "kerberos_messages"
+path = "fuzz_targets/kerberos_messages.rs"
 test = false
 doc = false
 bench = false

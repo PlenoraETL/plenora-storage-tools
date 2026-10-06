@@ -222,6 +222,17 @@ fn read_bytes(data: &[u8], pos: &mut usize, len: usize) -> Result<Vec<u8>> {
     Ok(val)
 }
 
+/// Skip `len` bytes that must be present, like [`read_bytes`] without the copy.
+fn skip_bytes(data: &[u8], pos: &mut usize, len: usize) -> Result<()> {
+    match pos.checked_add(len) {
+        Some(end) if end <= data.len() => {
+            *pos = end;
+            Ok(())
+        }
+        _ => Err(Error::invalid_data("ccache: unexpected end of data")),
+    }
+}
+
 fn read_string(data: &[u8], pos: &mut usize) -> Result<String> {
     let len = read_u32(data, pos)? as usize;
     let bytes = read_bytes(data, pos, len)?;
@@ -232,7 +243,15 @@ fn read_principal(data: &[u8], pos: &mut usize) -> Result<CcachePrincipal> {
     let name_type = read_u32(data, pos)?;
     let num_components = read_u32(data, pos)?;
     let realm = read_string(data, pos)?;
-    let mut components = Vec::with_capacity(num_components as usize);
+    // The count comes from the file. Every component carries at least its
+    // 4-byte length, so a count the remaining bytes cannot hold is refused
+    // before it sizes an allocation that would abort the process.
+    let remaining = data.len().saturating_sub(*pos);
+    let num_components = usize::try_from(num_components)
+        .ok()
+        .filter(|count| *count <= remaining / 4)
+        .ok_or_else(|| Error::invalid_data("ccache: component count exceeds the data"))?;
+    let mut components = Vec::with_capacity(num_components);
     for _ in 0..num_components {
         components.push(read_string(data, pos)?);
     }
@@ -266,7 +285,7 @@ fn read_credential(data: &[u8], pos: &mut usize) -> Result<CcacheCredential> {
     for _ in 0..addr_count {
         let _addr_type = read_u16(data, pos)?;
         let addr_len = read_u32(data, pos)? as usize;
-        *pos += addr_len; // skip address data
+        skip_bytes(data, pos, addr_len)?;
     }
 
     // Auth data (count + entries).
@@ -274,7 +293,7 @@ fn read_credential(data: &[u8], pos: &mut usize) -> Result<CcacheCredential> {
     for _ in 0..authdata_count {
         let _ad_type = read_u16(data, pos)?;
         let ad_len = read_u32(data, pos)? as usize;
-        *pos += ad_len; // skip authdata
+        skip_bytes(data, pos, ad_len)?;
     }
 
     // Ticket.
@@ -433,6 +452,36 @@ mod tests {
     fn reject_truncated_file() {
         let result = parse_ccache(&[0x05]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn forged_component_count_is_an_error_not_an_allocation() {
+        // v4, no header; principal type 1 claiming u32::MAX components with
+        // only a realm behind it. Reserving the claimed count aborted the
+        // process (found by the kerberos_messages fuzz target).
+        let mut data = vec![0x05, 0x04, 0x00, 0x00];
+        data.extend_from_slice(&[0, 0, 0, 1]);
+        data.extend_from_slice(&u32::MAX.to_be_bytes());
+        data.extend_from_slice(&[0, 0, 0, 1]);
+        data.push(b'R');
+        let error = parse_ccache(&data).unwrap_err();
+        assert!(
+            matches!(&error, Error::InvalidData { message } if message.contains("component count")),
+            "{error:?}"
+        );
+    }
+
+    #[test]
+    fn skipped_address_past_the_end_is_an_error() {
+        let mut data = Vec::new();
+        let mut pos = 0;
+        data.extend_from_slice(&[1, 2, 3]);
+        assert!(skip_bytes(&data, &mut pos, 4).is_err());
+        assert_eq!(pos, 0);
+        assert!(skip_bytes(&data, &mut pos, 3).is_ok());
+        assert_eq!(pos, 3);
+        pos = usize::MAX;
+        assert!(skip_bytes(&data, &mut pos, 1).is_err());
     }
 
     #[test]

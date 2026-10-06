@@ -28,6 +28,14 @@
 //!   obvious fuzzing target.
 //! - [`fuzz_name_round_trip`] -- the private-use-area filename mapping. The
 //!   only target here that asserts a property rather than "doesn't panic".
+//! - [`fuzz_smb2_messages`] -- every SMB2 framing parser above on the same
+//!   server bytes: transform headers, compound split, header and body.
+//! - [`fuzz_spnego_der`] -- DER TLVs, the SPNEGO `negTokenResp` and the
+//!   GSS-API wrapper carried in SESSION_SETUP security buffers.
+//! - [`fuzz_ntlm_challenge`] -- the server's NTLM CHALLENGE_MESSAGE and its
+//!   AV pairs, through the public authenticator.
+//! - [`fuzz_kerberos_messages`] -- KDC replies, KRB-ERROR, AP-REP, their
+//!   decrypted parts, tickets and credential caches.
 
 use crate::msg::header::Header;
 use crate::msg::transform::{CompressionTransformHeader, TransformHeader};
@@ -284,4 +292,66 @@ fn assert_wire_safe(encoded: &str, original: &str) {
         !matches!(encoded.chars().next_back(), Some(' ') | Some('.')),
         "encoding {original:?} left a trailing space or period"
     );
+}
+
+/// Run every SMB2 framing parser on the same server bytes: the transform
+/// headers that precede decryption and decompression, the compound splitter,
+/// and header plus body of a single sub-frame.
+pub fn fuzz_smb2_messages(data: &[u8]) {
+    fuzz_transform_header_parse(data);
+    fuzz_compression_transform_header_parse(data);
+    fuzz_frame_parse(data);
+    fuzz_sub_frame_parse(data);
+    fuzz_negotiate_response_parse(data);
+    fuzz_create_response_parse(data);
+    fuzz_query_info_response_parse(data);
+    fuzz_dfs_referral_response_parse(data);
+    fuzz_error_context_walk(data);
+}
+
+/// Parse the DER and SPNEGO structures a server returns in SESSION_SETUP.
+pub fn fuzz_spnego_der(data: &[u8]) {
+    let _ = crate::auth::der::parse_der_length(data);
+    let mut rest = data;
+    // Walk a TLV chain the way the SPNEGO and Kerberos decoders do; every
+    // step consumes at least the tag byte, so the walk terminates.
+    while let Ok((_, _, consumed)) = crate::auth::der::parse_der_tlv(rest) {
+        let Some(next) = rest.get(consumed..) else {
+            break;
+        };
+        if next.len() >= rest.len() {
+            break;
+        }
+        rest = next;
+    }
+    let _ = crate::auth::spnego::parse_neg_token_resp(data);
+    let _ = crate::auth::kerberos::messages::parse_gss_api_wrapper(data);
+}
+
+/// Process a server CHALLENGE_MESSAGE through the public NTLM authenticator,
+/// both after a NEGOTIATE_MESSAGE (MIC path) and without one.
+pub fn fuzz_ntlm_challenge(data: &[u8]) {
+    let credentials = || crate::auth::ntlm::NtlmCredentials {
+        username: "user".to_owned(),
+        password: "password".to_owned(),
+        domain: "DOMAIN".to_owned(),
+    };
+    let mut negotiated = crate::auth::ntlm::NtlmAuthenticator::new(credentials());
+    let _ = negotiated.negotiate();
+    let _ = negotiated.authenticate(data);
+    let mut direct = crate::auth::ntlm::NtlmAuthenticator::new(credentials());
+    let _ = direct.authenticate(data);
+}
+
+/// Parse every Kerberos structure received from a KDC, a server or a
+/// credential cache file.
+pub fn fuzz_kerberos_messages(data: &[u8]) {
+    use crate::auth::kerberos::{ccache, messages};
+    let _ = messages::parse_kdc_rep(data);
+    let _ = messages::parse_enc_kdc_rep_part(data);
+    let _ = messages::parse_krb_error(data);
+    let _ = messages::parse_ap_rep(data);
+    let _ = messages::parse_enc_ap_rep_part(data);
+    let _ = messages::parse_ticket(data);
+    let _ = ccache::parse_ccache(data);
 }

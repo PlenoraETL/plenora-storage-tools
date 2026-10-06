@@ -16,7 +16,7 @@ use crate::client::connection::{
     CompoundOp, Connection, Frame, WriteBudgetStep, reserve_write_budget_or_drain,
 };
 use crate::client::credits;
-use crate::client::stream::{FileDownload, Progress};
+use crate::client::stream::{FileDownload, Progress, zeroed_buffer_for_declared_size};
 use crate::error::Result;
 use crate::msg::close::CloseRequest;
 use crate::msg::create::{
@@ -1513,9 +1513,27 @@ impl Tree {
     ///
     /// Uses 64 KB chunks with CreditCharge=1 to maximize concurrency.
     /// The window is capped at 32 in-flight requests (2 MB).
-    pub async fn read_file_pipelined(&self, conn: &mut Connection, path: &str) -> Result<Vec<u8>> {
+    ///
+    /// The whole file is returned as one buffer sized by the server's
+    /// declared file size, so `max_bytes` bounds it: a larger declared size
+    /// fails with [`Error::DeclaredSizeOverLimit`] before any READ and before
+    /// the memory is reserved.
+    pub async fn read_file_pipelined(
+        &self,
+        conn: &mut Connection,
+        path: &str,
+        max_bytes: u64,
+    ) -> Result<Vec<u8>> {
         // Open the file.
         let (file_id, file_size) = self.open_file(conn, path).await?;
+        if file_size > max_bytes {
+            // The refusal is the error to report; the CLOSE is best effort.
+            let _ = self.close_handle(conn, file_id).await;
+            return Err(Error::DeclaredSizeOverLimit {
+                size: file_size,
+                limit: max_bytes,
+            });
+        }
 
         if file_size == 0 {
             trace!(
@@ -1594,16 +1612,26 @@ impl Tree {
     /// Same as [`read_file_pipelined`](Self::read_file_pipelined) but calls
     /// `on_progress` after each chunk is received. Return
     /// `ControlFlow::Break(())` from the callback to cancel the read.
+    /// `max_bytes` bounds the declared file size as in
+    /// [`read_file_pipelined`](Self::read_file_pipelined).
     pub async fn read_file_pipelined_with_progress<F>(
         &self,
         conn: &mut Connection,
         path: &str,
+        max_bytes: u64,
         mut on_progress: F,
     ) -> Result<Vec<u8>>
     where
         F: FnMut(Progress) -> ControlFlow<()>,
     {
         let (file_id, file_size) = self.open_file(conn, path).await?;
+        if file_size > max_bytes {
+            let _ = self.close_handle(conn, file_id).await;
+            return Err(Error::DeclaredSizeOverLimit {
+                size: file_size,
+                limit: max_bytes,
+            });
+        }
 
         if file_size == 0 {
             trace!(
@@ -2522,69 +2550,6 @@ impl Tree {
         Ok(all_entries)
     }
 
-    /// Read file data in chunks.
-    #[allow(dead_code)] // Will be used by read_file_pipelined for large-file chunked reads.
-    async fn read_loop(
-        &self,
-        conn: &mut Connection,
-        file_id: FileId,
-        file_size: u64,
-    ) -> Result<Vec<u8>> {
-        let max_read = conn.params().map(|p| p.max_read_size).unwrap_or(65536);
-
-        let mut data = Vec::with_capacity(file_size as usize);
-        let mut offset = 0u64;
-
-        loop {
-            let remaining = file_size.saturating_sub(offset);
-            if remaining == 0 {
-                break;
-            }
-
-            let chunk_size = remaining.min(max_read as u64) as u32;
-
-            let req = ReadRequest {
-                padding: 0x50,
-                flags: 0,
-                length: chunk_size,
-                offset,
-                file_id,
-                minimum_count: 0,
-                channel: SMB2_CHANNEL_NONE,
-                remaining_bytes: 0,
-                read_channel_info: vec![],
-            };
-
-            let frame = conn
-                .execute(Command::Read, &req, Some(self.tree_id))
-                .await?;
-
-            // STATUS_END_OF_FILE means we read past the end.
-            if frame.header.status == NtStatus::END_OF_FILE {
-                break;
-            }
-
-            if frame.header.status != NtStatus::SUCCESS {
-                return Err(Error::Protocol {
-                    status: frame.header.status,
-                    command: Command::Read,
-                });
-            }
-
-            let mut cursor = ReadCursor::new(&frame.body);
-            let resp = ReadResponse::unpack(&mut cursor)?;
-
-            if resp.data.is_empty() {
-                break;
-            }
-
-            offset += resp.data.len() as u64;
-            data.extend_from_slice(&resp.data);
-        }
-
-        Ok(data)
-    }
-
     /// Pipelined read using a sliding window.
     ///
     /// Instead of batch send/receive phases, each received response
@@ -2601,7 +2566,9 @@ impl Tree {
     ) -> Result<Vec<u8>> {
         use futures_util::stream::{FuturesUnordered, StreamExt};
 
-        let mut data = vec![0u8; file_size as usize];
+        // The caller checked `file_size` against its limit; the reservation
+        // itself is fallible.
+        let mut data = zeroed_buffer_for_declared_size(file_size, file_size)?;
         let mut chunks_sent = 0usize;
         let mut chunks_received = 0usize;
 
@@ -2722,7 +2689,9 @@ impl Tree {
     {
         use futures_util::stream::{FuturesUnordered, StreamExt};
 
-        let mut data = vec![0u8; file_size as usize];
+        // The caller checked `file_size` against its limit; the reservation
+        // itself is fallible.
+        let mut data = zeroed_buffer_for_declared_size(file_size, file_size)?;
         let mut chunks_sent = 0usize;
         let mut chunks_received = 0usize;
         let mut bytes_received = 0u64;
@@ -5273,7 +5242,7 @@ mod tests {
         };
 
         let data = tree
-            .read_file_pipelined(&mut conn, "big.bin")
+            .read_file_pipelined(&mut conn, "big.bin", u64::MAX)
             .await
             .unwrap();
 
@@ -5326,7 +5295,7 @@ mod tests {
         };
 
         let data = tree
-            .read_file_pipelined(&mut conn, "reverse.bin")
+            .read_file_pipelined(&mut conn, "reverse.bin", u64::MAX)
             .await
             .unwrap();
 
@@ -5357,13 +5326,141 @@ mod tests {
         };
 
         let data = tree
-            .read_file_pipelined(&mut conn, "empty.bin")
+            .read_file_pipelined(&mut conn, "empty.bin", u64::MAX)
             .await
             .unwrap();
 
         assert!(data.is_empty());
         // 1 CREATE + 1 CLOSE = 2 messages (no READs needed).
         assert_eq!(mock.sent_count(), 2);
+    }
+
+    /// A server-declared size beyond the caller's limit is refused before any
+    /// READ and before the whole-file buffer is reserved. Without the bound
+    /// these reads reserved the declared size up front: 1 PiB aborts the
+    /// process instead of returning an error.
+    const FORGED_FILE_SIZE: u64 = 1 << 50;
+
+    fn declared_size_tree() -> Tree {
+        Tree {
+            tree_id: TreeId(20),
+            share_name: "test".to_string(),
+            server: "test-server".to_string(),
+            is_dfs: false,
+            encrypt_data: false,
+            dfs_origin: None,
+        }
+    }
+
+    fn assert_declared_size_refused(result: Result<Vec<u8>>) {
+        match result {
+            Err(error @ Error::DeclaredSizeOverLimit { .. }) => {
+                assert!(matches!(
+                    error,
+                    Error::DeclaredSizeOverLimit {
+                        size: FORGED_FILE_SIZE,
+                        limit: 1_048_576
+                    }
+                ));
+                assert_eq!(error.kind(), crate::error::ErrorKind::TooLarge);
+                assert!(!error.is_retryable());
+            }
+            other => panic!("expected DeclaredSizeOverLimit, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn pipelined_read_refuses_a_declared_size_over_the_limit() {
+        let mock = Arc::new(MockTransport::new());
+        let file_id = FileId {
+            persistent: 0x900,
+            volatile: 0x901,
+        };
+        mock.queue_response(build_create_response(file_id, FORGED_FILE_SIZE));
+        mock.queue_response(build_close_response());
+        let mut conn = setup_connection(&mock);
+        let tree = declared_size_tree();
+
+        assert_declared_size_refused(
+            tree.read_file_pipelined(&mut conn, "forged.bin", 1_048_576)
+                .await,
+        );
+        // CREATE + CLOSE: no READ was sent.
+        assert_eq!(mock.sent_count(), 2);
+    }
+
+    #[tokio::test]
+    async fn pipelined_read_with_progress_refuses_a_declared_size_over_the_limit() {
+        let mock = Arc::new(MockTransport::new());
+        let file_id = FileId {
+            persistent: 0x902,
+            volatile: 0x903,
+        };
+        mock.queue_response(build_create_response(file_id, FORGED_FILE_SIZE));
+        mock.queue_response(build_close_response());
+        let mut conn = setup_connection(&mock);
+        let tree = declared_size_tree();
+
+        let mut calls = 0;
+        let result = tree
+            .read_file_pipelined_with_progress(&mut conn, "forged.bin", 1_048_576, |_| {
+                calls += 1;
+                ControlFlow::Continue(())
+            })
+            .await;
+        assert_declared_size_refused(result);
+        assert_eq!(calls, 0);
+        assert_eq!(mock.sent_count(), 2);
+    }
+
+    #[tokio::test]
+    async fn download_collect_refuses_a_declared_size_over_the_limit() {
+        let mock = Arc::new(MockTransport::new());
+        let file_id = FileId {
+            persistent: 0x904,
+            volatile: 0x905,
+        };
+        mock.queue_response(build_create_response(file_id, FORGED_FILE_SIZE));
+        mock.queue_response(build_close_response());
+        let mut conn = setup_connection(&mock);
+        let tree = declared_size_tree();
+
+        let download = tree.download(&mut conn, "forged.bin").await.unwrap();
+        assert_declared_size_refused(download.collect(1_048_576).await);
+        assert_eq!(mock.sent_count(), 2);
+    }
+
+    #[tokio::test]
+    async fn download_collect_refuses_a_server_sending_more_than_the_limit() {
+        // The server declares 64 KiB, within the 64 KiB limit, then answers
+        // the READ with more bytes than it declared.
+        let mock = Arc::new(MockTransport::new());
+        let file_id = FileId {
+            persistent: 0x906,
+            volatile: 0x907,
+        };
+        mock.queue_response(build_create_response(file_id, 65_536));
+        mock.queue_response(build_read_response_with_msg_id(
+            NtStatus::SUCCESS,
+            MessageId(1),
+            vec![0xAB; 65_537],
+        ));
+        mock.queue_response(build_close_response());
+        let mut conn = setup_connection(&mock);
+        let tree = declared_size_tree();
+
+        let download = tree.download(&mut conn, "grown.bin").await.unwrap();
+        let result = download.collect(65_536).await;
+        assert!(
+            matches!(
+                result,
+                Err(Error::DeclaredSizeOverLimit {
+                    size: 65_537,
+                    limit: 65_536
+                })
+            ),
+            "expected DeclaredSizeOverLimit, got {result:?}"
+        );
     }
 
     #[tokio::test]
@@ -5403,7 +5500,7 @@ mod tests {
         };
 
         let data = tree
-            .read_file_pipelined(&mut conn, "truncated.bin")
+            .read_file_pipelined(&mut conn, "truncated.bin", u64::MAX)
             .await
             .unwrap();
 
@@ -5501,7 +5598,7 @@ mod tests {
         };
 
         let data = tree
-            .read_file_pipelined(&mut conn, "sliding.bin")
+            .read_file_pipelined(&mut conn, "sliding.bin", u64::MAX)
             .await
             .unwrap();
 
@@ -5584,7 +5681,7 @@ mod tests {
         };
 
         let data = tree
-            .read_file_pipelined(&mut conn, "sliding_test.bin")
+            .read_file_pipelined(&mut conn, "sliding_test.bin", u64::MAX)
             .await
             .unwrap();
 
@@ -5653,7 +5750,7 @@ mod tests {
 
         let mut progress_reports = Vec::new();
         let data = tree
-            .read_file_pipelined_with_progress(&mut conn, "progress_test.bin", |p| {
+            .read_file_pipelined_with_progress(&mut conn, "progress_test.bin", u64::MAX, |p| {
                 progress_reports.push(p.bytes_transferred);
                 ControlFlow::Continue(())
             })
@@ -5720,7 +5817,7 @@ mod tests {
 
         // Cancel after the first chunk.
         let result = tree
-            .read_file_pipelined_with_progress(&mut conn, "cancel_test.bin", |_p| {
+            .read_file_pipelined_with_progress(&mut conn, "cancel_test.bin", u64::MAX, |_p| {
                 ControlFlow::Break(())
             })
             .await;
@@ -5776,7 +5873,7 @@ mod tests {
 
         let mut progress_called = false;
         let data = tree
-            .read_file_pipelined_with_progress(&mut conn, "empty.bin", |p| {
+            .read_file_pipelined_with_progress(&mut conn, "empty.bin", u64::MAX, |p| {
                 progress_called = true;
                 assert_eq!(p.bytes_transferred, 0);
                 assert_eq!(p.total_bytes, Some(0));

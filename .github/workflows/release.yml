@@ -103,6 +103,23 @@ jobs:
         with:
           name: verified-publication
           path: target/publication
+      # The release-candidate jobs that compiled these bytes attested their
+      # provenance and SBOM; publishing requires both, from this repository's
+      # workflow, on GitHub-hosted runners and at the tagged commit.
+      - name: Verify build provenance and SBOM attestations of the distributed files
+        run: |
+          shopt -s nullglob
+          revision="$(git rev-parse HEAD)"
+          signer="$GH_REPO/.github/workflows/release-candidate.yml"
+          files=(target/publication/*.whl target/publication/*-source.tar.gz
+                 target/publication/*-x86_64-unknown-linux-gnu.tar.gz target/publication/*-x86_64-pc-windows-msvc.zip)
+          test "${#files[@]}" -eq 5
+          for file in "${files[@]}"; do
+            for predicate in https://slsa.dev/provenance/v1 https://cyclonedx.org/bom; do
+              gh attestation verify "$file" --repo "$GH_REPO" --signer-workflow "$signer" \
+                --source-digest "$revision" --deny-self-hosted-runners --predicate-type "$predicate" > /dev/null
+            done
+          done
       - name: Attest the qualification of the exact distribution assets
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:

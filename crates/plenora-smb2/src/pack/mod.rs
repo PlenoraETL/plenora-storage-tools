@@ -118,6 +118,20 @@ impl<'a> ReadCursor<'a> {
         self.data.len() - self.pos
     }
 
+    /// Capacity for `count` elements that each take at least
+    /// `min_element_len` wire bytes, refusing a count the remaining bytes
+    /// cannot hold. A count comes from the peer, so reserving it before the
+    /// bytes are known to exist would let a forged count exhaust memory.
+    pub(crate) fn capacity_for(&self, count: usize, min_element_len: usize) -> Result<usize> {
+        match count.checked_mul(min_element_len) {
+            Some(needed) if needed <= self.remaining() => Ok(count),
+            _ => Err(Error::invalid_data(format!(
+                "element count {count} exceeds the {} remaining bytes",
+                self.remaining()
+            ))),
+        }
+    }
+
     /// Return the current byte position.
     pub fn position(&self) -> usize {
         self.pos
