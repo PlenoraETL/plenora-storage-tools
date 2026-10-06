@@ -286,7 +286,8 @@ impl Engine {
     /// # Errors
     /// A failed read/write or interruption may leave bytes in the sink. A sink
     /// that accepts part of the transfer and then fails yields
-    /// `STORAGE_GET_SINK_PARTIAL` (`io`, `write`, `partial`, `never`). Callers
+    /// `STORAGE_GET_SINK_PARTIAL` (`partial`, `never`), keeping the category
+    /// and phase of the sink failure. Callers
     /// requiring atomic local publication must use staging; this stream API does
     /// not replace or roll back a caller-owned destination.
     pub async fn get<W>(

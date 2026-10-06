@@ -23,3 +23,43 @@ fn an_unavailable_random_source_is_a_typed_error() {
     assert_eq!(error.phase, ErrorPhase::Validate);
     assert_eq!(error.remote_effect, RemoteEffect::None);
 }
+
+/// A sink that accepted a prefix and then failed restates the failure as a
+/// partial transfer, keeping its category and phase: a full disk stays a
+/// `resource_limit`, so a caller that rolls the sink back never retries it.
+#[test]
+fn a_partial_sink_failure_keeps_its_cause() {
+    let sink = CountingSink {
+        inner: (),
+        delivered: 5,
+        failed: true,
+    };
+    let full = StorageError::new(
+        ErrorCategory::ResourceLimit,
+        ErrorPhase::Write,
+        RemoteEffect::Unknown,
+        RetryDisposition::RequiresRecovery,
+        "LOCAL_DISK_FULL",
+        "local disk is full",
+    );
+    let restated = sink.restate(full, "local");
+    assert_eq!(restated.code, "STORAGE_GET_SINK_PARTIAL");
+    assert_eq!(restated.category, ErrorCategory::ResourceLimit);
+    assert_eq!(restated.phase, ErrorPhase::Write);
+    assert_eq!(restated.remote_effect, RemoteEffect::Partial);
+    assert_eq!(restated.retry, RetryDisposition::Never);
+    assert_eq!(restated.provider.as_deref(), Some("local"));
+    assert_eq!(restated.rolled_back().retry, RetryDisposition::Never);
+
+    // Without a delivered prefix, or without a sink failure, the provider's
+    // error is unchanged.
+    for (delivered, failed) in [(0, true), (5, false)] {
+        let sink = CountingSink {
+            inner: (),
+            delivered,
+            failed,
+        };
+        let error = StorageError::unsupported("unchanged");
+        assert_eq!(sink.restate(error.clone(), "local"), error);
+    }
+}

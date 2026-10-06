@@ -314,15 +314,17 @@ impl<W> CountingSink<W> {
     }
 
     /// A get whose sink accepted part of the transfer and then failed is
-    /// `STORAGE_GET_SINK_PARTIAL`, `io`/`write`/`partial`/`never`, whatever
-    /// code the provider gave the write failure.
+    /// `STORAGE_GET_SINK_PARTIAL` with `remote_effect: partial` and retry
+    /// `never`, whatever code the provider gave the write failure. Category
+    /// and phase stay those of the failure, so a full disk remains a
+    /// `resource_limit` and an I/O failure an `io` in `write`.
     pub fn restate(&self, error: StorageError, provider: &str) -> StorageError {
         if !(self.failed && self.delivered > 0) {
             return error;
         }
         StorageError::new(
-            ErrorCategory::Io,
-            ErrorPhase::Write,
+            error.category,
+            error.phase,
             RemoteEffect::Partial,
             RetryDisposition::Never,
             "STORAGE_GET_SINK_PARTIAL",

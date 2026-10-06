@@ -120,7 +120,7 @@ propone di ratificare e che non sono ancora normative. Il codice le segnala.
 | Deadline anche nel payload | i contratti di input storage non hanno una deadline: `invalid_configuration`/`validate`/`none`/`never` anche a valori uguali | P (RT-023) |
 | Chiave di idempotenza | solo `plenora.execution.idempotency_key` (N); presente: `unsupported`, codice `RUNTIME_CONTROL_UNSUPPORTED` (N rifiuto, D categoria, RT-006); vuota o `null`: `protocol` (P, RT-022) | N, D, P |
 | Chiavi `plenora.*` non riservate | ignorate | N (§9) |
-| Get fallito dopo byte consegnati al sink | `partial`/`never`; se è il sink a fallire dopo un prefisso, codice `STORAGE_GET_SINK_PARTIAL` per ogni provider (`Engine::get`) | D (fixture `storage-get-partial-error`) |
+| Get fallito dopo byte consegnati al sink | `partial`/`never`; se è il sink a fallire dopo un prefisso, codice `STORAGE_GET_SINK_PARTIAL` per ogni provider (`Engine::get`), con categoria e fase del guasto del sink | D (fixture `storage-get-partial-error`) |
 | Get fallito con sink aperto e nessun byte consegnato | `unknown`/`requires_recovery` | N (ERR-004) per `unknown`; P (ERR-014) per `requires_recovery` |
 | Pubblicazione provata, metadati non rileggibili (S3, SFTP, FTP) | `committed`/`cleanup`/`never`: nessun residuo, un nuovo tentativo ripubblicherebbe | P (ERR-015) |
 | Pubblicazione FTP con dimensione diversa dai byte trasferiti | `committed`/`cleanup`/`requires_recovery`, codice `FTP_COMMITTED_SIZE_MISMATCH` | P (ERR-015) |
