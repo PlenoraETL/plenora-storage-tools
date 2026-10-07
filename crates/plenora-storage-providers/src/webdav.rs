@@ -12,8 +12,8 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use plenora_storage_core::{
     CredentialResolver, EngineConfig, ErrorCategory, ErrorPhase, ObjectMetadata, OperationContext,
-    ProviderConnection, ProviderListRequest, ProviderListResult, PutRequest, StorageError,
-    StorageResult, directory_may_contain, validate_object_key,
+    ProviderConnection, ProviderListRequest, ProviderListResult, PutRequest, RemoteEffect,
+    RetryDisposition, StorageError, StorageResult, directory_may_contain, validate_object_key,
 };
 use reqwest::{Client, Method, RequestBuilder, Response, StatusCode};
 use serde::Deserialize;
@@ -202,6 +202,10 @@ fn parse_properties(root: &Url, data: &[u8]) -> StorageResult<Vec<DavEntry>> {
 #[path = "webdav_parser_tests.rs"]
 mod parser_tests;
 
+#[cfg(test)]
+#[path = "webdav_status_tests.rs"]
+mod status_tests;
+
 #[cfg(fuzzing)]
 pub(crate) fn fuzz_properties(data: &[u8]) {
     let root = Url::parse("https://fixture.invalid/storage/").unwrap();
@@ -280,6 +284,39 @@ fn strong_etag(value: &str) -> Option<String> {
     }
     Some(format!("\"{opaque}\""))
 }
+/// Classifies an HTTP failure. Only 401 rejects the credentials. 429 and
+/// 502-504 are transient refusals: without a mutation nothing happened, so
+/// the retry is safe; a mutation keeps an unknown effect. Before 3.0.0 they
+/// were `protocol` with retry `never`, the same class of error as an FTP login
+/// refused under load being reported as rejected credentials.
+fn status_error(status: u16, mutating: bool) -> StorageError {
+    let phase = if mutating {
+        ErrorPhase::Commit
+    } else {
+        ErrorPhase::Read
+    };
+    let category = match status {
+        401 => ErrorCategory::Authentication,
+        403 => ErrorCategory::Authorization,
+        404 => ErrorCategory::NotFound,
+        409 | 412 => ErrorCategory::Conflict,
+        405 | 501 => ErrorCategory::Unsupported,
+        429 | 502..=504 if !mutating => {
+            return StorageError::new(
+                ErrorCategory::Transient,
+                phase,
+                RemoteEffect::None,
+                RetryDisposition::Safe,
+                "WEBDAV_TEMPORARILY_UNAVAILABLE",
+                "WebDAV server is temporarily unavailable",
+            );
+        }
+        429 | 502..=504 => ErrorCategory::Transient,
+        _ => ErrorCategory::Protocol,
+    };
+    failure(category, phase, mutating)
+}
+
 fn checked(response: Response, mutating: bool) -> StorageResult<Response> {
     let status = response.status();
     if status.is_success()
@@ -288,21 +325,5 @@ fn checked(response: Response, mutating: bool) -> StorageResult<Response> {
     {
         return Ok(response);
     }
-    let category = match status.as_u16() {
-        401 => ErrorCategory::Authentication,
-        403 => ErrorCategory::Authorization,
-        404 => ErrorCategory::NotFound,
-        409 | 412 => ErrorCategory::Conflict,
-        405 | 501 => ErrorCategory::Unsupported,
-        _ => ErrorCategory::Protocol,
-    };
-    Err(failure(
-        category,
-        if mutating {
-            ErrorPhase::Commit
-        } else {
-            ErrorPhase::Read
-        },
-        mutating,
-    ))
+    Err(status_error(status.as_u16(), mutating))
 }

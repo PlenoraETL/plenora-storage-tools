@@ -59,14 +59,20 @@ services:
       FTP_USER_NAME: plenora
       FTP_USER_PASS: plenora-ftp-secret
       FTP_USER_HOME: /home/plenora
-      # Copy uses two sessions; 16 concurrent operations need at least 32.
-      FTP_MAX_CLIENTS: "64"
-      FTP_MAX_CONNECTIONS: "64"
-      FTP_PASSIVE_PORTS: "30000:30063"
+      # Capacity for the 16-worker transfer qualification: each copy holds a
+      # source and a destination session, so 16 workers need 32 at once plus
+      # the probes that overlap them. With 64 passive ports and -c 64,
+      # pure-ftpd accepted only 32 sessions ("421 ... 32 users (the maximum)"),
+      # which failed the 3.0.0 campaign: the client limit follows half the
+      # passive range. 100 passive ports cover the 48 clients configured
+      # here; the range stays below the FTPS fixture's 30100-30163.
+      FTP_MAX_CLIENTS: "48"
+      FTP_MAX_CONNECTIONS: "48"
+      FTP_PASSIVE_PORTS: "30000:30099"
       PUBLICHOST: ftp
     ports:
       - "2121:21"
-      - "30000-30063:30000-30063"
+      - "30000-30099:30000-30099"
     volumes:
       - ftp-data:/home/plenora
     healthcheck:

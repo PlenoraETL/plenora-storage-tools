@@ -1,8 +1,8 @@
 //! Protocol failures translated to redacted public effect and retry axes.
 
 use super::{
-    ErrorCategory, ErrorPhase, FtpError, PROVIDER_ID, RemoteEffect, RetryDisposition, Status,
-    StorageError,
+    ErrorCategory, ErrorPhase, FtpError, PROVIDER_ID, RemoteEffect, Response, RetryDisposition,
+    Status, StorageError,
 };
 
 pub fn configuration_error() -> StorageError {
@@ -13,14 +13,64 @@ pub fn configuration_error() -> StorageError {
     .with_provider(PROVIDER_ID)
 }
 
-pub fn map_ftp_auth_error(_error: FtpError) -> StorageError {
+/// Classifies a failed `USER`/`PASS` exchange by the server's reply code.
+///
+/// Only 530 (not logged in) and 532 (account required) reject the
+/// credentials. A 4xx reply is a transient refusal, for example pure-ftpd's
+/// `421 ... users (the maximum) are already logged in`: logging in has no
+/// remote effect, so it is safe to retry. Any other reply is unexpected and
+/// stays an explicit protocol error; transport failures follow the general
+/// mapping. Before 3.0.0 every login failure was reported as
+/// `FTP_AUTHENTICATION_FAILED` with retry `never`.
+pub fn map_ftp_auth_error(error: FtpError) -> StorageError {
+    let FtpError::UnexpectedResponse(response) = error else {
+        return match error {
+            FtpError::BadResponse => login_protocol_error(),
+            other => map_ftp_error(other, ErrorPhase::Connect, false),
+        };
+    };
+    match reply_code(&response) {
+        Some(530 | 532) => StorageError::new(
+            ErrorCategory::Authentication,
+            ErrorPhase::Connect,
+            RemoteEffect::None,
+            RetryDisposition::Never,
+            "FTP_AUTHENTICATION_FAILED",
+            "FTP server rejected the credentials",
+        )
+        .with_provider(PROVIDER_ID),
+        Some(400..=499) => StorageError::new(
+            ErrorCategory::Transient,
+            ErrorPhase::Connect,
+            RemoteEffect::None,
+            RetryDisposition::Safe,
+            "FTP_LOGIN_TEMPORARILY_REFUSED",
+            "FTP server temporarily refused the login",
+        )
+        .with_provider(PROVIDER_ID),
+        _ => login_protocol_error(),
+    }
+}
+
+/// The three-digit reply code that opens the response line. The parsed
+/// [`Status`] cannot be used alone: codes the client library does not name
+/// collapse into `Status::Unknown` and would lose their class.
+fn reply_code(response: &Response) -> Option<u32> {
+    let digits = response.body.get(..3)?;
+    if !digits.iter().all(u8::is_ascii_digit) {
+        return None;
+    }
+    std::str::from_utf8(digits).ok()?.parse().ok()
+}
+
+fn login_protocol_error() -> StorageError {
     StorageError::new(
-        ErrorCategory::Authentication,
+        ErrorCategory::Protocol,
         ErrorPhase::Connect,
         RemoteEffect::None,
         RetryDisposition::Never,
-        "FTP_AUTHENTICATION_FAILED",
-        "FTP server rejected the credentials",
+        "FTP_LOGIN_UNEXPECTED_RESPONSE",
+        "FTP server answered the login with an unexpected response",
     )
     .with_provider(PROVIDER_ID)
 }

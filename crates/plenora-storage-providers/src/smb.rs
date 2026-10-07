@@ -9,8 +9,8 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use plenora_storage_core::{
     CredentialResolver, EngineConfig, ErrorCategory, ErrorPhase, ObjectMetadata, OperationContext,
-    ProviderConnection, ProviderListRequest, ProviderListResult, PutRequest, StorageError,
-    StorageResult, resolve_network_target,
+    ProviderConnection, ProviderListRequest, ProviderListResult, PutRequest, RemoteEffect,
+    RetryDisposition, StorageError, StorageResult, resolve_network_target,
 };
 use serde::Deserialize;
 use smb2::{ErrorKind, FileReader, Session, Tree, client::connection::Connection};
@@ -82,7 +82,7 @@ impl ProviderFactory for Smb {
             connected.ok_or_else(|| failure(ErrorCategory::Io, ErrorPhase::Connect, false))?;
         conn.negotiate()
             .await
-            .map_err(|error| smb_error(&error, false))?;
+            .map_err(|error| smb_login_error(&error))?;
         let session = Session::setup(
             &mut conn,
             material.required("username")?,
@@ -90,7 +90,7 @@ impl ProviderFactory for Smb {
             material.optional("domain").unwrap_or_default(),
         )
         .await
-        .map_err(|error| smb_error(&error, false).with_detail("operation", "session_setup"))?;
+        .map_err(|error| smb_login_error(&error).with_detail("operation", "session_setup"))?;
         // Require authenticated SMB3 encryption. No guest sessions, ambient
         // credentials, DFS referrals or automatic reconnect to unvalidated hosts.
         let cipher = conn
@@ -177,6 +177,79 @@ impl Reader for SmbReader {
         Ok(())
     }
 }
+/// Classifies a failed negotiate or session setup. Neither has a remote
+/// effect, so a refusal that may clear by itself is safe to retry.
+///
+/// Only the server's logon-rejection statuses (`STATUS_LOGON_FAILURE` and the
+/// account restrictions [`ErrorKind::AuthRequired`] groups) reject the
+/// credentials. A local failure of the authentication exchange itself
+/// (`smb2::Error::Auth`, for example a missing session key) is an unexpected
+/// protocol state, never rejected credentials. Before 3.0.0 these failures
+/// went through [`smb_error`]: phase `read`, transient refusals and timeouts
+/// with retry `never`, and local exchange failures as `authentication`.
+fn smb_login_error(error: &smb2::Error) -> StorageError {
+    let (category, retry, code, message) = match error {
+        smb2::Error::Auth { .. } => (
+            ErrorCategory::Protocol,
+            RetryDisposition::Never,
+            "SMB_SESSION_SETUP_FAILED",
+            "SMB authentication exchange failed",
+        ),
+        _ if error.kind() == ErrorKind::AuthRequired => (
+            ErrorCategory::Authentication,
+            RetryDisposition::Never,
+            "SMB_AUTHENTICATION_FAILED",
+            "SMB server rejected the credentials",
+        ),
+        _ if error.kind() == ErrorKind::AccessDenied => (
+            ErrorCategory::Authorization,
+            RetryDisposition::Never,
+            "SMB_ACCESS_DENIED",
+            "SMB server denied the session",
+        ),
+        _ if matches!(error.kind(), ErrorKind::TimedOut) => (
+            ErrorCategory::Timeout,
+            RetryDisposition::Safe,
+            "SMB_CONNECT_TIMEOUT",
+            "SMB session setup timed out",
+        ),
+        _ if error.is_retryable()
+            || matches!(
+                error.status(),
+                Some(smb2::types::status::NtStatus::REQUEST_NOT_ACCEPTED)
+            )
+            || matches!(error.kind(), ErrorKind::ConnectionLost | ErrorKind::Io) =>
+        {
+            (
+                ErrorCategory::Transient,
+                RetryDisposition::Safe,
+                "SMB_SESSION_TEMPORARILY_REFUSED",
+                "SMB server temporarily refused the session",
+            )
+        }
+        smb2::Error::Internal { .. } => (
+            ErrorCategory::Internal,
+            RetryDisposition::Never,
+            "SMB_INTERNAL_ERROR",
+            "SMB client reached an internal error",
+        ),
+        _ => (
+            ErrorCategory::Protocol,
+            RetryDisposition::Never,
+            "SMB_SESSION_SETUP_FAILED",
+            "SMB session setup failed",
+        ),
+    };
+    StorageError::new(
+        category,
+        ErrorPhase::Connect,
+        RemoteEffect::None,
+        retry,
+        code,
+        message,
+    )
+}
+
 fn smb_error(error: &smb2::Error, mutating: bool) -> StorageError {
     let category = match error.kind() {
         ErrorKind::NotFound => ErrorCategory::NotFound,
