@@ -37,7 +37,7 @@ fn transient_refusals_without_mutation_are_safe_to_retry() {
 /// During a mutation the same refusal leaves the remote outcome unknown.
 #[test]
 fn transient_refusals_during_a_mutation_require_recovery() {
-    for status in [429, 503] {
+    for status in [429, 502, 503, 504] {
         let error = status_error(status, true);
         assert_eq!(
             (error.category, error.remote_effect, error.retry),

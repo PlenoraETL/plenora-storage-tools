@@ -53,15 +53,53 @@ pub fn map_ftp_auth_error(error: FtpError) -> StorageError {
     }
 }
 
-/// The three-digit reply code that opens the response line. The parsed
-/// [`Status`] cannot be used alone: codes the client library does not name
-/// collapse into `Status::Unknown` and would lose their class.
+/// The reply code of a complete FTP reply, parsed strictly as RFC 959
+/// section 4.2 defines it; `None` for any malformation.
+///
+/// The parsed [`Status`] cannot be used: codes the client library does not
+/// name collapse into `Status::Unknown`, and suppaftp accepts a terminal line
+/// whose code differs from the opening one while keeping the whole body.
+///
+/// - A reply ends with its last line; lines end with CRLF or LF.
+/// - A single-line reply is one line `NNN` or `NNN text`.
+/// - A multiline reply opens with `NNN-text` and ends with `NNN` or
+///   `NNN text` carrying the same code. Lines in between are free text, as
+///   RFC 959 allows, but none may already be that terminator.
+/// - A code is exactly three ASCII digits followed by a space, `-` (opening
+///   line only) or the end of the line.
 fn reply_code(response: &Response) -> Option<u32> {
-    let digits = response.body.get(..3)?;
+    let body = response.body.strip_suffix(b"\n").unwrap_or(&response.body);
+    let lines: Vec<&[u8]> = body
+        .split(|byte| *byte == b'\n')
+        .map(|line| line.strip_suffix(b"\r").unwrap_or(line))
+        .collect();
+    let (first, rest) = lines.split_first()?;
+    let (code, continued) = line_code(first)?;
+    if !continued {
+        return rest.is_empty().then_some(code);
+    }
+    let (last, middle) = rest.split_last()?;
+    let terminator = |line: &[u8]| matches!(line_code(line), Some((value, false)) if value == code);
+    (terminator(last) && !middle.iter().any(|line| terminator(line))).then_some(code)
+}
+
+/// `(code, continued)` for a line opening with a reply code: `continued` is
+/// true for `NNN-`. `None` when the line does not open with exactly three
+/// digits followed by a space, `-` or the end of the line.
+fn line_code(line: &[u8]) -> Option<(u32, bool)> {
+    let (digits, after) = line.split_at_checked(3)?;
     if !digits.iter().all(u8::is_ascii_digit) {
         return None;
     }
-    std::str::from_utf8(digits).ok()?.parse().ok()
+    let continued = match after.first() {
+        None | Some(b' ') => false,
+        Some(b'-') => true,
+        Some(_) => return None,
+    };
+    let code = digits
+        .iter()
+        .fold(0, |value, digit| value * 10 + u32::from(digit - b'0'));
+    Some((code, continued))
 }
 
 fn login_protocol_error() -> StorageError {

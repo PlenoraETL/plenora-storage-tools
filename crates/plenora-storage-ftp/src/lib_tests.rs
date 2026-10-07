@@ -412,3 +412,79 @@ fn login_transport_failures_follow_the_general_mapping() {
     assert!(!refused.message.contains("32 users"));
     assert!(refused.details.is_empty());
 }
+
+fn raw_reply(body: &[u8]) -> suppaftp::FtpError {
+    suppaftp::FtpError::UnexpectedResponse(super::Response {
+        status: suppaftp::Status::Unknown,
+        body: body.to_vec(),
+    })
+}
+
+/// Replies are parsed strictly (RFC 959 section 4.2): the code that decides
+/// is the terminal one, with CRLF or LF line ends.
+#[test]
+fn login_replies_are_classified_by_their_complete_code() {
+    use plenora_storage_core::ErrorCategory;
+    let cases: [(&[u8], ErrorCategory); 6] = [
+        (b"530 Login incorrect\r\n", ErrorCategory::Authentication),
+        (b"530 Login incorrect\n", ErrorCategory::Authentication),
+        (b"530\r\n", ErrorCategory::Authentication),
+        (
+            b"530-Login refused.\r\n Contact the administrator.\r\n530 Login incorrect\r\n",
+            ErrorCategory::Authentication,
+        ),
+        (
+            b"421-Too many users\n421 Try again later\n",
+            ErrorCategory::Transient,
+        ),
+        (b"421 Service not available", ErrorCategory::Transient),
+    ];
+    for (body, expected) in cases {
+        let error = super::map_ftp_auth_error(raw_reply(body));
+        assert_eq!(
+            error.category,
+            expected,
+            "{}",
+            String::from_utf8_lossy(body)
+        );
+    }
+}
+
+/// Any malformed reply is `protocol`/`never`, never `authentication` or
+/// `transient`.
+#[test]
+fn malformed_login_replies_are_protocol_errors() {
+    use plenora_storage_core::{ErrorCategory, RetryDisposition};
+    let malformed: [&[u8]; 10] = [
+        // Empty body.
+        b"",
+        b"\r\n",
+        // Four-digit code.
+        b"4210 text\r\n421 end\r\n",
+        b"5300 Login incorrect\r\n",
+        // A code followed by an invalid character.
+        b"530x Login incorrect\r\n",
+        b"421\tbusy\r\n",
+        // Multiline reply whose terminal code differs from the opening one.
+        b"421-start\r\n530 Login incorrect\r\n",
+        // Multiline reply without a terminal line.
+        b"530-Login refused\r\n",
+        // Single-line reply followed by more lines.
+        b"530 Login incorrect\r\n421 later\r\n",
+        // Terminator before the last line.
+        b"530-start\r\n530 middle\r\n530 end\r\n",
+    ];
+    for body in malformed {
+        let error = super::map_ftp_auth_error(raw_reply(body));
+        assert_eq!(
+            (error.category, error.retry, error.code.as_str()),
+            (
+                ErrorCategory::Protocol,
+                RetryDisposition::Never,
+                "FTP_LOGIN_UNEXPECTED_RESPONSE"
+            ),
+            "{}",
+            String::from_utf8_lossy(body)
+        );
+    }
+}
