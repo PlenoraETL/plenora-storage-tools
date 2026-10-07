@@ -311,11 +311,13 @@ fn axes(
     )
 }
 
-/// Only 530 and 532 reject the credentials.
+/// Only 430, 530 and 532 reject the credentials. 430 is a 4xx code, but
+/// retrying rejected credentials would only repeat the rejection.
 #[test]
 fn login_credential_rejections_are_authentication_never() {
     use plenora_storage_core::{ErrorCategory, ErrorPhase, RemoteEffect, RetryDisposition};
     for reply in [
+        "430 Invalid username or password\r\n",
         "530 Login authentication failed\r\n",
         "532 Need account\r\n",
     ] {
@@ -344,7 +346,6 @@ fn login_transient_refusals_are_transient_and_safe() {
     use plenora_storage_core::{ErrorCategory, ErrorPhase, RemoteEffect, RetryDisposition};
     for reply in [
         "421 32 users (the maximum) are already logged in, sorry\r\n",
-        "430 Invalid username or password\r\n",
         "450 Requested action not taken\r\n",
         "499 Unnamed transient reply\r\n",
     ] {

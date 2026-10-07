@@ -15,8 +15,9 @@ pub fn configuration_error() -> StorageError {
 
 /// Classifies a failed `USER`/`PASS` exchange by the server's reply code.
 ///
-/// Only 530 (not logged in) and 532 (account required) reject the
-/// credentials. A 4xx reply is a transient refusal, for example pure-ftpd's
+/// Only 430 (invalid username or password), 530 (not logged in) and 532
+/// (account required) reject the credentials. Any other 4xx reply is a
+/// transient refusal, for example pure-ftpd's
 /// `421 ... users (the maximum) are already logged in`: logging in has no
 /// remote effect, so it is safe to retry. Any other reply is unexpected and
 /// stays an explicit protocol error; transport failures follow the general
@@ -30,7 +31,7 @@ pub fn map_ftp_auth_error(error: FtpError) -> StorageError {
         };
     };
     match reply_code(&response) {
-        Some(530 | 532) => StorageError::new(
+        Some(430 | 530 | 532) => StorageError::new(
             ErrorCategory::Authentication,
             ErrorPhase::Connect,
             RemoteEffect::None,
