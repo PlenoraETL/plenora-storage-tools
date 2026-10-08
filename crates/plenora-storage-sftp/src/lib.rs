@@ -310,18 +310,26 @@ impl SftpConnection {
 /// effective limit of each request is the time remaining when it is sent.
 /// Without a deadline it is [`REQUEST_TIMEOUT_WITHOUT_DEADLINE`].
 fn request_timeout_secs(control: &ExecutionControl) -> u64 {
-    control
-        .deadline
-        .map_or(REQUEST_TIMEOUT_WITHOUT_DEADLINE.as_secs(), |deadline| {
-            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
-            let whole = remaining.as_secs();
-            let rounded = if remaining.subsec_nanos() == 0 {
-                whole
-            } else {
-                whole.saturating_add(1)
-            };
-            rounded.max(1)
-        })
+    request_timeout_for(
+        control
+            .deadline
+            .map(|deadline| deadline.saturating_duration_since(std::time::Instant::now())),
+    )
+}
+
+/// [`request_timeout_secs`] for a given time remaining: whole seconds rounded
+/// up, never below one; [`REQUEST_TIMEOUT_WITHOUT_DEADLINE`] without a
+/// deadline.
+fn request_timeout_for(remaining: Option<Duration>) -> u64 {
+    remaining.map_or(REQUEST_TIMEOUT_WITHOUT_DEADLINE.as_secs(), |remaining| {
+        let whole = remaining.as_secs();
+        let rounded = if remaining.subsec_nanos() == 0 {
+            whole
+        } else {
+            whole.saturating_add(1)
+        };
+        rounded.max(1)
+    })
 }
 
 /// Opens the high-level SFTP session with the request timeout of `control`

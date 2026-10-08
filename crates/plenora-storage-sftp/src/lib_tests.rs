@@ -431,6 +431,8 @@ fn unavailable_metadata_after_publication_is_committed_and_never_retried() {
 /// flush of a large upload on a loaded server.
 struct SlowFsync {
     fsync_delay: std::time::Duration,
+    /// Set when the server receives the fsync, before it starts waiting.
+    fsync_started: Arc<std::sync::atomic::AtomicBool>,
 }
 
 #[allow(
@@ -476,6 +478,7 @@ impl Handler for SlowFsync {
         _data: Vec<u8>,
     ) -> Result<Packet, Self::Error> {
         assert_eq!(request, "fsync@openssh.com");
+        self.fsync_started.store(true, Ordering::SeqCst);
         tokio::time::sleep(self.fsync_delay).await;
         Ok(Packet::Status(ok_status(id)))
     }
@@ -504,6 +507,7 @@ async fn library_default_request_timeout_fails_a_slow_fsync() {
         server,
         SlowFsync {
             fsync_delay: std::time::Duration::from_secs(30),
+            fsync_started: Arc::default(),
         },
     ));
     let sftp = SftpSession::new(client).await.expect("session");
@@ -517,13 +521,21 @@ async fn library_default_request_timeout_fails_a_slow_fsync() {
 }
 
 /// Opens a product session against `SlowFsync`, creates a file and completes
-/// it with the product's commit step under `control`.
+/// it with the product's commit step under `control`. Returns the outcome and
+/// whether the server received the fsync.
 async fn finish_after_slow_fsync(
     fsync_delay: std::time::Duration,
     control: ExecutionControl,
-) -> plenora_storage_core::StorageResult<()> {
+) -> (plenora_storage_core::StorageResult<()>, bool) {
+    let fsync_started = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let (client, server) = tokio::io::duplex(4096);
-    let server = tokio::spawn(russh_sftp::server::run(server, SlowFsync { fsync_delay }));
+    let server = tokio::spawn(russh_sftp::server::run(
+        server,
+        SlowFsync {
+            fsync_delay,
+            fsync_started: Arc::clone(&fsync_started),
+        },
+    ));
     let sftp = super::open_session(client, &control)
         .await
         .expect("session");
@@ -538,7 +550,7 @@ async fn finish_after_slow_fsync(
     )
     .await;
     server.abort();
-    result
+    (result, fsync_started.load(Ordering::SeqCst))
 }
 
 fn after(seconds: u64) -> ExecutionControl {
@@ -551,7 +563,9 @@ fn after(seconds: u64) -> ExecutionControl {
 /// with a minute left, as `SFTP_TRANSFER_IO_FAILED`.
 #[tokio::test(start_paused = true)]
 async fn a_slow_fsync_within_the_deadline_completes() {
-    let result = finish_after_slow_fsync(std::time::Duration::from_secs(30), after(60)).await;
+    let (result, started) =
+        finish_after_slow_fsync(std::time::Duration::from_secs(30), after(60)).await;
+    assert!(started);
     assert!(result.is_ok(), "{result:?}");
 }
 
@@ -559,53 +573,77 @@ async fn a_slow_fsync_within_the_deadline_completes() {
 /// `REQUEST_TIMEOUT_WITHOUT_DEADLINE`, not a hidden 10 s.
 #[tokio::test(start_paused = true)]
 async fn a_slow_fsync_without_deadline_completes_within_the_declared_limit() {
-    let result = finish_after_slow_fsync(
+    let (result, started) = finish_after_slow_fsync(
         std::time::Duration::from_secs(30),
         ExecutionControl::default(),
     )
     .await;
+    assert!(started);
     assert!(result.is_ok(), "{result:?}");
 }
 
-/// An fsync that is never answered within the limit is a `timeout` with the
-/// effect of a write: unknown, requires recovery. Before 3.0.0 it was `io`.
-#[tokio::test(start_paused = true)]
-async fn an_unanswered_fsync_is_a_timeout_with_unknown_effect() {
-    let delay = super::REQUEST_TIMEOUT_WITHOUT_DEADLINE + std::time::Duration::from_secs(60);
-    for control in [ExecutionControl::default(), after(20)] {
-        let error = finish_after_slow_fsync(delay, control)
-            .await
-            .expect_err("unanswered fsync");
-        assert_eq!(
-            (
-                error.category,
-                error.phase,
-                error.remote_effect,
-                error.retry.clone()
-            ),
-            (
-                ErrorCategory::Timeout,
-                ErrorPhase::Commit,
-                RemoteEffect::Unknown,
-                RetryDisposition::RequiresRecovery
-            )
-        );
-    }
+fn assert_pending_fsync_timed_out(outcome: (plenora_storage_core::StorageResult<()>, bool)) {
+    let (result, started) = outcome;
+    assert!(started, "the fsync must be pending when the limit expires");
+    let error = result.expect_err("unanswered fsync");
+    assert_eq!(
+        (
+            error.category,
+            error.phase,
+            error.remote_effect,
+            error.retry
+        ),
+        (
+            ErrorCategory::Timeout,
+            ErrorPhase::Commit,
+            RemoteEffect::Unknown,
+            RetryDisposition::RequiresRecovery
+        )
+    );
 }
 
-/// The request timeout follows the time remaining: rounded up, never below one
-/// second, and the declared limit without a deadline.
+/// Without a deadline, a pending fsync that gets no answer within the declared
+/// limit is a `timeout` with the effect of a write: unknown, requires
+/// recovery. Before 3.0.0 it was `io` after 10 s.
+#[tokio::test(start_paused = true)]
+async fn an_unanswered_fsync_without_deadline_is_a_timeout() {
+    let delay = super::REQUEST_TIMEOUT_WITHOUT_DEADLINE + std::time::Duration::from_secs(60);
+    assert_pending_fsync_timed_out(
+        finish_after_slow_fsync(delay, ExecutionControl::default()).await,
+    );
+}
+
+/// With a deadline, a pending fsync is interrupted at the deadline as a
+/// `timeout` with unknown effect. The deadline is built for this case alone, so
+/// the fsync has started well before it expires.
+#[tokio::test(start_paused = true)]
+async fn a_pending_fsync_is_interrupted_at_the_deadline_as_a_timeout() {
+    let delay = std::time::Duration::from_secs(400);
+    assert_pending_fsync_timed_out(finish_after_slow_fsync(delay, after(20)).await);
+}
+
+/// The request timeout follows the time remaining: whole seconds rounded up,
+/// never below one, and the declared limit without a deadline.
 #[test]
-fn request_timeout_follows_the_remaining_deadline() {
+fn request_timeout_rounds_the_remaining_time_up() {
+    use std::time::Duration;
     assert_eq!(
-        super::request_timeout_secs(&ExecutionControl::default()),
+        super::request_timeout_for(Some(Duration::from_millis(41_500))),
+        42
+    );
+    assert_eq!(
+        super::request_timeout_for(Some(Duration::from_secs(42))),
+        42
+    );
+    assert_eq!(
+        super::request_timeout_for(Some(Duration::from_millis(200))),
+        1
+    );
+    assert_eq!(super::request_timeout_for(Some(Duration::ZERO)), 1);
+    assert_eq!(
+        super::request_timeout_for(None),
         super::REQUEST_TIMEOUT_WITHOUT_DEADLINE.as_secs()
     );
-    let control = ExecutionControl::default()
-        .with_deadline(std::time::Instant::now() + std::time::Duration::from_millis(42_500));
-    assert!((42..=43).contains(&super::request_timeout_secs(&control)));
-    let expired = ExecutionControl::default().with_deadline(std::time::Instant::now());
-    assert_eq!(super::request_timeout_secs(&expired), 1);
 }
 
 /// A rejected fsync or a broken stream stays `io`; only an unanswered request
