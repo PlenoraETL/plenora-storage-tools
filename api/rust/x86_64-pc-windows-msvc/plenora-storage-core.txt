@@ -2502,6 +2502,7 @@ pub plenora_storage_core::ExecutionControl::deadline: core::option::Option<std::
 impl plenora_storage_core::ExecutionControl
 pub fn plenora_storage_core::ExecutionControl::check(&self, phase: plenora_storage_core::ErrorPhase, mutating: bool) -> plenora_storage_core::StorageResult<()>
 pub fn plenora_storage_core::ExecutionControl::new(cancellation: plenora_storage_core::CancellationToken) -> Self
+pub fn plenora_storage_core::ExecutionControl::remaining(&self) -> core::option::Option<core::time::Duration>
 pub async fn plenora_storage_core::ExecutionControl::run<T, F>(&self, future: F, phase: plenora_storage_core::ErrorPhase, mutating: bool) -> plenora_storage_core::StorageResult<T> where F: core::future::future::Future<Output = plenora_storage_core::StorageResult<T>> + core::marker::Send
 pub fn plenora_storage_core::ExecutionControl::with_deadline(self, deadline: std::time::Instant) -> Self
 impl core::clone::Clone for plenora_storage_core::ExecutionControl

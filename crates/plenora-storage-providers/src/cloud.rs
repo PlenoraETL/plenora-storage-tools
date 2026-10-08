@@ -3,7 +3,10 @@ mod operations;
 mod publication;
 
 use crate::{
-    common::{Backend, ProviderFactory, Reader, failure, invalid, page, parse, select},
+    common::{
+        Backend, ProviderFactory, Reader, failure, invalid, is_timeout, page, parse, select,
+        timed_out, transport_failure,
+    },
     http,
 };
 use async_trait::async_trait;
@@ -133,6 +136,14 @@ fn public_meta(meta: object_store::ObjectMeta) -> StorageResult<ObjectMetadata> 
     reason = "Consume upstream errors at the redaction boundary"
 )]
 fn store_error(error: object_store::Error, mutating: bool) -> StorageError {
+    let phase = if mutating {
+        ErrorPhase::Commit
+    } else {
+        ErrorPhase::Read
+    };
+    if is_timeout(&error) {
+        return timed_out(phase, mutating);
+    }
     let category =
         match error {
             object_store::Error::NotFound { .. } => ErrorCategory::NotFound,

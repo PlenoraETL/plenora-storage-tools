@@ -4134,6 +4134,13 @@ impl Connection {
         self.inner.response_timeout.set(after);
     }
 
+    /// The response timeout currently in force; see
+    /// [`set_response_timeout`](Self::set_response_timeout).
+    #[must_use]
+    pub fn response_timeout(&self) -> Option<Duration> {
+        self.inner.response_timeout.get()
+    }
+
     /// How long one frame may take to reach the socket before its caller
     /// gives up with [`Error::SendTimeout`], or `None` to wait indefinitely.
     ///

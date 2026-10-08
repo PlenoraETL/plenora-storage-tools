@@ -154,6 +154,20 @@ nel job `product-quality` della CI.
   recuperabili da un runner pulito. La sua licenza AGPL-3.0 resta nell'immagine
   di test; MinIO non è incluso negli asset Storage Tools. Non estendere il claim ad AWS o ad altri server senza
   eseguire la matrice del documento release-readiness.
+- Le richieste HTTP (WebDAV, Azure, GCS), S3 e SMB attendono il server al più
+  per il tempo che resta alla deadline dell'operazione; l'apertura della
+  connessione resta limitata a 10 s per HTTP e a 5 s per S3 e SMB, o al tempo
+  residuo se è minore. Senza deadline:
+  - una richiesta HTTP o S3 fallisce se la risposta resta 300 s senza dati
+    (`HTTP_READ_TIMEOUT_WITHOUT_DEADLINE`, `READ_TIMEOUT_WITHOUT_DEADLINE`);
+    non c'è un limite alla durata complessiva, e un invio che il server smette
+    di leggere non è interrotto da questo limite;
+  - una richiesta SMB fallisce dopo 30 s di silenzio del server
+    (`SMB_RESPONSE_TIMEOUT_WITHOUT_DEADLINE`); ogni `STATUS_PENDING` riavvia
+    l'attesa, e su una connessione che il keepalive dimostra viva il limite è
+    sei volte più lungo.
+  Allo scadere l'errore è `timeout`: effetto `none` e retry `safe` senza
+  mutazione, `unknown` e `requires_recovery` durante una scrittura.
 - FTP è in chiaro e richiede autorizzazione esplicita. FTPS esplicito verifica
   il certificato TLS; SFTP usa pin SHA-256 con password oppure chiave privata
   OpenSSH, anche cifrata. Il resolver fornisce `username` e una sola modalità:

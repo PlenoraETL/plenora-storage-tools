@@ -5,6 +5,7 @@ mod publication;
 use crate::{
     common::{
         Backend, ProviderFactory, Reader, failure, invalid, limit_error, page, parse, select,
+        transport_failure,
     },
     http,
 };
@@ -63,7 +64,7 @@ impl ProviderFactory for Gcs {
         let client = http::Connector::new(&root, context)
             .await?
             .client()
-            .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Connect, false))?;
+            .map_err(|error| transport_failure(&error, ErrorPhase::Connect, false))?;
         let material = credentials.resolve(&connection.credential_ref)?;
         Ok(Box::new(GcsBackend {
             root,
@@ -149,13 +150,13 @@ impl Reader for GcsReader {
         self.response
             .chunk()
             .await
-            .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Read, false))
+            .map_err(|error| transport_failure(&error, ErrorPhase::Read, false))
     }
 }
 async fn send(request: RequestBuilder, mutating: bool) -> StorageResult<Response> {
-    let response = request.send().await.map_err(|_| {
-        failure(
-            ErrorCategory::Io,
+    let response = request.send().await.map_err(|error| {
+        transport_failure(
+            &error,
             if mutating {
                 ErrorPhase::Commit
             } else {
@@ -189,7 +190,7 @@ async fn json<T: DeserializeOwned>(mut response: Response) -> StorageResult<T> {
     while let Some(chunk) = response
         .chunk()
         .await
-        .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Read, false))?
+        .map_err(|error| transport_failure(&error, ErrorPhase::Read, false))?
     {
         if data.len().saturating_add(chunk.len()) > 8 * 1024 * 1024 {
             return Err(limit_error());

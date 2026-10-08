@@ -139,7 +139,10 @@ impl S3Provider {
         // Installed unconditionally: the connector also refuses redirects and
         // proxies, which an endpoint reached by literal address needs just as
         // much as one reached by name.
-        builder = builder.with_http_connector(PinnedDnsConnector { pinned });
+        builder = builder.with_http_connector(PinnedDnsConnector {
+            pinned,
+            timeouts: ClientTimeouts::for_remaining(context.control.remaining()),
+        });
         builder
             .build()
             .map_err(|error| map_store_error(error, ErrorPhase::Connect, false))
@@ -197,20 +200,57 @@ impl S3Provider {
 #[derive(Debug)]
 struct PinnedDnsConnector {
     pinned: Vec<(String, Vec<SocketAddr>)>,
+    timeouts: ClientTimeouts,
 }
 
-/// Mirrors the `object_store` client defaults this connector replaces.
-const CLIENT_TIMEOUT: Duration = Duration::from_secs(30);
+/// Limit on silence while reading one S3 response without a deadline.
+///
+/// A request that receives nothing for this long fails as `timeout`. With a
+/// deadline every request is bounded by the time remaining instead. The whole
+/// request has no other fixed limit, so a large part that keeps moving is
+/// never cut short.
+pub const READ_TIMEOUT_WITHOUT_DEADLINE: Duration = Duration::from_secs(300);
+/// Upper bound on establishing a connection; the time remaining before the
+/// deadline applies when it is shorter.
 const CLIENT_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Timeouts of the S3 HTTP client for one operation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ClientTimeouts {
+    /// Whole request, from sending to the end of the response body.
+    total: Option<Duration>,
+    /// Silence while reading the response.
+    read: Option<Duration>,
+    /// Establishing the connection.
+    connect: Duration,
+}
+
+impl ClientTimeouts {
+    /// With a deadline every request may last as long as the time remaining
+    /// (the operation control ends it exactly at the deadline); without one,
+    /// only silence while reading is bounded. Before 3.0.0 every request had a
+    /// fixed 30 s total limit, whatever the deadline.
+    fn for_remaining(remaining: Option<Duration>) -> Self {
+        remaining.map_or(
+            Self {
+                total: None,
+                read: Some(READ_TIMEOUT_WITHOUT_DEADLINE),
+                connect: CLIENT_CONNECT_TIMEOUT,
+            },
+            |remaining| Self {
+                total: Some(remaining),
+                read: None,
+                connect: CLIENT_CONNECT_TIMEOUT.min(remaining),
+            },
+        )
+    }
+}
 const CLIENT_USER_AGENT: &str = concat!("plenora-storage-tools/", env!("CARGO_PKG_VERSION"));
 
-impl HttpConnector for PinnedDnsConnector {
-    fn connect(&self, options: &ClientOptions) -> object_store::Result<HttpClient> {
-        // The plaintext authorization stays with `ClientOptions` so that
-        // replacing the connector cannot silently re-enable HTTP.
-        let allow_http = options
-            .get_config_value(&ClientConfigKey::AllowHttp)
-            .is_some_and(|value| value == "true");
+impl PinnedDnsConnector {
+    /// The HTTP client of one operation: pinned addresses, no redirects or
+    /// proxies, and the timeouts of [`ClientTimeouts`].
+    fn client(&self, allow_http: bool) -> reqwest::Result<reqwest::Client> {
         let mut builder = reqwest::Client::builder()
             .https_only(!allow_http)
             // Redirects and proxies would resolve a host this connector never
@@ -220,8 +260,7 @@ impl HttpConnector for PinnedDnsConnector {
             .no_proxy()
             .retry(reqwest::retry::never())
             .user_agent(CLIENT_USER_AGENT)
-            .timeout(CLIENT_TIMEOUT)
-            .connect_timeout(CLIENT_CONNECT_TIMEOUT)
+            .connect_timeout(self.timeouts.connect)
             .http1_only()
             // Transparent compression rewrites `Content-Length`, which the
             // object size accounting depends on.
@@ -229,11 +268,28 @@ impl HttpConnector for PinnedDnsConnector {
             .no_brotli()
             .no_zstd()
             .no_deflate();
+        if let Some(total) = self.timeouts.total {
+            builder = builder.timeout(total);
+        }
+        if let Some(read) = self.timeouts.read {
+            builder = builder.read_timeout(read);
+        }
         for (host, addresses) in &self.pinned {
             builder = builder.resolve_to_addrs(host, addresses);
         }
-        let client = builder
-            .build()
+        builder.build()
+    }
+}
+
+impl HttpConnector for PinnedDnsConnector {
+    fn connect(&self, options: &ClientOptions) -> object_store::Result<HttpClient> {
+        // The plaintext authorization stays with `ClientOptions` so that
+        // replacing the connector cannot silently re-enable HTTP.
+        let allow_http = options
+            .get_config_value(&ClientConfigKey::AllowHttp)
+            .is_some_and(|value| value == "true");
+        let client = self
+            .client(allow_http)
             .map_err(|error| object_store::Error::Generic {
                 store: "S3",
                 source: Box::new(error),

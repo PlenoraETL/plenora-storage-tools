@@ -1,8 +1,8 @@
 //! Upload and copy publication, including cleanup and ambiguous commit outcomes.
 
 use super::{
-    Bytes, Dav, ErrorCategory, ErrorPhase, Method, PutRequest, StatusCode, StorageError,
-    StorageResult, checked, failure, invalid,
+    Bytes, Dav, ErrorPhase, Method, PutRequest, StatusCode, StorageError, StorageResult, checked,
+    invalid, transport_failure,
 };
 
 pub async fn put(provider: &Dav, r: &PutRequest, data: Bytes) -> StorageResult<()> {
@@ -48,7 +48,7 @@ async fn publish(
                     )
                     .send()
                     .await
-                    .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Prepare, true))?;
+                    .map_err(|error| transport_failure(&error, ErrorPhase::Prepare, true))?;
                 let status = response.status();
                 if let Err(error) = checked(response, true) {
                     // Servers can report 405, 409 or even 500 when MKCOL
@@ -78,7 +78,7 @@ async fn publish(
         let response = request
             .send()
             .await
-            .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Commit, true))?;
+            .map_err(|error| transport_failure(&error, ErrorPhase::Commit, true))?;
         checked(response, true)?;
         Ok(())
     }

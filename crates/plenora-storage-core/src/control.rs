@@ -1,4 +1,7 @@
-use std::{future::Future, time::Instant};
+use std::{
+    future::Future,
+    time::{Duration, Instant},
+};
 
 use tokio_util::sync::CancellationToken as TokioCancellationToken;
 
@@ -66,6 +69,15 @@ impl ExecutionControl {
     pub fn with_deadline(mut self, deadline: Instant) -> Self {
         self.deadline = Some(deadline);
         self
+    }
+
+    /// Time left before the deadline, zero once it has passed; `None` without
+    /// a deadline. Adapters derive the timeouts of their client libraries
+    /// from it so that no library gives up before the operation's deadline.
+    #[must_use]
+    pub fn remaining(&self) -> Option<Duration> {
+        self.deadline
+            .map(|deadline| deadline.saturating_duration_since(Instant::now()))
     }
 
     ///

@@ -2,7 +2,9 @@ mod operations;
 mod publication;
 
 use crate::{
-    common::{Backend, ProviderFactory, Reader, failure, invalid, metadata, page, parse},
+    common::{
+        Backend, ProviderFactory, Reader, failure, invalid, metadata, page, parse, timed_out,
+    },
     keys::portable_key,
 };
 use async_trait::async_trait;
@@ -69,17 +71,22 @@ impl ProviderFactory for Smb {
             resolve_network_target(&cfg.host, cfg.port, context.policy.allow_private_network)
                 .await?;
         let material = credentials.resolve(&connection.credential_ref)?;
+        let connect_timeout = context
+            .control
+            .remaining()
+            .map_or(SMB_CONNECT_TIMEOUT, |remaining| {
+                SMB_CONNECT_TIMEOUT.min(remaining)
+            });
         let mut connected = None;
         for address in addresses {
-            if let Ok(conn) =
-                Connection::connect(&address.to_string(), Duration::from_secs(5)).await
-            {
+            if let Ok(conn) = Connection::connect(&address.to_string(), connect_timeout).await {
                 connected = Some(conn);
                 break;
             }
         }
         let mut conn =
             connected.ok_or_else(|| failure(ErrorCategory::Io, ErrorPhase::Connect, false))?;
+        arm_response_timeout(&conn, context.control.remaining());
         conn.negotiate()
             .await
             .map_err(|error| smb_login_error(&error))?;
@@ -177,6 +184,32 @@ impl Reader for SmbReader {
         Ok(())
     }
 }
+/// Upper bound on establishing the TCP connection; the time remaining before
+/// the deadline applies when it is shorter.
+const SMB_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// How long the SMB client waits in silence for one response when the
+/// operation has no deadline. The client restarts this wait on every interim
+/// `STATUS_PENDING`, and allows six times as much on a connection whose
+/// keepalive proves it alive (see plenora-smb2 `ALIVE_DEADLINE_FACTOR`).
+pub const SMB_RESPONSE_TIMEOUT_WITHOUT_DEADLINE: Duration = Duration::from_secs(30);
+
+/// The SMB response timeout for an operation: the time remaining before the
+/// deadline (the operation control ends every wait exactly there), never
+/// zero; [`SMB_RESPONSE_TIMEOUT_WITHOUT_DEADLINE`] without one. Before 3.0.0
+/// it was the library's fixed 30 s, whatever the deadline.
+fn response_timeout(remaining: Option<Duration>) -> Duration {
+    remaining.map_or(SMB_RESPONSE_TIMEOUT_WITHOUT_DEADLINE, |remaining| {
+        remaining.max(Duration::from_millis(1))
+    })
+}
+
+/// Sets the connection's response timeout for an operation with `remaining`
+/// time before its deadline.
+fn arm_response_timeout(conn: &Connection, remaining: Option<Duration>) {
+    conn.set_response_timeout(Some(response_timeout(remaining)));
+}
+
 /// Classifies a failed negotiate or session setup. Neither has a remote
 /// effect, so a refusal that may clear by itself is safe to retry.
 ///
@@ -251,6 +284,16 @@ fn smb_login_error(error: &smb2::Error) -> StorageError {
 }
 
 fn smb_error(error: &smb2::Error, mutating: bool) -> StorageError {
+    let phase = if mutating {
+        ErrorPhase::Commit
+    } else {
+        ErrorPhase::Read
+    };
+    // A response the client gave up waiting for is a timeout; before 3.0.0 it
+    // was `io`.
+    if error.kind() == ErrorKind::TimedOut {
+        return timed_out(phase, mutating);
+    }
     let category = match error.kind() {
         ErrorKind::NotFound => ErrorCategory::NotFound,
         ErrorKind::AlreadyExists => ErrorCategory::Conflict,

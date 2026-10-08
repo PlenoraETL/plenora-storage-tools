@@ -42,5 +42,12 @@ tokio.workspace = true
 tokio-util.workspace = true
 url = { workspace = true, optional = true }
 
+[dev-dependencies]
+# Paused time lets the request-timeout tests wait minutes of server silence
+# deterministically, without real sleeps.
+tokio = { workspace = true, features = ["test-util"] }
+# The SMB response-timeout test drives a connection over the in-memory mock.
+smb2 = { workspace = true, features = ["testing"] }
+
 [lints]
 workspace = true

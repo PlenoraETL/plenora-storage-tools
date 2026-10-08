@@ -1,4 +1,7 @@
-use super::{smb_error, smb_login_error};
+use super::{
+    SMB_RESPONSE_TIMEOUT_WITHOUT_DEADLINE, arm_response_timeout, response_timeout, smb_error,
+    smb_login_error,
+};
 use plenora_storage_core::{ErrorCategory, ErrorPhase, RemoteEffect, RetryDisposition};
 use smb2::types::{Command, status::NtStatus};
 
@@ -128,4 +131,77 @@ fn session_setup_unexpected_failures_are_protocol_not_authentication() {
         );
         assert!(!mapped.message.contains("NTLM"));
     }
+}
+
+/// A connection armed for an operation waits for each response as long as
+/// the time remaining before the deadline. Before 3.0.0 it kept the library's
+/// fixed 30 s whatever the deadline. The wait itself is the library's,
+/// covered by its own response-timeout tests; it measures silence with
+/// `std::time::Instant`, which paused tokio time cannot drive.
+#[tokio::test]
+async fn an_armed_smb_connection_waits_as_long_as_the_deadline_allows() {
+    let mock = std::sync::Arc::new(smb2::transport::MockTransport::new());
+    let conn = smb2::client::connection::Connection::from_transport(
+        Box::new(mock.clone()),
+        Box::new(mock),
+        "fixture",
+    )
+    .expect("connection");
+    arm_response_timeout(&conn, Some(std::time::Duration::from_secs(600)));
+    assert_eq!(
+        conn.response_timeout(),
+        Some(std::time::Duration::from_secs(600))
+    );
+    arm_response_timeout(&conn, None);
+    assert_eq!(
+        conn.response_timeout(),
+        Some(SMB_RESPONSE_TIMEOUT_WITHOUT_DEADLINE)
+    );
+}
+
+/// The response timeout is the time remaining, never zero, and the declared
+/// limit without a deadline.
+#[test]
+fn smb_response_timeout_follows_the_remaining_time() {
+    use std::time::Duration;
+    assert_eq!(
+        response_timeout(Some(Duration::from_secs(600))),
+        Duration::from_secs(600)
+    );
+    assert_eq!(
+        response_timeout(Some(Duration::ZERO)),
+        Duration::from_millis(1)
+    );
+    assert_eq!(
+        response_timeout(None),
+        SMB_RESPONSE_TIMEOUT_WITHOUT_DEADLINE
+    );
+}
+
+/// A response the client gave up waiting for is a `timeout` with the effect of
+/// the operation; before 3.0.0 it was `io`. A lost connection stays `io`.
+#[test]
+fn an_smb_timeout_is_reported_as_timeout() {
+    let read = smb_error(&smb2::Error::Timeout, false);
+    assert_eq!(
+        (read.category, read.remote_effect, read.retry),
+        (
+            ErrorCategory::Timeout,
+            RemoteEffect::None,
+            RetryDisposition::Safe
+        )
+    );
+    let write = smb_error(&smb2::Error::Timeout, true);
+    assert_eq!(
+        (write.category, write.remote_effect, write.retry),
+        (
+            ErrorCategory::Timeout,
+            RemoteEffect::Unknown,
+            RetryDisposition::RequiresRecovery
+        )
+    );
+    assert_eq!(
+        smb_error(&smb2::Error::Disconnected, false).category,
+        ErrorCategory::Io
+    );
 }

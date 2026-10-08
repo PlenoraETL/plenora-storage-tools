@@ -245,6 +245,78 @@ pub fn io_error(error: &std::io::Error, phase: ErrorPhase, mutating: bool) -> St
     };
     failure(category, phase, mutating)
 }
+#[cfg(any(
+    feature = "azure",
+    feature = "gcs",
+    feature = "webdav",
+    feature = "smb"
+))]
+/// A client library gave up waiting for the server. Without a mutation
+/// nothing happened and the retry is safe; during one the outcome is unknown.
+pub fn timed_out(phase: ErrorPhase, mutating: bool) -> StorageError {
+    StorageError::new(
+        ErrorCategory::Timeout,
+        phase,
+        if mutating {
+            RemoteEffect::Unknown
+        } else {
+            RemoteEffect::None
+        },
+        if mutating {
+            RetryDisposition::RequiresRecovery
+        } else {
+            RetryDisposition::Safe
+        },
+        "PROVIDER_REQUEST_TIMED_OUT",
+        "storage provider request timed out",
+    )
+}
+
+#[cfg(any(feature = "azure", feature = "gcs", feature = "webdav"))]
+/// Whether a client error, or any error it wraps, reports that a request
+/// timed out.
+pub fn is_timeout(error: &(dyn std::error::Error + 'static)) -> bool {
+    let mut current = Some(error);
+    while let Some(error) = current {
+        if error
+            .downcast_ref::<reqwest::Error>()
+            .is_some_and(reqwest::Error::is_timeout)
+        {
+            return true;
+        }
+        #[cfg(feature = "azure")]
+        if error
+            .downcast_ref::<object_store::client::HttpError>()
+            .is_some_and(|error| error.kind() == object_store::client::HttpErrorKind::Timeout)
+        {
+            return true;
+        }
+        if error
+            .downcast_ref::<std::io::Error>()
+            .is_some_and(|error| error.kind() == std::io::ErrorKind::TimedOut)
+        {
+            return true;
+        }
+        current = error.source();
+    }
+    false
+}
+
+#[cfg(any(feature = "azure", feature = "gcs", feature = "webdav"))]
+/// A transport failure: a timeout when the client gave up waiting, `io`
+/// otherwise.
+pub fn transport_failure(
+    error: &(dyn std::error::Error + 'static),
+    phase: ErrorPhase,
+    mutating: bool,
+) -> StorageError {
+    if is_timeout(error) {
+        timed_out(phase, mutating)
+    } else {
+        failure(ErrorCategory::Io, phase, mutating)
+    }
+}
+
 pub fn failure(category: ErrorCategory, phase: ErrorPhase, mutating: bool) -> StorageError {
     let effect = mutating
         && !matches!(

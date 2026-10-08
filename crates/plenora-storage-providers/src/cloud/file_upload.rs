@@ -2,7 +2,7 @@
 
 use super::{
     AzureConnectionConfig, ErrorCategory, ErrorPhase, PutRequest, StorageResult, failure, http,
-    invalid,
+    invalid, transport_failure,
 };
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use hmac::{Hmac, KeyInit, Mac};
@@ -60,7 +60,7 @@ impl FileUpload {
         let client = self
             .connector
             .client()
-            .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Connect, false))?;
+            .map_err(|error| transport_failure(&error, ErrorPhase::Connect, false))?;
         let mut url = self.root.clone();
         {
             let mut path = url
@@ -121,7 +121,7 @@ impl FileUpload {
             ))
             .send()
             .await
-            .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Commit, true))?;
+            .map_err(|error| transport_failure(&error, ErrorPhase::Commit, true))?;
         let category = match response.status().as_u16() {
             201 => return Ok(()),
             401 => ErrorCategory::Authentication,

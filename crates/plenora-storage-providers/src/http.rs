@@ -24,11 +24,55 @@ pub fn endpoint(value: &str, policy: &EngineConfig) -> StorageResult<Url> {
     Ok(url)
 }
 
+/// Limit on silence while reading one HTTP response without a deadline.
+///
+/// A request that receives nothing for this long fails as `timeout`. With a
+/// deadline every request is bounded by the time remaining instead. The whole
+/// request has no other fixed limit, so a large transfer that keeps moving is
+/// never cut short.
+pub const HTTP_READ_TIMEOUT_WITHOUT_DEADLINE: Duration = Duration::from_secs(300);
+/// Upper bound on establishing a connection; the time remaining before the
+/// deadline applies when it is shorter.
+pub const HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Timeouts of the HTTP client for one operation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct HttpTimeouts {
+    /// Whole request, from sending to the end of the response body.
+    pub total: Option<Duration>,
+    /// Silence while reading the response.
+    pub read: Option<Duration>,
+    /// Establishing the connection.
+    pub connect: Duration,
+}
+
+impl HttpTimeouts {
+    /// With a deadline every request may last as long as the time remaining
+    /// (the operation control ends it exactly at the deadline); without one,
+    /// only silence while reading is bounded. Before 3.0.0 every request had a
+    /// fixed 60 s total limit, whatever the deadline.
+    pub fn for_remaining(remaining: Option<Duration>) -> Self {
+        remaining.map_or(
+            Self {
+                total: None,
+                read: Some(HTTP_READ_TIMEOUT_WITHOUT_DEADLINE),
+                connect: HTTP_CONNECT_TIMEOUT,
+            },
+            |remaining| Self {
+                total: Some(remaining),
+                read: None,
+                connect: HTTP_CONNECT_TIMEOUT.min(remaining),
+            },
+        )
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Connector {
     host: String,
     addresses: Vec<SocketAddr>,
     allow_http: bool,
+    timeouts: HttpTimeouts,
 }
 impl Connector {
     pub(crate) async fn new(url: &Url, context: &OperationContext<'_>) -> StorageResult<Self> {
@@ -43,22 +87,28 @@ impl Connector {
             host: host.to_owned(),
             addresses,
             allow_http: context.policy.allow_insecure_http,
+            timeouts: HttpTimeouts::for_remaining(context.control.remaining()),
         })
     }
     pub(crate) fn client(&self) -> Result<reqwest::Client, reqwest::Error> {
-        reqwest::Client::builder()
+        let mut builder = reqwest::Client::builder()
             .https_only(!self.allow_http)
             .no_proxy()
             .retry(reqwest::retry::never())
             .redirect(reqwest::redirect::Policy::none())
             .resolve_to_addrs(&self.host, &self.addresses)
-            .connect_timeout(Duration::from_secs(10))
-            .timeout(Duration::from_secs(60))
+            .connect_timeout(self.timeouts.connect)
             .no_gzip()
             .no_brotli()
             .no_deflate()
-            .no_zstd()
-            .build()
+            .no_zstd();
+        if let Some(total) = self.timeouts.total {
+            builder = builder.timeout(total);
+        }
+        if let Some(read) = self.timeouts.read {
+            builder = builder.read_timeout(read);
+        }
+        builder.build()
     }
 }
 #[cfg(feature = "azure")]
@@ -72,3 +122,7 @@ impl HttpConnector for Connector {
             })
     }
 }
+
+#[cfg(test)]
+#[path = "http_tests.rs"]
+mod tests;

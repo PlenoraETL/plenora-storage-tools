@@ -2666,6 +2666,7 @@ pub fn smb2::client::connection::Connection::previous_session_id(&self) -> smb2:
 pub async fn smb2::client::connection::Connection::reconnect_if_needed(&self) -> smb2::error::Result<()>
 pub fn smb2::client::connection::Connection::reconnect_policy(&self) -> smb2::client::connection::ReconnectPolicy
 pub fn smb2::client::connection::Connection::register_dfs_tree(&mut self, tree_id: smb2::types::TreeId) -> smb2::error::Result<()>
+pub fn smb2::client::connection::Connection::response_timeout(&self) -> core::option::Option<core::time::Duration>
 pub async fn smb2::client::connection::Connection::send_cancel(&self, original_msg_id: smb2::types::MessageId, async_id: core::option::Option<u64>, generation: u64) -> smb2::error::Result<()>
 pub fn smb2::client::connection::Connection::send_queue_depth(&self) -> usize
 pub fn smb2::client::connection::Connection::server_name(&self) -> &str
@@ -8098,6 +8099,7 @@ pub fn smb2::client::connection::Connection::previous_session_id(&self) -> smb2:
 pub async fn smb2::client::connection::Connection::reconnect_if_needed(&self) -> smb2::error::Result<()>
 pub fn smb2::client::connection::Connection::reconnect_policy(&self) -> smb2::client::connection::ReconnectPolicy
 pub fn smb2::client::connection::Connection::register_dfs_tree(&mut self, tree_id: smb2::types::TreeId) -> smb2::error::Result<()>
+pub fn smb2::client::connection::Connection::response_timeout(&self) -> core::option::Option<core::time::Duration>
 pub async fn smb2::client::connection::Connection::send_cancel(&self, original_msg_id: smb2::types::MessageId, async_id: core::option::Option<u64>, generation: u64) -> smb2::error::Result<()>
 pub fn smb2::client::connection::Connection::send_queue_depth(&self) -> usize
 pub fn smb2::client::connection::Connection::server_name(&self) -> &str

@@ -4,7 +4,7 @@ use super::{
     BTreeMap, BTreeSet, Backend, Bytes, Dav, DavReader, ErrorCategory, ErrorPhase, Method,
     ObjectMetadata, ProviderListRequest, ProviderListResult, PutRequest, Reader, StorageError,
     StorageResult, async_trait, checked, directory_may_contain, failure, invalid, limit_error,
-    metadata, page, select,
+    metadata, page, select, transport_failure,
 };
 
 #[async_trait]
@@ -68,7 +68,7 @@ impl Backend for Dav {
             .request(Method::GET, self.url(key)?)
             .send()
             .await
-            .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Read, false))?;
+            .map_err(|error| transport_failure(&error, ErrorPhase::Read, false))?;
         Ok((
             meta,
             Box::new(DavReader {
@@ -101,7 +101,7 @@ impl Backend for Dav {
             .header("If-Match", etag)
             .send()
             .await
-            .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Commit, true))?;
+            .map_err(|error| transport_failure(&error, ErrorPhase::Commit, true))?;
         checked(response, true)?;
         Ok(())
     }
