@@ -49,6 +49,7 @@ use suppaftp::{
         TransferStream,
     },
     types::FileType,
+    types::Response,
 };
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use tokio::io::{

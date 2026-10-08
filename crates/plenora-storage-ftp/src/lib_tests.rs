@@ -286,3 +286,217 @@ fn committed_size_mismatch_requires_recovery() {
         plenora_storage_core::RetryDisposition::RequiresRecovery
     );
 }
+
+fn login_reply(line: &str) -> suppaftp::FtpError {
+    let code: u32 = line[..3].parse().expect("test reply code");
+    suppaftp::FtpError::UnexpectedResponse(super::Response {
+        status: suppaftp::Status::from(code),
+        body: line.as_bytes().to_vec(),
+    })
+}
+
+fn axes(
+    error: &plenora_storage_core::StorageError,
+) -> (
+    plenora_storage_core::ErrorCategory,
+    plenora_storage_core::ErrorPhase,
+    plenora_storage_core::RemoteEffect,
+    plenora_storage_core::RetryDisposition,
+) {
+    (
+        error.category,
+        error.phase,
+        error.remote_effect,
+        error.retry.clone(),
+    )
+}
+
+/// Only 430, 530 and 532 reject the credentials. 430 is a 4xx code, but
+/// retrying rejected credentials would only repeat the rejection.
+#[test]
+fn login_credential_rejections_are_authentication_never() {
+    use plenora_storage_core::{ErrorCategory, ErrorPhase, RemoteEffect, RetryDisposition};
+    for reply in [
+        "430 Invalid username or password\r\n",
+        "530 Login authentication failed\r\n",
+        "532 Need account\r\n",
+    ] {
+        let error = super::map_ftp_auth_error(login_reply(reply));
+        assert_eq!(
+            axes(&error),
+            (
+                ErrorCategory::Authentication,
+                ErrorPhase::Connect,
+                RemoteEffect::None,
+                RetryDisposition::Never
+            ),
+            "{reply}"
+        );
+        assert_eq!(error.code, "FTP_AUTHENTICATION_FAILED");
+    }
+}
+
+/// A 4xx reply refuses the login temporarily: pure-ftpd answers
+/// `421 32 users (the maximum) are already logged in` under load. Logging in
+/// has no remote effect, so the retry is safe. Before 3.0.0 this was
+/// `FTP_AUTHENTICATION_FAILED` with retry `never`. 4xx codes the client
+/// library does not name (here 499) keep their class.
+#[test]
+fn login_transient_refusals_are_transient_and_safe() {
+    use plenora_storage_core::{ErrorCategory, ErrorPhase, RemoteEffect, RetryDisposition};
+    for reply in [
+        "421 32 users (the maximum) are already logged in, sorry\r\n",
+        "450 Requested action not taken\r\n",
+        "499 Unnamed transient reply\r\n",
+    ] {
+        let error = super::map_ftp_auth_error(login_reply(reply));
+        assert_eq!(
+            axes(&error),
+            (
+                ErrorCategory::Transient,
+                ErrorPhase::Connect,
+                RemoteEffect::None,
+                RetryDisposition::Safe
+            ),
+            "{reply}"
+        );
+        assert_eq!(error.code, "FTP_LOGIN_TEMPORARILY_REFUSED");
+    }
+}
+
+/// Unexpected replies stay explicit protocol errors and are never reported
+/// as rejected credentials.
+#[test]
+fn login_unexpected_replies_are_protocol_errors_not_authentication() {
+    use plenora_storage_core::{ErrorCategory, ErrorPhase, RemoteEffect, RetryDisposition};
+    let unexpected = [
+        login_reply("500 Syntax error\r\n"),
+        login_reply("550 Unavailable\r\n"),
+        login_reply("599 Unnamed permanent reply\r\n"),
+        login_reply("220 Unexpected greeting\r\n"),
+        suppaftp::FtpError::UnexpectedResponse(super::Response {
+            status: suppaftp::Status::Unknown,
+            body: b"x1".to_vec(),
+        }),
+        suppaftp::FtpError::BadResponse,
+    ];
+    for error in unexpected {
+        let mapped = super::map_ftp_auth_error(error);
+        assert_eq!(
+            axes(&mapped),
+            (
+                ErrorCategory::Protocol,
+                ErrorPhase::Connect,
+                RemoteEffect::None,
+                RetryDisposition::Never
+            )
+        );
+        assert_eq!(mapped.code, "FTP_LOGIN_UNEXPECTED_RESPONSE");
+    }
+}
+
+/// A transport failure during login follows the general mapping and is not
+/// an authentication failure. Messages carry no server text.
+#[test]
+fn login_transport_failures_follow_the_general_mapping() {
+    use plenora_storage_core::{ErrorCategory, RemoteEffect, RetryDisposition};
+    let error = super::map_ftp_auth_error(suppaftp::FtpError::ConnectionError(
+        std::io::Error::from(std::io::ErrorKind::ConnectionReset),
+    ));
+    assert_ne!(error.category, ErrorCategory::Authentication);
+    assert_eq!(error.remote_effect, RemoteEffect::None);
+    assert_eq!(error.retry, RetryDisposition::Safe);
+    let refused = super::map_ftp_auth_error(login_reply(
+        "421 32 users (the maximum) are already logged in, sorry\r\n",
+    ));
+    assert!(!refused.message.contains("32 users"));
+    assert!(refused.details.is_empty());
+}
+
+fn raw_reply(body: &[u8]) -> suppaftp::FtpError {
+    suppaftp::FtpError::UnexpectedResponse(super::Response {
+        status: suppaftp::Status::Unknown,
+        body: body.to_vec(),
+    })
+}
+
+/// Replies are parsed strictly (RFC 959 section 4.2): the code that decides
+/// is the terminal one, with CRLF or LF line ends.
+#[test]
+fn login_replies_are_classified_by_their_complete_code() {
+    use plenora_storage_core::ErrorCategory;
+    let cases: [(&[u8], ErrorCategory); 6] = [
+        (b"530 Login incorrect\r\n", ErrorCategory::Authentication),
+        (b"530 Login incorrect\n", ErrorCategory::Authentication),
+        (b"530\r\n", ErrorCategory::Authentication),
+        (
+            b"530-Login refused.\r\n Contact the administrator.\r\n530 Login incorrect\r\n",
+            ErrorCategory::Authentication,
+        ),
+        (
+            b"421-Too many users\n421 Try again later\n",
+            ErrorCategory::Transient,
+        ),
+        (b"421 Service not available", ErrorCategory::Transient),
+    ];
+    for (body, expected) in cases {
+        let error = super::map_ftp_auth_error(raw_reply(body));
+        assert_eq!(
+            error.category,
+            expected,
+            "{}",
+            String::from_utf8_lossy(body)
+        );
+    }
+}
+
+/// Any malformed reply is `protocol`/`never`, never `authentication` or
+/// `transient`.
+#[test]
+fn malformed_login_replies_are_protocol_errors() {
+    use plenora_storage_core::{ErrorCategory, RetryDisposition};
+    let malformed: [&[u8]; 10] = [
+        // Empty body.
+        b"",
+        b"\r\n",
+        // Four-digit code.
+        b"4210 text\r\n421 end\r\n",
+        b"5300 Login incorrect\r\n",
+        // A code followed by an invalid character.
+        b"530x Login incorrect\r\n",
+        b"421\tbusy\r\n",
+        // Multiline reply whose terminal code differs from the opening one.
+        b"421-start\r\n530 Login incorrect\r\n",
+        // Multiline reply without a terminal line.
+        b"530-Login refused\r\n",
+        // Single-line reply followed by more lines.
+        b"530 Login incorrect\r\n421 later\r\n",
+        // Terminator before the last line.
+        b"530-start\r\n530 middle\r\n530 end\r\n",
+    ];
+    for body in malformed {
+        let error = super::map_ftp_auth_error(raw_reply(body));
+        assert_eq!(
+            (error.category, error.retry, error.code.as_str()),
+            (
+                ErrorCategory::Protocol,
+                RetryDisposition::Never,
+                "FTP_LOGIN_UNEXPECTED_RESPONSE"
+            ),
+            "{}",
+            String::from_utf8_lossy(body)
+        );
+    }
+}
+
+/// Mixed CRLF and LF line ends within one reply are accepted: they do not
+/// change the deciding code, and rejecting them would misreport a real
+/// credential rejection as a protocol error.
+#[test]
+fn login_replies_with_mixed_line_ends_keep_their_code() {
+    use plenora_storage_core::ErrorCategory;
+    let transient = super::map_ftp_auth_error(raw_reply(b"421-start\r\n421 end\n"));
+    assert_eq!(transient.category, ErrorCategory::Transient);
+    let rejected = super::map_ftp_auth_error(raw_reply(b"530-a\n530 b\r\n"));
+    assert_eq!(rejected.category, ErrorCategory::Authentication);
+}

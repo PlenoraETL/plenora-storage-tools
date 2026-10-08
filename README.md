@@ -127,7 +127,7 @@ docker compose run --rm --no-deps storage-rust target/debug/plenora-storage --fo
 La console MinIO è esposta su `http://localhost:9001`; l'API S3 è esposta su
 `http://localhost:9000` e raggiunta dal container Rust come
 `http://minio:9000`. SFTP è esposto su `localhost:2222`; FTP su
-`localhost:2121`, con porte passive `30000-30009`.
+`localhost:2121`, con porte passive `30000-30099` (fino a 48 sessioni).
 
 ## Verifica Rust
 
