@@ -425,3 +425,212 @@ fn unavailable_metadata_after_publication_is_committed_and_never_retried() {
     assert_eq!(error.phase, plenora_storage_core::ErrorPhase::Cleanup);
     assert_eq!(error.retry, plenora_storage_core::RetryDisposition::Never);
 }
+
+/// An SFTP server that announces `fsync@openssh.com` and answers fsync only
+/// after `fsync_delay` of (paused, deterministic) time: a slow but correct
+/// flush of a large upload on a loaded server.
+struct SlowFsync {
+    fsync_delay: std::time::Duration,
+}
+
+#[allow(
+    clippy::unused_async_trait_impl,
+    reason = "russh-sftp declares the handler methods as async; the test servers keep that shape"
+)]
+impl Handler for SlowFsync {
+    type Error = StatusCode;
+
+    fn unimplemented(&self) -> Self::Error {
+        StatusCode::OpUnsupported
+    }
+
+    async fn init(
+        &mut self,
+        _version: u32,
+        _extensions: std::collections::HashMap<String, String>,
+    ) -> Result<Version, Self::Error> {
+        let mut version = Version::new();
+        version
+            .extensions
+            .insert("fsync@openssh.com".to_owned(), "1".to_owned());
+        Ok(version)
+    }
+
+    async fn open(
+        &mut self,
+        id: u32,
+        _filename: String,
+        _pflags: russh_sftp::protocol::OpenFlags,
+        _attrs: russh_sftp::protocol::FileAttributes,
+    ) -> Result<Handle, Self::Error> {
+        Ok(Handle {
+            id,
+            handle: "slow".to_owned(),
+        })
+    }
+
+    async fn extended(
+        &mut self,
+        id: u32,
+        request: String,
+        _data: Vec<u8>,
+    ) -> Result<Packet, Self::Error> {
+        assert_eq!(request, "fsync@openssh.com");
+        tokio::time::sleep(self.fsync_delay).await;
+        Ok(Packet::Status(ok_status(id)))
+    }
+
+    async fn close(&mut self, id: u32, _handle: String) -> Result<Status, Self::Error> {
+        Ok(ok_status(id))
+    }
+}
+
+fn ok_status(id: u32) -> Status {
+    Status {
+        id,
+        status_code: StatusCode::Ok,
+        error_message: String::new(),
+        language_tag: String::new(),
+    }
+}
+
+/// Demonstrates the cause of the 3.0.0 campaign failure: russh-sftp gives
+/// every request a fixed 10 s timeout, so an fsync that takes 30 s fails
+/// although the operation deadline is a minute away.
+#[tokio::test(start_paused = true)]
+async fn library_default_request_timeout_fails_a_slow_fsync() {
+    let (client, server) = tokio::io::duplex(4096);
+    let server = tokio::spawn(russh_sftp::server::run(
+        server,
+        SlowFsync {
+            fsync_delay: std::time::Duration::from_secs(30),
+        },
+    ));
+    let sftp = SftpSession::new(client).await.expect("session");
+    let file = sftp.create("object").await.expect("create");
+    let result = file.sync_all().await;
+    assert!(
+        matches!(result, Err(russh_sftp::client::error::Error::Timeout)),
+        "{result:?}"
+    );
+    server.abort();
+}
+
+/// Opens a product session against `SlowFsync`, creates a file and completes
+/// it with the product's commit step under `control`.
+async fn finish_after_slow_fsync(
+    fsync_delay: std::time::Duration,
+    control: ExecutionControl,
+) -> plenora_storage_core::StorageResult<()> {
+    let (client, server) = tokio::io::duplex(4096);
+    let server = tokio::spawn(russh_sftp::server::run(server, SlowFsync { fsync_delay }));
+    let sftp = super::open_session(client, &control)
+        .await
+        .expect("session");
+    let mut file = sftp.create("object").await.expect("create");
+    let policy = EngineConfig::default();
+    let result = super::publication::finish_written_file(
+        &mut file,
+        &OperationContext {
+            policy: &policy,
+            control: &control,
+        },
+    )
+    .await;
+    server.abort();
+    result
+}
+
+fn after(seconds: u64) -> ExecutionControl {
+    ExecutionControl::default()
+        .with_deadline(std::time::Instant::now() + std::time::Duration::from_secs(seconds))
+}
+
+/// The commit `fsync` may take as long as the operation deadline allows.
+/// Before 3.0.0 the library's fixed 10 s request timeout failed a 30 s fsync
+/// with a minute left, as `SFTP_TRANSFER_IO_FAILED`.
+#[tokio::test(start_paused = true)]
+async fn a_slow_fsync_within_the_deadline_completes() {
+    let result = finish_after_slow_fsync(std::time::Duration::from_secs(30), after(60)).await;
+    assert!(result.is_ok(), "{result:?}");
+}
+
+/// Without a deadline the request limit is the declared
+/// `REQUEST_TIMEOUT_WITHOUT_DEADLINE`, not a hidden 10 s.
+#[tokio::test(start_paused = true)]
+async fn a_slow_fsync_without_deadline_completes_within_the_declared_limit() {
+    let result = finish_after_slow_fsync(
+        std::time::Duration::from_secs(30),
+        ExecutionControl::default(),
+    )
+    .await;
+    assert!(result.is_ok(), "{result:?}");
+}
+
+/// An fsync that is never answered within the limit is a `timeout` with the
+/// effect of a write: unknown, requires recovery. Before 3.0.0 it was `io`.
+#[tokio::test(start_paused = true)]
+async fn an_unanswered_fsync_is_a_timeout_with_unknown_effect() {
+    let delay = super::REQUEST_TIMEOUT_WITHOUT_DEADLINE + std::time::Duration::from_secs(60);
+    for control in [ExecutionControl::default(), after(20)] {
+        let error = finish_after_slow_fsync(delay, control)
+            .await
+            .expect_err("unanswered fsync");
+        assert_eq!(
+            (
+                error.category,
+                error.phase,
+                error.remote_effect,
+                error.retry.clone()
+            ),
+            (
+                ErrorCategory::Timeout,
+                ErrorPhase::Commit,
+                RemoteEffect::Unknown,
+                RetryDisposition::RequiresRecovery
+            )
+        );
+    }
+}
+
+/// The request timeout follows the time remaining: rounded up, never below one
+/// second, and the declared limit without a deadline.
+#[test]
+fn request_timeout_follows_the_remaining_deadline() {
+    assert_eq!(
+        super::request_timeout_secs(&ExecutionControl::default()),
+        super::REQUEST_TIMEOUT_WITHOUT_DEADLINE.as_secs()
+    );
+    let control = ExecutionControl::default()
+        .with_deadline(std::time::Instant::now() + std::time::Duration::from_millis(42_500));
+    assert!((42..=43).contains(&super::request_timeout_secs(&control)));
+    let expired = ExecutionControl::default().with_deadline(std::time::Instant::now());
+    assert_eq!(super::request_timeout_secs(&expired), 1);
+}
+
+/// A rejected fsync or a broken stream stays `io`; only an unanswered request
+/// is a `timeout`.
+#[test]
+fn real_io_failures_stay_io() {
+    let rejected = super::flush_error(russh_sftp::client::error::Error::Status(Status {
+        id: 1,
+        status_code: StatusCode::Failure,
+        error_message: String::new(),
+        language_tag: String::new(),
+    }));
+    assert_eq!(rejected.category, ErrorCategory::Io);
+    assert_eq!(rejected.remote_effect, RemoteEffect::Unknown);
+    let broken = super::stream_error(
+        &std::io::Error::from(std::io::ErrorKind::BrokenPipe),
+        ErrorPhase::Write,
+        true,
+    );
+    assert_eq!(broken.category, ErrorCategory::Io);
+    let timed_out = super::stream_error(
+        &std::io::Error::from(std::io::ErrorKind::TimedOut),
+        ErrorPhase::Write,
+        true,
+    );
+    assert_eq!(timed_out.category, ErrorCategory::Timeout);
+    assert_eq!(timed_out.retry, RetryDisposition::RequiresRecovery);
+}

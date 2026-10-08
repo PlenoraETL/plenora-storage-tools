@@ -202,3 +202,4 @@ impl<T> typenum::type_operators::Same for plenora_storage_sftp::SftpProvider
 pub type plenora_storage_sftp::SftpProvider::Output = T
 pub const plenora_storage_sftp::CONFIG_CONTRACT: &str
 pub const plenora_storage_sftp::PROVIDER_ID: &str
+pub const plenora_storage_sftp::REQUEST_TIMEOUT_WITHOUT_DEADLINE: core::time::Duration

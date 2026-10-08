@@ -28,3 +28,8 @@ aws-lc-rs = { version = "=1.18.1", default-features = false, features = ["prebui
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+# Paused time lets the request-timeout tests advance 30 s of server delay
+# deterministically, without real sleeps.
+tokio = { workspace = true, features = ["test-util"] }
