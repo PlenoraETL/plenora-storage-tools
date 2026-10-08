@@ -488,3 +488,15 @@ fn malformed_login_replies_are_protocol_errors() {
         );
     }
 }
+
+/// Mixed CRLF and LF line ends within one reply are accepted: they do not
+/// change the deciding code, and rejecting them would misreport a real
+/// credential rejection as a protocol error.
+#[test]
+fn login_replies_with_mixed_line_ends_keep_their_code() {
+    use plenora_storage_core::ErrorCategory;
+    let transient = super::map_ftp_auth_error(raw_reply(b"421-start\r\n421 end\n"));
+    assert_eq!(transient.category, ErrorCategory::Transient);
+    let rejected = super::map_ftp_auth_error(raw_reply(b"530-a\n530 b\r\n"));
+    assert_eq!(rejected.category, ErrorCategory::Authentication);
+}

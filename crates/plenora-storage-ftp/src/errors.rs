@@ -60,7 +60,11 @@ pub fn map_ftp_auth_error(error: FtpError) -> StorageError {
 /// name collapse into `Status::Unknown`, and suppaftp accepts a terminal line
 /// whose code differs from the opening one while keeping the whole body.
 ///
-/// - A reply ends with its last line; lines end with CRLF or LF.
+/// - A reply ends with its last line; lines end with CRLF or LF. Mixed line
+///   ends within one reply are accepted on purpose: they cannot change the
+///   code that decides, while rejecting them would turn a real 530 from a
+///   careless server into a protocol error. The structure of the codes stays
+///   strict.
 /// - A single-line reply is one line `NNN` or `NNN text`.
 /// - A multiline reply opens with `NNN-text` and ends with `NNN` or
 ///   `NNN text` carrying the same code. Lines in between are free text, as
