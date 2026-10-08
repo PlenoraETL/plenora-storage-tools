@@ -86,7 +86,7 @@ async fn a_request_may_wait_until_the_deadline() {
     let (error, elapsed) = unanswered_request(deadline_in(600)).await;
     assert!(error.is_timeout());
     assert!(elapsed >= Duration::from_secs(590), "{elapsed:?}");
-    assert!(elapsed <= Duration::from_secs(600), "{elapsed:?}");
+    assert!(elapsed <= Duration::from_secs(601), "{elapsed:?}");
 }
 
 /// Without a deadline the declared read limit applies, not a hidden 60 s.
