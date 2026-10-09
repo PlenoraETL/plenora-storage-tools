@@ -61,14 +61,18 @@ impl ProviderFactory for Gcs {
     ) -> StorageResult<Box<dyn Backend>> {
         let cfg: GcsConnectionConfig = parse(connection)?;
         let root = http::endpoint(&cfg.endpoint, context.policy)?;
-        let client = http::Connector::new(&root, context)
-            .await?
+        let connector = http::Connector::new(&root, context).await?;
+        let client = connector
             .client()
+            .map_err(|error| transport_failure(&error, ErrorPhase::Connect, false))?;
+        let upload = connector
+            .upload_client()
             .map_err(|error| transport_failure(&error, ErrorPhase::Connect, false))?;
         let material = credentials.resolve(&connection.credential_ref)?;
         Ok(Box::new(GcsBackend {
             root,
             client,
+            upload,
             bucket: cfg.bucket,
             token: material.required("bearer_token")?.to_owned(),
         }))
@@ -77,6 +81,8 @@ impl ProviderFactory for Gcs {
 struct GcsBackend {
     root: Url,
     client: Client,
+    /// Used for requests that upload a body (see `Connector::upload_client`).
+    upload: Client,
     bucket: String,
     token: String,
 }
@@ -99,7 +105,12 @@ impl GcsBackend {
         Ok(url)
     }
     fn request(&self, method: Method, url: Url) -> RequestBuilder {
-        self.client.request(method, url).bearer_auth(&self.token)
+        let client = if matches!(method, Method::POST | Method::PUT) {
+            &self.upload
+        } else {
+            &self.client
+        };
+        client.request(method, url).bearer_auth(&self.token)
     }
     async fn object(&self, key: &str) -> StorageResult<Object> {
         let response = send(

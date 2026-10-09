@@ -207,8 +207,9 @@ struct PinnedDnsConnector {
 ///
 /// A request that receives nothing for this long fails as `timeout`. With a
 /// deadline every request is bounded by the time remaining instead. The whole
-/// request has no other fixed limit, so a large part that keeps moving is
-/// never cut short.
+/// request has no other fixed limit, so a large download that keeps moving is
+/// never cut short. Requests that upload a body (parts included) are not
+/// subject to it: without a deadline the client puts no limit on them.
 pub const READ_TIMEOUT_WITHOUT_DEADLINE: Duration = Duration::from_secs(300);
 /// Upper bound on establishing a connection; the time remaining before the
 /// deadline applies when it is shorter.
@@ -249,8 +250,11 @@ const CLIENT_USER_AGENT: &str = concat!("plenora-storage-tools/", env!("CARGO_PK
 
 impl PinnedDnsConnector {
     /// The HTTP client of one operation: pinned addresses, no redirects or
-    /// proxies, and the timeouts of [`ClientTimeouts`].
-    fn client(&self, allow_http: bool) -> reqwest::Result<reqwest::Client> {
+    /// proxies, and the timeouts of [`ClientTimeouts`]. `upload` leaves out
+    /// the read timeout: reqwest starts it with the request and does not
+    /// re-arm it with the bytes sent, so it would cut an upload that keeps
+    /// moving; without a deadline such requests have no client limit.
+    fn client(&self, allow_http: bool, upload: bool) -> reqwest::Result<reqwest::Client> {
         let mut builder = reqwest::Client::builder()
             .https_only(!allow_http)
             // Redirects and proxies would resolve a host this connector never
@@ -271,7 +275,7 @@ impl PinnedDnsConnector {
         if let Some(total) = self.timeouts.total {
             builder = builder.timeout(total);
         }
-        if let Some(read) = self.timeouts.read {
+        if let Some(read) = self.timeouts.read.filter(|_| !upload) {
             builder = builder.read_timeout(read);
         }
         for (host, addresses) in &self.pinned {
@@ -288,13 +292,17 @@ impl HttpConnector for PinnedDnsConnector {
         let allow_http = options
             .get_config_value(&ClientConfigKey::AllowHttp)
             .is_some_and(|value| value == "true");
-        let client = self
-            .client(allow_http)
-            .map_err(|error| object_store::Error::Generic {
-                store: "S3",
-                source: Box::new(error),
-            })?;
-        Ok(HttpClient::new(list_validation::ValidatingClient(client)))
+        let build = |upload| {
+            self.client(allow_http, upload)
+                .map_err(|error| object_store::Error::Generic {
+                    store: "S3",
+                    source: Box::new(error),
+                })
+        };
+        Ok(HttpClient::new(list_validation::ValidatingClient {
+            read: build(false)?,
+            upload: build(true)?,
+        }))
     }
 }
 

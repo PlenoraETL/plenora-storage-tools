@@ -78,14 +78,17 @@ impl ProviderFactory for Smb {
                 SMB_CONNECT_TIMEOUT.min(remaining)
             });
         let mut connected = None;
+        let mut last_error = None;
         for address in addresses {
-            if let Ok(conn) = Connection::connect(&address.to_string(), connect_timeout).await {
-                connected = Some(conn);
-                break;
+            match Connection::connect(&address.to_string(), connect_timeout).await {
+                Ok(conn) => {
+                    connected = Some(conn);
+                    break;
+                }
+                Err(error) => last_error = Some(error),
             }
         }
-        let mut conn =
-            connected.ok_or_else(|| failure(ErrorCategory::Io, ErrorPhase::Connect, false))?;
+        let mut conn = connected.ok_or_else(|| smb_connect_error(last_error.as_ref()))?;
         arm_response_timeout(&conn, context.control.remaining());
         conn.negotiate()
             .await
@@ -189,7 +192,9 @@ impl Reader for SmbReader {
 const SMB_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// How long the SMB client waits in silence for one response when the
-/// operation has no deadline. The client restarts this wait on every interim
+/// operation has no deadline.
+///
+/// The client restarts this wait on every interim
 /// `STATUS_PENDING`, and allows six times as much on a connection whose
 /// keepalive proves it alive (see plenora-smb2 `ALIVE_DEADLINE_FACTOR`).
 pub const SMB_RESPONSE_TIMEOUT_WITHOUT_DEADLINE: Duration = Duration::from_secs(30);
@@ -202,6 +207,57 @@ fn response_timeout(remaining: Option<Duration>) -> Duration {
     remaining.map_or(SMB_RESPONSE_TIMEOUT_WITHOUT_DEADLINE, |remaining| {
         remaining.max(Duration::from_millis(1))
     })
+}
+
+/// Whether an SMB failure means the client gave up waiting: a request left
+/// unanswered past its response timeout, including on a connection declared
+/// unresponsive because nothing at all answered, a request that could not
+/// reach the socket in time, credits the server never granted, or an I/O
+/// timeout anywhere in the cause chain.
+fn is_smb_timeout(error: &smb2::Error) -> bool {
+    if matches!(
+        error,
+        smb2::Error::Timeout
+            | smb2::Error::SendTimeout { .. }
+            | smb2::Error::ServerUnresponsive { .. }
+            | smb2::Error::CreditStarvation { .. }
+    ) || error.kind() == ErrorKind::TimedOut
+    {
+        return true;
+    }
+    let mut cause: Option<&(dyn std::error::Error + 'static)> = Some(error);
+    while let Some(current) = cause {
+        if current
+            .downcast_ref::<std::io::Error>()
+            .is_some_and(|error| error.kind() == std::io::ErrorKind::TimedOut)
+        {
+            return true;
+        }
+        cause = current.source();
+    }
+    false
+}
+
+/// A failed TCP connection: a timeout when every address ran out of budget,
+/// `io` for a refusal or any other failure. Nothing was sent, so a timeout is
+/// safe to retry.
+fn smb_connect_error(error: Option<&smb2::Error>) -> StorageError {
+    let timed_out_everywhere = error.is_some_and(|error| match error {
+        smb2::Error::ConnectFailed { attempts, .. } => {
+            !attempts.is_empty()
+                && attempts.iter().all(|attempt| {
+                    attempt
+                        .error_kind
+                        .is_none_or(|kind| kind == std::io::ErrorKind::TimedOut)
+                })
+        }
+        other => is_smb_timeout(other),
+    });
+    if timed_out_everywhere {
+        timed_out(ErrorPhase::Connect, false)
+    } else {
+        failure(ErrorCategory::Io, ErrorPhase::Connect, false)
+    }
 }
 
 /// Sets the connection's response timeout for an operation with `remaining`
@@ -240,7 +296,7 @@ fn smb_login_error(error: &smb2::Error) -> StorageError {
             "SMB_ACCESS_DENIED",
             "SMB server denied the session",
         ),
-        _ if matches!(error.kind(), ErrorKind::TimedOut) => (
+        _ if is_smb_timeout(error) => (
             ErrorCategory::Timeout,
             RetryDisposition::Safe,
             "SMB_CONNECT_TIMEOUT",
@@ -291,7 +347,7 @@ fn smb_error(error: &smb2::Error, mutating: bool) -> StorageError {
     };
     // A response the client gave up waiting for is a timeout; before 3.0.0 it
     // was `io`.
-    if error.kind() == ErrorKind::TimedOut {
+    if is_smb_timeout(error) {
         return timed_out(phase, mutating);
     }
     let category = match error.kind() {

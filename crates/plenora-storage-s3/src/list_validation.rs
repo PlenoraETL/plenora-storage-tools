@@ -16,7 +16,12 @@ use crate::{PROVIDER_ID, unrepresentable_key_error};
 const MAX_LIST_RESPONSE_BYTES: usize = 32 * 1_024 * 1_024;
 
 #[derive(Debug)]
-pub struct ValidatingClient(pub reqwest::Client);
+pub struct ValidatingClient {
+    /// Requests without a body.
+    pub read: reqwest::Client,
+    /// Requests that upload a body (see `PinnedDnsConnector::client`).
+    pub upload: reqwest::Client,
+}
 
 #[async_trait]
 impl HttpService for ValidatingClient {
@@ -26,7 +31,14 @@ impl HttpService for ValidatingClient {
                 url::form_urlencoded::parse(query.as_bytes())
                     .any(|(name, value)| name == "list-type" && value == "2")
             });
-        let response = self.0.call(request).await?;
+        // By length, not `is_empty`: in object_store 0.14.2 `is_empty` is
+        // inverted for `PutPayload` bodies, the ones every upload carries.
+        let client = if request.body().content_length() == 0 {
+            &self.read
+        } else {
+            &self.upload
+        };
+        let response = client.call(request).await?;
         if !is_listing || !response.status().is_success() {
             return Ok(response);
         }

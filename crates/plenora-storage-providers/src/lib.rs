@@ -47,10 +47,12 @@ pub use cloud::{Azure, AzureConnectionConfig};
 pub use common::{Provider, ProviderFactory};
 #[cfg(feature = "gcs")]
 pub use gcs::{Gcs, GcsConnectionConfig};
+#[cfg(any(feature = "azure", feature = "gcs", feature = "webdav"))]
+pub use http::HTTP_READ_TIMEOUT_WITHOUT_DEADLINE;
 #[cfg(feature = "local")]
 pub use local::{Local, LocalConnectionConfig};
 #[cfg(feature = "smb")]
-pub use smb::{Smb, SmbConnectionConfig};
+pub use smb::{SMB_RESPONSE_TIMEOUT_WITHOUT_DEADLINE, Smb, SmbConnectionConfig};
 #[cfg(feature = "webdav")]
 pub use webdav::{WebDav, WebDavConnectionConfig};
 

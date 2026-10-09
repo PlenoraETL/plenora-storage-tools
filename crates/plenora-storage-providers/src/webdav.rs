@@ -51,9 +51,12 @@ impl ProviderFactory for WebDav {
     ) -> StorageResult<Box<dyn Backend>> {
         let cfg: WebDavConnectionConfig = parse(c)?;
         let root = http::endpoint(&cfg.endpoint, x.policy)?;
-        let client = http::Connector::new(&root, x)
-            .await?
+        let connector = http::Connector::new(&root, x).await?;
+        let client = connector
             .client()
+            .map_err(|error| transport_failure(&error, ErrorPhase::Connect, false))?;
+        let upload = connector
+            .upload_client()
             .map_err(|error| transport_failure(&error, ErrorPhase::Connect, false))?;
         let credential = credentials.resolve(&c.credential_ref)?;
         let auth = if let Some(token) = credential.optional("bearer_token") {
@@ -64,7 +67,12 @@ impl ProviderFactory for WebDav {
                 credential.required("password")?.to_owned(),
             )
         };
-        Ok(Box::new(Dav { root, client, auth }))
+        Ok(Box::new(Dav {
+            root,
+            client,
+            upload,
+            auth,
+        }))
     }
 }
 enum Auth {
@@ -74,6 +82,8 @@ enum Auth {
 struct Dav {
     root: Url,
     client: Client,
+    /// Used for requests that upload a body (see `Connector::upload_client`).
+    upload: Client,
     auth: Auth,
 }
 struct DavReader {
@@ -106,7 +116,12 @@ impl Dav {
         Ok(url)
     }
     fn request(&self, method: Method, url: Url) -> RequestBuilder {
-        let request = self.client.request(method, url);
+        let client = if method == Method::PUT {
+            &self.upload
+        } else {
+            &self.client
+        };
+        let request = client.request(method, url);
         match &self.auth {
             Auth::Basic(user, password) => request.basic_auth(user, Some(password)),
             Auth::Bearer(token) => request.bearer_auth(token),

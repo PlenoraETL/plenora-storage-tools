@@ -1081,6 +1081,8 @@ impl<T> tracing::instrument::Instrument for plenora_storage_providers::WebDavCon
 impl<T> tracing::instrument::WithSubscriber for plenora_storage_providers::WebDavConnectionConfig
 impl<T> typenum::type_operators::Same for plenora_storage_providers::WebDavConnectionConfig
 pub type plenora_storage_providers::WebDavConnectionConfig::Output = T
+pub const plenora_storage_providers::HTTP_READ_TIMEOUT_WITHOUT_DEADLINE: core::time::Duration
+pub const plenora_storage_providers::SMB_RESPONSE_TIMEOUT_WITHOUT_DEADLINE: core::time::Duration
 pub trait plenora_storage_providers::ProviderFactory: core::marker::Send + core::marker::Sync + 'static
 pub const plenora_storage_providers::ProviderFactory::ATOMIC: bool
 pub const plenora_storage_providers::ProviderFactory::CONTRACT: &'static str

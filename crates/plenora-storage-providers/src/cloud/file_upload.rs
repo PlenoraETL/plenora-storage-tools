@@ -59,7 +59,7 @@ impl FileUpload {
         // separate transport only for a prepared upload, retaining the pinned DNS.
         let client = self
             .connector
-            .client()
+            .upload_client()
             .map_err(|error| transport_failure(&error, ErrorPhase::Connect, false))?;
         let mut url = self.root.clone();
         {

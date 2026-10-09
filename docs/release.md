@@ -158,16 +158,30 @@ nel job `product-quality` della CI.
   per il tempo che resta alla deadline dell'operazione; l'apertura della
   connessione resta limitata a 10 s per HTTP e a 5 s per S3 e SMB, o al tempo
   residuo se è minore. Senza deadline:
-  - una richiesta HTTP o S3 fallisce se la risposta resta 300 s senza dati
-    (`HTTP_READ_TIMEOUT_WITHOUT_DEADLINE`, `READ_TIMEOUT_WITHOUT_DEADLINE`);
-    non c'è un limite alla durata complessiva, e un invio che il server smette
-    di leggere non è interrotto da questo limite;
+  - una richiesta HTTP o S3 senza corpo (lettura, elenco, metadati) fallisce
+    se la risposta resta 300 s senza dati (`HTTP_READ_TIMEOUT_WITHOUT_DEADLINE`,
+    `READ_TIMEOUT_WITHOUT_DEADLINE`); non c'è un limite alla durata
+    complessiva, e un download che continua ad avanzare non è mai interrotto;
+  - una richiesta HTTP o S3 che invia un corpo (upload, parte multipart,
+    completamento) non ha nessun limite dal client, né durante l'invio né
+    nell'attesa della risposta: solo la deadline la interrompe. reqwest 0.13
+    non ha un limite di inattività in scrittura e il suo limite di lettura parte
+    con la richiesta senza essere riarmato dai byte inviati, quindi
+    interromperebbe un invio che avanza; chi vuole un limite imposta una
+    deadline;
   - una richiesta SMB fallisce dopo 30 s di silenzio del server
     (`SMB_RESPONSE_TIMEOUT_WITHOUT_DEADLINE`); ogni `STATUS_PENDING` riavvia
-    l'attesa, e su una connessione che il keepalive dimostra viva il limite è
-    sei volte più lungo.
+    l'attesa, e su una connessione che il keepalive dimostra viva una richiesta
+    senza risposta attende sei volte tanto (180 s).
   Allo scadere l'errore è `timeout`: effetto `none` e retry `safe` senza
-  mutazione, `unknown` e `requires_recovery` durante una scrittura.
+  mutazione, `unknown` e `requires_recovery` durante una scrittura. Per SMB
+  questo vale anche quando la libreria dichiara il server non responsivo
+  (`ServerUnresponsive`), quando una richiesta non riesce a partire in tempo e
+  quando la connessione TCP esaurisce il tempo su ogni indirizzo (`timeout` in
+  `connect`, `none`, `safe`); una connessione rifiutata resta `io`.
+- Dopo un upload multipart S3 fallito, la pulizia (`abort_multipart`) ha un
+  budget proprio di 10 s: può quindi durare fino a 10 s oltre la deadline
+  dell'operazione.
 - FTP è in chiaro e richiede autorizzazione esplicita. FTPS esplicito verifica
   il certificato TLS; SFTP usa pin SHA-256 con password oppure chiave privata
   OpenSSH, anche cifrata. Il resolver fornisce `username` e una sola modalità:

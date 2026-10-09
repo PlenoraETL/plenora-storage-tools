@@ -29,7 +29,8 @@ pub fn endpoint(value: &str, policy: &EngineConfig) -> StorageResult<Url> {
 /// A request that receives nothing for this long fails as `timeout`. With a
 /// deadline every request is bounded by the time remaining instead. The whole
 /// request has no other fixed limit, so a large transfer that keeps moving is
-/// never cut short.
+/// never cut short. Requests that upload a body are not subject to it: without
+/// a deadline the client puts no limit on them.
 pub const HTTP_READ_TIMEOUT_WITHOUT_DEADLINE: Duration = Duration::from_secs(300);
 /// Upper bound on establishing a connection; the time remaining before the
 /// deadline applies when it is shorter.
@@ -90,8 +91,8 @@ impl Connector {
             timeouts: HttpTimeouts::for_remaining(context.control.remaining()),
         })
     }
-    pub(crate) fn client(&self) -> Result<reqwest::Client, reqwest::Error> {
-        let mut builder = reqwest::Client::builder()
+    fn builder(&self) -> reqwest::ClientBuilder {
+        let builder = reqwest::Client::builder()
             .https_only(!self.allow_http)
             .no_proxy()
             .retry(reqwest::retry::never())
@@ -102,20 +103,39 @@ impl Connector {
             .no_brotli()
             .no_deflate()
             .no_zstd();
-        if let Some(total) = self.timeouts.total {
-            builder = builder.timeout(total);
+        match self.timeouts.total {
+            Some(total) => builder.timeout(total),
+            None => builder,
         }
-        if let Some(read) = self.timeouts.read {
-            builder = builder.read_timeout(read);
-        }
-        builder.build()
+    }
+
+    /// Client for requests whose response is the transfer: without a
+    /// deadline, silence while reading is bounded by
+    /// [`HTTP_READ_TIMEOUT_WITHOUT_DEADLINE`].
+    pub(crate) fn client(&self) -> Result<reqwest::Client, reqwest::Error> {
+        self.timeouts
+            .read
+            .map_or_else(|| self.builder(), |read| self.builder().read_timeout(read))
+            .build()
+    }
+
+    /// Client for requests that upload a body. reqwest's read timeout starts
+    /// with the request and is not re-armed by the bytes sent, so it would cut
+    /// an upload that keeps moving; without a deadline these requests have no
+    /// client limit, only the deadline the caller sets.
+    pub(crate) fn upload_client(&self) -> Result<reqwest::Client, reqwest::Error> {
+        self.builder().build()
     }
 }
 #[cfg(feature = "azure")]
 impl HttpConnector for Connector {
     fn connect(&self, _: &ClientOptions) -> object_store::Result<HttpClient> {
         self.client()
-            .map(|client| HttpClient::new(crate::azure_listing::ValidatingClient(client)))
+            .and_then(|read| {
+                self.upload_client().map(|upload| {
+                    HttpClient::new(crate::azure_listing::ValidatingClient { read, upload })
+                })
+            })
             .map_err(|error| object_store::Error::Generic {
                 store: "Plenora",
                 source: Box::new(error),

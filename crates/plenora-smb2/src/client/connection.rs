@@ -15,7 +15,11 @@ use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Weak};
 
 use crate::sync::{StateLock, ValueLock};
-use std::time::{Duration, Instant};
+use std::time::Duration;
+// The response deadline, liveness and keepalive clocks use tokio's clock:
+// identical to the system monotonic clock in production, and controllable
+// with paused time in tests.
+use tokio::time::Instant;
 
 use futures_util::future::{Either, select};
 use log::{Level, debug, error, info, trace, warn};
@@ -33,7 +37,7 @@ struct Waiter {
     command: Command,
     /// When the waiter was inserted, which is BEFORE the bytes reach the
     /// transport. A request can sit here having never been sent.
-    registered_at: std::time::Instant,
+    registered_at: Instant,
     /// When the transport accepted the frame, or `None` while it is still
     /// queued for the writer task.
     ///
@@ -41,13 +45,13 @@ struct Waiter {
     /// and "sent 20 minutes ago, unanswered" are opposite diagnoses, and
     /// collapsing them into one timestamp is what sent three investigations
     /// after an innocent server.
-    sent_at: Option<std::time::Instant>,
+    sent_at: Option<Instant>,
     /// Last sign of life for this request: the send, then every interim
     /// STATUS_PENDING the server sends. Separate from the timestamps above
     /// because the response deadline wants "how long since the server last
     /// said anything", and a request still in the send queue has not asked
     /// it anything yet.
-    last_activity: std::time::Instant,
+    last_activity: Instant,
     /// The `AsyncId` the server assigned in its interim STATUS_PENDING, if it
     /// sent one.
     ///
@@ -434,7 +438,7 @@ struct WriteJob {
     /// For the log line and the [`Error::SendTimeout`]; the first sub-op's
     /// command for a compound.
     command: Command,
-    queued_at: std::time::Instant,
+    queued_at: Instant,
     done: oneshot::Sender<Result<()>>,
 }
 
@@ -469,7 +473,7 @@ async fn writer_loop(
         };
         let deadline = strong.send_timeout.get();
         let len = job.bytes.len();
-        let started = std::time::Instant::now();
+        let started = Instant::now();
 
         let result = match deadline {
             Some(d) => match tokio::time::timeout(d, sender.send(&job.bytes)).await {
@@ -571,7 +575,7 @@ struct OutstandingSplit {
 }
 
 fn classify_outstanding(inner: &Inner, threshold: std::time::Duration) -> Result<OutstandingSplit> {
-    let now = std::time::Instant::now();
+    let now = Instant::now();
     let mut split = OutstandingSplit::default();
     for (id, w) in inner.waiters.lock()?.iter() {
         let request = Outstanding {
@@ -1506,14 +1510,14 @@ struct Inner {
     /// `None` rather than "the connection's birth" on purpose: a server that
     /// has never said anything has not proven anything, and the deadline
     /// extension must never be granted on an assumption.
-    last_frame_at: ValueLock<Option<std::time::Instant>>,
+    last_frame_at: ValueLock<Option<Instant>>,
     /// When one of this connection's own loops was last scheduled: the
     /// process's liveness clock, as opposed to the server's.
     ///
     /// Every other clock here measures wall time, which silently assumes we
     /// were running to hear the silence we are measuring. This is the witness
     /// that says whether we were. See [`Inner::forgive_scheduling_stall`].
-    last_scheduled_at: ValueLock<std::time::Instant>,
+    last_scheduled_at: ValueLock<Instant>,
     /// How much server silence, with work outstanding, triggers an ECHO probe,
     /// or `None` to never probe. See `Connection::set_keepalive`.
     keepalive_after: ValueLock<Option<Duration>>,
@@ -1749,7 +1753,7 @@ impl Inner {
             send_tally: SendTally::default(),
             response_timeout: ValueLock::new(Some(RESPONSE_TIMEOUT)),
             last_frame_at: ValueLock::new(None),
-            last_scheduled_at: ValueLock::new(std::time::Instant::now()),
+            last_scheduled_at: ValueLock::new(Instant::now()),
             keepalive_after: ValueLock::new(Some(KEEPALIVE_AFTER)),
             long_poll_refresh: ValueLock::new(Some(LONG_POLL_REFRESH)),
             credits: CreditPool::new(),
@@ -1803,7 +1807,7 @@ impl Inner {
         let job = WriteJob {
             bytes: bytes.to_vec(),
             command,
-            queued_at: std::time::Instant::now(),
+            queued_at: Instant::now(),
             done: done_tx,
         };
         let queued_at = job.queued_at;
@@ -1882,7 +1886,7 @@ impl Inner {
     /// Also restarts the response deadline: the clock measures the server's
     /// silence, and the server has only now been asked.
     fn mark_sent(&self, msg_ids: &[MessageId]) -> Result<()> {
-        let now = std::time::Instant::now();
+        let now = Instant::now();
         let mut waiters = self.waiters.lock()?;
         for id in msg_ids {
             if let Some(w) = waiters.get_mut(id) {
@@ -1932,7 +1936,7 @@ impl Inner {
             self.credits.available()
         );
 
-        let started = std::time::Instant::now();
+        let started = Instant::now();
         let deadline = started + self.credits.wait_timeout();
         let mut reserving = Box::pin(self.credits.reserve(charge));
         loop {
@@ -1957,7 +1961,7 @@ impl Inner {
                 }
                 Either::Right((_, still_reserving)) => {
                     let nothing_outstanding = self.waiters.lock()?.is_empty();
-                    if nothing_outstanding || std::time::Instant::now() >= deadline {
+                    if nothing_outstanding || Instant::now() >= deadline {
                         self.metrics
                             .credit_starvations
                             .fetch_add(1, Ordering::Relaxed);
@@ -1971,13 +1975,13 @@ impl Inner {
 
     /// Record that the server put a frame on the wire just now.
     fn note_server_spoke(&self) {
-        self.last_frame_at.set(Some(std::time::Instant::now()));
+        self.last_frame_at.set(Some(Instant::now()));
     }
 
     /// How long since the server last said anything, or `None` if it never
     /// has.
     fn server_silent_for(&self) -> Option<Duration> {
-        let now = std::time::Instant::now();
+        let now = Instant::now();
         self.last_frame_at
             .get()
             .map(|t| now.saturating_duration_since(t))
@@ -1998,7 +2002,7 @@ impl Inner {
     /// case, and conflating the two is the misdiagnosis the `sent_at` split
     /// exists to prevent.
     fn quiet_for(&self) -> Result<Option<Duration>> {
-        let now = std::time::Instant::now();
+        let now = Instant::now();
         let oldest_sent = {
             let waiters = self.waiters.lock()?;
             waiters.values().filter_map(|w| w.sent_at).min()
@@ -2049,7 +2053,7 @@ impl Inner {
         // armed: "we were not running" is a fact about this process, and
         // `set_keepalive(None)` says nothing about it either way.
         let after = self.keepalive_after.get().unwrap_or(KEEPALIVE_AFTER);
-        let now = std::time::Instant::now();
+        let now = Instant::now();
         let witness = self.last_scheduled_at.replace(now);
         let gap = now
             .saturating_duration_since(witness)
@@ -2061,7 +2065,7 @@ impl Inner {
         // Shifting forward, rather than resetting to now, keeps whatever the
         // clocks legitimately read BEFORE the stall: a request the server had
         // already owed us for 10 s is still 10 s overdue afterwards.
-        let shift = |t: &mut std::time::Instant| *t = t.checked_add(stall).unwrap_or(now);
+        let shift = |t: &mut Instant| *t = t.checked_add(stall).unwrap_or(now);
         self.last_frame_at.update(|spoke| {
             (
                 spoke.map(|mut t| {
@@ -2171,7 +2175,7 @@ impl Inner {
     /// of those, right at the start, and a clock that restarted there would
     /// measure the same thing while claiming to measure registration age.
     fn waiter_sent_age(&self, msg_id: MessageId) -> Result<Option<Duration>> {
-        let now = std::time::Instant::now();
+        let now = Instant::now();
         Ok(self
             .waiters
             .lock()?
@@ -2189,7 +2193,7 @@ impl Inner {
     /// How long `msg_id` has gone without a sign of life, or `None` if it is
     /// no longer outstanding (its response has been routed).
     fn waiter_idle_for(&self, msg_id: MessageId) -> Result<Option<Duration>> {
-        let now = std::time::Instant::now();
+        let now = Instant::now();
         Ok(self
             .waiters
             .lock()?
@@ -2493,7 +2497,7 @@ impl Connection {
 
         let mut guard = self.register_waiter(msg_id, Command::Negotiate)?;
 
-        let rtt_start = std::time::Instant::now();
+        let rtt_start = Instant::now();
         self.inner
             .send_and_count(&req_bytes, Command::Negotiate)
             .await?;
@@ -3756,7 +3760,7 @@ impl Connection {
             return Err(Error::Disconnected);
         }
         let (tx, rx) = oneshot::channel();
-        let now = std::time::Instant::now();
+        let now = Instant::now();
         waiters.insert(
             msg_id,
             Waiter {
@@ -3803,7 +3807,7 @@ impl Connection {
     pub fn outstanding_requests(
         &self,
     ) -> Result<Vec<crate::client::diagnostics::OutstandingRequest>> {
-        let now = std::time::Instant::now();
+        let now = Instant::now();
         let mut out: Vec<_> = self
             .inner
             .waiters
@@ -5232,7 +5236,7 @@ fn prepare_sub_frame(sub: &[u8], was_encrypted: bool, inner: &Inner) -> Result<S
         // response deadline (MS-SMB2 § 3.2.5.1.5). Without this, a legitimately
         // slow operation the server has acknowledged would be timed out.
         if let Some(waiter) = inner.waiters.lock()?.get_mut(&header.message_id) {
-            waiter.last_activity = std::time::Instant::now();
+            waiter.last_activity = Instant::now();
             // Remember the id a CANCEL for this request will have to carry
             // (MS-SMB2 § 3.2.4.24). The interim response is the only place the
             // server ever states it.
@@ -5852,6 +5856,121 @@ mod tests {
             conn.outstanding_requests().unwrap().is_empty(),
             "the abandoned request must not leak a waiter"
         );
+    }
+
+    /// A connection to a server that never answers, in plain (not
+    /// auto-rewrite) mode, with credits and the given response timeout.
+    fn silent_connection(timeout: Duration) -> (Arc<MockTransport>, Connection) {
+        let mock = Arc::new(MockTransport::new());
+        let conn = Connection::from_transport(
+            Box::new(mock.clone()),
+            Box::new(mock.clone()),
+            "test-server",
+        )
+        .unwrap();
+        conn.set_credits(512);
+        conn.set_response_timeout(Some(timeout));
+        (mock, conn)
+    }
+
+    /// The response clock runs on tokio time: with paused time a silent
+    /// server is given up on after exactly the configured timeout, whether it
+    /// is the 30 s default or a deadline ten minutes away.
+    #[tokio::test(start_paused = true)]
+    async fn a_silent_server_is_given_up_on_after_the_configured_timeout() {
+        for timeout in [Duration::from_secs(30), Duration::from_secs(600)] {
+            let (_mock, conn) = silent_connection(timeout);
+            let started = Instant::now();
+            let result = conn
+                .execute(
+                    Command::Echo,
+                    &crate::msg::echo::EchoRequest,
+                    Some(TreeId(1)),
+                )
+                .await;
+            let elapsed = started.elapsed();
+            // The default keepalive gets no answer either, so the verdict is a
+            // dead link; both errors mean the full budget went unanswered.
+            assert!(
+                matches!(
+                    result,
+                    Err(Error::Timeout | Error::ServerUnresponsive { .. })
+                ),
+                "{result:?}"
+            );
+            assert!(elapsed >= timeout, "{elapsed:?}");
+            assert!(elapsed <= timeout + Duration::from_secs(2), "{elapsed:?}");
+        }
+    }
+
+    /// STATUS_PENDING restarts the silence clock: an operation the server keeps
+    /// acknowledging every 20 s outlives a 30 s response timeout by minutes.
+    #[tokio::test(start_paused = true)]
+    async fn pending_responses_keep_a_slow_operation_alive_in_virtual_time() {
+        let (mock, conn) = silent_connection(Duration::from_secs(30));
+        let c = conn.clone();
+        let call = tokio::spawn(async move {
+            c.execute(
+                Command::Echo,
+                &crate::msg::echo::EchoRequest,
+                Some(TreeId(1)),
+            )
+            .await
+        });
+        while mock.sent_count() < 1 {
+            tokio::task::yield_now().await;
+        }
+        let started = Instant::now();
+        for _ in 0..9 {
+            tokio::time::sleep(Duration::from_secs(20)).await;
+            let mut h = Header::new_request(Command::Echo);
+            h.flags.set_response();
+            h.credits = 1;
+            h.status = NtStatus::PENDING;
+            h.message_id = MessageId(0);
+            mock.queue_response(pack_message(&h, &crate::msg::echo::EchoResponse));
+        }
+        mock.queue_response(build_echo_response_with_msg_id(MessageId(0)));
+        let result = call.await.unwrap();
+        assert!(result.is_ok(), "{result:?}");
+        assert!(started.elapsed() >= Duration::from_secs(180));
+        assert_eq!(conn.metrics().response_timeouts, 0);
+    }
+
+    /// With the keepalive armed, a connection the server keeps talking on is
+    /// provably alive, so one unanswered request gets six times the response
+    /// timeout before it is given up on, not the base timeout.
+    #[tokio::test(start_paused = true)]
+    async fn a_connection_proven_alive_extends_the_wait_in_virtual_time() {
+        let timeout = Duration::from_secs(30);
+        let (mock, conn) = silent_connection(timeout);
+        conn.set_keepalive(Some(Duration::from_secs(5)));
+        let chatter = {
+            let mock = mock.clone();
+            tokio::spawn(async move {
+                // Frames for requests nobody is waiting on still prove the
+                // server is speaking on this connection.
+                for id in 1_000_u64..1_100 {
+                    tokio::time::sleep(Duration::from_secs(4)).await;
+                    mock.queue_response(build_echo_response_with_msg_id(MessageId(id)));
+                }
+            })
+        };
+        let started = Instant::now();
+        let result = conn
+            .execute(
+                Command::Echo,
+                &crate::msg::echo::EchoRequest,
+                Some(TreeId(1)),
+            )
+            .await;
+        let elapsed = started.elapsed();
+        chatter.abort();
+        assert!(matches!(result, Err(Error::Timeout)), "{result:?}");
+        let ceiling = timeout * ALIVE_DEADLINE_FACTOR;
+        assert!(elapsed >= ceiling, "{elapsed:?}");
+        assert!(elapsed <= ceiling + Duration::from_secs(2), "{elapsed:?}");
+        assert_eq!(conn.metrics().response_deadline_extensions, 1);
     }
 
     /// A server that answers STATUS_PENDING is working, not dead. Timing it
