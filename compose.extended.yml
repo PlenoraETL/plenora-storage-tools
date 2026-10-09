@@ -5,7 +5,11 @@ services:
     ports: ["10000:10000"]
   gcs:
     image: fsouza/fake-gcs-server@sha256:3730da0e31f7e5186a90ec4899dc2c336104e7599df400411392ef17e684c31f
-    command: ["-scheme", "http", "-port", "4443", "-public-host", "gcs:4443", "-external-url", "http://gcs:4443"]
+    # In-memory backend: the filesystem backend keeps the empty prefix
+    # directories of deleted objects, and listing walks them, so LIST latency
+    # grew with every qualification round (1 ms to 68 ms after 300 create and
+    # delete cycles), a fixture drift that skewed performance comparisons.
+    command: ["-scheme", "http", "-port", "4443", "-public-host", "gcs:4443", "-external-url", "http://gcs:4443", "-backend", "memory"]
     ports: ["4443:4443"]
   ftps:
     build: docker/extended

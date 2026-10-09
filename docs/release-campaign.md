@@ -106,6 +106,12 @@ dallo schema ABBA dei suoi round e provider viene rifiutato, mai letto come
 report storico. Dalla 3.0.0 il bundle di evidenze richiede una misura
 accoppiata.
 
+Il fixture GCS usa il backend in memoria di fake-gcs: con il backend su file
+le directory dei prefissi degli oggetti cancellati restano, il listing le
+percorre e la sua latenza cresceva a ogni round (da 1 ms a 68 ms dopo 300 cicli
+di creazione e cancellazione), una deriva della fixture che nella campagna
+3.0.0 ricadeva su `gcs test`.
+
 Fino alla 3.0.0 baseline e candidato erano due fasi consecutive: nella prima
 campagna della 3.0.0 un rallentamento dell'host durante la misura, e poi un
 fixture GCS che rallentava nel tempo, sono ricaduti sul candidato e hanno

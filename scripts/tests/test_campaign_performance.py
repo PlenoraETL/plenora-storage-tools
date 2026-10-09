@@ -408,6 +408,15 @@ class FixtureResetTests(unittest.TestCase):
             run_vm_campaign.check_fixture_state(output, 'n0nce')
 
 
+class FixtureDefinitionTests(unittest.TestCase):
+    def test_fake_gcs_keeps_no_state_that_slows_listing_down(self):
+        # Plain text: the test tooling has no YAML parser.
+        lines = (ROOT / 'compose.extended.yml').read_text().splitlines()
+        service = lines.index('  gcs:')
+        command = next(line for line in lines[service:] if line.strip().startswith('command:'))
+        self.assertIn('"-backend", "memory"', command)
+
+
 class Server:
     """A local TCP server that answers every connection with fixed bytes."""
 
