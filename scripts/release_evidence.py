@@ -91,6 +91,13 @@ def validate_transfers(report, binary, *, size, workers, rounds, spool_uploads=F
                     and measure['elapsed_seconds'] > 0, 'invalid transfer measurement')
 
 
+def require_paired_performance(version_core, baseline, candidate):
+    """From 3.0.0 performance evidence comes from one alternated run."""
+    if version_core >= (3, 0, 0):
+        require('paired_measurement' in baseline and 'paired_measurement' in candidate,
+                'performance evidence must come from a paired alternated run')
+
+
 def validate_soak(report, wheel, version, minimum_seconds=SOAK_DURATION_SECONDS, *, both_upload_modes=False):
     require(report['status'] == 'PASS' and report['wheel_sha256'] == wheel
             and report['version'] == version, 'soak failed or describes another wheel')
@@ -234,10 +241,7 @@ already checked by verify_release.py. No caller-supplied waiver is accepted.
     evidence.read('performance/candidate.json', performance['candidate_sha256'])
     clean_source(candidate, revision)
     performance_policy = json.loads((ROOT / 'scripts/performance-policy.json').read_text())
-    if version_core >= (3, 0, 0):
-        # From 3.0.0 performance evidence comes from one alternated run.
-        require('paired_measurement' in baseline and 'paired_measurement' in candidate,
-                'performance evidence must come from a paired alternated run')
+    require_paired_performance(version_core, baseline, candidate)
     actual = compare(baseline, candidate, linux['binary_sha256'], performance_policy)
     require(actual['status'] == 'PASS' and all(performance[key] == value for key, value in actual.items()),
             'performance report differs or budget failed')

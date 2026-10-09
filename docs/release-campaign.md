@@ -71,24 +71,40 @@ dopo l'altro; chi parte per primo segue lo schema ABBA sull'indice di round di
 quel provider (baseline, candidato, candidato, baseline, poi di nuovo). Ogni
 provider, e quindi ogni sua operazione, parte per primo lo stesso numero di
 volte con ciascun binario; per questo i round devono essere un multiplo di
-quattro, altrimenti la misura viene rifiutata. Una deriva dell'ambiente
-durante la misura, come un fixture che rallenta o un host conteso, pesa così
-allo stesso modo sui due binari invece di ricadere tutta sul secondo.
+quattro, altrimenti la misura viene rifiutata. Lo scopo è ridurre l'effetto di
+una deriva lenta dell'ambiente, come un fixture che rallenta, che con due fasi
+consecutive ricadrebbe tutta sul secondo binario.
 
-Limite dichiarato: i due binari non girano nello stesso istante. Per una
-deriva lineare la differenza residua tra i ruoli, in mediana e p95, è al più
-la deriva accumulata in una singola esecuzione (un provider, quattro worker),
-contro metà della deriva dell'intera misura con le fasi consecutive.
+Limiti dichiarati:
+
+- i due binari non girano nello stesso istante. Per una deriva lineare la
+  differenza residua tra i ruoli, in mediana e p95, è al più la deriva
+  accumulata in una singola esecuzione (un provider, quattro worker). Con una
+  deriva del 50% sull'intera misura, il caso di riferimento dei test, il
+  residuo è circa 0,07% sulla mediana e 0,06% sul p95; una deriva così grande
+  viene comunque respinta dalla guardia di stabilità;
+- l'alternanza non protegge da un salto dell'ambiente tra le due esecuzioni di
+  una stessa coppia, né da cambiamenti non lineari: per questi c'è la guardia.
+
+**Guardia di stabilità.** Per ogni provider e operazione il confronto calcola,
+separatamente per baseline e candidato, la mediana del tempo nella prima e
+nella seconda metà dei round. Se uno dei due binari cambia rispetto a sé stesso
+oltre metà del budget della mediana (5%, con soglia minima di 5 ms), la misura
+è **non affidabile**: lo stato è `UNRELIABLE`, mai `PASS`, anche se il
+candidato ha anche regredito; `check_performance.py` esce con il codice 3,
+distinto dal codice 1 della regressione, e chiede di ripetere la campagna su un
+host stabile. Il report registra ogni controllo in `stability`.
 
 L'ordine dipende solo dalla posizione: è deterministico e non usa semi casuali.
 Entrambi i report lo registrano in `paired_measurement`, con ruolo, schema,
 ordine completo e `campaign_id` dell'altro report; lo schema entra
 nell'identità della campagna. Il confronto `performance-compare`, il budget di
-`scripts/performance-policy.json` e i criteri restano quelli di prima. Il
-confronto valida i metadati accoppiati: un campo presente ma vuoto, nullo,
-incompleto o con un ordine diverso dallo schema ABBA dei suoi round e provider
-viene rifiutato, mai letto come report storico. Dalla 3.0.0 il bundle di
-evidenze richiede una misura accoppiata.
+`scripts/performance-policy.json` e i criteri di regressione restano quelli di
+prima. Il confronto valida i metadati accoppiati, tipi compresi: un campo
+presente ma vuoto, nullo, incompleto, con tipi errati o con un ordine diverso
+dallo schema ABBA dei suoi round e provider viene rifiutato, mai letto come
+report storico. Dalla 3.0.0 il bundle di evidenze richiede una misura
+accoppiata.
 
 Fino alla 3.0.0 baseline e candidato erano due fasi consecutive: nella prima
 campagna della 3.0.0 un rallentamento dell'host durante la misura, e poi un
@@ -98,28 +114,47 @@ prodotto confronti rossi che un A/B alternato smentiva.
 ### Fixture ricreate prima del runner
 
 All'inizio di ogni tentativo `qualify-vm` il coordinatore riesegue la
-preparazione delle fixture con `PLENORA_FIXTURE_RECREATE=1`, in quest'ordine:
+preparazione delle fixture con `PLENORA_FIXTURE_RECREATE=1`. Ogni preparazione,
+anche quella di `prepare-vm`, ha un nonce unico, registrato nel tentativo
+locale (`<etichetta>-nonce.json`) e usato nei nomi dei file di segnale sulla
+VM: un segnale lasciato da un'esecuzione precedente non viene mai letto come
+quello corrente. Il wrapper registra sempre il codice d'uscita reale ed esce
+con quel codice. In ordine:
 
 1. lo script gira sotto il lock del runner VM (`.fixtures/campaign/campaign.lock`):
    se un runner o un'altra preparazione lo tiene, si ferma prima di toccare
-   qualcosa e la campagna termina con un errore esplicito. Anche la
-   preparazione di `prepare-vm` usa lo stesso lock;
+   qualcosa (codice 75) e la campagna termina con un errore esplicito;
 2. se un container runner di questa campagna è ancora in esecuzione, si ferma
-   con un errore esplicito. Non viene terminato nessun processo;
+   con un errore esplicito (codice 76). Non viene terminato nessun processo;
 3. archivia stato dei container, log delle fixture, certificati e fingerprint
-   SFTP, che il tentativo conserva in `pre-reset.tar.gz`. Il tentativo
-   precedente resta immutabile, perché le sue evidenze sono già inventariate;
+   SFTP, che il tentativo conserva in `pre-reset.tar.gz`. Se la raccolta
+   fallisce il reset non avviene. Il tentativo precedente resta immutabile,
+   perché le sue evidenze sono già inventariate;
 4. ricrea tutti i container delle fixture: i server in memoria (Azurite, fake
    GCS, WebDAV, SMB, FTPS) ripartono vuoti, gli altri ripartono sui loro volumi
    di dati, che la qualifica ripulisce man mano. Certificati, CA e fingerprint
    vengono rigenerati e il runner li legge al suo avvio;
-5. verifica con `scripts/check_fixtures.py` che ogni fixture sia in esecuzione,
-   sana dove dichiara un healthcheck (FTP, FTPS, SFTP, WebDAV, SMB) e che
-   risponda al suo protocollo sulla porta pubblicata.
+5. verifica con `scripts/check_fixtures.py` che ogni fixture sia in esecuzione
+   e sana, e che completi uno scambio applicativo con le identità di test:
+   HEAD firmato SigV4 del bucket MinIO, anche in HTTPS verificato con la CA
+   (dall'interno della rete delle fixture); login con chiave e listing SFTP con
+   la host key confrontata con il pin; login e listing FTP; TLS esplicito
+   verificato con la CA, login e listing FTPS; listing firmato SharedKey del
+   container Azurite; metadati del bucket GCS; PROPFIND autenticato WebDAV con
+   207; sessione SMB3 cifrata, tree connect e listing della share con
+   smbclient. Un banner o uno stato d'errore non bastano. Gli healthcheck di
+   FTPS, WebDAV e SMB fanno lo stesso scambio;
+6. registra il proprio nonce in `.fixtures/campaign/fixture-state.json`.
 
 Solo se tutte le fixture rispondono il tentativo registra `fixture-reset.json`
-con `recreated: true`, insieme a `fixture-check.json` e `fixture-reset.log`;
-altrimenti il tentativo fallisce prima di avviare il runner.
+con `recreated: true` e il nonce, insieme a `fixture-check.json` e
+`fixture-reset.log`; altrimenti il tentativo fallisce prima di avviare il
+runner. Il runner riceve il nonce (`--fixture-nonce`) e, appena acquisito il
+lock, verifica che `fixture-state.json` riporti proprio quel reset: se è stata
+eseguita un'altra preparazione dopo, si ferma senza misurare. Si è scelta la
+verifica del nonce invece di tenere il lock dalla preparazione all'avvio del
+runner: il lock è di un processo, e il runner parte in un container separato
+che non può ereditarlo.
 
 ## Ripresa, tentativi e spazio
 

@@ -14,27 +14,27 @@ services:
     ports: ["2122:21", "30100-30163:30100-30163"]
     volumes: ["./.fixtures/extended:/certs:ro"]
     healthcheck:
-      test: ["CMD", "python", "-c", "import socket; s = socket.create_connection(('127.0.0.1', 21), 2); s.settimeout(2); assert s.recv(3) == b'220'"]
+      test: [CMD, python, -c, 'import ftplib, ssl; c = ftplib.FTP_TLS(context=ssl.create_default_context(cafile=''/certs/server.crt''), timeout=5); c.connect(''ftps'', 21); c.auth(); c.login(''plenora'', ''plenora-fixture-secret''); c.prot_p(); c.nlst(); c.close()']
       interval: 2s
-      timeout: 3s
+      timeout: 10s
       retries: 30
   webdav:
     image: plenora-storage-extended-fixtures:0.2
     command: ["webdav"]
     ports: ["8088:8080"]
     healthcheck:
-      test: ["CMD", "python", "-c", "import socket; s = socket.create_connection(('127.0.0.1', 8080), 2); s.settimeout(2); s.sendall(b'GET / HTTP/1.1\\r\\nHost: f\\r\\nConnection: close\\r\\n\\r\\n'); assert s.recv(7) == b'HTTP/1.'"]
+      test: [CMD, python, -c, 'import base64, urllib.request as u; t = base64.b64encode(b''plenora:plenora-fixture-secret'').decode(); r = u.Request(''http://127.0.0.1:8080/'', method=''PROPFIND'', data=b'''', headers={''Depth'': ''0'', ''Authorization'': ''Basic '' + t}); assert u.urlopen(r, timeout=5).status == 207']
       interval: 2s
-      timeout: 3s
+      timeout: 10s
       retries: 30
   smb:
     image: plenora-storage-extended-fixtures:0.2
     command: ["smb"]
     ports: ["1445:445"]
     healthcheck:
-      test: ["CMD", "python", "-c", "import socket; s = socket.create_connection(('127.0.0.1', 445), 2); s.settimeout(2); s.close()"]
+      test: [CMD, smbclient, //127.0.0.1/storage, -U, plenora%plenora-fixture-secret, -m, SMB3, --option=client smb encrypt=required, -c, ls]
       interval: 2s
-      timeout: 3s
+      timeout: 10s
       retries: 30
   azure-init:
     image: plenora-storage-extended-fixtures:0.2

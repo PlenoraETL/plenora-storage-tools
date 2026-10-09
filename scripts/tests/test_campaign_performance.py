@@ -1,6 +1,8 @@
 import json
 import math
 from pathlib import Path
+import shutil
+import socket
 from statistics import median
 import sys
 import tempfile
@@ -11,11 +13,12 @@ import uuid
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from campaign_state import Campaign
-from check_performance import compare
+from check_performance import UNRELIABLE, compare
 from fixture_connections import BUFFERED, PROVIDERS
 from performance_order import SCHEME, paired_order, validate_pairing
 import qualify_transfers
 import release_campaign
+import release_evidence
 import run_vm_campaign
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -33,13 +36,14 @@ def report(name, rounds):
             'rss_limit_bytes': 256 * 1024**2, 'status': 'PASS', 'results': []}
 
 
-def measured(runs, rounds, drift):
+def measured(runs, rounds, slowdown):
     """Reports of a run executing `runs` (round, provider, role) in order: the
-    workers of one run are concurrent, runs are sequential, and the
-    environment slows down linearly by `drift` over the whole run."""
+    workers of one run are concurrent, runs are sequential, and the elapsed
+    time of the run at position `clock` is 0.2 s times 1 + slowdown(fraction
+    of the run already done)."""
     reports = {name: report(name, rounds) for name in BINARIES}
     for clock, (iteration, provider, name) in enumerate(runs):
-        elapsed = 0.2 * (1 + drift * clock / len(runs))
+        elapsed = 0.2 * (1 + slowdown(clock / len(runs)))
         for _ in range(WORKERS):
             reports[name]['results'].append({
                 'provider': provider, 'round': iteration, 'status': 'PASS', 'payload_bytes': 1024**2,
@@ -47,6 +51,10 @@ def measured(runs, rounds, drift):
                 'measurements': [{'operation': operation, 'status': 'PASS', 'elapsed_seconds': elapsed,
                                   'peak_rss_bytes': 12 * 1024**2} for operation in OPERATIONS]})
     return reports['baseline'], reports['candidate']
+
+
+def linear(drift):
+    return lambda fraction: drift * fraction
 
 
 def sequential(rounds):
@@ -68,11 +76,28 @@ def pair(baseline, candidate):
                                      'partner_campaign_id': other['campaign_id'], 'order': order}
 
 
+def paired_run(slowdown):
+    baseline, candidate = measured(alternated(ROUNDS), ROUNDS, slowdown)
+    pair(baseline, candidate)
+    return baseline, candidate
+
+
 def statistics(report_, provider, operation):
     """Median and p95 exactly as check_performance computes them."""
     values = sorted(m['elapsed_seconds'] for row in report_['results'] if row['provider'] == provider
                     for m in row['measurements'] if m['operation'] == operation)
     return median(values), values[math.ceil(len(values) * .95) - 1]
+
+
+def largest_residual(baseline, candidate):
+    """Largest relative difference between the roles, per compared statistic."""
+    worst = [0.0, 0.0]
+    for provider in PROVIDERS:
+        for operation in set(OPERATIONS):
+            for index, (old, new) in enumerate(zip(statistics(baseline, provider, operation),
+                                                   statistics(candidate, provider, operation))):
+                worst[index] = max(worst[index], abs(new / old - 1))
+    return worst
 
 
 class PairedOrderTests(unittest.TestCase):
@@ -91,35 +116,53 @@ class PairedOrderTests(unittest.TestCase):
                 paired_order(rounds, PROVIDERS)
         self.assertEqual(ROUNDS % 4, 0)
 
-    def test_linear_drift_is_balanced_in_the_compared_statistics(self):
-        drift = 0.5
-        baseline, candidate = measured(alternated(ROUNDS), ROUNDS, drift)
-        pair(baseline, candidate)
-        self.assertEqual(compare(baseline, candidate, BINARIES['candidate'], POLICY)['status'], 'PASS')
-        # Runs are sequential, so at any order statistic the samples of the two
-        # binaries are at most one run apart in time: for every provider,
-        # operation and compared statistic the residual difference is at most
-        # one run's share of the drift (0.02 % here), against half of the
-        # whole drift when the binaries run one after the other.
-        step = 0.2 * drift / len(alternated(ROUNDS))
-        for provider in PROVIDERS:
-            for operation in set(OPERATIONS):
-                for old, new in zip(statistics(baseline, provider, operation),
-                                    statistics(candidate, provider, operation)):
-                    self.assertLessEqual(abs(new - old), step + 1e-12, (provider, operation))
-        baseline, candidate = measured(sequential(ROUNDS), ROUNDS, drift)
-        self.assertEqual(compare(baseline, candidate, BINARIES['candidate'], POLICY)['status'], 'FAIL')
+    def test_a_drift_the_guard_accepts_leaves_only_a_one_run_residual(self):
+        # 8 % over the whole run: each binary moves 4 % between its halves,
+        # inside the guard (half of the 10 % budget).
+        baseline, candidate = paired_run(linear(0.08))
+        comparison = compare(baseline, candidate, BINARIES['candidate'], POLICY)
+        self.assertEqual(comparison['status'], 'PASS')
+        self.assertTrue(all(row['status'] == 'STABLE' for row in comparison['stability']))
+        # Runs are sequential, so at any order statistic the two roles' samples
+        # are one run apart: the residual is one run's share of the drift.
+        step = 0.08 / len(alternated(ROUNDS))
+        median_residual, p95_residual = largest_residual(baseline, candidate)
+        self.assertLessEqual(median_residual, step * 1.01)
+        self.assertLessEqual(p95_residual, step * 1.01)
+        # The same drift, run one binary after the other, biases the candidate
+        # by half of it.
+        old, new = measured(sequential(ROUNDS), ROUNDS, linear(0.08))
+        self.assertGreater(largest_residual(old, new)[0], 0.035)
 
-    def test_a_real_regression_still_fails_when_alternated(self):
-        baseline, candidate = measured(alternated(ROUNDS), ROUNDS, drift=0.0)
+    def test_the_documented_residual_of_a_large_linear_drift(self):
+        # The figures quoted in docs/release-campaign.md, for 50 % over the run.
+        baseline, candidate = paired_run(linear(0.5))
+        median_residual, p95_residual = largest_residual(baseline, candidate)
+        self.assertAlmostEqual(median_residual * 100, 0.07, delta=0.01)
+        self.assertAlmostEqual(p95_residual * 100, 0.06, delta=0.01)
+        # ... and that drift is far beyond what the guard accepts.
+        self.assertEqual(compare(baseline, candidate, BINARIES['candidate'], POLICY)['status'], UNRELIABLE)
+
+    def test_a_jump_mid_run_is_unreliable_never_pass_or_regression(self):
+        baseline, candidate = paired_run(lambda fraction: 0.25 if fraction >= 0.5 else 0.0)
+        comparison = compare(baseline, candidate, BINARIES['candidate'], POLICY)
+        self.assertEqual(comparison['status'], UNRELIABLE)
+        self.assertTrue(any(row['status'] == 'UNSTABLE' for row in comparison['stability']))
+        # Even when the candidate also regressed, the verdict is unreliable.
         for row in candidate['results']:
             for measure in row['measurements']:
                 measure['elapsed_seconds'] *= 1.3
-        pair(baseline, candidate)
+        self.assertEqual(compare(baseline, candidate, BINARIES['candidate'], POLICY)['status'], UNRELIABLE)
+
+    def test_a_real_regression_still_fails_when_alternated(self):
+        baseline, candidate = paired_run(linear(0.0))
+        for row in candidate['results']:
+            for measure in row['measurements']:
+                measure['elapsed_seconds'] *= 1.3
         self.assertEqual(compare(baseline, candidate, BINARIES['candidate'], POLICY)['status'], 'FAIL')
 
     def test_paired_metadata_is_validated_never_read_as_absent(self):
-        baseline, candidate = measured(alternated(ROUNDS), ROUNDS, drift=0.0)
+        baseline, candidate = measured(alternated(ROUNDS), ROUNDS, linear(0.0))
         self.assertFalse(validate_pairing(baseline, candidate, PROVIDERS))
         pair(baseline, candidate)
         self.assertTrue(validate_pairing(baseline, candidate, PROVIDERS))
@@ -128,15 +171,31 @@ class PairedOrderTests(unittest.TestCase):
                 altered = dict(candidate, paired_measurement=broken)
                 with self.assertRaises(ValueError):
                     compare(baseline, altered, BINARIES['candidate'], POLICY)
-        for field, value in (('order', paired_order(ROUNDS, PROVIDERS)[::-1]), ('order', []),
-                             ('order_scheme', 'ABAB'), ('role', 'baseline'), ('partner_campaign_id', 'x')):
-            with self.subTest(field=field):
-                altered = dict(candidate, paired_measurement=dict(candidate['paired_measurement'], **{field: value}))
+        order = paired_order(ROUNDS, PROVIDERS)
+        wrong_types = [dict(order[0], round=True), dict(order[0], round=0.0), dict(order[0], first='other'),
+                       dict(order[0], provider=7), dict(order[0], extra=1)]
+        for field, value in [('order', order[::-1]), ('order', []), ('order', None), ('order_scheme', 'ABAB'),
+                             ('role', 'baseline'), ('partner_campaign_id', 'x'),
+                             *(('order', [slot] + order[1:]) for slot in wrong_types)]:
+            with self.subTest(field=field, value=str(value)[:40]):
+                broken = dict(candidate['paired_measurement'], **{field: value})
+                altered = dict(candidate, paired_measurement=broken)
                 with self.assertRaises(ValueError):
                     compare(baseline, altered, BINARIES['candidate'], POLICY)
         with self.assertRaises(ValueError):
             compare(baseline, {k: v for k, v in candidate.items() if k != 'paired_measurement'},
                     BINARIES['candidate'], POLICY)
+
+    def test_release_evidence_from_3_0_0_requires_a_paired_run(self):
+        baseline, candidate = measured(alternated(ROUNDS), ROUNDS, linear(0.0))
+        release_evidence.require_paired_performance((2, 1, 0), baseline, candidate)
+        with self.assertRaises(ValueError):
+            release_evidence.require_paired_performance((3, 0, 0), baseline, candidate)
+        pair(baseline, candidate)
+        release_evidence.require_paired_performance((3, 0, 0), baseline, candidate)
+        with self.assertRaises(ValueError):
+            release_evidence.validate_transfers(candidate, BINARIES['candidate'], size=1024**2, workers=WORKERS,
+                                                rounds=1)
 
 
 class ProducerTests(unittest.TestCase):
@@ -174,8 +233,6 @@ class ProducerTests(unittest.TestCase):
             self.assertEqual(own['paired_measurement']['order'], expected)
             self.assertEqual(own['paired_measurement']['role'], role)
             self.assertEqual(len(own['results']), rounds * len(PROVIDERS) * WORKERS)
-        # In every slot all workers of the first binary end before any worker
-        # of the second binary starts.
         per_slot = 4 * WORKERS
         self.assertEqual(len(events), per_slot * len(expected))
         for index, slot in enumerate(expected):
@@ -237,43 +294,222 @@ class RetryTests(unittest.TestCase):
         self.assertIn('spooled-large', run_vm_campaign.phases_for('3.0.0'))
 
 
+class FakeRemote:
+    """A VM whose fixture preparation finishes after a few polls with a
+    scripted outcome; files are kept in memory by remote path."""
+
+    def __init__(self, root, *, code='0', check='PASS', polls=2):
+        self.root, self.code, self.check, self.polls = root, code, check, polls
+        self.files, self.commands = {}, []
+
+    def write(self, remote, text):
+        self.files[remote] = text
+
+    def download(self, remote, path):
+        path.write_text(self.files[remote])
+
+    def run(self, command):
+        self.commands.append(command)
+        if '(nohup bash .fixtures/' in command:
+            self.label_nonce = command.split('(nohup bash .fixtures/', 1)[1].split('-run.sh', 1)[0]
+            return 'started'
+        if 'then cat ' in command:
+            signal = command.split('if test -f ', 1)[1].split(';', 1)[0]
+            if signal in [f'.fixtures/signals/{self.label_nonce}.exit'] and self.polls == 0:
+                self.finish()
+            self.polls -= 1
+            return self.files.get(f'{self.root}/{signal}', 'running') if signal in self.local_signals() else 'running'
+        if 'then echo yes' in command:
+            path = command.split('if test -f ', 1)[1].split(';', 1)[0]
+            return 'yes' if f'{self.root}/{path}' in self.files else 'no'
+        return ''
+
+    def local_signals(self):
+        return {key[len(self.root) + 1:] for key in self.files if key.endswith('.exit')}
+
+    def finish(self):
+        signal = f'{self.root}/.fixtures/signals/{self.label_nonce}'
+        self.files[signal + '.exit'] = self.code
+        self.files[signal + '.log'] = 'log'
+        if self.code not in (str(release_campaign.LOCK_HELD),):
+            self.files[f'{self.root}/.fixtures/diagnostics/{self.label_nonce}.tar.gz'] = 'archive'
+        self.files[signal + '-check.json'] = json.dumps({'status': self.check})
+
+
 class FixtureResetTests(unittest.TestCase):
-    def test_reset_runs_under_the_lock_and_checks_before_and_after(self):
-        script, wrapper = release_campaign.fixture_scripts('/srv/root', 'storage-q-abc', 'vm.invalid',
-                                                           'fixture-reset', '3', recreate=True)
+    ROOT = '/srv/root'
+
+    def reset(self, remote, folder):
+        return release_campaign.reset_fixtures(remote, self.ROOT, 'storage-q-abc', 'vm.invalid', folder,
+                                               poll=0, deadline=60)
+
+    def test_a_reset_is_recorded_with_its_nonce_only_after_every_fixture_answers(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            remote = FakeRemote(self.ROOT)
+            nonce = self.reset(remote, folder)
+            record = json.loads((folder / 'fixture-reset.json').read_text())
+            self.assertEqual(record['nonce'], nonce)
+            self.assertTrue(record['recreated'])
+            self.assertEqual(json.loads((folder / 'fixture-reset-nonce.json').read_text())['nonce'], nonce)
+            self.assertTrue((folder / 'pre-reset.tar.gz').is_file())
+            script = remote.files[f'{self.ROOT}/.fixtures/fixture-reset-{nonce}.sh']
+            self.assertIn(f'.fixtures/signals/fixture-reset-{nonce}', script)
+            self.assertNotIn('|| true', script)
+
+    def test_a_stale_exit_signal_is_never_read_as_this_execution(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            remote = FakeRemote(self.ROOT, code='1')
+            # A successful signal left by an earlier execution of the same label.
+            remote.files[f'{self.ROOT}/.fixtures/signals/fixture-reset-{"0" * 32}.exit'] = '0'
+            with self.assertRaises(ValueError):
+                self.reset(remote, folder)
+            self.assertFalse((folder / 'fixture-reset.json').exists())
+
+    def test_a_held_lock_or_failed_check_records_no_reset(self):
+        for code, check in ((str(release_campaign.LOCK_HELD), 'PASS'), (str(release_campaign.RUNNER_ACTIVE), 'PASS'),
+                            ('0', 'FAIL')):
+            with self.subTest(code=code, check=check), tempfile.TemporaryDirectory() as temporary:
+                folder = Path(temporary)
+                with self.assertRaises(ValueError):
+                    self.reset(FakeRemote(self.ROOT, code=code, check=check), folder)
+                self.assertFalse((folder / 'fixture-reset.json').exists())
+
+    def test_the_wrapper_always_records_and_returns_the_real_code(self):
+        script, wrapper = release_campaign.fixture_scripts(self.ROOT, 'storage-q-abc', 'vm.invalid',
+                                                           'fixture-reset', 'n0nce', recreate=True)
         self.assertIn(f'flock -n -E {release_campaign.LOCK_HELD} .fixtures/campaign/campaign.lock', wrapper)
-        self.assertIn('test -f .fixtures/fixture-reset-3.exit || echo "$code"', wrapper)
+        self.assertIn('mv .fixtures/signals/fixture-reset-n0nce.exit.pending .fixtures/signals/fixture-reset-n0nce.exit',
+                      wrapper)
+        self.assertTrue(wrapper.rstrip().endswith('exit "$code"'))
+        self.assertNotIn('test -f', wrapper)
         steps = script.splitlines()
         runner = next(i for i, line in enumerate(steps) if "grep -q '^storage-q-abc-campaign-'" in line)
         archive = next(i for i, line in enumerate(steps) if 'logs --no-color' in line)
         recreate = steps.index('export PLENORA_FIXTURE_RECREATE=1')
         check = next(i for i, line in enumerate(steps) if 'check_fixtures.py' in line)
+        state = next(i for i, line in enumerate(steps) if 'fixture-state.json.pending' in line)
         self.assertLess(runner, archive)
         self.assertLess(archive, recreate)
         self.assertLess(recreate, check)
-        self.assertIn(f'exit {release_campaign.RUNNER_ACTIVE}', script)
-        plain, _ = release_campaign.fixture_scripts('/srv/root', 'storage-q-abc', 'vm.invalid', 'prepare', '1',
-                                                    recreate=False)
-        self.assertNotIn('PLENORA_FIXTURE_RECREATE', plain)
-        self.assertNotIn('check_fixtures', plain)
+        self.assertLess(check, state)
+
+    def test_the_runner_measures_only_after_this_attempts_reset(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            with self.assertRaises(ValueError):
+                run_vm_campaign.check_fixture_state(output, 'n0nce')
+            for state in ({'nonce': 'other', 'kind': 'reset'}, {'nonce': 'n0nce', 'kind': 'prepare'}):
+                (output / 'fixture-state.json').write_text(json.dumps(state))
+                with self.assertRaises(ValueError):
+                    run_vm_campaign.check_fixture_state(output, 'n0nce')
+            (output / 'fixture-state.json').write_text(json.dumps({'nonce': 'n0nce', 'kind': 'reset'}))
+            run_vm_campaign.check_fixture_state(output, 'n0nce')
 
 
-    def test_reset_is_recorded_only_when_every_fixture_answers(self):
+class Server:
+    """A local TCP server that answers every connection with fixed bytes."""
+
+    def __init__(self, reply):
+        self.reply = reply
+        self.listener = socket.create_server(('127.0.0.1', 0))
+        self.port = self.listener.getsockname()[1]
+        self.thread = threading.Thread(target=self.serve, daemon=True)
+        self.thread.start()
+
+    def serve(self):
+        while True:
+            try:
+                connection, _ = self.listener.accept()
+            except OSError:
+                return
+            with connection:
+                connection.settimeout(2)
+                try:
+                    connection.sendall(self.reply)
+                    connection.recv(4096)
+                except OSError:
+                    pass
+
+    def close(self):
+        self.listener.close()
+
+
+BANNERS = {
+    'http-503': b'HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n',
+    'http-200': b'HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n',
+    'ftp': b'220 fixture ready\r\n',
+    'ssh': b'SSH-2.0-fixture\r\n',
+    'smb': b'\x00\x00\x00\x04junk',
+}
+
+
+class ProbeTests(unittest.TestCase):
+    """Every application probe fails against a server that only answers a
+    banner, an error status or a bare success."""
+
+    def failing(self, banner, probe):
+        import check_fixtures
+        server = Server(BANNERS[banner])
+        try:
+            with self.assertRaises((check_fixtures.ProbeFailure, OSError)):
+                probe(check_fixtures, server.port)
+        finally:
+            server.close()
+
+    def test_http_probes_need_their_authenticated_answer(self):
+        for banner in ('http-503', 'http-200'):
+            with self.subTest(banner=banner):
+                self.failing(banner, lambda c, port: c.webdav_propfind(f'http://127.0.0.1:{port}/'))
+        self.failing('http-503', lambda c, port: c.s3_head_bucket(f'http://127.0.0.1:{port}'))
+        self.failing('http-503', lambda c, port: c.azure_list(f'http://127.0.0.1:{port}/devstoreaccount1'))
+        self.failing('http-503', lambda c, port: c.gcs_bucket(f'http://127.0.0.1:{port}'))
+
+    def test_tls_probe_refuses_a_plain_banner(self):
+        import ssl
+        self.failing('http-200', lambda c, port: c.s3_head_bucket(f'https://127.0.0.1:{port}',
+                                                                   ssl.create_default_context()))
+
+    def test_ftp_probes_need_login_and_listing(self):
+        self.failing('ftp', lambda c, port: c.ftp_list('127.0.0.1', port, 'user', 'secret'))
+        self.failing('ftp', lambda c, port: c.ftp_list('127.0.0.1', port, 'user', 'secret',
+                                                       tls_ca=ROOT / 'scripts/check_fixtures.py'))
+
+    @unittest.skipUnless(shutil.which('ssh-keyscan') and shutil.which('sftp'), 'OpenSSH client not available')
+    def test_sftp_probe_needs_the_pinned_key_and_a_listing(self):
+        self.failing('ssh', lambda c, port: c.sftp_list('127.0.0.1', port, Path('missing-key'), 'SHA256:pin'))
+
+    @unittest.skipUnless(shutil.which('smbclient'), 'smbclient not available')
+    def test_smb_probe_needs_a_session_and_a_listing(self):
+        self.failing('smb', lambda c, port: c.run_probe(c.smbclient_command('127.0.0.1', port, 'storage'),
+                                                        'SMB listing failed'))
+
+    def test_a_failed_container_probe_fails_the_check(self):
         import check_fixtures
         healthy = {service: {'Service': service, 'State': 'running', 'Health': 'healthy'}
                    for service in check_fixtures.SERVICES}
-        with patch.object(check_fixtures, 'containers', return_value=healthy),                 patch.object(check_fixtures, 'probe', return_value=True):
-            self.assertEqual(check_fixtures.inspect()['status'], 'PASS')
+        passing = {service: (lambda: None) for service in check_fixtures.SERVICES}
+        with patch.object(check_fixtures, 'containers', return_value=healthy), \
+                patch.object(check_fixtures, 'probes', return_value=passing):
+            self.assertEqual(check_fixtures.inspect('vm.invalid')['status'], 'PASS')
+
+        def refused():
+            raise check_fixtures.ProbeFailure('banner only')
+        for service in check_fixtures.SERVICES:
+            with self.subTest(service=service), patch.object(check_fixtures, 'containers', return_value=healthy), \
+                    patch.object(check_fixtures, 'probes', return_value=dict(passing, **{service: refused})):
+                report = check_fixtures.inspect('vm.invalid')
+                self.assertEqual(report['status'], 'FAIL')
+                self.assertEqual([r['service'] for r in report['results'] if r['status'] == 'FAIL'], [service])
         unhealthy = dict(healthy, webdav={'Service': 'webdav', 'State': 'running', 'Health': 'starting'})
-        with patch.object(check_fixtures, 'containers', return_value=unhealthy),                 patch.object(check_fixtures, 'probe', return_value=True):
-            self.assertEqual(check_fixtures.inspect()['status'], 'FAIL')
-        missing = {key: value for key, value in healthy.items() if key != 'smb'}
-        with patch.object(check_fixtures, 'containers', return_value=missing),                 patch.object(check_fixtures, 'probe', return_value=True):
-            self.assertEqual(check_fixtures.inspect()['status'], 'FAIL')
-        with patch.object(check_fixtures, 'containers', return_value=healthy),                 patch.object(check_fixtures, 'probe', side_effect=lambda port, kind: port != 2122):
-            report = check_fixtures.inspect()
-        self.assertEqual(report['status'], 'FAIL')
-        self.assertEqual([r['service'] for r in report['results'] if r['status'] == 'FAIL'], ['ftps'])
+        with patch.object(check_fixtures, 'containers', return_value=unhealthy), \
+                patch.object(check_fixtures, 'probes', return_value=passing):
+            self.assertEqual(check_fixtures.inspect('vm.invalid')['status'], 'FAIL')
+        with patch.object(check_fixtures.subprocess, 'run') as run:
+            run.return_value.returncode = 1
+            with self.assertRaises(check_fixtures.ProbeFailure):
+                check_fixtures.run_probe(['smbclient'], 'SMB listing failed')
 
 
 if __name__ == '__main__':

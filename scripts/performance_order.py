@@ -34,6 +34,13 @@ def validate_pairing(baseline, candidate, providers):
     if not all(present):
         raise ValueError('only one performance report declares a paired run')
     pairs = [baseline['paired_measurement'], candidate['paired_measurement']]
+    for pair in pairs:
+        order = pair.get('order') if isinstance(pair, dict) else None
+        if not isinstance(order, list) or not all(
+                isinstance(slot, dict) and set(slot) == {'round', 'provider', 'first'}
+                and type(slot['round']) is int and isinstance(slot['provider'], str) and slot['first'] in ROLES
+                for slot in order):
+            raise ValueError('paired performance order is malformed')
     for role, pair, own, other in (('baseline', pairs[0], baseline, candidate),
                                    ('candidate', pairs[1], candidate, baseline)):
         if (not isinstance(pair, dict) or set(pair) != {'role', 'order_scheme', 'partner_campaign_id', 'order'}

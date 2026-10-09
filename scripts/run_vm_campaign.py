@@ -47,7 +47,24 @@ def identity(folder, baseline):
             'large_transfer_rounds': 2}
 
 
-def run(folder, baseline, output, retries, reason, backend_data):
+def check_fixture_state(output, nonce):
+    """The fixtures were last prepared by this attempt's reset, and by nothing after it.
+
+    Every preparation records its nonce in fixture-state.json under the
+    campaign lock, which this runner holds from here on: a different nonce,
+    or a preparation that was not a reset, means the fixtures changed after
+    the reset of this attempt.
+    """
+    try:
+        state = json.loads((output / 'fixture-state.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        state = None
+    if state != {'nonce': nonce, 'kind': 'reset'}:
+        raise ValueError('fixtures were not reset for this attempt, or were prepared again after the reset; '
+                         'nothing was measured')
+
+
+def run(folder, baseline, output, retries, reason, backend_data, fixture_nonce):
     if sys.platform != 'linux':
         raise ValueError('VM campaign requires Linux')
     folder, baseline, output = folder.resolve(), baseline.resolve(), output.resolve()
@@ -64,6 +81,7 @@ def run(folder, baseline, output, retries, reason, backend_data):
               **{f'backend-{index}': path for index, path in enumerate(backend_data)}}
     subject['space_locations'] = {label: str(path.resolve()) for label, path in spaces.items()}
     with exclusive(output):
+        check_fixture_state(output, fixture_nonce)
         campaign = Campaign(output, subject)
         campaign.validate_retries(retries, phases_for(subject['version']))
 
@@ -152,5 +170,8 @@ if __name__ == '__main__':
     parser.add_argument('--backend-data', type=Path, action='append', default=[])
     parser.add_argument('--retry-phase', action='append', default=[])
     parser.add_argument('--retry-reason')
+    parser.add_argument('--fixture-nonce', required=True,
+                        help='nonce of the fixture reset of this attempt, checked before measuring')
     args = parser.parse_args()
-    run(args.distribution, args.baseline_binary, args.output, args.retry_phase, args.retry_reason, args.backend_data)
+    run(args.distribution, args.baseline_binary, args.output, args.retry_phase, args.retry_reason, args.backend_data,
+        args.fixture_nonce)
