@@ -89,11 +89,25 @@ Limiti dichiarati:
 **Guardia di stabilità.** Per ogni provider e operazione il confronto calcola,
 separatamente per baseline e candidato, la mediana del tempo nella prima e
 nella seconda metà dei round. Se uno dei due binari cambia rispetto a sé stesso
-oltre metà del budget della mediana (5%, con soglia minima di 5 ms), la misura
-è **non affidabile**: lo stato è `UNRELIABLE`, mai `PASS`, anche se il
+oltre metà del budget della mediana, 5% con un minimo di 10 ms
+(`stability_allowance` in `scripts/performance-policy.json`), la misura è
+**non affidabile**: lo stato è `UNRELIABLE`, mai `PASS`, anche se il
 candidato ha anche regredito; `check_performance.py` esce con il codice 3,
 distinto dal codice 1 della regressione, e chiede di ripetere la campagna su un
 host stabile. Il report registra ogni controllo in `stability`.
+
+Il minimo di 10 ms è lo stesso del budget di confronto ed è motivato dai dati
+reali. Sulla campagna 2.1.0 accettata, su un host tranquillo, un minimo di 5 ms
+avrebbe dichiarato non affidabile una misura buona (`azure copy`, 5,45 ms tra
+le due metà); con 10 ms la campagna accettata non dà allarmi. Restano rilevate
+le derive di almeno 10 ms sulle operazioni brevi (nelle misure della 3.0.0
+`smb copy` −10,6 ms e `webdav copy` −10,3 ms) e quelle oltre il 5% sulle
+operazioni lunghe (ftp e ftps tra −5% e −7% nella stessa misura, ftp da +6% a
++26% nella campagna VM fallita della 2.1.0). Limite dichiarato: uno
+spostamento sotto i 10 ms su un'operazione sotto i 200 ms non viene rilevato,
+anche se in percentuale è grande, come il +25/+32% (5–7 ms) di azure e smb in
+quella campagna fallita; lì il confronto resta coperto dall'alternanza ABBA e
+dal budget di 10 ms del confronto stesso.
 
 L'ordine dipende solo dalla posizione: è deterministico e non usa semi casuali.
 Entrambi i report lo registrano in `paired_measurement`, con ruolo, schema,

@@ -82,27 +82,25 @@ def compare(baseline, candidate, binary, policy):
 
 
 UNRELIABLE = 'UNRELIABLE'
-# Share of the median budget a binary may move between the first and the
-# second half of its own rounds before the measurement is unreliable.
-STABILITY_SHARE = 0.5
 
 
 def stability_checks(report, role, policy):
     """Median elapsed time of each provider and operation in the first and in
     the second half of the rounds, for one binary of a paired run.
 
-    The allowance is half of the median budget, percentage and absolute floor
-    alike: a binary that moves that much against itself during the run means
-    the environment moved, and ABBA balances a drift but not a jump between
-    the two runs of a pair.
+    The allowance is `stability_allowance` of the policy: half of the median
+    budget (5 %) with the comparison's own 10 ms floor. A binary that moves
+    more than that against itself during the run means the environment moved,
+    and ABBA balances a drift but not a jump between the two runs of a pair.
+    The policy file records why the floor is 10 ms and not 5 ms.
     """
     halves = defaultdict(lambda: ([], []))
     middle = report['rounds'] / 2
     for row in report['results']:
         for measure in row['measurements']:
             halves[(row['provider'], measure['operation'])][row['round'] >= middle].append(measure['elapsed_seconds'])
-    percent = policy['maximum_regression_percent']['median'] * STABILITY_SHARE
-    floor = policy['minimum_timing_budget_seconds']['median'] * STABILITY_SHARE
+    percent = policy['stability_allowance']['median_percent']
+    floor = policy['stability_allowance']['minimum_seconds']
     checks = []
     for (provider, operation), (first, second) in sorted(halves.items()):
         early, late = median(first), median(second)

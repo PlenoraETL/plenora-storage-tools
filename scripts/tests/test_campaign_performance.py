@@ -154,6 +154,25 @@ class PairedOrderTests(unittest.TestCase):
                 measure['elapsed_seconds'] *= 1.3
         self.assertEqual(compare(baseline, candidate, BINARIES['candidate'], POLICY)['status'], UNRELIABLE)
 
+    def test_the_stability_allowance_is_five_percent_with_a_ten_millisecond_floor(self):
+        from check_performance import stability_checks
+        self.assertEqual(POLICY['stability_allowance']['median_percent'], 5)
+        self.assertEqual(POLICY['stability_allowance']['minimum_seconds'], 0.010)
+
+        def halves(first, second):
+            own = report('baseline', 4)
+            for iteration in range(4):
+                elapsed = first if iteration < 2 else second
+                own['results'].append({'provider': 'azure', 'round': iteration, 'measurements': [
+                    {'operation': 'copy', 'elapsed_seconds': elapsed}]})
+            return stability_checks(own, 'baseline', POLICY)[0]['status']
+        # The accepted 2.1.0 campaign: azure copy moved 5.45 ms on a quiet host.
+        self.assertEqual(halves(0.06530, 0.05985), 'STABLE')
+        # A real drift of 3.0.0 day: smb copy -11.7 % on 90 ms.
+        self.assertEqual(halves(0.09065, 0.08005), 'UNSTABLE')
+        # Long operations follow the percentage: ftp copy +26 % on 5.3 s.
+        self.assertEqual(halves(5.2785, 6.65395), 'UNSTABLE')
+
     def test_a_real_regression_still_fails_when_alternated(self):
         baseline, candidate = paired_run(linear(0.0))
         for row in candidate['results']:
