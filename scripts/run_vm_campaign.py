@@ -10,6 +10,7 @@ import venv
 
 from campaign_state import Campaign, digest, exclusive, logged, write_json
 from check_disk_space import GIB, inspect
+from check_memory import available as available_memory, inspect as inspect_memory
 from soak_policy import SOAK_DURATION_SECONDS
 from performance_order import SCHEME
 from versioning import parse_version
@@ -64,7 +65,18 @@ def check_fixture_state(output, nonce):
                          'nothing was measured')
 
 
-def run(folder, baseline, output, retries, reason, backend_data, fixture_nonce):
+def check_controller(nonce, owner=None):
+    """The controller that started this runner still holds the VM campaign lock."""
+    owner = owner or ROOT / '.fixtures/controller-owner'
+    try:
+        holder = owner.read_text(encoding='utf-8').strip()
+    except OSError:
+        holder = None
+    if holder != nonce:
+        raise ValueError('the VM campaign lock is not held by the controller of this runner; nothing was measured')
+
+
+def run(folder, baseline, output, retries, reason, backend_data, fixture_nonce, controller_nonce):
     if sys.platform != 'linux':
         raise ValueError('VM campaign requires Linux')
     folder, baseline, output = folder.resolve(), baseline.resolve(), output.resolve()
@@ -81,6 +93,7 @@ def run(folder, baseline, output, retries, reason, backend_data, fixture_nonce):
               **{f'backend-{index}': path for index, path in enumerate(backend_data)}}
     subject['space_locations'] = {label: str(path.resolve()) for label, path in spaces.items()}
     with exclusive(output):
+        check_controller(controller_nonce)
         check_fixture_state(output, fixture_nonce)
         campaign = Campaign(output, subject)
         campaign.validate_retries(retries, phases_for(subject['version']))
@@ -97,6 +110,12 @@ def run(folder, baseline, output, retries, reason, backend_data, fixture_nonce):
             write_json(path / 'disk-space.json', space)
             if space['status'] != 'PASS':
                 raise ValueError('insufficient transfer headroom; no transfer started')
+            if spool_uploads and size >= GIB:
+                # The in-memory GCS fixture holds source and copy at once.
+                memory = inspect_memory(available_memory())
+                write_json(path / 'memory.json', memory)
+                if memory['status'] != 'PASS':
+                    raise ValueError('insufficient memory for the GCS fixture peak; no transfer started')
             # A paired run measures baseline and candidate alternately, slot by
             # slot, so a drift of the environment weighs the same on both.
             pair = (['--baseline-binary', baseline, '--baseline-output', path / 'baseline.json',
@@ -172,6 +191,8 @@ if __name__ == '__main__':
     parser.add_argument('--retry-reason')
     parser.add_argument('--fixture-nonce', required=True,
                         help='nonce of the fixture reset of this attempt, checked before measuring')
+    parser.add_argument('--controller-nonce', required=True,
+                        help='nonce of the controller holding the VM campaign lock, checked before measuring')
     args = parser.parse_args()
     run(args.distribution, args.baseline_binary, args.output, args.retry_phase, args.retry_reason, args.backend_data,
-        args.fixture_nonce)
+        args.fixture_nonce, args.controller_nonce)

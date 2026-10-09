@@ -5,6 +5,7 @@ uses verified SSH host keys with a private key or an interactive password prompt
 Run again with the same configuration to resume verified successful phases.
 """
 import argparse
+from contextlib import contextmanager
 import getpass
 import json
 import os
@@ -62,6 +63,14 @@ class Remote:
         if out.channel.recv_exit_status():
             raise RuntimeError('dedicated VM command failed')
         return text.strip()
+
+    def hold(self, command):
+        """Start `command` on its own channel and return the channel with the
+        first line it prints. The command keeps running while the channel is
+        open; closing the channel, or losing the connection, ends it."""
+        channel = self.client.get_transport().open_session()
+        channel.exec_command(command)
+        return channel, channel.makefile('r').readline().strip()
 
     def upload(self, path, remote):
         with self.client.open_sftp() as sftp:
@@ -129,6 +138,36 @@ LOCK_HELD, RUNNER_ACTIVE = 75, 76
 
 
 FIXTURE_STATE = '.fixtures/campaign/fixture-state.json'
+CONTROLLER_OWNER = '.fixtures/controller-owner'
+
+
+def campaign_lock_command(vm_root, remote_root, nonce):
+    """The VM side of the campaign lock: flock on the dedicated VM root,
+    held by a process that lives as long as the controller's channel.
+
+    It records the controller's nonce in CONTROLLER_OWNER, which the runner
+    checks, prints `locked` and waits on standard input; when the controller
+    closes the channel or disappears, the process ends and the lock is free.
+    A second controller gets exit code LOCK_HELD at once, touching nothing.
+    """
+    q = shlex.quote
+    owner = f'{remote_root}/{CONTROLLER_OWNER}'
+    holder = ('printf "%s\\n" "$1" >"$2.pending" && mv "$2.pending" "$2" && echo locked && exec cat >/dev/null')
+    return (f'mkdir -p {q(vm_root)} {q(remote_root + "/.fixtures")} && '
+            f'exec flock -n -E {LOCK_HELD} {q(vm_root + "/.campaign.lock")} sh -c {q(holder)} lock {q(nonce)} {q(owner)}')
+
+
+@contextmanager
+def campaign_lock(remote, vm_root, remote_root):
+    """Hold the VM campaign lock for the duration of the block; yields the nonce."""
+    nonce = uuid.uuid4().hex
+    channel, first = remote.hold(campaign_lock_command(vm_root, remote_root, nonce))
+    try:
+        if first != 'locked':
+            raise ValueError('another controller holds the campaign lock of this VM root; nothing was touched')
+        yield nonce
+    finally:
+        channel.close()
 
 
 def fixture_scripts(remote_root, project, host, label, nonce, *, recreate):
@@ -150,6 +189,11 @@ def fixture_scripts(remote_root, project, host, label, nonce, *, recreate):
     fixture serves requests.
     """
     q = shlex.quote
+
+    def state_lines(state):
+        return [f"printf '{{\"nonce\": \"%s\", \"kind\": \"%s\"}}\\n' {q(nonce)} {state} >{FIXTURE_STATE}.pending",
+                f'mv {FIXTURE_STATE}.pending {FIXTURE_STATE}']
+
     signal = '.fixtures/signals/' + label + '-' + nonce
     diagnostics = '.fixtures/diagnostics/' + label + '-' + nonce
     compose_all = 'docker compose -f docker-compose.yml -f compose.extended.yml'
@@ -163,18 +207,23 @@ def fixture_scripts(remote_root, project, host, label, nonce, *, recreate):
             f"if docker ps --format '{{{{.Names}}}}' | grep -q {q('^' + project + '-campaign-')}; then",
             f"  echo 'a VM runner container of this campaign is still running'; exit {RUNNER_ACTIVE}",
             'fi',
+            # From here on the fixtures may change: a preparation that stops
+            # anywhere below leaves this state, which no runner accepts.
+            *state_lines('in-progress'),
             f'mkdir -p {diagnostics}',
             f'{compose_all} ps --all --format json >{diagnostics}/containers.json',
             f'{compose_all} logs --no-color --timestamps >{diagnostics}/fixtures.log 2>&1',
             'for file in .fixtures/ca.crt .fixtures/minio/public.crt .fixtures/extended/server.crt '
             f'.fixtures/sftp-fingerprint; do cp "$file" {diagnostics}/; done',
             f'tar -czf {diagnostics}.tar.gz -C {diagnostics} .',
+            f'python3 scripts/check_memory.py --output {signal}-memory.json',
             'export PLENORA_FIXTURE_RECREATE=1']
+    else:
+        lines += state_lines('in-progress')
     lines += ['bash scripts/prepare-fixtures.sh', 'bash scripts/prepare-extended-fixtures.sh']
     if recreate:
         lines += [f'python3 scripts/check_fixtures.py --output {signal}-check.json']
-    lines += [f"printf '{{\"nonce\": \"%s\", \"kind\": \"%s\"}}\\n' {q(nonce)} {kind} >{FIXTURE_STATE}.pending",
-              f'mv {FIXTURE_STATE}.pending {FIXTURE_STATE}']
+    lines += state_lines(kind)
     wrapper = (f'cd {q(remote_root)} && mkdir -p .fixtures/campaign .fixtures/signals || exit 1\n'
                f'flock -n -E {LOCK_HELD} .fixtures/campaign/campaign.lock bash .fixtures/{label}-{nonce}.sh\n'
                'code=$?\n'
@@ -327,6 +376,10 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
                        '-f compose.extended.yml -f .fixtures/compose.campaign.json')
 
             def prepare(path):
+                with campaign_lock(remote, config['vm_root'], remote_root):
+                    prepare_locked(path)
+
+            def prepare_locked(path):
                 bundle = path / 'source.bundle'
                 logged(['git', 'bundle', 'create', str(bundle), 'HEAD'], path, cwd=ROOT)
                 remote.run('mkdir -p ' + q(remote_root))
@@ -365,6 +418,13 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
             windows_result = phase('qualify-windows', windows)
 
             def vm(path):
+                # The lock covers everything this attempt puts on the VM, from
+                # the fixture reset and the distribution to the end of the
+                # runner, which checks that its controller holds it.
+                with campaign_lock(remote, config['vm_root'], remote_root) as controller:
+                    vm_locked(path, controller)
+
+            def vm_locked(path, controller):
                 if connect_host:
                     import hashlib
                     host_key = remote.client.get_transport().get_remote_server_key()
@@ -383,7 +443,7 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
                 container = project + '-campaign-' + path.name
                 command = ['python3', 'scripts/run_vm_campaign.py', f'dist/{version}/{TARGETS["linux"]}',
                            '--baseline-binary', '/baseline/plenora-storage', '--output', '.fixtures/campaign',
-                           '--fixture-nonce', nonce,
+                           '--fixture-nonce', nonce, '--controller-nonce', controller,
                            '--backend-data', '/fixture-disks/minio', '--backend-data', '/fixture-disks/sftp', '--backend-data', '/fixture-disks/ftp']
                 for name in vm_retries:
                     command.extend(['--retry-phase', name])

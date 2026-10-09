@@ -106,8 +106,13 @@ def webdav_propfind(endpoint):
     require(http(request) == 207, 'authenticated PROPFIND did not return 207')
 
 
-def ftp_list(host, port, user, secret, *, tls_ca=None):
-    """Login and listing; with `tls_ca`, explicit TLS verified against that CA."""
+def ftp_list(host, port, user, secret, *, tls_ca=None, tls_name=None):
+    """Login and listing; with `tls_ca`, explicit TLS verified against that CA.
+
+    `host` is only where to connect. The certificate is verified for
+    `tls_name`, the fixture's own identity, so the probe can reach the fixture
+    on loopback, or on a new address after a restart, without ever relaxing
+    the verification."""
     if tls_ca is None:
         client = ftplib.FTP(timeout=TIMEOUT)
     else:
@@ -115,6 +120,10 @@ def ftp_list(host, port, user, secret, *, tls_ca=None):
     try:
         client.connect(host, port)
         if tls_ca is not None:
+            # ftplib verifies the control and data channels against
+            # `client.host`; the passive data connection still goes to the
+            # address actually connected, never to one the server announces.
+            client.host = tls_name or host
             client.auth()
         client.login(user, secret)
         if tls_ca is not None:
@@ -175,7 +184,10 @@ def probes(host):
         'sftp': lambda: sftp_list('127.0.0.1', 2222, fixtures / 'sftp-client',
                                   (fixtures / 'sftp-fingerprint').read_text().strip()),
         'ftp': lambda: ftp_list('127.0.0.1', 2121, 'plenora', 'plenora-ftp-secret'),
-        'ftps': lambda: ftp_list(host, 2122, FIXTURE_USER, FIXTURE_SECRET, tls_ca=fixtures / 'extended/server.crt'),
+        # On loopback, verified as the host named in the certificate: the VM's
+        # own address may have changed (--connect-host), its identity not.
+        'ftps': lambda: ftp_list('127.0.0.1', 2122, FIXTURE_USER, FIXTURE_SECRET,
+                                 tls_ca=fixtures / 'extended/server.crt', tls_name=host),
         'azure': lambda: azure_list(f'http://127.0.0.1:10000/{AZURE_ACCOUNT}'),
         'gcs': lambda: gcs_bucket('http://127.0.0.1:4443'),
         'webdav': lambda: webdav_propfind('http://127.0.0.1:8088/'),

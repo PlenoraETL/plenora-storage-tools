@@ -408,11 +408,16 @@ class FixtureResetTests(unittest.TestCase):
         archive = next(i for i, line in enumerate(steps) if 'logs --no-color' in line)
         recreate = steps.index('export PLENORA_FIXTURE_RECREATE=1')
         check = next(i for i, line in enumerate(steps) if 'check_fixtures.py' in line)
-        state = next(i for i, line in enumerate(steps) if 'fixture-state.json.pending' in line)
-        self.assertLess(runner, archive)
-        self.assertLess(archive, recreate)
+        states = [i for i, line in enumerate(steps) if line.startswith('printf') and 'fixture-state' in line]
+        memory = next(i for i, line in enumerate(steps) if 'check_memory.py' in line)
+        self.assertIn('in-progress', steps[states[0]])
+        self.assertIn('reset', steps[states[-1]])
+        self.assertLess(runner, states[0])
+        self.assertLess(states[0], archive)
+        self.assertLess(archive, memory)
+        self.assertLess(memory, recreate)
         self.assertLess(recreate, check)
-        self.assertLess(check, state)
+        self.assertLess(check, states[-1])
 
     def test_the_runner_measures_only_after_this_attempts_reset(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -434,6 +439,145 @@ class FixtureDefinitionTests(unittest.TestCase):
         service = lines.index('  gcs:')
         command = next(line for line in lines[service:] if line.strip().startswith('command:'))
         self.assertIn('"-backend", "memory"', command)
+
+
+STUB_DOCKER = """#!/usr/bin/env bash
+# Stub: `ps` lists no runner; `compose logs` fails when FAIL_LOGS is set.
+if [ "$1" = ps ]; then exit 0; fi
+if [ "$1" = compose ] && [[ " $* " == *" logs "* ]] && [ -n "${FAIL_LOGS:-}" ]; then exit 1; fi
+exit 0
+"""
+
+
+@unittest.skipUnless(sys.platform != 'win32' and shutil.which('bash') and shutil.which('python3'),
+                     'runs the generated bash script')
+class FixtureScriptBehaviourTests(unittest.TestCase):
+    """Executes the generated preparation script with stubbed docker and
+    preparation steps, and checks what it leaves behind."""
+
+    def setUp(self):
+        self.folder = tempfile.TemporaryDirectory()
+        self.root = Path(self.folder.name)
+        for path in ('.fixtures/signals', '.fixtures/campaign', '.fixtures/minio', '.fixtures/extended', 'scripts',
+                     'bin'):
+            (self.root / path).mkdir(parents=True)
+        for path in ('.fixtures/ca.crt', '.fixtures/minio/public.crt', '.fixtures/extended/server.crt',
+                     '.fixtures/sftp-fingerprint'):
+            (self.root / path).write_text('fixture')
+        (self.root / 'bin/docker').write_text(STUB_DOCKER)
+        (self.root / 'bin/docker').chmod(0o755)
+        (self.root / 'scripts/prepare-fixtures.sh').write_text('touch .fixtures/prepared\n')
+        (self.root / 'scripts/prepare-extended-fixtures.sh').write_text('exit "${FAIL_EXTENDED:-0}"\n')
+        report = "import json,sys; open(sys.argv[2],'w').write(json.dumps({'status': 'PASS'}))\n"
+        (self.root / 'scripts/check_fixtures.py').write_text(report)
+        (self.root / 'scripts/check_memory.py').write_text(report)
+
+    def tearDown(self):
+        self.folder.cleanup()
+
+    def execute(self, nonce, **environment):
+        import os
+        import subprocess
+        script, _ = release_campaign.fixture_scripts(str(self.root), 'storage-q-abc', 'vm.invalid', 'fixture-reset',
+                                                     nonce, recreate=True)
+        path = self.root / f'.fixtures/fixture-reset-{nonce}.sh'
+        path.write_text(script)
+        env = dict(os.environ, PATH=f'{self.root / "bin"}:{os.environ["PATH"]}', **environment)
+        return subprocess.run(['bash', str(path)], env=env, check=False).returncode
+
+    def test_a_failed_preparation_invalidates_the_previous_reset(self):
+        self.assertEqual(self.execute('a' * 32), 0)
+        run_vm_campaign.check_fixture_state(self.root / '.fixtures/campaign', 'a' * 32)
+        self.assertNotEqual(self.execute('b' * 32, FAIL_EXTENDED='1'), 0)
+        with self.assertRaises(ValueError):
+            run_vm_campaign.check_fixture_state(self.root / '.fixtures/campaign', 'a' * 32)
+        with self.assertRaises(ValueError):
+            run_vm_campaign.check_fixture_state(self.root / '.fixtures/campaign', 'b' * 32)
+
+    def test_a_failed_diagnostic_collection_recreates_nothing(self):
+        self.assertNotEqual(self.execute('c' * 32, FAIL_LOGS='1'), 0)
+        self.assertFalse((self.root / '.fixtures/prepared').exists())
+        with self.assertRaises(ValueError):
+            run_vm_campaign.check_fixture_state(self.root / '.fixtures/campaign', 'c' * 32)
+
+
+class CampaignLockTests(unittest.TestCase):
+    class Channel:
+        def __init__(self):
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    class Holder:
+        """Hands out the lock to the first holder only, as flock does."""
+
+        def __init__(self):
+            self.held, self.channels = False, []
+
+        def hold(self, command):
+            channel = CampaignLockTests.Channel()
+            self.channels.append(channel)
+            if self.held:
+                return channel, ''
+            self.held = True
+            return channel, 'locked'
+
+    def test_a_second_controller_is_refused_and_the_first_releases_on_exit(self):
+        remote = self.Holder()
+        with release_campaign.campaign_lock(remote, '/srv', '/srv/root') as nonce:
+            self.assertEqual(len(nonce), 32)
+            with self.assertRaises(ValueError):
+                with release_campaign.campaign_lock(remote, '/srv', '/srv/root'):
+                    self.fail('second controller acquired the lock')
+            self.assertTrue(remote.channels[1].closed)
+            self.assertFalse(remote.channels[0].closed)
+        self.assertTrue(remote.channels[0].closed)
+
+    @unittest.skipUnless(sys.platform != 'win32' and shutil.which('flock'), 'needs flock')
+    def test_the_vm_command_admits_one_holder_and_records_its_nonce(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            first = subprocess.Popen(['sh', '-c', release_campaign.campaign_lock_command(
+                str(root / 'q'), str(root / 'q/run'), 'first')], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                text=True)
+            try:
+                self.assertEqual(first.stdout.readline().strip(), 'locked')
+                second = subprocess.run(['sh', '-c', release_campaign.campaign_lock_command(
+                    str(root / 'q'), str(root / 'q/run'), 'second')], stdin=subprocess.DEVNULL,
+                    capture_output=True, text=True)
+                self.assertEqual(second.returncode, release_campaign.LOCK_HELD)
+                owner = root / 'q/run/.fixtures/controller-owner'
+                self.assertEqual(owner.read_text().strip(), 'first')
+                run_vm_campaign.check_controller('first', owner)
+                with self.assertRaises(ValueError):
+                    run_vm_campaign.check_controller('second', owner)
+            finally:
+                first.stdin.close()
+                first.wait(10)
+            third = subprocess.Popen(['sh', '-c', release_campaign.campaign_lock_command(
+                str(root / 'q'), str(root / 'q/run'), 'third')], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                text=True)
+            self.assertEqual(third.stdout.readline().strip(), 'locked')
+            third.stdin.close()
+            third.wait(10)
+
+
+class MemoryTests(unittest.TestCase):
+    def test_the_gcs_peak_and_reserve_must_be_available(self):
+        import check_memory
+        gib = check_memory.GIB
+        self.assertEqual(check_memory.inspect(4 * gib)['status'], 'PASS')
+        self.assertEqual(check_memory.inspect(4 * gib - 1)['status'], 'FAIL')
+        self.assertEqual(check_memory.GCS_PEAK_BYTES, 2 * gib)
+        with tempfile.TemporaryDirectory() as temporary:
+            meminfo = Path(temporary) / 'meminfo'
+            meminfo.write_text('MemTotal: 16000000 kB\nMemAvailable: 1024 kB\n')
+            self.assertEqual(check_memory.available(meminfo), 1024 * 1024)
+            meminfo.write_text('MemTotal: 16000000 kB\n')
+            with self.assertRaises(ValueError):
+                check_memory.available(meminfo)
 
 
 class Server:
@@ -471,6 +615,122 @@ BANNERS = {
     'ssh': b'SSH-2.0-fixture\r\n',
     'smb': b'\x00\x00\x00\x04junk',
 }
+
+
+class TlsFtpServer:
+    """A minimal explicit-TLS FTP server: AUTH TLS, login, PBSZ/PROT and one
+    passive NLST over TLS, enough for a real handshake on both channels."""
+
+    def __init__(self, certificate, key):
+        import ssl
+        self.context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        self.context.load_cert_chain(certificate, key)
+        self.listener = socket.create_server(('127.0.0.1', 0))
+        self.port = self.listener.getsockname()[1]
+        threading.Thread(target=self.serve, daemon=True).start()
+
+    def serve(self):
+        try:
+            connection, _ = self.listener.accept()
+        except OSError:
+            return
+        try:
+            self.session(connection)
+        except OSError:
+            pass
+        finally:
+            connection.close()
+
+    def session(self, connection):
+        def send(line):
+            connection.sendall(line.encode() + b'\r\n')
+
+        def receive():
+            data = b''
+            while not data.endswith(b'\r\n'):
+                chunk = connection.recv(1)
+                if not chunk:
+                    raise OSError('closed')
+                data += chunk
+            return data.decode().strip()
+
+        send('220 fixture')
+        data_listener = None
+        while True:
+            command = receive().split(' ', 1)[0].upper()
+            if command == 'AUTH':
+                send('234 TLS')
+                connection = self.context.wrap_socket(connection, server_side=True)
+            elif command == 'USER':
+                send('331 password')
+            elif command == 'PASS':
+                send('230 logged in')
+            elif command in ('PBSZ', 'PROT', 'TYPE'):
+                send('200 ok')
+            elif command == 'PASV':
+                data_listener = socket.create_server(('127.0.0.1', 0))
+                port = data_listener.getsockname()[1]
+                send(f'227 Entering Passive Mode (127,0,0,1,{port // 256},{port % 256})')
+            elif command == 'NLST':
+                data, _ = data_listener.accept()
+                send('150 listing')
+                data = self.context.wrap_socket(data, server_side=True)
+                data.sendall(b'file\r\n')
+                data.unwrap().close()
+                send('226 done')
+            else:
+                send('221 bye')
+                return
+
+    def close(self):
+        self.listener.close()
+
+
+def certificate(folder, name):
+    """A self-signed certificate for `name`, made with the openssl CLI."""
+    import subprocess
+    certificate, key = folder / (name + '.crt'), folder / (name + '.key')
+    subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-keyout', str(key),
+                    '-out', str(certificate), '-subj', '/CN=' + name, '-addext', 'subjectAltName=DNS:' + name],
+                   check=True, capture_output=True)
+    return certificate, key
+
+
+@unittest.skipUnless(shutil.which('openssl'), 'needs the openssl CLI')
+class FtpsHandshakeTests(unittest.TestCase):
+    """Real TLS handshakes against the FTPS probe. The probe connects to
+    127.0.0.1, like a probe after --connect-host, and verifies the certificate
+    for the fixture's own name."""
+
+    def setUp(self):
+        self.folder = tempfile.TemporaryDirectory()
+        folder = Path(self.folder.name)
+        self.trusted = certificate(folder, 'fixture.invalid')
+        self.stranger = certificate(folder, 'stranger.invalid')
+
+    def tearDown(self):
+        self.folder.cleanup()
+
+    def probe(self, served, ca, name):
+        import check_fixtures
+        server = TlsFtpServer(*served)
+        try:
+            check_fixtures.ftp_list('127.0.0.1', server.port, 'user', 'secret', tls_ca=ca, tls_name=name)
+        finally:
+            server.close()
+
+    def test_the_fixture_identity_is_verified_on_another_address(self):
+        self.probe(self.trusted, self.trusted[0], 'fixture.invalid')
+
+    def test_an_untrusted_certificate_fails_the_handshake(self):
+        import check_fixtures
+        with self.assertRaises(check_fixtures.ProbeFailure):
+            self.probe(self.stranger, self.trusted[0], 'fixture.invalid')
+
+    def test_a_certificate_for_another_name_fails(self):
+        import check_fixtures
+        with self.assertRaises(check_fixtures.ProbeFailure):
+            self.probe(self.trusted, self.trusted[0], 'other.invalid')
 
 
 class ProbeTests(unittest.TestCase):

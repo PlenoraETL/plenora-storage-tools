@@ -131,6 +131,19 @@ campagna della 3.0.0 un rallentamento dell'host durante la misura, e poi un
 fixture GCS che rallentava nel tempo, sono ricaduti sul candidato e hanno
 prodotto confronti rossi che un A/B alternato smentiva.
 
+### Lock di campagna sulla VM
+
+Un solo controller alla volta lavora su una radice VM (`vm_root`). All'inizio
+di `prepare-vm` e di ogni tentativo `qualify-vm`, prima di caricare bundle,
+binari, override o distribuzioni, il controller acquisisce con `flock` il lock
+`<vm_root>/.campaign.lock`. Lo tiene un processo sulla VM legato al canale SSH
+del controller, fino alla fine del runner: se il controller termina o perde la
+connessione, il processo finisce e il lock si libera. Un secondo controller
+fallisce subito, senza toccare nulla. Il titolare registra il suo nonce in
+`.fixtures/controller-owner`; il runner, nel suo container, verifica che sia il
+nonce del controller che l'ha avviato (`--controller-nonce`) e altrimenti si
+ferma senza misurare.
+
 ### Fixture ricreate prima del runner
 
 All'inizio di ogni tentativo `qualify-vm` il coordinatore riesegue la
@@ -165,6 +178,22 @@ con quel codice. In ordine:
    smbclient. Un banner o uno stato d'errore non bastano. Gli healthcheck di
    FTPS, WebDAV e SMB fanno lo stesso scambio;
 6. registra il proprio nonce in `.fixtures/campaign/fixture-state.json`.
+
+Prima di modificare qualsiasi fixture, ogni preparazione scrive in
+`fixture-state.json` il proprio nonce con stato `in-progress`: una preparazione
+che si ferma in qualunque punto invalida quindi sempre la ricevuta precedente,
+e nessun runner la accetta. Prima di ricreare, il reset controlla anche la
+memoria disponibile (`scripts/check_memory.py`): il fixture GCS in memoria
+tiene sorgente e copia del trasferimento spooled da 1 GiB, un picco di circa
+2 GiB, e serve una riserva di altri 2 GiB per le altre fixture e il runner. Lo
+stesso controllo precede la fase `spooled-large`. Se la memoria non basta, si
+ferma con un errore esplicito e non libera niente da solo.
+
+Le sonde girano sulla VM e raggiungono le fixture in loopback. Il TLS di FTPS
+viene verificato per il nome dell'host della configurazione, che è nel
+certificato: dopo una ripresa con `--connect-host` cambia solo l'indirizzo con
+cui il controller raggiunge la VM, non l'identità verificata, e la verifica non
+viene mai disattivata.
 
 Solo se tutte le fixture rispondono il tentativo registra `fixture-reset.json`
 con `recreated: true` e il nonce, insieme a `fixture-check.json` e
