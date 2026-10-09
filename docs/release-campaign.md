@@ -66,18 +66,29 @@ nel perimetro delle fixture.
 ### Prestazioni: misura alternata
 
 La fase `performance-ab` misura baseline e candidato nella stessa esecuzione,
-alternati per slot: per ogni round e provider girano entrambi i binari, uno dopo
-l'altro, e chi parte per primo segue lo schema ABBA (baseline, candidato,
-candidato, baseline, poi di nuovo). Così una deriva dell'ambiente durante la
-misura, come un fixture che rallenta o un host conteso, pesa allo stesso modo
-sui due binari, invece di ricadere tutta sul secondo. L'ordine dipende solo
-dalla posizione dello slot: è deterministico e non usa semi casuali. Viene
-registrato in entrambi i report (`paired_measurement`: ruolo, schema, ordine e
-`campaign_id` dell'altro report) e lo schema entra nell'identità della
-campagna. La fase produce `baseline.json` e `candidate.json`; il confronto
-`performance-compare`, il budget di `scripts/performance-policy.json` e i
-criteri restano quelli di prima. Il confronto rifiuta due report accoppiati che
-non descrivono la stessa esecuzione alternata.
+32 round con 4 worker. Per ogni round e provider girano entrambi i binari, uno
+dopo l'altro; chi parte per primo segue lo schema ABBA sull'indice di round di
+quel provider (baseline, candidato, candidato, baseline, poi di nuovo). Ogni
+provider, e quindi ogni sua operazione, parte per primo lo stesso numero di
+volte con ciascun binario; per questo i round devono essere un multiplo di
+quattro, altrimenti la misura viene rifiutata. Una deriva dell'ambiente
+durante la misura, come un fixture che rallenta o un host conteso, pesa così
+allo stesso modo sui due binari invece di ricadere tutta sul secondo.
+
+Limite dichiarato: i due binari non girano nello stesso istante. Per una
+deriva lineare la differenza residua tra i ruoli, in mediana e p95, è al più
+la deriva accumulata in una singola esecuzione (un provider, quattro worker),
+contro metà della deriva dell'intera misura con le fasi consecutive.
+
+L'ordine dipende solo dalla posizione: è deterministico e non usa semi casuali.
+Entrambi i report lo registrano in `paired_measurement`, con ruolo, schema,
+ordine completo e `campaign_id` dell'altro report; lo schema entra
+nell'identità della campagna. Il confronto `performance-compare`, il budget di
+`scripts/performance-policy.json` e i criteri restano quelli di prima. Il
+confronto valida i metadati accoppiati: un campo presente ma vuoto, nullo,
+incompleto o con un ordine diverso dallo schema ABBA dei suoi round e provider
+viene rifiutato, mai letto come report storico. Dalla 3.0.0 il bundle di
+evidenze richiede una misura accoppiata.
 
 Fino alla 3.0.0 baseline e candidato erano due fasi consecutive: nella prima
 campagna della 3.0.0 un rallentamento dell'host durante la misura, e poi un
@@ -87,13 +98,28 @@ prodotto confronti rossi che un A/B alternato smentiva.
 ### Fixture ricreate prima del runner
 
 All'inizio di ogni tentativo `qualify-vm` il coordinatore riesegue la
-preparazione delle fixture con `PLENORA_FIXTURE_RECREATE=1`: tutti i container
-delle fixture vengono ricreati, i server in memoria (Azurite, fake GCS, WebDAV,
-SMB, FTPS) ripartono vuoti, gli altri ripartono sui loro volumi di dati, che la
-qualifica ripulisce man mano. Certificati, CA e fingerprint SFTP vengono
-rigenerati e il runner li legge al suo avvio. Il tentativo registra la
-ricreazione in `fixture-reset.json` e il log in `fixture-reset.log`. Le misure
-di prestazioni partono quindi sempre da fixture appena ricreate.
+preparazione delle fixture con `PLENORA_FIXTURE_RECREATE=1`, in quest'ordine:
+
+1. lo script gira sotto il lock del runner VM (`.fixtures/campaign/campaign.lock`):
+   se un runner o un'altra preparazione lo tiene, si ferma prima di toccare
+   qualcosa e la campagna termina con un errore esplicito. Anche la
+   preparazione di `prepare-vm` usa lo stesso lock;
+2. se un container runner di questa campagna è ancora in esecuzione, si ferma
+   con un errore esplicito. Non viene terminato nessun processo;
+3. archivia stato dei container, log delle fixture, certificati e fingerprint
+   SFTP, che il tentativo conserva in `pre-reset.tar.gz`. Il tentativo
+   precedente resta immutabile, perché le sue evidenze sono già inventariate;
+4. ricrea tutti i container delle fixture: i server in memoria (Azurite, fake
+   GCS, WebDAV, SMB, FTPS) ripartono vuoti, gli altri ripartono sui loro volumi
+   di dati, che la qualifica ripulisce man mano. Certificati, CA e fingerprint
+   vengono rigenerati e il runner li legge al suo avvio;
+5. verifica con `scripts/check_fixtures.py` che ogni fixture sia in esecuzione,
+   sana dove dichiara un healthcheck (FTP, FTPS, SFTP, WebDAV, SMB) e che
+   risponda al suo protocollo sulla porta pubblicata.
+
+Solo se tutte le fixture rispondono il tentativo registra `fixture-reset.json`
+con `recreated: true`, insieme a `fixture-check.json` e `fixture-reset.log`;
+altrimenti il tentativo fallisce prima di avviare il runner.
 
 ## Ripresa, tentativi e spazio
 
@@ -107,7 +133,10 @@ Un retry di una fase già superata, o di una fase sconosciuta, viene rifiutato
 con un errore prima di eseguire qualsiasi fase, sia in `--retry-phase` sia in
 `--vm-retry-phase`: le evidenze superate non si rimisurano, perché ripetere
 una misura riuscita finché il risultato conviene non è una qualifica. Per
-misurare di nuovo si crea una campagna nuova.
+misurare di nuovo si crea una campagna nuova. `--vm-retry-phase` richiede
+anche `--retry-phase qualify-vm`, perché senza un nuovo tentativo VM il runner
+non lo vedrebbe; viene rifiutata una fase che il runner non esegue per la
+versione qualificata, come le fasi `spooled-*` prima della 2.1.0.
 
 ```powershell
 python scripts/release_campaign.py --config target/campaign.json --output target/campaign-2.0.1 --retry-phase qualify-vm --vm-retry-phase transfers-large --retry-reason "Spazio del laboratorio ripristinato"

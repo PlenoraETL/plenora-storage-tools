@@ -19,6 +19,7 @@ import tempfile
 import uuid
 
 from fixture_connections import ATOMIC, BUFFERED, PROVIDERS, ROOT, fixture
+from performance_order import SCHEME as PAIRED_ORDER, paired_order
 
 
 class OperationFailure(AssertionError):
@@ -165,24 +166,6 @@ def roundtrip(binary, provider, source, source_hash, size, root, timeout, rss_li
     return {'provider': provider, 'mode': mode, 'payload_bytes': size, 'status': 'PASS', 'measurements': measures}
 
 
-PAIRED_ORDER = 'ABBA'
-
-
-def paired_order(rounds, providers):
-    """Which binary runs first in each (round, provider) slot of a paired run.
-
-    Slots follow the ABBA pattern (baseline first, candidate first, candidate
-    first, baseline first, repeated), so any environment drift that is linear
-    over a block of four slots weighs the same on both binaries. The order is
-    fixed by position only: no seed, no clock, identical on every run.
-    """
-    order = []
-    for slot, (iteration, provider) in enumerate((r, p) for r in range(rounds) for p in providers):
-        first = 'baseline' if slot % 4 in (0, 3) else 'candidate'
-        order.append({'round': iteration, 'provider': provider, 'first': first})
-    return order
-
-
 def new_report(binary, args):
     return {'schema_version': 1, 'binary_sha256': digest(binary), 'platform': sys.platform,
             'campaign_id': str(uuid.uuid4()), 'started_utc': datetime.now(timezone.utc).isoformat(),
@@ -214,6 +197,8 @@ def main():
         parser.error('requires Linux, known fixture providers and positive resource limits')
     if (args.baseline_binary is None) != (args.baseline_output is None):
         parser.error('a paired run needs both --baseline-binary and --baseline-output')
+    if args.baseline_binary is not None and args.rounds % 4:
+        parser.error('a paired run needs a multiple of four rounds, so every provider runs first equally often')
     binaries = {'candidate': Path(os.environ.get('PLENORA_CLI_BIN', ROOT / 'target/release/plenora-storage')).resolve()}
     outputs = {'candidate': args.output}
     if args.baseline_binary is not None:

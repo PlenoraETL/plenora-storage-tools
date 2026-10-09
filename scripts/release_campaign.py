@@ -105,6 +105,69 @@ def validate_transport_resume(state, connect_host, reason):
             raise ValueError('transport address change requires completed pre-VM qualification')
 
 
+def validate_vm_retries(vm_retries, retries, version):
+    """VM retries reach the runner only through a new qualify-vm attempt.
+
+    Without `--retry-phase qualify-vm` the coordinator would reuse the passed
+    VM attempt and the runner would never see them, so they are refused; a
+    passed qualify-vm is refused by the ledger itself. Names must be phases
+    the runner executes for this version.
+    """
+    if not vm_retries:
+        return
+    if 'qualify-vm' not in retries:
+        raise ValueError('VM phase retries need --retry-phase qualify-vm; otherwise they would be ignored')
+    from run_vm_campaign import phases_for
+    known = phases_for(version)
+    unknown = sorted(set(vm_retries) - set(known))
+    if unknown:
+        raise ValueError('VM phase not executed for this version: ' + ', '.join(unknown))
+
+
+LOCK_HELD, RUNNER_ACTIVE = 75, 76
+
+
+def fixture_scripts(remote_root, project, host, label, attempt_name, *, recreate):
+    """The fixture preparation script for one attempt, and the wrapper that runs it.
+
+    The wrapper runs the script under the VM runner's own lock file, so a
+    preparation never overlaps a runner or another preparation: when the lock
+    is held, flock exits with LOCK_HELD before the script touches anything,
+    and the wrapper records that as the exit code. With `recreate` the script
+    also refuses (RUNNER_ACTIVE) while a runner container of this campaign is
+    running, archives the fixtures' state, logs and certificates before
+    recreating them, recreates every fixture container and checks that every
+    fixture answers.
+    """
+    q = shlex.quote
+    attempt = '.fixtures/' + label + '-' + attempt_name
+    diagnostics = '.fixtures/diagnostics/' + label + '-' + attempt_name
+    compose_all = 'docker compose -f docker-compose.yml -f compose.extended.yml'
+    lines = ['#!/usr/bin/env bash', 'set -euo pipefail', 'cd ' + q(remote_root),
+             f'exec >{attempt}.log 2>&1',
+             f"trap 'printf \"%s\\n\" \"$?\" >{attempt}.exit' EXIT",
+             'export COMPOSE_PROJECT_NAME=' + q(project),
+             'export PLENORA_FIXTURE_HOST=' + q(host)]
+    if recreate:
+        lines += [
+            f"if docker ps --format '{{{{.Names}}}}' | grep -q {q('^' + project + '-campaign-')}; then",
+            f"  echo 'a VM runner container of this campaign is still running'; exit {RUNNER_ACTIVE}",
+            'fi',
+            f'mkdir -p {diagnostics}',
+            f'{compose_all} ps --all --format json >{diagnostics}/containers.json || true',
+            f'{compose_all} logs --no-color --timestamps >{diagnostics}/fixtures.log 2>&1 || true',
+            'for file in .fixtures/ca.crt .fixtures/minio/public.crt .fixtures/extended/server.crt '
+            f'.fixtures/sftp-fingerprint; do if test -f "$file"; then cp "$file" {diagnostics}/; fi; done',
+            'export PLENORA_FIXTURE_RECREATE=1']
+    lines += ['bash scripts/prepare-fixtures.sh', 'bash scripts/prepare-extended-fixtures.sh']
+    if recreate:
+        lines += [f'python3 scripts/check_fixtures.py --output {attempt}-check.json']
+    wrapper = (f'cd {q(remote_root)} && mkdir -p .fixtures/campaign && '
+               f'flock -n -E {LOCK_HELD} .fixtures/campaign/campaign.lock bash .fixtures/{label}.sh; '
+               f'code=$?; test -f {attempt}.exit || echo "$code" >{attempt}.exit')
+    return '\n'.join(lines) + '\n', wrapper + '\n'
+
+
 def run(config_path, output, retries, reason, vm_retries, connect_host=None):
     if sys.platform != 'win32':
         raise ValueError('orchestrator qualifies the Windows distribution locally; use a Windows host')
@@ -125,10 +188,7 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
         campaign = Campaign(output, identity)
         validate_transport_resume(campaign.state, connect_host, reason)
         campaign.validate_retries(retries, LOCAL_PHASES)
-        from run_vm_campaign import PHASES as VM_PHASES
-        unknown = sorted(set(vm_retries) - set(VM_PHASES))
-        if unknown:
-            raise ValueError('unknown VM phase in retry: ' + ', '.join(unknown))
+        validate_vm_retries(vm_retries, retries, version)
 
         def phase(name, action):
             print('Phase:', name, flush=True)
@@ -198,30 +258,45 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
                        '-f compose.extended.yml -f .fixtures/compose.campaign.json')
 
             def fixtures(path, label, *, recreate):
-                """Run the fixture preparation scripts on the VM and wait for them.
+                """Run the fixture preparation on the VM under the campaign lock and wait for it.
 
-                With `recreate` every fixture container is recreated: the
-                stateless servers (Azurite, fake GCS, WebDAV, SMB, FTPS) start
-                empty, and the others restart on their data volumes, which the
-                qualification cleans as it goes."""
+                The scripts run under the runner's own lock file, so a
+                preparation never overlaps a VM runner or another
+                preparation: a held lock stops it before it touches anything.
+                With `recreate`, it also refuses while a runner container of
+                this campaign is still running, archives the fixtures' state,
+                logs and certificates before recreating them, recreates every
+                fixture container and then checks that every fixture answers.
+                """
                 attempt = '.fixtures/' + label + '-' + path.name
-                script = ('#!/usr/bin/env bash\nset -euo pipefail\ncd ' + q(remote_root) + '\n'
-                          + f"exec >{attempt}.log 2>&1\ntrap 'printf \"%s\\n\" \"$?\" >{attempt}.exit' EXIT\n"
-                          + 'export COMPOSE_PROJECT_NAME=' + q(project) + '\n'
-                          + 'export PLENORA_FIXTURE_HOST=' + q(config['host']) + '\n'
-                          + ('export PLENORA_FIXTURE_RECREATE=1\n' if recreate else '')
-                          + 'bash scripts/prepare-fixtures.sh\nbash scripts/prepare-extended-fixtures.sh\n')
+                diagnostics = '.fixtures/diagnostics/' + label + '-' + path.name
+                script, wrapper = fixture_scripts(remote_root, project, config['host'], label, path.name,
+                                                  recreate=recreate)
                 remote.write(remote_root + '/.fixtures/' + label + '.sh', script)
-                remote.run(f'cd {q(remote_root)} && (nohup bash .fixtures/{label}.sh >/dev/null 2>&1 </dev/null & echo started)')
+                remote.write(remote_root + '/.fixtures/' + label + '-run.sh', wrapper)
+                remote.run(f'cd {q(remote_root)} && (nohup bash .fixtures/{label}-run.sh >/dev/null 2>&1 </dev/null & echo started)')
                 deadline = time.monotonic() + 1800
                 while time.monotonic() < deadline:
                     result = remote.run(f'cd {q(remote_root)} && if test -f {attempt}.exit; then cat {attempt}.exit; else echo running; fi')
-                    if result != 'running':
-                        remote.download(remote_root + '/' + attempt + '.log', path / (label + '.log'))
-                        if result != '0':
-                            raise ValueError('fixture preparation failed')
-                        return
-                    time.sleep(10)
+                    if result == 'running':
+                        time.sleep(10)
+                        continue
+                    if result == str(LOCK_HELD):
+                        raise ValueError('a VM runner or fixture preparation of this campaign holds the campaign '
+                                         'lock; nothing was recreated')
+                    remote.run(f'cd {q(remote_root)} && test -f {attempt}.log || : >{attempt}.log')
+                    remote.download(remote_root + '/' + attempt + '.log', path / (label + '.log'))
+                    if recreate:
+                        remote.run(f'cd {q(remote_root)} && mkdir -p {diagnostics} && '
+                                   f'tar -czf {diagnostics}.tar.gz -C {diagnostics} .')
+                        remote.download(remote_root + '/' + diagnostics + '.tar.gz', path / 'pre-reset.tar.gz')
+                    if result == str(RUNNER_ACTIVE):
+                        raise ValueError('a VM runner container of this campaign is still running; nothing was recreated')
+                    if result != '0':
+                        raise ValueError('fixture preparation failed')
+                    if recreate:
+                        remote.download(remote_root + '/' + attempt + '-check.json', path / 'fixture-check.json')
+                    return
                 raise TimeoutError('fixture preparation timed out')
 
             def prepare(path):
@@ -271,11 +346,15 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
                 # Every VM attempt starts on recreated fixtures, so the
                 # performance phase never measures servers that earlier work
                 # left with accumulated state. The reset is recorded with the
-                # attempt.
+                # attempt, and only once every fixture answered.
                 started = time.time()
                 fixtures(path, 'fixture-reset', recreate=True)
+                check = json.loads((path / 'fixture-check.json').read_text())
+                if check.get('status') != 'PASS':
+                    raise ValueError('recreated fixtures do not all answer')
                 write_json(path / 'fixture-reset.json', {'recreated': True, 'started_unix': started,
-                                                         'finished_unix': time.time(),
+                                                         'finished_unix': time.time(), 'check': 'fixture-check.json',
+                                                         'diagnostics': 'pre-reset.tar.gz',
                                                          'reason': 'fresh fixtures before the VM runner'})
                 archive = path / 'linux-input.tar.gz'
                 with tarfile.open(archive, 'w:gz') as stream:

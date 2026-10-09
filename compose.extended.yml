@@ -13,14 +13,29 @@ services:
     command: ["ftps"]
     ports: ["2122:21", "30100-30163:30100-30163"]
     volumes: ["./.fixtures/extended:/certs:ro"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s = socket.create_connection(('127.0.0.1', 21), 2); s.settimeout(2); assert s.recv(3) == b'220'"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
   webdav:
     image: plenora-storage-extended-fixtures:0.2
     command: ["webdav"]
     ports: ["8088:8080"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s = socket.create_connection(('127.0.0.1', 8080), 2); s.settimeout(2); s.sendall(b'GET / HTTP/1.1\\r\\nHost: f\\r\\nConnection: close\\r\\n\\r\\n'); assert s.recv(7) == b'HTTP/1.'"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
   smb:
     image: plenora-storage-extended-fixtures:0.2
     command: ["smb"]
     ports: ["1445:445"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s = socket.create_connection(('127.0.0.1', 445), 2); s.settimeout(2); s.close()"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
   azure-init:
     image: plenora-storage-extended-fixtures:0.2
     command: ["azure-init"]

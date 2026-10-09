@@ -27,7 +27,7 @@ docker compose -f docker-compose.yml -f compose.extended.yml build ftps
 # start empty and every server serves the certificate generated above.
 recreate=()
 if [ "${PLENORA_FIXTURE_RECREATE:-0}" = 1 ]; then recreate=(--force-recreate); fi
-docker compose -f docker-compose.yml -f compose.extended.yml up -d "${recreate[@]}" azure gcs ftps webdav smb
+docker compose -f docker-compose.yml -f compose.extended.yml up -d --wait "${recreate[@]}" azure gcs ftps webdav smb
 for attempt in $(seq 1 30); do
   if docker compose -f docker-compose.yml -f compose.extended.yml run --rm --no-deps azure-init; then break; fi
   if [ "$attempt" = 30 ]; then exit 1; fi

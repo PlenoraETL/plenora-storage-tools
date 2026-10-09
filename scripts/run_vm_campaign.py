@@ -11,14 +11,24 @@ import venv
 from campaign_state import Campaign, digest, exclusive, logged, write_json
 from check_disk_space import GIB, inspect
 from soak_policy import SOAK_DURATION_SECONDS
+from performance_order import SCHEME
 from versioning import parse_version
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = 'x86_64-unknown-linux-gnu'
-PERFORMANCE_ORDER = 'ABBA'
+PERFORMANCE_ORDER = SCHEME
+# A multiple of four, so ABBA gives every provider the same number of first
+# runs as baseline and as candidate.
+PERFORMANCE_ROUNDS = 32
+SPOOLED_PHASES = ('spooled-large', 'spooled-workers4', 'spooled-workers16')
 PHASES = ('qualify-linux', 'install-sdk', 'performance-ab', 'performance-compare', 'transfers-large',
-          'transfers-workers4', 'transfers-workers16', 'spooled-large', 'spooled-workers4', 'spooled-workers16',
-          'soak')
+          'transfers-workers4', 'transfers-workers16', *SPOOLED_PHASES, 'soak')
+
+
+def phases_for(version):
+    """The phases this runner executes for `version`: spooled transfers exist from 2.1.0."""
+    spooled = parse_version(version).requires((2, 1, 0))
+    return tuple(name for name in PHASES if spooled or name not in SPOOLED_PHASES)
 
 
 
@@ -33,7 +43,8 @@ def identity(folder, baseline):
         raise ValueError('campaign distribution bytes differ from manifest')
     return {'source_revision': revision, 'version': manifest['version'], 'artifacts': subjects,
             'baseline_binary_sha256': digest(baseline), 'soak_seconds': SOAK_DURATION_SECONDS,
-            'performance_rounds': 30, 'performance_order': PERFORMANCE_ORDER, 'large_transfer_rounds': 2}
+            'performance_rounds': PERFORMANCE_ROUNDS, 'performance_order': PERFORMANCE_ORDER,
+            'large_transfer_rounds': 2}
 
 
 def run(folder, baseline, output, retries, reason, backend_data):
@@ -54,7 +65,7 @@ def run(folder, baseline, output, retries, reason, backend_data):
     subject['space_locations'] = {label: str(path.resolve()) for label, path in spaces.items()}
     with exclusive(output):
         campaign = Campaign(output, subject)
-        campaign.validate_retries(retries, PHASES)
+        campaign.validate_retries(retries, phases_for(subject['version']))
 
         def phase(name, action):
             return campaign.phase(name, action, retry=name in retries, reason=reason)
@@ -89,8 +100,8 @@ def run(folder, baseline, output, retries, reason, backend_data):
             write_json(path / 'wheel.json', {'sha256': digest(wheel)})
 
         installed = phase('install-sdk', sdk)
-        paired = phase('performance-ab', lambda path: transfers(path, size=1024**2, workers=4, rounds=30,
-                                                                paired=True))
+        paired = phase('performance-ab', lambda path: transfers(path, size=1024**2, workers=4,
+                                                                rounds=PERFORMANCE_ROUNDS, paired=True))
         old, new = paired / 'baseline.json', paired / 'candidate.json'
         comparison = phase('performance-compare', lambda path: command(path, 'check_performance.py',
                            old, new, '--output', path / 'report.json'))

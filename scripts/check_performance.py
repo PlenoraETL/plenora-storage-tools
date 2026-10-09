@@ -17,7 +17,7 @@ def compare(baseline, candidate, binary, policy):
     for report in (baseline, candidate):
         require(str(UUID(report['campaign_id'])) == report['campaign_id'], 'invalid performance campaign identity')
         validate_transfers(report, report['binary_sha256'], size=1024**2, workers=4,
-                           rounds=policy['minimum_rounds'])
+                           rounds=policy['minimum_rounds'], paired_allowed=True)
         require(report['dirty'] is False and len(report['source_revision']) == 40,
                 'performance campaigns require clean identified source')
     require(candidate['binary_sha256'] == binary, 'performance used another candidate binary')
@@ -28,16 +28,11 @@ def compare(baseline, candidate, binary, policy):
             'performance environment is incomplete')
     require(baseline['rounds'] == candidate['rounds'], 'performance sample counts differ')
     # A paired run measures both binaries alternately; its two reports must
-    # name each other and record the same order. Unpaired reports, as earlier
-    # campaigns produced, are compared as before.
-    pairs = [report.get('paired_measurement') for report in (baseline, candidate)]
-    if any(pairs):
-        require(all(pairs) and pairs[0]['role'] == 'baseline' and pairs[1]['role'] == 'candidate'
-                and pairs[0]['partner_campaign_id'] == candidate['campaign_id']
-                and pairs[1]['partner_campaign_id'] == baseline['campaign_id']
-                and pairs[0]['order_scheme'] == pairs[1]['order_scheme']
-                and pairs[0]['order'] == pairs[1]['order'] and pairs[0]['order'],
-                'paired performance reports do not describe the same alternated run')
+    # name each other and record the ABBA order of their rounds and providers.
+    # Reports without the field, as earlier campaigns produced, compare as before.
+    from fixture_connections import PROVIDERS
+    from performance_order import validate_pairing
+    validate_pairing(baseline, candidate, PROVIDERS)
 
     def samples(report):
         result = defaultdict(list)
