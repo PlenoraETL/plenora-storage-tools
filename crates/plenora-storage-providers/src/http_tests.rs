@@ -38,6 +38,9 @@ enum Reply {
 struct Server {
     address: SocketAddr,
     accepted: Arc<AtomicUsize>,
+    /// Late answers and trickled bytes the client has received; the test
+    /// counts them.
+    received: Arc<AtomicUsize>,
     task: tokio::task::JoinHandle<()>,
 }
 
@@ -54,23 +57,30 @@ async fn server(script: Vec<Reply>) -> Server {
     let address = listener.local_addr().expect("address");
     let accepted = Arc::new(AtomicUsize::new(0));
     let script = Arc::new(Mutex::new(VecDeque::from(script)));
+    let received = Arc::new(AtomicUsize::new(0));
     let counter = accepted.clone();
+    let delivered = received.clone();
     let task = tokio::spawn(async move {
         let mut connections = tokio::task::JoinSet::new();
         loop {
             let (socket, _) = listener.accept().await.expect("accept");
             counter.fetch_add(1, Ordering::SeqCst);
-            connections.spawn(serve(socket, script.clone()));
+            connections.spawn(serve(socket, script.clone(), delivered.clone()));
         }
     });
     Server {
         address,
         accepted,
+        received,
         task,
     }
 }
 
-async fn serve(mut socket: TcpStream, script: Arc<Mutex<VecDeque<Reply>>>) {
+async fn serve(
+    mut socket: TcpStream,
+    script: Arc<Mutex<VecDeque<Reply>>>,
+    received: Arc<AtomicUsize>,
+) {
     while read_request(&mut socket).await {
         let reply = script
             .lock()
@@ -81,15 +91,29 @@ async fn serve(mut socket: TcpStream, script: Arc<Mutex<VecDeque<Reply>>>) {
             Reply::Now => answer(&mut socket).await,
             Reply::After(delay) => {
                 tokio::time::sleep(delay).await;
+                let seen = received.load(Ordering::SeqCst);
                 answer(&mut socket).await;
+                // As for a trickled byte below: no virtual time passes until
+                // the client has the answer.
+                while received.load(Ordering::SeqCst) == seen {
+                    tokio::task::yield_now().await;
+                }
             }
             Reply::Never => std::future::pending::<()>().await,
             Reply::Trickle { every, count } => {
                 let head = format!("HTTP/1.1 200 OK\r\nContent-Length: {count}\r\n\r\n");
                 socket.write_all(head.as_bytes()).await.expect("head");
-                for _ in 0..count {
+                for sent in 1..=count {
                     tokio::time::sleep(every).await;
                     socket.write_all(b"x").await.expect("byte");
+                    // Paused time jumps to the next timer as soon as no task
+                    // can run, even if a byte is still on its way through the
+                    // socket: the client's read timeout could then fire
+                    // before the byte is seen. Staying runnable until the
+                    // client has read it keeps the clock still meanwhile.
+                    while received.load(Ordering::SeqCst) < sent {
+                        tokio::task::yield_now().await;
+                    }
                 }
             }
         }
@@ -186,8 +210,10 @@ async fn warm_up(client: &reqwest::Client, url: &url::Url) {
     tokio::time::pause();
 }
 
-/// A GET through the operation control, as the providers issue it.
+/// A GET through the operation control, as the providers issue it; counts
+/// the answer as received by `server`.
 async fn get(
+    server: &Server,
     control: &ExecutionControl,
     client: &reqwest::Client,
     url: &url::Url,
@@ -200,6 +226,7 @@ async fn get(
                     .send()
                     .await
                     .map_err(|error| transport_failure(&error, ErrorPhase::Read, false))?;
+                server.received.fetch_add(1, Ordering::SeqCst);
                 response
                     .bytes()
                     .await
@@ -232,7 +259,9 @@ async fn a_request_may_wait_until_the_deadline() {
     let client = connector.client().expect("client");
     warm_up(&client, &url).await;
     let started = Instant::now();
-    let error = get(&control, &client, &url).await.expect_err("timeout");
+    let error = get(&server, &control, &client, &url)
+        .await
+        .expect_err("timeout");
     let elapsed = started.elapsed();
     assert_safe_timeout(error);
     assert!(elapsed >= Duration::from_secs(590), "{elapsed:?}");
@@ -256,9 +285,13 @@ async fn a_later_request_still_ends_at_the_deadline() {
     let client = connector.client().expect("client");
     warm_up(&client, &url).await;
     let started = Instant::now();
-    get(&control, &client, &url).await.expect("slow answer");
+    get(&server, &control, &client, &url)
+        .await
+        .expect("slow answer");
     assert!(started.elapsed() >= Duration::from_secs(200));
-    let error = get(&control, &client, &url).await.expect_err("timeout");
+    let error = get(&server, &control, &client, &url)
+        .await
+        .expect_err("timeout");
     let elapsed = started.elapsed();
     assert_safe_timeout(error);
     assert!(elapsed >= Duration::from_secs(590), "{elapsed:?}");
@@ -276,7 +309,9 @@ async fn without_deadline_a_silent_response_ends_at_the_read_limit() {
     let client = connector.client().expect("client");
     warm_up(&client, &url).await;
     let started = Instant::now();
-    let error = get(&control, &client, &url).await.expect_err("timeout");
+    let error = get(&server, &control, &client, &url)
+        .await
+        .expect_err("timeout");
     let elapsed = started.elapsed();
     assert_safe_timeout(error);
     assert!(elapsed >= HTTP_READ_TIMEOUT_WITHOUT_DEADLINE, "{elapsed:?}");
@@ -304,8 +339,28 @@ async fn without_deadline_a_download_that_keeps_moving_is_not_cut() {
     let client = connector.client().expect("client");
     warm_up(&client, &url).await;
     let started = Instant::now();
-    let body = get(&control, &client, &url).await.expect("download");
-    assert_eq!(body.len(), 6);
+    let length = control
+        .run(
+            async {
+                let response = client
+                    .get(url.clone())
+                    .send()
+                    .await
+                    .map_err(|error| transport_failure(&error, ErrorPhase::Read, false))?;
+                let mut body = response.bytes_stream();
+                while let Some(chunk) = futures_util::StreamExt::next(&mut body).await {
+                    let chunk = chunk
+                        .map_err(|error| transport_failure(&error, ErrorPhase::Read, false))?;
+                    server.received.fetch_add(chunk.len(), Ordering::SeqCst);
+                }
+                Ok(server.received.load(Ordering::SeqCst))
+            },
+            ErrorPhase::Read,
+            false,
+        )
+        .await
+        .expect("download");
+    assert_eq!(length, 6);
     assert!(started.elapsed() >= Duration::from_secs(600));
     assert_eq!(server.accepted.load(Ordering::SeqCst), 1);
 }
@@ -409,6 +464,7 @@ async fn azure_request_answered_after_400_s(
     tokio::time::pause();
     let started = Instant::now();
     let result = client.execute(request()).await.map(|_| started.elapsed());
+    server.received.fetch_add(1, Ordering::SeqCst);
     assert_eq!(server.accepted.load(Ordering::SeqCst), 1);
     result
 }
