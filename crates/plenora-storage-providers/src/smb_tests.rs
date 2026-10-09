@@ -1,8 +1,10 @@
 use super::{
-    SMB_RESPONSE_TIMEOUT_WITHOUT_DEADLINE, arm_response_timeout, response_timeout,
-    smb_connect_error, smb_error, smb_login_error,
+    SMB_RESPONSE_TIMEOUT_WITHOUT_DEADLINE, arm_response_timeout, first_connection,
+    response_timeout, smb_error, smb_login_error,
 };
-use plenora_storage_core::{ErrorCategory, ErrorPhase, RemoteEffect, RetryDisposition};
+use plenora_storage_core::{
+    ErrorCategory, ErrorPhase, RemoteEffect, RetryDisposition, StorageError,
+};
 use smb2::types::{Command, status::NtStatus};
 
 #[test]
@@ -142,18 +144,31 @@ mod fake_smb {
         pack::{Guid, Pack, ReadCursor, Unpack, WriteCursor},
         transport::MockTransport,
         types::{
-            Command, Dialect, MessageId,
+            Command, CreditCharge, Dialect, MessageId,
             flags::{Capabilities, SecurityMode},
             status::NtStatus,
         },
     };
     use std::{sync::Arc, time::Duration};
 
+    /// Credits the fake server grants at negotiate.
+    pub const GRANTED: u16 = 64;
+
+    /// Yields until `ready` holds. A condition that never comes true fails
+    /// the test after 10 s of real time instead of hanging it.
+    pub async fn yield_until(mut ready: impl FnMut() -> bool, what: &str) {
+        let started = std::time::Instant::now();
+        while !ready() {
+            assert!(started.elapsed() < Duration::from_secs(10), "{what}");
+            tokio::task::yield_now().await;
+        }
+    }
+
     /// A response frame for request `id`.
     pub fn frame(command: Command, status: NtStatus, id: MessageId, body: &dyn Pack) -> Vec<u8> {
         let mut header = Header::new_request(command);
         header.flags.set_response();
-        header.credits = 64;
+        header.credits = GRANTED;
         header.status = status;
         header.message_id = id;
         let mut cursor = WriteCursor::new();
@@ -192,37 +207,24 @@ mod fake_smb {
         (mock, conn)
     }
 
-    /// Sends an ECHO and waits for its outcome, with the (virtual) time it
-    /// took; `server` plays the server's side once the request is out.
-    pub async fn echo<F, Fut>(
-        mock: &Arc<MockTransport>,
-        conn: &Connection,
-        server: F,
-    ) -> (smb2::Result<()>, Duration)
-    where
-        F: FnOnce(Arc<MockTransport>, MessageId) -> Fut,
-        Fut: Future<Output = ()> + Send + 'static,
-    {
-        let started = tokio::time::Instant::now();
-        let request = {
-            let conn = conn.clone();
-            tokio::spawn(async move {
-                conn.execute(Command::Echo, &smb2::msg::echo::EchoRequest, None)
-                    .await
-                    .map(drop)
-            })
-        };
-        while mock.sent_count() < 2 {
-            tokio::task::yield_now().await;
-        }
-        let sent = mock.sent_message(1).expect("echo");
-        let id = Header::unpack(&mut ReadCursor::new(&sent))
+    /// The message id of the `n`-th frame the client sent.
+    pub fn sent_id(mock: &MockTransport, n: usize) -> MessageId {
+        let sent = mock.sent_message(n).expect("sent frame");
+        Header::unpack(&mut ReadCursor::new(&sent))
             .expect("header")
-            .message_id;
-        let server = tokio::spawn(server(mock.clone(), id));
-        let result = request.await.expect("request task");
-        server.abort();
-        (result, started.elapsed())
+            .message_id
+    }
+
+    /// Sends an ECHO costing `charge` credits.
+    pub async fn send_echo(conn: &Connection, charge: u16) -> smb2::Result<()> {
+        conn.execute_with_credits(
+            Command::Echo,
+            &smb2::msg::echo::EchoRequest,
+            None,
+            CreditCharge(charge),
+        )
+        .await
+        .map(drop)
     }
 
     /// A server that never answers.
@@ -253,8 +255,58 @@ mod fake_smb {
     }
 }
 
-fn axes(error: &smb2::Error, mutating: bool) -> (ErrorCategory, RemoteEffect, RetryDisposition) {
-    let error = smb_error(error, mutating);
+/// Runs one ECHO through the operation control, as the provider runs every
+/// SMB operation, while `server` plays the server's side; returns the
+/// outcome with the (virtual) time it took.
+async fn echo_under_control<F, Fut>(
+    remaining: Option<std::time::Duration>,
+    mutating: bool,
+    server: F,
+) -> (plenora_storage_core::StorageResult<()>, std::time::Duration)
+where
+    F: FnOnce(std::sync::Arc<smb2::transport::MockTransport>, smb2::types::MessageId) -> Fut
+        + Send
+        + 'static,
+    Fut: Future<Output = ()> + Send + 'static,
+{
+    let control = remaining.map_or_else(
+        plenora_storage_core::ExecutionControl::default,
+        |remaining| {
+            plenora_storage_core::ExecutionControl::default()
+                // On the paused clock: earlier cases of a test have moved
+                // it ahead of the real one.
+                .with_deadline(tokio::time::Instant::now().into_std() + remaining)
+        },
+    );
+    let (mock, conn) = fake_smb::connection(remaining).await;
+    let started = tokio::time::Instant::now();
+    let watched = mock.clone();
+    let player = tokio::spawn(async move {
+        fake_smb::yield_until(|| watched.sent_count() >= 2, "the echo was never sent").await;
+        server(watched.clone(), fake_smb::sent_id(&watched, 1)).await;
+    });
+    let phase = if mutating {
+        ErrorPhase::Commit
+    } else {
+        ErrorPhase::Read
+    };
+    let result = control
+        .run(
+            async {
+                fake_smb::send_echo(&conn, 1)
+                    .await
+                    .map_err(|error| smb_error(&error, mutating))
+            },
+            phase,
+            mutating,
+        )
+        .await;
+    let elapsed = started.elapsed();
+    player.abort();
+    (result, elapsed)
+}
+
+fn axes(error: StorageError) -> (ErrorCategory, RemoteEffect, RetryDisposition) {
     (error.category, error.remote_effect, error.retry)
 }
 
@@ -270,10 +322,10 @@ const MUTATING_TIMEOUT: (ErrorCategory, RemoteEffect, RetryDisposition) = (
 );
 
 /// A server that stops answering is given up on after the declared limit
-/// without a deadline, and after the time remaining with one. The library
-/// reports it as `ServerUnresponsive` (its keepalive got no answer either):
-/// that is a `timeout`, with the effect of the operation. Before 3.0.0 the
-/// limit was 30 s whatever the deadline, and the failure was `io`.
+/// without a deadline, and at the deadline with one: a `timeout` with the
+/// effect of the operation. The library reports the silence as
+/// `ServerUnresponsive` (its keepalive got no answer either). Before 3.0.0
+/// the limit was 30 s whatever the deadline, and the failure was `io`.
 #[tokio::test(start_paused = true)]
 async fn a_silent_smb_server_is_a_timeout_at_the_declared_limit() {
     use std::time::Duration;
@@ -281,20 +333,12 @@ async fn a_silent_smb_server_is_a_timeout_at_the_declared_limit() {
         (None, SMB_RESPONSE_TIMEOUT_WITHOUT_DEADLINE),
         (Some(Duration::from_secs(600)), Duration::from_secs(600)),
     ] {
-        let (mock, conn) = fake_smb::connection(remaining).await;
-        let (result, elapsed) = fake_smb::echo(&mock, &conn, fake_smb::silent).await;
-        let error = result.expect_err("silence");
-        assert!(
-            matches!(
-                error,
-                smb2::Error::ServerUnresponsive { .. } | smb2::Error::Timeout
-            ),
-            "{error:?}"
-        );
-        assert!(elapsed >= limit, "{elapsed:?}");
-        assert!(elapsed <= limit + Duration::from_secs(2), "{elapsed:?}");
-        assert_eq!(axes(&error, false), SAFE_TIMEOUT);
-        assert_eq!(axes(&error, true), MUTATING_TIMEOUT);
+        for (mutating, expected) in [(false, SAFE_TIMEOUT), (true, MUTATING_TIMEOUT)] {
+            let (result, elapsed) = echo_under_control(remaining, mutating, fake_smb::silent).await;
+            assert_eq!(axes(result.expect_err("silence")), expected);
+            assert!(elapsed + Duration::from_secs(1) >= limit, "{elapsed:?}");
+            assert!(elapsed <= limit + Duration::from_secs(2), "{elapsed:?}");
+        }
     }
 }
 
@@ -302,8 +346,8 @@ async fn a_silent_smb_server_is_a_timeout_at_the_declared_limit() {
 /// acknowledging lasts minutes past the declared limit without failing.
 #[tokio::test(start_paused = true)]
 async fn an_smb_operation_the_server_keeps_pending_is_not_cut() {
-    let (mock, conn) = fake_smb::connection(None).await;
-    let (result, elapsed) = fake_smb::echo(&mock, &conn, fake_smb::pending_for_three_minutes).await;
+    let (result, elapsed) =
+        echo_under_control(None, false, fake_smb::pending_for_three_minutes).await;
     result.expect("completed");
     assert!(
         elapsed >= std::time::Duration::from_secs(180),
@@ -315,66 +359,184 @@ async fn an_smb_operation_the_server_keeps_pending_is_not_cut() {
 /// waits six times the declared limit, then is a `timeout`, not `io`.
 #[tokio::test(start_paused = true)]
 async fn an_unanswered_request_on_a_live_smb_connection_is_a_timeout() {
-    let (mock, conn) = fake_smb::connection(None).await;
-    let (result, elapsed) = fake_smb::echo(&mock, &conn, fake_smb::chatty).await;
-    let error = result.expect_err("unanswered");
+    let (result, elapsed) = echo_under_control(None, true, fake_smb::chatty).await;
+    assert_eq!(axes(result.expect_err("unanswered")), MUTATING_TIMEOUT);
     let ceiling = SMB_RESPONSE_TIMEOUT_WITHOUT_DEADLINE * 6;
     assert!(elapsed >= ceiling, "{elapsed:?}");
     assert!(
         elapsed <= ceiling + std::time::Duration::from_secs(2),
         "{elapsed:?}"
     );
-    assert_eq!(axes(&error, false), SAFE_TIMEOUT);
-    assert_eq!(axes(&error, true), MUTATING_TIMEOUT);
 }
 
-/// A connection that ran out of budget on every address is a `timeout` in
-/// `connect`, safe to retry because nothing was sent; a refusal, or a mix of
-/// refusals and timeouts, stays `io`. Before 3.0.0 every connection failure
-/// was `io`, whatever the cause.
-#[test]
-fn smb_connection_failures_keep_their_cause() {
-    use smb2::transport::ConnectAttempt;
-    use std::io::ErrorKind;
-    let failed = |kinds: &[Option<ErrorKind>]| smb2::Error::ConnectFailed {
-        host: "fixture".to_owned(),
-        attempts: kinds
-            .iter()
-            .map(|&error_kind| ConnectAttempt {
-                addr: "192.0.2.1:445".parse().expect("address"),
-                error_kind,
-            })
-            .collect(),
-    };
-    let axes = |error: Option<&smb2::Error>| {
-        let error = smb_connect_error(error);
+/// A request the connection's credits cannot fund, with nothing outstanding
+/// to bring more, fails at once as a resource limit of the connection: no
+/// wait ran out, so it is not a `timeout`. Before this fix it was reported
+/// as one.
+#[tokio::test(start_paused = true)]
+async fn credits_that_cannot_arrive_are_a_resource_limit_not_a_timeout() {
+    let (_mock, conn) = fake_smb::connection(None).await;
+    let started = tokio::time::Instant::now();
+    let control = plenora_storage_core::ExecutionControl::default();
+    let result = control
+        .run(
+            async {
+                fake_smb::send_echo(&conn, fake_smb::GRANTED + 1)
+                    .await
+                    .map_err(|error| smb_error(&error, false))
+            },
+            ErrorPhase::Read,
+            false,
+        )
+        .await;
+    let error = result.expect_err("unfundable");
+    assert_eq!(
+        (error.category, error.remote_effect, error.retry),
         (
-            error.category,
-            error.phase,
-            error.remote_effect,
-            error.retry,
+            ErrorCategory::ResourceLimit,
+            RemoteEffect::None,
+            RetryDisposition::Safe
+        )
+    );
+    assert_eq!(error.code, "SMB_CREDITS_EXHAUSTED");
+    assert_eq!(started.elapsed(), std::time::Duration::ZERO);
+}
+
+/// A wait for credits that a pending response could still bring, and that
+/// runs out of time, is a `timeout`.
+#[tokio::test(start_paused = true)]
+async fn a_wait_for_credits_that_runs_out_is_a_timeout() {
+    let (mock, conn) = fake_smb::connection(None).await;
+    conn.set_credit_wait_timeout(std::time::Duration::from_secs(10));
+    // Holds all but one credit and stays unanswered, so its response could
+    // still grant more for the whole wait.
+    let holder = conn.clone();
+    let held =
+        tokio::spawn(async move { fake_smb::send_echo(&holder, fake_smb::GRANTED - 1).await });
+    fake_smb::yield_until(|| mock.sent_count() >= 2, "the holder was never sent").await;
+    let started = tokio::time::Instant::now();
+    let result = plenora_storage_core::ExecutionControl::default()
+        .run(
+            async {
+                fake_smb::send_echo(&conn, 2)
+                    .await
+                    .map_err(|error| smb_error(&error, true))
+            },
+            ErrorPhase::Commit,
+            true,
+        )
+        .await;
+    held.abort();
+    assert_eq!(axes(result.expect_err("starved")), MUTATING_TIMEOUT);
+    let elapsed = started.elapsed();
+    assert!(elapsed >= std::time::Duration::from_secs(10), "{elapsed:?}");
+    assert!(elapsed <= std::time::Duration::from_secs(11), "{elapsed:?}");
+}
+
+/// The address loop of `connect`, with every failure it may meet. The
+/// outcome depends on all of them, never on their order: `timeout` only
+/// when every address ran out of time, `io` as soon as one refused.
+#[tokio::test]
+async fn smb_connection_failures_on_several_addresses_keep_their_cause() {
+    use smb2::transport::ConnectAttempt;
+    use std::{io::ErrorKind, net::SocketAddr};
+    #[derive(Clone, Copy, Debug)]
+    enum Dial {
+        TimedOut,
+        Refused,
+        Connects,
+    }
+    let address = |n: u8| SocketAddr::from(([192, 0, 2, n], 445));
+    let failed = |address: SocketAddr, error_kind: Option<ErrorKind>| smb2::Error::ConnectFailed {
+        host: "fixture".to_owned(),
+        attempts: vec![ConnectAttempt {
+            addr: address,
+            error_kind,
+        }],
+    };
+    let outcome = |plan: Vec<Dial>| async move {
+        let addresses: Vec<SocketAddr> = (1..=u8::try_from(plan.len()).expect("few"))
+            .map(address)
+            .collect();
+        let mut dialled = Vec::new();
+        let result = first_connection(&addresses, |address| {
+            dialled.push(address);
+            let dial = plan[dialled.len() - 1];
+            async move {
+                match dial {
+                    Dial::TimedOut => Err(failed(address, None)),
+                    Dial::Refused => Err(failed(address, Some(ErrorKind::ConnectionRefused))),
+                    Dial::Connects => Ok(address),
+                }
+            }
+        })
+        .await;
+        (
+            result.map_err(|error| {
+                (
+                    error.category,
+                    error.phase,
+                    error.remote_effect,
+                    error.retry,
+                )
+            }),
+            dialled.len(),
         )
     };
-    let timeout = (
+    let timeout = Err((
         ErrorCategory::Timeout,
         ErrorPhase::Connect,
         RemoteEffect::None,
         RetryDisposition::Safe,
-    );
-    assert_eq!(axes(Some(&failed(&[None]))), timeout);
+    ));
+    let io = (ErrorCategory::Io, ErrorPhase::Connect);
     assert_eq!(
-        axes(Some(&failed(&[None, Some(ErrorKind::TimedOut)]))),
-        timeout
+        outcome(vec![Dial::TimedOut, Dial::TimedOut]).await,
+        (timeout, 2)
     );
-    assert_eq!(axes(Some(&smb2::Error::Timeout)), timeout);
-    for refused in [
-        failed(&[Some(ErrorKind::ConnectionRefused)]),
-        failed(&[None, Some(ErrorKind::ConnectionRefused)]),
-        failed(&[]),
+    for plan in [
+        vec![Dial::Refused, Dial::TimedOut],
+        vec![Dial::TimedOut, Dial::Refused],
+        vec![Dial::Refused],
     ] {
-        assert_eq!(axes(Some(&refused)).0, ErrorCategory::Io, "{refused:?}");
+        let (result, dialled) = outcome(plan.clone()).await;
+        let error = result.expect_err("no connection");
+        assert_eq!((error.0, error.1), io, "{plan:?}");
+        assert_eq!(dialled, plan.len());
     }
-    assert_eq!(axes(None).0, ErrorCategory::Io);
+    assert_eq!(
+        outcome(vec![Dial::Refused, Dial::Connects, Dial::TimedOut]).await,
+        (Ok(address(2)), 2)
+    );
+    let error = first_connection::<(), _, _>(&[], |_| async { Err(smb2::Error::Disconnected) })
+        .await
+        .expect_err("no address");
+    assert_eq!(error.category, ErrorCategory::Io);
+}
+
+/// The same loop with the real dialler: two loopback ports nobody listens
+/// on refuse, and the connection fails as `io`, not `timeout`.
+#[tokio::test]
+async fn refused_smb_connections_are_io() {
+    let mut addresses = Vec::new();
+    for _ in 0..2 {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        addresses.push(listener.local_addr().expect("address"));
+    }
+    let error = first_connection(&addresses, |address| async move {
+        smb2::client::connection::Connection::connect(
+            &address.to_string(),
+            std::time::Duration::from_secs(5),
+        )
+        .await
+    })
+    .await
+    .map(drop)
+    .expect_err("refused");
+    assert_eq!(
+        (error.category, error.phase),
+        (ErrorCategory::Io, ErrorPhase::Connect)
+    );
 }
 
 /// The response timeout is the time remaining, never zero, and the declared

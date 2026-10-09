@@ -16,7 +16,7 @@ use plenora_storage_core::{
 };
 use serde::Deserialize;
 use smb2::{ErrorKind, FileReader, Session, Tree, client::connection::Connection};
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use std::{collections::BTreeMap, net::SocketAddr, sync::Arc, time::Duration};
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -77,18 +77,10 @@ impl ProviderFactory for Smb {
             .map_or(SMB_CONNECT_TIMEOUT, |remaining| {
                 SMB_CONNECT_TIMEOUT.min(remaining)
             });
-        let mut connected = None;
-        let mut last_error = None;
-        for address in addresses {
-            match Connection::connect(&address.to_string(), connect_timeout).await {
-                Ok(conn) => {
-                    connected = Some(conn);
-                    break;
-                }
-                Err(error) => last_error = Some(error),
-            }
-        }
-        let mut conn = connected.ok_or_else(|| smb_connect_error(last_error.as_ref()))?;
+        let mut conn = first_connection(&addresses, |address| async move {
+            Connection::connect(&address.to_string(), connect_timeout).await
+        })
+        .await?;
         arm_response_timeout(&conn, context.control.remaining());
         conn.negotiate()
             .await
@@ -212,8 +204,9 @@ fn response_timeout(remaining: Option<Duration>) -> Duration {
 /// Whether an SMB failure means the client gave up waiting: a request left
 /// unanswered past its response timeout, including on a connection declared
 /// unresponsive because nothing at all answered, a request that could not
-/// reach the socket in time, credits the server never granted, or an I/O
-/// timeout anywhere in the cause chain.
+/// reach the socket in time, a wait for credits that ran out of time, or an
+/// I/O timeout anywhere in the cause chain. Credits that cannot arrive at all
+/// (`CreditsExhausted`) fail without waiting and are not a timeout.
 fn is_smb_timeout(error: &smb2::Error) -> bool {
     if matches!(
         error,
@@ -238,11 +231,40 @@ fn is_smb_timeout(error: &smb2::Error) -> bool {
     false
 }
 
-/// A failed TCP connection: a timeout when every address ran out of budget,
-/// `io` for a refusal or any other failure. Nothing was sent, so a timeout is
-/// safe to retry.
-fn smb_connect_error(error: Option<&smb2::Error>) -> StorageError {
-    let timed_out_everywhere = error.is_some_and(|error| match error {
+/// Dials `addresses` in order and returns the first connection established.
+///
+/// When none is, the outcome depends on every failure, never on which address
+/// came last: see [`smb_connect_error`].
+async fn first_connection<C, F, Fut>(addresses: &[SocketAddr], mut dial: F) -> StorageResult<C>
+where
+    F: FnMut(SocketAddr) -> Fut,
+    Fut: Future<Output = Result<C, smb2::Error>>,
+{
+    let mut failures = Vec::with_capacity(addresses.len());
+    for &address in addresses {
+        match dial(address).await {
+            Ok(connection) => return Ok(connection),
+            Err(error) => failures.push(error),
+        }
+    }
+    Err(smb_connect_error(&failures))
+}
+
+/// The TCP connection failed on every address: a timeout when every attempt
+/// ran out of time, `io` as soon as one was refused or failed otherwise, so
+/// the outcome does not depend on the order of the addresses. Nothing was
+/// sent, so a timeout is safe to retry.
+fn smb_connect_error(failures: &[smb2::Error]) -> StorageError {
+    if !failures.is_empty() && failures.iter().all(connect_timed_out) {
+        timed_out(ErrorPhase::Connect, false)
+    } else {
+        failure(ErrorCategory::Io, ErrorPhase::Connect, false)
+    }
+}
+
+/// Whether one failed dial ran out of time on every address it tried.
+fn connect_timed_out(error: &smb2::Error) -> bool {
+    match error {
         smb2::Error::ConnectFailed { attempts, .. } => {
             !attempts.is_empty()
                 && attempts.iter().all(|attempt| {
@@ -252,12 +274,29 @@ fn smb_connect_error(error: Option<&smb2::Error>) -> StorageError {
                 })
         }
         other => is_smb_timeout(other),
-    });
-    if timed_out_everywhere {
-        timed_out(ErrorPhase::Connect, false)
-    } else {
-        failure(ErrorCategory::Io, ErrorPhase::Connect, false)
     }
+}
+
+/// The server's credit window cannot fund a request and no response can
+/// widen it: a resource limit of this connection, not a timeout. Nothing was
+/// sent; a new connection starts with a fresh window.
+fn credits_exhausted(phase: ErrorPhase, mutating: bool) -> StorageError {
+    StorageError::new(
+        ErrorCategory::ResourceLimit,
+        phase,
+        if mutating {
+            RemoteEffect::Unknown
+        } else {
+            RemoteEffect::None
+        },
+        if mutating {
+            RetryDisposition::RequiresRecovery
+        } else {
+            RetryDisposition::Safe
+        },
+        "SMB_CREDITS_EXHAUSTED",
+        "SMB server granted too few credits for the request",
+    )
 }
 
 /// Sets the connection's response timeout for an operation with `remaining`
@@ -296,6 +335,9 @@ fn smb_login_error(error: &smb2::Error) -> StorageError {
             "SMB_ACCESS_DENIED",
             "SMB server denied the session",
         ),
+        smb2::Error::CreditsExhausted { .. } => {
+            return credits_exhausted(ErrorPhase::Connect, false);
+        }
         _ if is_smb_timeout(error) => (
             ErrorCategory::Timeout,
             RetryDisposition::Safe,
@@ -349,6 +391,9 @@ fn smb_error(error: &smb2::Error, mutating: bool) -> StorageError {
     // was `io`.
     if is_smb_timeout(error) {
         return timed_out(phase, mutating);
+    }
+    if matches!(error, smb2::Error::CreditsExhausted { .. }) {
+        return credits_exhausted(phase, mutating);
     }
     let category = match error.kind() {
         ErrorKind::NotFound => ErrorCategory::NotFound,

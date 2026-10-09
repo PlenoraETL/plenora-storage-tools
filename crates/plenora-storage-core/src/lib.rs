@@ -7,6 +7,7 @@ mod control;
 mod credentials;
 mod engine;
 mod error;
+mod inactivity;
 mod model;
 mod network;
 mod provider;
@@ -28,6 +29,7 @@ pub use error::{
     ErrorCategory, ErrorPhase, ExecutionId, RemoteEffect, RetryDisposition, StorageError,
     StorageResult,
 };
+pub use inactivity::{Inactivity, InactivityTimeout};
 pub use model::{
     ArtifactMetadata, ArtifactReference, ArtifactSinkReference, CONNECTION_CONFIG_MAX_PROPERTIES,
     CopyInput, CopyRequest, DeleteInput, DeleteRequest, DeleteResult, GetInput, GetRequest,

@@ -5,12 +5,12 @@ use object_store::client::{HttpError, HttpErrorKind, HttpRequest, HttpResponse, 
 use plenora_storage_core::{StorageResult, validate_object_key};
 use serde::Deserialize;
 
-/// Routes requests with a body to the upload client and everything else to
-/// the read client (see `http::Connector::upload_client`).
+/// The HTTP service `object_store` runs Azure requests on: every request goes
+/// through `crate::watched` with the operation's inactivity limit.
 #[derive(Debug)]
 pub struct ValidatingClient {
-    pub read: reqwest::Client,
-    pub upload: reqwest::Client,
+    pub client: reqwest::Client,
+    pub idle: Option<std::time::Duration>,
 }
 
 #[async_trait]
@@ -21,14 +21,7 @@ impl HttpService for ValidatingClient {
                 url::form_urlencoded::parse(query.as_bytes())
                     .any(|(name, value)| name == "comp" && value == "list")
             });
-        // By length, not `is_empty`: in object_store 0.14.2 `is_empty` is
-        // inverted for `PutPayload` bodies, the ones every upload carries.
-        let client = if request.body().content_length() == 0 {
-            &self.read
-        } else {
-            &self.upload
-        };
-        let response = client.call(request).await?;
+        let response = crate::watched::call(&self.client, self.idle, request).await?;
         if !listing || !response.status().is_success() {
             return Ok(response);
         }

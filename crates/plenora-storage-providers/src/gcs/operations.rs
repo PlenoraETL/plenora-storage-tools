@@ -3,7 +3,7 @@
 use super::{
     BTreeMap, BTreeSet, Backend, Bytes, GcsBackend, GcsReader, Method, ObjectMetadata, ObjectPage,
     ProviderListRequest, ProviderListResult, PutRequest, Reader, StorageResult, async_trait,
-    invalid, json, page, select, send,
+    invalid, json, page, select,
 };
 
 #[async_trait]
@@ -11,7 +11,7 @@ impl Backend for GcsBackend {
     async fn test(&mut self) -> StorageResult<()> {
         let mut url = self.url(None, false)?;
         url.query_pairs_mut().append_pair("maxResults", "1");
-        let _: ObjectPage = json(send(self.request(Method::GET, url), false).await?).await?;
+        let _: ObjectPage = json(self.send(self.request(Method::GET, url), false).await?).await?;
         Ok(())
     }
     async fn list(
@@ -37,7 +37,8 @@ impl Backend for GcsBackend {
                     query.append_pair("pageToken", token);
                 }
             }
-            let page: ObjectPage = json(send(self.request(Method::GET, url), false).await?).await?;
+            let page: ObjectPage =
+                json(self.send(self.request(Method::GET, url), false).await?).await?;
             for object in page.items {
                 select(&mut selected, object.metadata()?, request, limit)?;
             }
@@ -61,7 +62,7 @@ impl Backend for GcsBackend {
         url.query_pairs_mut()
             .append_pair("alt", "media")
             .append_pair("generation", meta.version.as_deref().unwrap_or_default());
-        let response = send(self.request(Method::GET, url), false).await?;
+        let response = self.send(self.request(Method::GET, url), false).await?;
         Ok((meta, Box::new(GcsReader { response })))
     }
     async fn put(&mut self, request: &PutRequest, data: Bytes) -> StorageResult<()> {
@@ -76,7 +77,7 @@ impl Backend for GcsBackend {
         super::publication::put_file(self, request, file, size).await
     }
     async fn delete(&mut self, key: &str) -> StorageResult<()> {
-        send(
+        self.send(
             self.request(Method::DELETE, self.url(Some(key), false)?),
             true,
         )

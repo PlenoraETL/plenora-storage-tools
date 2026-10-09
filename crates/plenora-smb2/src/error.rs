@@ -300,6 +300,8 @@ pub enum Error {
     ///
     /// Tune the wait with
     /// [`Connection::set_credit_wait_timeout`](crate::client::connection::Connection::set_credit_wait_timeout).
+    /// Only a wait that ran out of that time ends here; when no grant can
+    /// arrive at all the send fails with [`Error::CreditsExhausted`] instead.
     #[error(
         "server stopped granting SMB credits: needed {needed}, {available} available \
          after waiting {waited:?}"
@@ -311,6 +313,23 @@ pub enum Error {
         available: u16,
         /// How long the send waited for a grant.
         waited: std::time::Duration,
+    },
+
+    /// A request needs more credits than the connection holds, and no request
+    /// is outstanding whose response could grant more.
+    ///
+    /// Credits only arrive on responses, so waiting cannot help: the send
+    /// fails without waiting and the request never reaches the wire. Unlike
+    /// [`Error::CreditStarvation`] nothing timed out; the server's credit
+    /// window is too small for this request on this connection. A new
+    /// connection starts with a fresh window, so it classifies as
+    /// [`ErrorKind::ConnectionLost`] and reports as retryable.
+    #[error("not enough SMB credits and none can arrive: needed {needed}, {available} available")]
+    CreditsExhausted {
+        /// Credits the request needed (its `CreditCharge`).
+        needed: u16,
+        /// Credits on hand.
+        available: u16,
     },
 
     /// A request could not be handed to the network in time.
@@ -406,6 +425,7 @@ impl Error {
             Error::Timeout
                 | Error::Disconnected
                 | Error::CreditStarvation { .. }
+                | Error::CreditsExhausted { .. }
                 | Error::SendTimeout { .. }
                 | Error::ServerUnresponsive { .. }
                 | Error::ReconnectFailed { .. }
@@ -592,6 +612,9 @@ impl Error {
             // A connection whose credits never come back is a dead connection
             // wearing a live socket; consumers already reconnect on TimedOut.
             Error::CreditStarvation { .. } => ErrorKind::TimedOut,
+            // Nothing timed out: this connection cannot fund the request, and
+            // only a new one, with a fresh credit window, can.
+            Error::CreditsExhausted { .. } => ErrorKind::ConnectionLost,
             Error::SendTimeout { .. } => ErrorKind::TimedOut,
             // The socket is up but nobody is home. Consumers already
             // reconnect on `ConnectionLost`, and reconnecting is the only

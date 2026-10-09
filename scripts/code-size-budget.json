@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "basis": "Reviewed 2.0 adapter separation; provider budget reviewed for 2.1 private-file preparation and publication (docs/roadmap-2.1.0.md). Other budgets unchanged. Core code budget raised to 2650 for the 3.0.0 runtime binding admission (Runtime Binding 1.0 RT-016 to RT-023: reserved-key grammars, rejection categories, result identity, envelope-level rejection), split into runtime_admission.rs.",
+  "basis": "Reviewed 2.0 adapter separation; provider budget reviewed for 2.1 private-file preparation and publication (docs/roadmap-2.1.0.md). Other budgets unchanged. Core code budget raised to 2650 for the 3.0.0 runtime binding admission (Runtime Binding 1.0 RT-016 to RT-023: reserved-key grammars, rejection categories, result identity, envelope-level rejection), split into runtime_admission.rs. 3.0.0 request inactivity limit: core raised to 2800 code / 3800 physical lines (inactivity.rs, the shared clock), providers to 3900 / 4300 and S3 to 1550 / 1850 (watched.rs in each: body adapters that re-arm the clock frame by frame and the reqwest conversion object_store no longer does). The adapters are copied in S3 rather than shared through core because they implement http_body::Body, which must not cross the public API of plenora-storage-core.",
   "areas": {
     "plenora-smb2": {
       "code_lines": 21100,
@@ -13,8 +13,8 @@
       "max_file_code_lines": 300
     },
     "plenora-storage-core": {
-      "code_lines": 2650,
-      "physical_lines": 3650,
+      "code_lines": 2800,
+      "physical_lines": 3800,
       "max_file_code_lines": 700
     },
     "plenora-storage-engine": {
@@ -28,8 +28,8 @@
       "max_file_code_lines": 400
     },
     "plenora-storage-providers": {
-      "code_lines": 3600,
-      "physical_lines": 4200,
+      "code_lines": 3900,
+      "physical_lines": 4300,
       "max_file_code_lines": 400
     },
     "plenora-storage-py": {
@@ -38,8 +38,8 @@
       "max_file_code_lines": 300
     },
     "plenora-storage-s3": {
-      "code_lines": 1400,
-      "physical_lines": 1700,
+      "code_lines": 1550,
+      "physical_lines": 1850,
       "max_file_code_lines": 400
     },
     "plenora-storage-sftp": {

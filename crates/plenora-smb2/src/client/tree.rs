@@ -3488,7 +3488,7 @@ mod tests {
              out a response deadline for an answer that is never coming"
         );
         assert!(
-            matches!(attempt, Err(Error::CreditStarvation { .. })),
+            matches!(attempt, Err(Error::CreditsExhausted { .. })),
             "the caller gets a bounded error instead, got {:?}",
             attempt.map(|_| "a tree")
         );

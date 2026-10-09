@@ -13,7 +13,9 @@ readme = "../../README.md"
 [dependencies]
 hex.workspace = true
 async-trait.workspace = true
+bytes.workspace = true
 futures-util.workspace = true
+http-body.workspace = true
 object_store.workspace = true
 plenora-storage-core = { path = "../plenora-storage-core", version = "3.0.0" }
 reqwest.workspace = true

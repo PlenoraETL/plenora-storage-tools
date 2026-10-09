@@ -22,6 +22,7 @@ use validation::{
 };
 
 mod list_validation;
+mod watched;
 
 #[cfg(fuzzing)]
 /// Exercise S3 listing validation in instrumented builds.
@@ -203,13 +204,15 @@ struct PinnedDnsConnector {
     timeouts: ClientTimeouts,
 }
 
-/// Limit on silence while reading one S3 response without a deadline.
+/// Limit on inactivity of one S3 request without a deadline.
 ///
-/// A request that receives nothing for this long fails as `timeout`. With a
-/// deadline every request is bounded by the time remaining instead. The whole
-/// request has no other fixed limit, so a large download that keeps moving is
-/// never cut short. Requests that upload a body (parts included) are not
-/// subject to it: without a deadline the client puts no limit on them.
+/// A request fails as `timeout` when, for this long, the transport takes no
+/// frame of its body and no frame of the answer arrives: while sending (parts
+/// included), while waiting for the answer and while reading it. A transfer
+/// that keeps moving in either direction is never cut short. A frame counts
+/// once the transport has taken it, which may be into socket buffers the server
+/// never reads. With a deadline every request is bounded by the time remaining
+/// instead.
 pub const READ_TIMEOUT_WITHOUT_DEADLINE: Duration = Duration::from_secs(300);
 /// Upper bound on establishing a connection; the time remaining before the
 /// deadline applies when it is shorter.
@@ -220,8 +223,8 @@ const CLIENT_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 struct ClientTimeouts {
     /// Whole request, from sending to the end of the response body.
     total: Option<Duration>,
-    /// Silence while reading the response.
-    read: Option<Duration>,
+    /// Inactivity in either direction (see `watched`).
+    idle: Option<Duration>,
     /// Establishing the connection.
     connect: Duration,
 }
@@ -229,18 +232,18 @@ struct ClientTimeouts {
 impl ClientTimeouts {
     /// With a deadline every request may last as long as the time remaining
     /// (the operation control ends it exactly at the deadline); without one,
-    /// only silence while reading is bounded. Before 3.0.0 every request had a
-    /// fixed 30 s total limit, whatever the deadline.
+    /// only inactivity is bounded. Before 3.0.0 every request had a fixed
+    /// 30 s total limit, whatever the deadline.
     fn for_remaining(remaining: Option<Duration>) -> Self {
         remaining.map_or(
             Self {
                 total: None,
-                read: Some(READ_TIMEOUT_WITHOUT_DEADLINE),
+                idle: Some(READ_TIMEOUT_WITHOUT_DEADLINE),
                 connect: CLIENT_CONNECT_TIMEOUT,
             },
             |remaining| Self {
                 total: Some(remaining),
-                read: None,
+                idle: None,
                 connect: CLIENT_CONNECT_TIMEOUT.min(remaining),
             },
         )
@@ -250,11 +253,12 @@ const CLIENT_USER_AGENT: &str = concat!("plenora-storage-tools/", env!("CARGO_PK
 
 impl PinnedDnsConnector {
     /// The HTTP client of one operation: pinned addresses, no redirects or
-    /// proxies, and the timeouts of [`ClientTimeouts`]. `upload` leaves out
-    /// the read timeout: reqwest starts it with the request and does not
-    /// re-arm it with the bytes sent, so it would cut an upload that keeps
-    /// moving; without a deadline such requests have no client limit.
-    fn client(&self, allow_http: bool, upload: bool) -> reqwest::Result<reqwest::Client> {
+    /// proxies, and the total and connection timeouts of [`ClientTimeouts`].
+    /// It has no read timeout: reqwest starts one with the request and does
+    /// not re-arm it with the bytes sent, so it would cut an upload that keeps
+    /// moving. Every request goes through `watched` with the inactivity limit
+    /// instead.
+    fn client(&self, allow_http: bool) -> reqwest::Result<reqwest::Client> {
         let mut builder = reqwest::Client::builder()
             .https_only(!allow_http)
             // Redirects and proxies would resolve a host this connector never
@@ -275,9 +279,6 @@ impl PinnedDnsConnector {
         if let Some(total) = self.timeouts.total {
             builder = builder.timeout(total);
         }
-        if let Some(read) = self.timeouts.read.filter(|_| !upload) {
-            builder = builder.read_timeout(read);
-        }
         for (host, addresses) in &self.pinned {
             builder = builder.resolve_to_addrs(host, addresses);
         }
@@ -292,16 +293,15 @@ impl HttpConnector for PinnedDnsConnector {
         let allow_http = options
             .get_config_value(&ClientConfigKey::AllowHttp)
             .is_some_and(|value| value == "true");
-        let build = |upload| {
-            self.client(allow_http, upload)
-                .map_err(|error| object_store::Error::Generic {
-                    store: "S3",
-                    source: Box::new(error),
-                })
-        };
+        let client = self
+            .client(allow_http)
+            .map_err(|error| object_store::Error::Generic {
+                store: "S3",
+                source: Box::new(error),
+            })?;
         Ok(HttpClient::new(list_validation::ValidatingClient {
-            read: build(false)?,
-            upload: build(true)?,
+            client,
+            idle: self.timeouts.idle,
         }))
     }
 }

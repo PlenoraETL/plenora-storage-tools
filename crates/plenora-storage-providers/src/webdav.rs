@@ -55,9 +55,6 @@ impl ProviderFactory for WebDav {
         let client = connector
             .client()
             .map_err(|error| transport_failure(&error, ErrorPhase::Connect, false))?;
-        let upload = connector
-            .upload_client()
-            .map_err(|error| transport_failure(&error, ErrorPhase::Connect, false))?;
         let credential = credentials.resolve(&c.credential_ref)?;
         let auth = if let Some(token) = credential.optional("bearer_token") {
             Auth::Bearer(token.to_owned())
@@ -70,7 +67,7 @@ impl ProviderFactory for WebDav {
         Ok(Box::new(Dav {
             root,
             client,
-            upload,
+            idle: connector.idle(),
             auth,
         }))
     }
@@ -82,8 +79,8 @@ enum Auth {
 struct Dav {
     root: Url,
     client: Client,
-    /// Used for requests that upload a body (see `Connector::upload_client`).
-    upload: Client,
+    /// Inactivity limit of every request (see `crate::watched`).
+    idle: Option<std::time::Duration>,
     auth: Auth,
 }
 struct DavReader {
@@ -116,22 +113,24 @@ impl Dav {
         Ok(url)
     }
     fn request(&self, method: Method, url: Url) -> RequestBuilder {
-        let client = if method == Method::PUT {
-            &self.upload
-        } else {
-            &self.client
-        };
-        let request = client.request(method, url);
+        let request = self.client.request(method, url);
         match &self.auth {
             Auth::Basic(user, password) => request.basic_auth(user, Some(password)),
             Auth::Bearer(token) => request.bearer_auth(token),
         }
     }
+    /// Sends a request under the operation's inactivity limit.
+    async fn send(&self, request: RequestBuilder) -> Result<Response, crate::watched::BoxError> {
+        crate::watched::send(request, self.idle).await
+    }
     async fn properties(&self, key: &str, depth: &str) -> StorageResult<Vec<DavEntry>> {
-        let response = self.request(Method::from_bytes(b"PROPFIND").map_err(|_| invalid("METHOD_INVALID"))?,self.url(key)?)
+        let request = self.request(Method::from_bytes(b"PROPFIND").map_err(|_| invalid("METHOD_INVALID"))?,self.url(key)?)
             .header("Depth",depth).header("Content-Type","application/xml")
-            .body("<?xml version=\"1.0\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:resourcetype/><d:getcontentlength/><d:getetag/></d:prop></d:propfind>")
-            .send().await.map_err(|error| transport_failure(&error, ErrorPhase::Read, false))?;
+            .body("<?xml version=\"1.0\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:resourcetype/><d:getcontentlength/><d:getetag/></d:prop></d:propfind>");
+        let response = self
+            .send(request)
+            .await
+            .map_err(|error| transport_failure(&*error, ErrorPhase::Read, false))?;
         let mut response = checked(response, false)?;
         if response.status() != StatusCode::MULTI_STATUS {
             return Err(failure(ErrorCategory::Protocol, ErrorPhase::Read, false));

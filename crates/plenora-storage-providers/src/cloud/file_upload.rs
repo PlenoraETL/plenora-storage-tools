@@ -59,7 +59,7 @@ impl FileUpload {
         // separate transport only for a prepared upload, retaining the pinned DNS.
         let client = self
             .connector
-            .upload_client()
+            .client()
             .map_err(|error| transport_failure(&error, ErrorPhase::Connect, false))?;
         let mut url = self.root.clone();
         {
@@ -113,15 +113,15 @@ impl FileUpload {
             HeaderValue::from_str(&authorization).map_err(|_| invalid("AZURE_SIGNING_FAILED"))?;
         authorization.set_sensitive(true);
         headers.insert("authorization", authorization);
-        let response = client
+        let request = client
             .put(url)
             .headers(headers)
             .body(reqwest::Body::wrap_stream(
                 tokio_util::io::ReaderStream::new(file),
-            ))
-            .send()
+            ));
+        let response = crate::watched::send(request, self.connector.idle())
             .await
-            .map_err(|error| transport_failure(&error, ErrorPhase::Commit, true))?;
+            .map_err(|error| transport_failure(&*error, ErrorPhase::Commit, true))?;
         let category = match response.status().as_u16() {
             201 => return Ok(()),
             401 => ErrorCategory::Authentication,

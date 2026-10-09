@@ -65,10 +65,9 @@ impl Backend for Dav {
     async fn get(&mut self, key: &str) -> StorageResult<(ObjectMetadata, Box<dyn Reader>)> {
         let meta = self.stat(key).await?;
         let response = self
-            .request(Method::GET, self.url(key)?)
-            .send()
+            .send(self.request(Method::GET, self.url(key)?))
             .await
-            .map_err(|error| transport_failure(&error, ErrorPhase::Read, false))?;
+            .map_err(|error| transport_failure(&*error, ErrorPhase::Read, false))?;
         Ok((
             meta,
             Box::new(DavReader {
@@ -97,11 +96,12 @@ impl Backend for Dav {
                 StorageError::unsupported("WebDAV file deletion requires a strong ETag")
             })?;
         let response = self
-            .request(Method::DELETE, self.url(key)?)
-            .header("If-Match", etag)
-            .send()
+            .send(
+                self.request(Method::DELETE, self.url(key)?)
+                    .header("If-Match", etag),
+            )
             .await
-            .map_err(|error| transport_failure(&error, ErrorPhase::Commit, true))?;
+            .map_err(|error| transport_failure(&*error, ErrorPhase::Commit, true))?;
         checked(response, true)?;
         Ok(())
     }

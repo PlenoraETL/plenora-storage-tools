@@ -65,14 +65,11 @@ impl ProviderFactory for Gcs {
         let client = connector
             .client()
             .map_err(|error| transport_failure(&error, ErrorPhase::Connect, false))?;
-        let upload = connector
-            .upload_client()
-            .map_err(|error| transport_failure(&error, ErrorPhase::Connect, false))?;
         let material = credentials.resolve(&connection.credential_ref)?;
         Ok(Box::new(GcsBackend {
             root,
             client,
-            upload,
+            idle: connector.idle(),
             bucket: cfg.bucket,
             token: material.required("bearer_token")?.to_owned(),
         }))
@@ -81,8 +78,8 @@ impl ProviderFactory for Gcs {
 struct GcsBackend {
     root: Url,
     client: Client,
-    /// Used for requests that upload a body (see `Connector::upload_client`).
-    upload: Client,
+    /// Inactivity limit of every request (see `crate::watched`).
+    idle: Option<std::time::Duration>,
     bucket: String,
     token: String,
 }
@@ -105,19 +102,15 @@ impl GcsBackend {
         Ok(url)
     }
     fn request(&self, method: Method, url: Url) -> RequestBuilder {
-        let client = if matches!(method, Method::POST | Method::PUT) {
-            &self.upload
-        } else {
-            &self.client
-        };
-        client.request(method, url).bearer_auth(&self.token)
+        self.client.request(method, url).bearer_auth(&self.token)
     }
     async fn object(&self, key: &str) -> StorageResult<Object> {
-        let response = send(
-            self.request(Method::GET, self.url(Some(key), false)?),
-            false,
-        )
-        .await?;
+        let response = self
+            .send(
+                self.request(Method::GET, self.url(Some(key), false)?),
+                false,
+            )
+            .await?;
         let object: Object = json(response).await?;
         if object.name != key {
             return Err(invalid("GCS_OBJECT_NAME_MISMATCH"));
@@ -164,10 +157,20 @@ impl Reader for GcsReader {
             .map_err(|error| transport_failure(&error, ErrorPhase::Read, false))
     }
 }
-async fn send(request: RequestBuilder, mutating: bool) -> StorageResult<Response> {
-    let response = request.send().await.map_err(|error| {
+impl GcsBackend {
+    /// Sends a request under the operation's inactivity limit.
+    async fn send(&self, request: RequestBuilder, mutating: bool) -> StorageResult<Response> {
+        send(request, self.idle, mutating).await
+    }
+}
+async fn send(
+    request: RequestBuilder,
+    idle: Option<std::time::Duration>,
+    mutating: bool,
+) -> StorageResult<Response> {
+    let response = crate::watched::send(request, idle).await.map_err(|error| {
         transport_failure(
-            &error,
+            &*error,
             if mutating {
                 ErrorPhase::Commit
             } else {

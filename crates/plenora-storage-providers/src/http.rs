@@ -24,13 +24,14 @@ pub fn endpoint(value: &str, policy: &EngineConfig) -> StorageResult<Url> {
     Ok(url)
 }
 
-/// Limit on silence while reading one HTTP response without a deadline.
+/// Limit on inactivity of one HTTP request without a deadline.
 ///
-/// A request that receives nothing for this long fails as `timeout`. With a
-/// deadline every request is bounded by the time remaining instead. The whole
-/// request has no other fixed limit, so a large transfer that keeps moving is
-/// never cut short. Requests that upload a body are not subject to it: without
-/// a deadline the client puts no limit on them.
+/// A request fails as `timeout` when, for this long, the transport takes no
+/// frame of its body and no frame of the answer arrives: while sending, while
+/// waiting for the answer and while reading it. A transfer that keeps moving
+/// in either direction is never cut short. A frame counts once the transport
+/// has taken it, which may be into socket buffers the server never reads. With
+/// a deadline every request is bounded by the time remaining instead.
 pub const HTTP_READ_TIMEOUT_WITHOUT_DEADLINE: Duration = Duration::from_secs(300);
 /// Upper bound on establishing a connection; the time remaining before the
 /// deadline applies when it is shorter.
@@ -41,8 +42,8 @@ pub const HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 pub struct HttpTimeouts {
     /// Whole request, from sending to the end of the response body.
     pub total: Option<Duration>,
-    /// Silence while reading the response.
-    pub read: Option<Duration>,
+    /// Inactivity in either direction (see `crate::watched`).
+    pub idle: Option<Duration>,
     /// Establishing the connection.
     pub connect: Duration,
 }
@@ -50,18 +51,18 @@ pub struct HttpTimeouts {
 impl HttpTimeouts {
     /// With a deadline every request may last as long as the time remaining
     /// (the operation control ends it exactly at the deadline); without one,
-    /// only silence while reading is bounded. Before 3.0.0 every request had a
-    /// fixed 60 s total limit, whatever the deadline.
+    /// only inactivity is bounded. Before 3.0.0 every request had a fixed
+    /// 60 s total limit, whatever the deadline.
     pub fn for_remaining(remaining: Option<Duration>) -> Self {
         remaining.map_or(
             Self {
                 total: None,
-                read: Some(HTTP_READ_TIMEOUT_WITHOUT_DEADLINE),
+                idle: Some(HTTP_READ_TIMEOUT_WITHOUT_DEADLINE),
                 connect: HTTP_CONNECT_TIMEOUT,
             },
             |remaining| Self {
                 total: Some(remaining),
-                read: None,
+                idle: None,
                 connect: HTTP_CONNECT_TIMEOUT.min(remaining),
             },
         )
@@ -91,7 +92,12 @@ impl Connector {
             timeouts: HttpTimeouts::for_remaining(context.control.remaining()),
         })
     }
-    fn builder(&self) -> reqwest::ClientBuilder {
+
+    /// The client of the operation. It has no read timeout: reqwest starts
+    /// one with the request and does not re-arm it with the bytes sent, so it
+    /// would cut an upload that keeps moving. Requests go through
+    /// `crate::watched` with [`Self::idle`] instead.
+    pub(crate) fn client(&self) -> Result<reqwest::Client, reqwest::Error> {
         let builder = reqwest::Client::builder()
             .https_only(!self.allow_http)
             .no_proxy()
@@ -107,33 +113,22 @@ impl Connector {
             Some(total) => builder.timeout(total),
             None => builder,
         }
+        .build()
     }
 
-    /// Client for requests whose response is the transfer: without a
-    /// deadline, silence while reading is bounded by
-    /// [`HTTP_READ_TIMEOUT_WITHOUT_DEADLINE`].
-    pub(crate) fn client(&self) -> Result<reqwest::Client, reqwest::Error> {
-        self.timeouts
-            .read
-            .map_or_else(|| self.builder(), |read| self.builder().read_timeout(read))
-            .build()
-    }
-
-    /// Client for requests that upload a body. reqwest's read timeout starts
-    /// with the request and is not re-armed by the bytes sent, so it would cut
-    /// an upload that keeps moving; without a deadline these requests have no
-    /// client limit, only the deadline the caller sets.
-    pub(crate) fn upload_client(&self) -> Result<reqwest::Client, reqwest::Error> {
-        self.builder().build()
+    /// The inactivity limit of every request of the operation.
+    pub(crate) const fn idle(&self) -> Option<Duration> {
+        self.timeouts.idle
     }
 }
 #[cfg(feature = "azure")]
 impl HttpConnector for Connector {
     fn connect(&self, _: &ClientOptions) -> object_store::Result<HttpClient> {
         self.client()
-            .and_then(|read| {
-                self.upload_client().map(|upload| {
-                    HttpClient::new(crate::azure_listing::ValidatingClient { read, upload })
+            .map(|client| {
+                HttpClient::new(crate::azure_listing::ValidatingClient {
+                    client,
+                    idle: self.idle(),
                 })
             })
             .map_err(|error| object_store::Error::Generic {

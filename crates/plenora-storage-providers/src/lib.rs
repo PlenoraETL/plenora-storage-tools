@@ -39,6 +39,8 @@ mod local;
 mod smb;
 #[cfg(feature = "smb")]
 mod smb_listing;
+#[cfg(any(feature = "azure", feature = "gcs", feature = "webdav"))]
+mod watched;
 #[cfg(feature = "webdav")]
 mod webdav;
 

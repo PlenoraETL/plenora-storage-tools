@@ -1907,10 +1907,13 @@ impl Inner {
     /// the over-spend hang for a starvation hang:
     ///
     /// 1. Nothing outstanding and not enough on hand: no grant can ever
-    ///    arrive, so fail immediately rather than wait out the deadline.
+    ///    arrive, so fail with [`Error::CreditsExhausted`] rather than wait
+    ///    out the deadline, whether that is known before waiting or becomes
+    ///    true during the wait.
     /// 2. The connection dies: `CreditPool::close` wakes every waiter.
     /// 3. Otherwise the deadline from
-    ///    [`Connection::set_credit_wait_timeout`] applies.
+    ///    [`Connection::set_credit_wait_timeout`] applies, and only its expiry
+    ///    is [`Error::CreditStarvation`].
     async fn reserve_credits(
         &self,
         charge: u16,
@@ -1925,7 +1928,7 @@ impl Inner {
         if self.waiters.lock()?.is_empty() {
             // Every credit the server will ever return rides on a response,
             // and there is no request outstanding to carry one.
-            return Err(self.starvation(charge, Duration::ZERO));
+            return Err(self.credits_exhausted(charge));
         }
 
         self.metrics.credit_waits.fetch_add(1, Ordering::Relaxed);
@@ -1960,8 +1963,12 @@ impl Inner {
                     };
                 }
                 Either::Right((_, still_reserving)) => {
-                    let nothing_outstanding = self.waiters.lock()?.is_empty();
-                    if nothing_outstanding || Instant::now() >= deadline {
+                    if self.waiters.lock()?.is_empty() {
+                        // The last response came and went without enough
+                        // credits: none can arrive any more.
+                        return Err(self.credits_exhausted(charge));
+                    }
+                    if Instant::now() >= deadline {
                         self.metrics
                             .credit_starvations
                             .fetch_add(1, Ordering::Relaxed);
@@ -2206,6 +2213,13 @@ impl Inner {
             needed: charge,
             available: self.credits.available(),
             waited,
+        }
+    }
+
+    fn credits_exhausted(&self, charge: u16) -> Error {
+        Error::CreditsExhausted {
+            needed: charge,
+            available: self.credits.available(),
         }
     }
 
@@ -5819,6 +5833,83 @@ mod tests {
         );
     }
 
+    /// The other way a credit wait ends: the only outstanding request is
+    /// answered without granting enough. No response can bring credits any
+    /// more, so the wait stops at the next recheck with
+    /// [`Error::CreditsExhausted`], long before its deadline, and it is not
+    /// counted as a starvation: no time ran out.
+    #[tokio::test(start_paused = true)]
+    async fn a_wait_that_no_response_can_fund_any_more_is_exhausted_not_starved() {
+        let mock = Arc::new(MockTransport::new());
+        let conn = Connection::from_transport(
+            Box::new(mock.clone()),
+            Box::new(mock.clone()),
+            "test-server",
+        )
+        .unwrap();
+        conn.set_credits(2);
+        conn.set_credit_wait_timeout(Duration::from_secs(60));
+        let holder = conn.clone();
+        let held = tokio::spawn(async move {
+            holder
+                .execute_with_credits(
+                    Command::Echo,
+                    &crate::msg::echo::EchoRequest,
+                    Some(TreeId(1)),
+                    CreditCharge(2),
+                )
+                .await
+        });
+        let waiting = std::time::Instant::now();
+        while mock.sent_count() < 1 {
+            assert!(waiting.elapsed() < Duration::from_secs(10), "never sent");
+            tokio::task::yield_now().await;
+        }
+        let blocked = {
+            let conn = conn.clone();
+            tokio::spawn(async move {
+                conn.execute_with_credits(
+                    Command::Echo,
+                    &crate::msg::echo::EchoRequest,
+                    Some(TreeId(1)),
+                    CreditCharge(2),
+                )
+                .await
+            })
+        };
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        // The holder's answer grants nothing back.
+        let mut h = Header::new_request(Command::Echo);
+        h.flags.set_response();
+        h.credits = 0;
+        h.message_id = MessageId(0);
+        let started = Instant::now();
+        mock.queue_response(pack_message(&h, &crate::msg::echo::EchoResponse));
+        assert!(held.await.unwrap().is_ok());
+        let result = blocked.await.unwrap();
+        assert!(
+            matches!(
+                result,
+                Err(Error::CreditsExhausted {
+                    needed: 2,
+                    available: 0
+                })
+            ),
+            "{result:?}"
+        );
+        assert!(started.elapsed() <= Duration::from_secs(1));
+        assert_eq!(conn.metrics().credit_starvations, 0);
+        assert_eq!(mock.sent_count(), 1, "the unfunded request never left");
+        assert_eq!(
+            Error::CreditsExhausted {
+                needed: 2,
+                available: 0
+            }
+            .kind(),
+            crate::error::ErrorKind::ConnectionLost
+        );
+    }
+
     // ── Response deadline ──────────────────────────────────────────────
 
     /// The failure that started all this: a server that accepts a request and
@@ -5917,7 +6008,10 @@ mod tests {
             )
             .await
         });
+        // Bounded: a request that is never sent fails the test, not hangs it.
+        let waiting = std::time::Instant::now();
         while mock.sent_count() < 1 {
+            assert!(waiting.elapsed() < Duration::from_secs(10), "never sent");
             tokio::task::yield_now().await;
         }
         let started = Instant::now();
@@ -6423,10 +6517,9 @@ mod tests {
         assert!(
             matches!(
                 result,
-                Err(Error::CreditStarvation {
+                Err(Error::CreditsExhausted {
                     needed: 4,
                     available: 1,
-                    ..
                 })
             ),
             "expected an immediate starvation error, got {result:?}"
