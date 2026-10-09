@@ -44,7 +44,8 @@ enum Reply {
     NeverRead,
     /// Answers at once with a body of `count` bytes, sending one every `every`.
     Trickle { every: Duration, count: usize },
-    /// Reads the request and answers with exactly this head and body.
+    /// Reads the request and answers with exactly this head and body; the
+    /// client acknowledges it once it has read the whole body.
     Fixed {
         head: &'static str,
         body: &'static [u8],
@@ -681,13 +682,12 @@ async fn azure_request(
             async {
                 let outcome = async {
                     let response = client.execute(request).await?;
-                    server.answers.fetch_add(1, Ordering::SeqCst);
                     let (parts, body) = response.into_parts();
-                    Ok::<_, object_store::client::HttpError>((
-                        parts.status,
-                        parts.headers,
-                        body.bytes().await?,
-                    ))
+                    let body = body.bytes().await?;
+                    // Acknowledged once the whole answer is in: the server
+                    // keeps the clock still until then.
+                    server.answers.fetch_add(1, Ordering::SeqCst);
+                    Ok::<_, object_store::client::HttpError>((parts.status, parts.headers, body))
                 }
                 .await;
                 outcome.map_err(|error| {
@@ -772,13 +772,15 @@ async fn send_and_read(server: &Server, request: reqwest::RequestBuilder) -> Ans
                 let response = crate::watched::send(request, Some(LIMIT))
                     .await
                     .map_err(|error| transport_failure(&*error, ErrorPhase::Read, false))?;
-                server.answers.fetch_add(1, Ordering::SeqCst);
                 let status = response.status();
                 let headers = response.headers().clone();
                 let body = response
                     .bytes()
                     .await
                     .map_err(|error| transport_failure(&error, ErrorPhase::Read, false))?;
+                // Acknowledged once the whole answer is in: the server keeps
+                // the clock still until then.
+                server.answers.fetch_add(1, Ordering::SeqCst);
                 Ok((status, headers, body))
             },
             ErrorPhase::Read,
