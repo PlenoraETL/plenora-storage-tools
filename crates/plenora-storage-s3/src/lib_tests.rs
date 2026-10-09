@@ -65,7 +65,8 @@ mod fake_s3 {
 
     pub struct Server {
         pub address: SocketAddr,
-        pub accepted: Arc<AtomicUsize>,
+        /// Requests received in full, on any connection.
+        pub requests: Arc<AtomicUsize>,
         /// Bytes of trickled downloads the client has read; the test counts them.
         pub received: Arc<AtomicUsize>,
         task: tokio::task::JoinHandle<()>,
@@ -82,21 +83,20 @@ mod fake_s3 {
             .await
             .expect("bind");
         let address = listener.local_addr().expect("address");
-        let accepted = Arc::new(AtomicUsize::new(0));
+        let requests = Arc::new(AtomicUsize::new(0));
         let received = Arc::new(AtomicUsize::new(0));
-        let counter = accepted.clone();
+        let counter = requests.clone();
         let delivered = received.clone();
         let task = tokio::spawn(async move {
             let mut connections = tokio::task::JoinSet::new();
             loop {
                 let (socket, _) = listener.accept().await.expect("accept");
-                counter.fetch_add(1, Ordering::SeqCst);
-                connections.spawn(serve(socket, script, delivered.clone()));
+                connections.spawn(serve(socket, script, counter.clone(), delivered.clone()));
             }
         });
         Server {
             address,
-            accepted,
+            requests,
             received,
             task,
         }
@@ -104,8 +104,14 @@ mod fake_s3 {
 
     const OBJECT_HEADERS: &str = "Last-Modified: Thu, 01 Jan 2026 00:00:00 GMT\r\nETag: \"e\"\r\n";
 
-    async fn serve(mut socket: TcpStream, script: Script, received: Arc<AtomicUsize>) {
+    async fn serve(
+        mut socket: TcpStream,
+        script: Script,
+        requests: Arc<AtomicUsize>,
+        received: Arc<AtomicUsize>,
+    ) {
         while let Some((method, target)) = read_request(&mut socket).await {
+            requests.fetch_add(1, Ordering::SeqCst);
             let answer = match (method.as_str(), target.contains("?uploads")) {
                 ("POST", true) => xml(
                     "<InitiateMultipartUploadResult><Bucket>bucket</Bucket><Key>object</Key>\
@@ -120,7 +126,21 @@ mod fake_s3 {
                         return;
                     };
                     tokio::time::sleep(delay).await;
-                    "HTTP/1.1 200 OK\r\nETag: \"p\"\r\nContent-Length: 0\r\n\r\n".to_owned()
+                    let seen = requests.load(Ordering::SeqCst);
+                    socket
+                        .write_all(b"HTTP/1.1 200 OK\r\nETag: \"p\"\r\nContent-Length: 0\r\n\r\n")
+                        .await
+                        .expect("answer");
+                    // No virtual time passes until the completion request
+                    // arrives, on whatever connection the pool picks; it may
+                    // be this one, so another task holds the clock.
+                    let requests = requests.clone();
+                    tokio::spawn(async move {
+                        while requests.load(Ordering::SeqCst) == seen {
+                            tokio::task::yield_now().await;
+                        }
+                    });
+                    continue;
                 }
                 ("PUT", _) => {
                     "HTTP/1.1 200 OK\r\nETag: \"e\"\r\nContent-Length: 0\r\n\r\n".to_owned()
@@ -211,9 +231,7 @@ impl plenora_storage_core::CredentialResolver for TestCredentials {
 /// The store the S3 provider builds for an operation under `control`, against
 /// the fake endpoint. Its two pooled connections (the read client and the
 /// upload client) are opened in real time by a HEAD and a PUT, then tokio
-/// time is paused: every later request reuses them (the tests check that no
-/// third connection was accepted), so the waits under test involve no
-/// connection setup and advance only in virtual time.
+/// time is paused.
 async fn warm_store(
     server: &fake_s3::Server,
     control: &plenora_storage_core::ExecutionControl,
@@ -252,6 +270,21 @@ async fn warm_store(
         .expect("warm-up upload");
     tokio::time::pause();
     store
+}
+
+/// Keeps virtual time still until the server has received `count` requests
+/// in total, warm-up included. The pool decides when a request reuses a
+/// connection and when it opens one: either way that happens before any
+/// virtual time passes, so no connection timeout can fire while a loopback
+/// connection is being set up, and the waits under test start only once the
+/// request is at the server.
+fn hold_time_until(server: &fake_s3::Server, count: usize) {
+    let requests = server.requests.clone();
+    tokio::spawn(async move {
+        while requests.load(std::sync::atomic::Ordering::SeqCst) < count {
+            tokio::task::yield_now().await;
+        }
+    });
 }
 
 /// A multipart upload of one part, through the operation control as the
@@ -301,13 +334,13 @@ async fn without_deadline_an_s3_multipart_upload_is_not_cut_by_the_read_limit() 
     .await;
     let control = plenora_storage_core::ExecutionControl::default();
     let store = warm_store(&server, &control).await;
+    hold_time_until(&server, 4);
     let (result, elapsed) = multipart_upload(&store, &control).await;
     result.expect("upload");
     assert!(
         elapsed >= std::time::Duration::from_secs(400),
         "{elapsed:?}"
     );
-    assert_eq!(server.accepted.load(std::sync::atomic::Ordering::SeqCst), 2);
 }
 
 /// With a ten-minute deadline a multipart upload whose part is never
@@ -324,6 +357,7 @@ async fn an_s3_multipart_upload_may_wait_until_the_deadline() {
     let control = plenora_storage_core::ExecutionControl::default()
         .with_deadline(std::time::Instant::now() + std::time::Duration::from_secs(600));
     let store = warm_store(&server, &control).await;
+    hold_time_until(&server, 4);
     let (result, elapsed) = multipart_upload(&store, &control).await;
     let error = result.expect_err("timeout");
     assert_eq!(
@@ -342,7 +376,6 @@ async fn an_s3_multipart_upload_may_wait_until_the_deadline() {
         elapsed <= std::time::Duration::from_secs(601),
         "{elapsed:?}"
     );
-    assert_eq!(server.accepted.load(std::sync::atomic::Ordering::SeqCst), 2);
 }
 
 /// Downloads the object through the operation control without a deadline.
@@ -390,6 +423,7 @@ async fn without_deadline_a_silent_s3_download_ends_at_the_read_limit() {
     })
     .await;
     let store = warm_store(&server, &plenora_storage_core::ExecutionControl::default()).await;
+    hold_time_until(&server, 3);
     let (result, elapsed) = download(&store, &server.received).await;
     let error = result.expect_err("timeout");
     assert_eq!(
@@ -408,7 +442,6 @@ async fn without_deadline_a_silent_s3_download_ends_at_the_read_limit() {
         elapsed <= super::READ_TIMEOUT_WITHOUT_DEADLINE + std::time::Duration::from_secs(1),
         "{elapsed:?}"
     );
-    assert_eq!(server.accepted.load(std::sync::atomic::Ordering::SeqCst), 2);
 }
 
 /// Without a deadline an S3 download that keeps moving is never cut, however
@@ -421,13 +454,13 @@ async fn without_deadline_an_s3_download_that_keeps_moving_is_not_cut() {
     })
     .await;
     let store = warm_store(&server, &plenora_storage_core::ExecutionControl::default()).await;
+    hold_time_until(&server, 3);
     let (result, elapsed) = download(&store, &server.received).await;
     assert_eq!(result.expect("download"), 6);
     assert!(
         elapsed >= std::time::Duration::from_secs(600),
         "{elapsed:?}"
     );
-    assert_eq!(server.accepted.load(std::sync::atomic::Ordering::SeqCst), 2);
 }
 
 /// Other store failures keep their mapping.

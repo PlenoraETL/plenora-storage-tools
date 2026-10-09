@@ -37,7 +37,8 @@ enum Reply {
 /// never answers.
 struct Server {
     address: SocketAddr,
-    accepted: Arc<AtomicUsize>,
+    /// Requests received in full, on any connection.
+    requests: Arc<AtomicUsize>,
     /// Late answers and trickled bytes the client has received; the test
     /// counts them.
     received: Arc<AtomicUsize>,
@@ -55,22 +56,26 @@ async fn server(script: Vec<Reply>) -> Server {
         .await
         .expect("bind");
     let address = listener.local_addr().expect("address");
-    let accepted = Arc::new(AtomicUsize::new(0));
+    let requests = Arc::new(AtomicUsize::new(0));
     let script = Arc::new(Mutex::new(VecDeque::from(script)));
     let received = Arc::new(AtomicUsize::new(0));
-    let counter = accepted.clone();
+    let counter = requests.clone();
     let delivered = received.clone();
     let task = tokio::spawn(async move {
         let mut connections = tokio::task::JoinSet::new();
         loop {
             let (socket, _) = listener.accept().await.expect("accept");
-            counter.fetch_add(1, Ordering::SeqCst);
-            connections.spawn(serve(socket, script.clone(), delivered.clone()));
+            connections.spawn(serve(
+                socket,
+                script.clone(),
+                counter.clone(),
+                delivered.clone(),
+            ));
         }
     });
     Server {
         address,
-        accepted,
+        requests,
         received,
         task,
     }
@@ -79,9 +84,11 @@ async fn server(script: Vec<Reply>) -> Server {
 async fn serve(
     mut socket: TcpStream,
     script: Arc<Mutex<VecDeque<Reply>>>,
+    requests: Arc<AtomicUsize>,
     received: Arc<AtomicUsize>,
 ) {
     while read_request(&mut socket).await {
+        requests.fetch_add(1, Ordering::SeqCst);
         let reply = script
             .lock()
             .expect("script")
@@ -201,13 +208,26 @@ async fn connector(server: &Server, control: &ExecutionControl) -> (Connector, u
 }
 
 /// Opens the client's pooled connection with one answered request in real
-/// time, then pauses tokio time. Every later request reuses that connection
-/// (each test checks that only one was accepted), so the waits under test
-/// involve no connection setup and advance only in virtual time: no outcome
-/// depends on how fast the machine is.
+/// time, then pauses tokio time.
 async fn warm_up(client: &reqwest::Client, url: &url::Url) {
     client.get(url.clone()).send().await.expect("warm-up");
     tokio::time::pause();
+}
+
+/// Keeps virtual time still until the server has received one more request
+/// than it has now. The pool decides whether the request reuses a connection
+/// or opens one: either way that happens before any virtual time passes, so
+/// no client timer can fire while a loopback connection is being set up, and
+/// the wait under test starts only once the request is at the server. Not for
+/// a body that itself waits on the clock.
+fn hold_time_for_next_request(server: &Server) {
+    let requests = server.requests.clone();
+    let target = requests.load(Ordering::SeqCst) + 1;
+    tokio::spawn(async move {
+        while requests.load(Ordering::SeqCst) < target {
+            tokio::task::yield_now().await;
+        }
+    });
 }
 
 /// A GET through the operation control, as the providers issue it; counts
@@ -218,6 +238,7 @@ async fn get(
     client: &reqwest::Client,
     url: &url::Url,
 ) -> Result<bytes::Bytes, StorageError> {
+    hold_time_for_next_request(server);
     control
         .run(
             async {
@@ -266,7 +287,6 @@ async fn a_request_may_wait_until_the_deadline() {
     assert_safe_timeout(error);
     assert!(elapsed >= Duration::from_secs(590), "{elapsed:?}");
     assert!(elapsed <= Duration::from_secs(601), "{elapsed:?}");
-    assert_eq!(server.accepted.load(Ordering::SeqCst), 1);
 }
 
 /// A later request of the same operation ends at the deadline too, not one
@@ -296,7 +316,6 @@ async fn a_later_request_still_ends_at_the_deadline() {
     assert_safe_timeout(error);
     assert!(elapsed >= Duration::from_secs(590), "{elapsed:?}");
     assert!(elapsed <= Duration::from_secs(601), "{elapsed:?}");
-    assert_eq!(server.accepted.load(Ordering::SeqCst), 1);
 }
 
 /// Without a deadline a silent response is given up on after the declared
@@ -319,7 +338,6 @@ async fn without_deadline_a_silent_response_ends_at_the_read_limit() {
         elapsed <= HTTP_READ_TIMEOUT_WITHOUT_DEADLINE + Duration::from_secs(1),
         "{elapsed:?}"
     );
-    assert_eq!(server.accepted.load(Ordering::SeqCst), 1);
 }
 
 /// Without a deadline a download that keeps moving is never cut, however
@@ -339,6 +357,7 @@ async fn without_deadline_a_download_that_keeps_moving_is_not_cut() {
     let client = connector.client().expect("client");
     warm_up(&client, &url).await;
     let started = Instant::now();
+    hold_time_for_next_request(&server);
     let length = control
         .run(
             async {
@@ -362,7 +381,6 @@ async fn without_deadline_a_download_that_keeps_moving_is_not_cut() {
         .expect("download");
     assert_eq!(length, 6);
     assert!(started.elapsed() >= Duration::from_secs(600));
-    assert_eq!(server.accepted.load(Ordering::SeqCst), 1);
 }
 
 /// Uploads a body that sends one byte every 100 s for 400 s, through the
@@ -414,7 +432,6 @@ async fn without_deadline_an_upload_is_not_cut_by_the_read_limit() {
     let (result, elapsed) = slow_upload(&client, &url).await;
     result.expect("upload");
     assert!(elapsed >= Duration::from_secs(400), "{elapsed:?}");
-    assert_eq!(server.accepted.load(Ordering::SeqCst), 1);
 }
 
 /// Why uploads need their own client: reqwest starts the read timeout with
@@ -463,9 +480,9 @@ async fn azure_request_answered_after_400_s(
     client.execute(request()).await.expect("warm-up");
     tokio::time::pause();
     let started = Instant::now();
+    hold_time_for_next_request(&server);
     let result = client.execute(request()).await.map(|_| started.elapsed());
     server.received.fetch_add(1, Ordering::SeqCst);
-    assert_eq!(server.accepted.load(Ordering::SeqCst), 1);
     result
 }
 
