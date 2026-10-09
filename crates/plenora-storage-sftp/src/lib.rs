@@ -11,9 +11,9 @@ mod operations;
 mod publication;
 mod transfer;
 use errors::{
-    committed_verification_error, configuration_error, list_scan_limit_error,
-    map_exclusive_open_error, map_sftp_error, map_ssh_connect_error, mutation_io_error,
-    transfer_io_error, transfer_limit_error,
+    committed_verification_error, configuration_error, flush_error, list_scan_limit_error,
+    map_exclusive_open_error, map_sftp_error, map_ssh_connect_error, mutation_stream_error,
+    stream_error, transfer_io_error, transfer_limit_error,
 };
 use transfer::{
     atomic_replace, copy_with_control, discard_staged_object, ensure_parent_directories,
@@ -37,19 +37,22 @@ use std::{
 use async_trait::async_trait;
 use plenora_storage_core::{
     ArtifactMetadata, CopyRequest, CredentialMaterial, CredentialResolver, DeleteRequest,
-    DeleteResult, ErrorCategory, ErrorPhase, GetRequest, IntegrityMetadata, ObjectMetadata,
-    OperationContext, ProviderCapabilities, ProviderConnection, ProviderListRequest,
-    ProviderListResult, PublicationPolicy, PutRequest, RemoteEffect, RetryDisposition, StatRequest,
-    StorageError, StorageProvider, StorageResult, TestResult, TransferResult,
-    directory_may_contain, key_matches_prefix, resolve_network_target, validate_object_key,
-    validate_object_prefix,
+    DeleteResult, ErrorCategory, ErrorPhase, ExecutionControl, GetRequest, IntegrityMetadata,
+    ObjectMetadata, OperationContext, ProviderCapabilities, ProviderConnection,
+    ProviderListRequest, ProviderListResult, PublicationPolicy, PutRequest, RemoteEffect,
+    RetryDisposition, StatRequest, StorageError, StorageProvider, StorageResult, TestResult,
+    TransferResult, directory_may_contain, key_matches_prefix, resolve_network_target,
+    validate_object_key, validate_object_prefix,
 };
 use russh::{
     client,
     keys::{HashAlg, PrivateKey, PrivateKeyWithHashAlg, PublicKeyOrCertificate, decode_secret_key},
 };
 use russh_sftp::{
-    client::{RawSftpSession, SftpSession, error::Error as SftpError, fs::Metadata},
+    client::{
+        Config as SftpClientConfig, RawSftpSession, SftpSession, error::Error as SftpError,
+        fs::Metadata,
+    },
     protocol::{OpenFlags, Packet, StatusCode},
 };
 use serde::Deserialize;
@@ -59,6 +62,17 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 /// Stable provider identifier for dispatch and capability discovery.
 pub const PROVIDER_ID: &str = "sftp";
+/// Limit on the server's answer to one SFTP request when the operation has no
+/// deadline.
+///
+/// The SFTP client library otherwise gives every request a fixed 10 s timeout
+/// that ignores the operation deadline, and a slow but correct `fsync` of a
+/// large upload exceeded it. With a deadline the operation's
+/// [`ExecutionControl`] bounds every request with the time that remains, and
+/// this constant is not used. Without one, a request that gets no answer for
+/// this long fails as `timeout` instead of waiting forever: the limit covers a
+/// single unanswered request, not the whole operation.
+pub const REQUEST_TIMEOUT_WITHOUT_DEADLINE: Duration = Duration::from_secs(300);
 /// Versioned connection contract accepted by this adapter.
 pub const CONFIG_CONTRACT: &str = "plenora-storage-sftp-connection-v1";
 static TEMPORARY_NAME_NONCE: AtomicU64 = AtomicU64::new(0);
@@ -187,7 +201,7 @@ impl SftpProvider {
             .request_subsystem(true, "sftp")
             .await
             .map_err(map_ssh_connect_error)?;
-        let sftp = SftpSession::new(channel.into_stream())
+        let sftp = open_session(channel.into_stream(), context.control)
             .await
             .map_err(|error| map_sftp_error(error, ErrorPhase::Connect, false))?;
         Ok(SftpConnection { ssh, sftp, root })
@@ -272,7 +286,7 @@ struct SftpConnection {
 impl SftpConnection {
     /// Negotiate the atomic replacement primitive before creating any directories
     /// or files. The high-level client only exposes the non-replacing v3 rename.
-    async fn atomic_session(&self) -> StorageResult<RawSftpSession> {
+    async fn atomic_session(&self, control: &ExecutionControl) -> StorageResult<RawSftpSession> {
         let channel = self
             .ssh
             .channel_open_session()
@@ -282,10 +296,64 @@ impl SftpConnection {
             .request_subsystem(true, "sftp")
             .await
             .map_err(map_ssh_connect_error)?;
-        let session = RawSftpSession::new(channel.into_stream());
+        let session = open_raw_session(channel.into_stream(), control);
         qualify_atomic_session(&session).await?;
         Ok(session)
     }
+}
+
+/// Seconds the SFTP client library may wait for the answer to one request.
+///
+/// With a deadline this is the time remaining, rounded up so the library never
+/// expires before the deadline: [`ExecutionControl::run`], which wraps every
+/// request, ends the wait exactly at the deadline and reports `timeout`, so the
+/// effective limit of each request is the time remaining when it is sent.
+/// Without a deadline it is [`REQUEST_TIMEOUT_WITHOUT_DEADLINE`].
+fn request_timeout_secs(control: &ExecutionControl) -> u64 {
+    request_timeout_for(
+        control
+            .deadline
+            .map(|deadline| deadline.saturating_duration_since(std::time::Instant::now())),
+    )
+}
+
+/// [`request_timeout_secs`] for a given time remaining: whole seconds rounded
+/// up, never below one; [`REQUEST_TIMEOUT_WITHOUT_DEADLINE`] without a
+/// deadline.
+fn request_timeout_for(remaining: Option<Duration>) -> u64 {
+    remaining.map_or(REQUEST_TIMEOUT_WITHOUT_DEADLINE.as_secs(), |remaining| {
+        let whole = remaining.as_secs();
+        let rounded = if remaining.subsec_nanos() == 0 {
+            whole
+        } else {
+            whole.saturating_add(1)
+        };
+        rounded.max(1)
+    })
+}
+
+/// Opens the high-level SFTP session with the request timeout of `control`
+/// instead of the library's fixed 10 s.
+async fn open_session<S>(stream: S, control: &ExecutionControl) -> Result<SftpSession, SftpError>
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static,
+{
+    let config = SftpClientConfig {
+        request_timeout_secs: request_timeout_secs(control),
+        ..SftpClientConfig::default()
+    };
+    SftpSession::new_with_config(stream, config).await
+}
+
+/// Opens a raw SFTP session with the request timeout of `control`, before its
+/// first request.
+fn open_raw_session<S>(stream: S, control: &ExecutionControl) -> RawSftpSession
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static,
+{
+    let session = RawSftpSession::new(stream);
+    session.set_timeout(request_timeout_secs(control));
+    session
 }
 
 /// Independent budget for cleanup after a failure.

@@ -5,9 +5,9 @@ use super::{
     OperationContext, PROVIDER_ID, ProviderConnection, PutRequest, RemoteEffect, RetryDisposition,
     SftpProvider, StorageError, StorageResult, TransferResult, atomic_replace,
     committed_verification_error, copy_with_control, discard_staged_object,
-    ensure_parent_directories, map_exclusive_open_error, map_sftp_error, mutation_io_error,
-    public_metadata, remote_path, temporary_path, transfer_limit_error, transfer_result,
-    validate_file_metadata, validate_key, validate_sftp_publication,
+    ensure_parent_directories, flush_error, map_exclusive_open_error, map_sftp_error,
+    mutation_stream_error, public_metadata, remote_path, temporary_path, transfer_limit_error,
+    transfer_result, validate_file_metadata, validate_key, validate_sftp_publication,
 };
 
 #[allow(
@@ -47,7 +47,11 @@ pub async fn put(
             Some(
                 context
                     .control
-                    .run(remote.atomic_session(), ErrorPhase::Connect, false)
+                    .run(
+                        remote.atomic_session(context.control),
+                        ErrorPhase::Connect,
+                        false,
+                    )
                     .await?,
             )
         } else {
@@ -121,22 +125,7 @@ pub async fn put(
                 discard_staged_object(&remote.sftp, atomic_publish, &write_path, error).await,
             );
         }
-        if let Err(error) = context
-            .control
-            .run(
-                async {
-                    file.sync_all()
-                        .await
-                        .map_err(|_| mutation_io_error(ErrorPhase::Commit))?;
-                    file.shutdown()
-                        .await
-                        .map_err(|_| mutation_io_error(ErrorPhase::Commit))
-                },
-                ErrorPhase::Commit,
-                true,
-            )
-            .await
-        {
+        if let Err(error) = finish_written_file(&mut file, context).await {
             return Err(
                 discard_staged_object(&remote.sftp, atomic_publish, &write_path, error).await,
             );
@@ -200,7 +189,11 @@ pub async fn copy(
             Some(
                 context
                     .control
-                    .run(remote.atomic_session(), ErrorPhase::Connect, false)
+                    .run(
+                        remote.atomic_session(context.control),
+                        ErrorPhase::Connect,
+                        false,
+                    )
                     .await?,
             )
         } else {
@@ -262,24 +255,7 @@ pub async fn copy(
                 discard_staged_object(&remote.sftp, atomic_publish, &write_path, error).await,
             );
         }
-        if let Err(error) = context
-            .control
-            .run(
-                async {
-                    destination
-                        .sync_all()
-                        .await
-                        .map_err(|_| mutation_io_error(ErrorPhase::Commit))?;
-                    destination
-                        .shutdown()
-                        .await
-                        .map_err(|_| mutation_io_error(ErrorPhase::Commit))
-                },
-                ErrorPhase::Commit,
-                true,
-            )
-            .await
-        {
+        if let Err(error) = finish_written_file(&mut destination, context).await {
             return Err(
                 discard_staged_object(&remote.sftp, atomic_publish, &write_path, error).await,
             );
@@ -317,4 +293,27 @@ pub async fn copy(
     }
     .await;
     result.map_err(|error: StorageError| error.with_preparation_effect(parent_effect))
+}
+
+/// Completes a written file: `fsync`, then close, under the operation
+/// control. Both requests use the session's request timeout (see
+/// `request_timeout_secs`), so a slow but answered `fsync` succeeds within the
+/// deadline; an unanswered one is a `timeout` with an unknown effect.
+pub async fn finish_written_file(
+    file: &mut russh_sftp::client::fs::File,
+    context: &OperationContext<'_>,
+) -> StorageResult<()> {
+    context
+        .control
+        .run(
+            async {
+                file.sync_all().await.map_err(flush_error)?;
+                file.shutdown()
+                    .await
+                    .map_err(|error| mutation_stream_error(&error, ErrorPhase::Commit))
+            },
+            ErrorPhase::Commit,
+            true,
+        )
+        .await
 }

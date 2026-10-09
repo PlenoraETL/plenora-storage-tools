@@ -16,14 +16,14 @@ numero non misura copertura o maturità. I file contengono le firme complete.
 | `x86_64-pc-windows-msvc` | [plenora-storage-ftp](../api/rust/x86_64-pc-windows-msvc/plenora-storage-ftp.txt) | 311 |
 | `x86_64-pc-windows-msvc` | [plenora-storage-providers](../api/rust/x86_64-pc-windows-msvc/plenora-storage-providers.txt) | 1142 |
 | `x86_64-pc-windows-msvc` | [plenora-storage-s3](../api/rust/x86_64-pc-windows-msvc/plenora-storage-s3.txt) | 218 |
-| `x86_64-pc-windows-msvc` | [plenora-storage-sftp](../api/rust/x86_64-pc-windows-msvc/plenora-storage-sftp.txt) | 205 |
+| `x86_64-pc-windows-msvc` | [plenora-storage-sftp](../api/rust/x86_64-pc-windows-msvc/plenora-storage-sftp.txt) | 206 |
 | `x86_64-unknown-linux-gnu` | [plenora-smb2](../api/rust/x86_64-unknown-linux-gnu/plenora-smb2.txt) | 28468 |
 | `x86_64-unknown-linux-gnu` | [plenora-storage-core](../api/rust/x86_64-unknown-linux-gnu/plenora-storage-core.txt) | 5864 |
 | `x86_64-unknown-linux-gnu` | [plenora-storage-engine](../api/rust/x86_64-unknown-linux-gnu/plenora-storage-engine.txt) | 212 |
 | `x86_64-unknown-linux-gnu` | [plenora-storage-ftp](../api/rust/x86_64-unknown-linux-gnu/plenora-storage-ftp.txt) | 311 |
 | `x86_64-unknown-linux-gnu` | [plenora-storage-providers](../api/rust/x86_64-unknown-linux-gnu/plenora-storage-providers.txt) | 1142 |
 | `x86_64-unknown-linux-gnu` | [plenora-storage-s3](../api/rust/x86_64-unknown-linux-gnu/plenora-storage-s3.txt) | 218 |
-| `x86_64-unknown-linux-gnu` | [plenora-storage-sftp](../api/rust/x86_64-unknown-linux-gnu/plenora-storage-sftp.txt) | 204 |
+| `x86_64-unknown-linux-gnu` | [plenora-storage-sftp](../api/rust/x86_64-unknown-linux-gnu/plenora-storage-sftp.txt) | 205 |
 
 ## Python
 

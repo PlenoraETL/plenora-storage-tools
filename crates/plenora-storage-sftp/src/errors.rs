@@ -131,6 +131,36 @@ pub fn mutation_io_error(phase: ErrorPhase) -> StorageError {
     transfer_io_error(phase, true)
 }
 
+/// A stream failure: a request the SFTP client gave up waiting for surfaces
+/// as `TimedOut` and is a `timeout` with the same effect and retry; any other
+/// failure stays `io`.
+pub fn stream_error(error: &std::io::Error, phase: ErrorPhase, mutating: bool) -> StorageError {
+    if error.kind() == std::io::ErrorKind::TimedOut {
+        map_sftp_error(SftpError::Timeout, phase, mutating)
+    } else {
+        transfer_io_error(phase, mutating)
+    }
+}
+
+/// [`stream_error`] for a write that may already have taken effect.
+pub fn mutation_stream_error(error: &std::io::Error, phase: ErrorPhase) -> StorageError {
+    stream_error(error, phase, true)
+}
+
+/// Failure of the `fsync` that completes an upload: an unanswered request is
+/// a `timeout`, a rejected or broken one stays `io`. Either way the written
+/// bytes may already be durable, so the effect is `unknown`.
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Consume upstream errors at the redaction boundary and support map_err"
+)]
+pub fn flush_error(error: SftpError) -> StorageError {
+    match error {
+        SftpError::Timeout => map_sftp_error(error, ErrorPhase::Commit, true),
+        _ => mutation_io_error(ErrorPhase::Commit),
+    }
+}
+
 /// The destination is published, but its metadata could not be read back.
 /// Publication is proved and nothing remains to reconcile, while repeating
 /// the request would publish again: `committed`, never retried (case 9e of the

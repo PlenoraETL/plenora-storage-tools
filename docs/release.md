@@ -175,6 +175,12 @@ nel job `product-quality` della CI.
   il testo del file, non il suo percorso; il limite è 64 KiB. Password e chiave
   mescolate vengono rifiutate prima della connessione. Le fixture esercitano
   chiavi Ed25519; altre famiglie richiedono prove dedicate.
+- Ogni richiesta SFTP attende la risposta del server al più per il tempo che
+  resta alla deadline dell'operazione. Senza deadline il limite per una singola
+  richiesta senza risposta è di 300 secondi (`REQUEST_TIMEOUT_WITHOUT_DEADLINE`),
+  e non riguarda la durata complessiva dell'operazione. Allo scadere l'errore è
+  `timeout`, con effetto `unknown` e retry `requires_recovery` dopo una
+  scrittura.
 - Il root remoto è un namespace applicativo, non una sandbox contro symlink o
   hardlink ostili. Il server deve applicare isolamento/chroot e permessi corretti.
 - Le deadline sono cooperative. `unknown` richiede verifica dello stato remoto,
