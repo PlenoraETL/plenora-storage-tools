@@ -162,12 +162,18 @@ nel job `product-quality` della CI.
     inattività (`HTTP_READ_TIMEOUT_WITHOUT_DEADLINE`,
     `READ_TIMEOUT_WITHOUT_DEADLINE`): nessun pezzo del corpo preso dal
     trasporto, nessuna risposta, nessun dato della risposta. Il tempo si
-    riarma a ogni pezzo inviato (al più 64 KiB) e a ogni dato ricevuto, e
-    continua a correre dopo la fine del corpo, nell'attesa della risposta. Non
+    riarma solo con dati veri: a ogni pezzo non vuoto inviato (al più 64 KiB)
+    e a ogni dato non vuoto ricevuto; frame vuoti, trailer, fine del corpo ed
+    errori non contano. Continua a correre dopo la fine del corpo,
+    nell'attesa della risposta. Non
     c'è un limite alla durata complessiva: un upload o un download che
     continua ad avanzare non è mai interrotto. Lo stesso limite vale per le
     mutazioni senza corpo (DELETE, MKCOL, `UploadPartCopy`, completamento del
     multipart);
+  - nessun corpo viene rimandato: i retry interni di `object_store` (S3 e
+    Azure) sono configurati a zero e reqwest ha i retry disattivati, quindi
+    una richiesta fallita viene riportata e mai ripetuta dall'adattatore o dal
+    client;
   - limite intrinseco: un pezzo conta come progresso quando il trasporto lo
     ha preso, non quando il server lo ha ricevuto. Un server che smette di
     leggere viene rilevato solo dopo che i buffer dei socket si sono

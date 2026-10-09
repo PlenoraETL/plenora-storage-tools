@@ -44,6 +44,29 @@ enum Reply {
     NeverRead,
     /// Answers at once with a body of `count` bytes, sending one every `every`.
     Trickle { every: Duration, count: usize },
+    /// Reads the request and answers with exactly this head and body.
+    Fixed {
+        head: &'static str,
+        body: &'static [u8],
+    },
+}
+
+/// One request as the server received it.
+#[derive(Clone, Debug)]
+struct Recorded {
+    method: String,
+    /// Header names in lower case, with their values.
+    headers: Vec<(String, String)>,
+    body: Vec<u8>,
+}
+
+impl Recorded {
+    fn header(&self, name: &str) -> Option<&str> {
+        self.headers
+            .iter()
+            .find(|(header, _)| header == name)
+            .map(|(_, value)| value.as_str())
+    }
 }
 
 /// An HTTP/1.1 server with keep-alive that answers requests, on whatever
@@ -57,7 +80,21 @@ struct Server {
     answers: Arc<AtomicUsize>,
     /// Trickled body bytes the client has received; the tests count them.
     bytes: Arc<AtomicUsize>,
+    /// Every request received, in order.
+    log: Arc<Mutex<Vec<Recorded>>>,
     task: tokio::task::JoinHandle<()>,
+}
+
+impl Server {
+    /// The last request received.
+    fn last(&self) -> Recorded {
+        self.log
+            .lock()
+            .expect("log")
+            .last()
+            .cloned()
+            .expect("a request")
+    }
 }
 
 impl Drop for Server {
@@ -72,6 +109,7 @@ struct Shared {
     requests: Arc<AtomicUsize>,
     answers: Arc<AtomicUsize>,
     bytes: Arc<AtomicUsize>,
+    log: Arc<Mutex<Vec<Recorded>>>,
 }
 
 async fn server(script: Vec<Reply>) -> Server {
@@ -84,11 +122,13 @@ async fn server(script: Vec<Reply>) -> Server {
         requests: Arc::new(AtomicUsize::new(0)),
         answers: Arc::new(AtomicUsize::new(0)),
         bytes: Arc::new(AtomicUsize::new(0)),
+        log: Arc::new(Mutex::new(Vec::new())),
     };
-    let (requests, answers, bytes) = (
+    let (requests, answers, bytes, log) = (
         shared.requests.clone(),
         shared.answers.clone(),
         shared.bytes.clone(),
+        shared.log.clone(),
     );
     let task = tokio::spawn(async move {
         let mut connections = tokio::task::JoinSet::new();
@@ -102,12 +142,13 @@ async fn server(script: Vec<Reply>) -> Server {
         requests,
         answers,
         bytes,
+        log,
         task,
     }
 }
 
 async fn serve(mut socket: TcpStream, shared: Shared) {
-    while let Some(body) = read_head(&mut socket).await {
+    while let Some((method, headers, framing)) = read_head(&mut socket).await {
         shared.requests.fetch_add(1, Ordering::SeqCst);
         let reply = shared
             .script
@@ -118,9 +159,24 @@ async fn serve(mut socket: TcpStream, shared: Shared) {
         if matches!(reply, Reply::NeverRead) {
             std::future::pending::<()>().await;
         }
-        read_body(&mut socket, body).await;
+        let body = read_body(&mut socket, framing).await;
+        shared.log.lock().expect("log").push(Recorded {
+            method,
+            headers,
+            body,
+        });
         match reply {
             Reply::Now => answer(&mut socket, &shared.answers).await,
+            Reply::Fixed { head, body } => {
+                let seen = shared.answers.load(Ordering::SeqCst);
+                socket.write_all(head.as_bytes()).await.expect("head");
+                socket.write_all(body).await.expect("body");
+                yield_until(
+                    || shared.answers.load(Ordering::SeqCst) > seen,
+                    "the client never read an answer",
+                )
+                .await;
+            }
             Reply::After(delay) => {
                 tokio::time::sleep(delay).await;
                 answer(&mut socket, &shared.answers).await;
@@ -182,39 +238,52 @@ enum Framing {
     Chunked,
 }
 
+/// A request head: method, headers (names in lower case) and framing.
+type Head = (String, Vec<(String, String)>, Framing);
+
 /// Reads one request head; `None` when the client closed the connection.
-async fn read_head(socket: &mut TcpStream) -> Option<Framing> {
+async fn read_head(socket: &mut TcpStream) -> Option<Head> {
+    let request_line = read_line(socket).await?;
+    let method = request_line.split(' ').next().expect("method").to_owned();
+    let mut headers = Vec::new();
     let mut framing = Framing::Length(0);
     loop {
         let line = read_line(socket).await?;
         if line.is_empty() {
-            return Some(framing);
+            return Some((method, headers, framing));
         }
-        let line = line.to_ascii_lowercase();
-        if let Some(value) = line.strip_prefix("content-length:") {
-            framing = Framing::Length(value.trim().parse().expect("length"));
+        let (name, value) = line.split_once(':').expect("header");
+        let (name, value) = (name.to_ascii_lowercase(), value.trim().to_owned());
+        if name == "content-length" {
+            framing = Framing::Length(value.parse().expect("length"));
         }
-        if line == "transfer-encoding: chunked" {
+        if name == "transfer-encoding" && value.eq_ignore_ascii_case("chunked") {
             framing = Framing::Chunked;
         }
+        headers.push((name, value));
     }
 }
 
-async fn read_body(socket: &mut TcpStream, framing: Framing) {
+async fn read_body(socket: &mut TcpStream, framing: Framing) -> Vec<u8> {
     match framing {
         Framing::Length(length) => {
             let mut body = vec![0; length];
             socket.read_exact(&mut body).await.expect("body");
+            body
         }
-        Framing::Chunked => loop {
-            let size = read_line(socket).await.expect("chunk size");
-            let size = usize::from_str_radix(&size, 16).expect("hex size");
-            let mut chunk = vec![0; size + 2];
-            socket.read_exact(&mut chunk).await.expect("chunk");
-            if size == 0 {
-                break;
+        Framing::Chunked => {
+            let mut body = Vec::new();
+            loop {
+                let size = read_line(socket).await.expect("chunk size");
+                let size = usize::from_str_radix(&size, 16).expect("hex size");
+                let mut chunk = vec![0; size + 2];
+                socket.read_exact(&mut chunk).await.expect("chunk");
+                if size == 0 {
+                    return body;
+                }
+                body.extend_from_slice(&chunk[..size]);
             }
-        },
+        }
     }
 }
 
@@ -443,6 +512,23 @@ async fn an_upload_that_stops_moving_ends_at_the_limit() {
     assert_near(elapsed, Duration::from_secs(200) + LIMIT);
 }
 
+/// Empty frames are not progress: an upload whose body sends only empty
+/// frames, every 10 s, ends at the limit.
+#[tokio::test]
+async fn an_upload_of_empty_frames_ends_at_the_limit() {
+    let control = ExecutionControl::default();
+    let server = server(vec![Reply::Now, Reply::Never]).await;
+    let (client, idle, url) = warm_client(&server, &control).await;
+    let body = futures_util::stream::unfold((), |()| async {
+        tokio::time::sleep(Duration::from_secs(10)).await;
+        Some((Ok::<_, std::io::Error>(bytes::Bytes::new()), ()))
+    });
+    let request = client.put(url).body(reqwest::Body::wrap_stream(body));
+    let (result, elapsed) = exchange(&server, &control, idle, request, true).await;
+    assert_axes(result.expect_err("timeout"), true);
+    assert_near(elapsed, LIMIT);
+}
+
 /// A server that stops reading: once the socket buffers are full the
 /// transport takes no more frames, and the upload fails at the limit. A frame
 /// counts once the transport has taken it, not once the server has it.
@@ -485,12 +571,27 @@ async fn a_mutation_without_a_body_follows_the_same_rule() {
     let server = server(vec![Reply::Now, Reply::Never]).await;
     let (client, idle, url) = warm_client(&server, &control).await;
     let started = Instant::now();
-    let error = crate::watched::send(client.delete(url), idle)
-        .await
-        .expect_err("timeout");
+    let mut cause = None;
+    let result = control
+        .run(
+            async {
+                crate::watched::send(client.delete(url), idle)
+                    .await
+                    .map(drop)
+                    .map_err(|error| {
+                        let mapped = transport_failure(&*error, ErrorPhase::Commit, true);
+                        cause = Some(error);
+                        mapped
+                    })
+            },
+            ErrorPhase::Commit,
+            true,
+        )
+        .await;
     assert_near(started.elapsed(), LIMIT);
-    assert!(inactivity_in_chain(&*error), "{error:?}");
-    assert_axes(transport_failure(&*error, ErrorPhase::Commit, true), true);
+    assert_axes(result.expect_err("timeout"), true);
+    let cause = cause.expect("a transport failure");
+    assert!(inactivity_in_chain(&*cause), "{cause:?}");
 }
 
 /// Whether the inactivity clock is what failed `error`.
@@ -512,19 +613,25 @@ fn inactivity_in_chain(error: &(dyn std::error::Error + 'static)) -> bool {
     false
 }
 
+/// The answer to one request: status, headers and the whole body.
+type Answer = (
+    reqwest::StatusCode,
+    reqwest::header::HeaderMap,
+    bytes::Bytes,
+);
+
 /// Sends one request through the client `object_store` gets for Azure, after
-/// a first one in real time opened the pooled connection, and returns the
-/// outcome with the (virtual) time it took.
+/// a first one in real time opened the pooled connection, through the
+/// operation control, and returns the answer or the `object_store` error with
+/// the (virtual) time it took.
 #[cfg(feature = "azure")]
 async fn azure_request(
-    script: Vec<Reply>,
+    server: &Server,
+    method: reqwest::Method,
+    headers: &[(&'static str, &'static str)],
     body: object_store::client::HttpRequestBody,
-) -> (
-    Result<object_store::client::HttpResponse, object_store::client::HttpError>,
-    Duration,
-) {
+) -> (Result<Answer, object_store::client::HttpError>, Duration) {
     use object_store::client::{HttpConnector, HttpRequest};
-    let server = server(script).await;
     let control = ExecutionControl::default();
     let policy = EngineConfig {
         allow_insecure_http: true,
@@ -544,18 +651,21 @@ async fn azure_request(
     let client = connector
         .connect(&object_store::ClientOptions::new())
         .expect("client");
-    let request = |body| {
-        let mut request = HttpRequest::new(body);
-        *request.method_mut() = reqwest::Method::PUT;
-        *request.uri_mut() = url.as_str().parse().expect("uri");
-        request
-    };
-    client
-        .execute(request(object_store::client::HttpRequestBody::empty()))
-        .await
-        .expect("warm-up");
+    let mut warm = HttpRequest::new(object_store::client::HttpRequestBody::empty());
+    *warm.method_mut() = reqwest::Method::PUT;
+    *warm.uri_mut() = url.as_str().parse().expect("uri");
+    client.execute(warm).await.expect("warm-up");
     server.answers.fetch_add(1, Ordering::SeqCst);
     tokio::time::pause();
+    let mut request = HttpRequest::new(body);
+    *request.method_mut() = method;
+    *request.uri_mut() = url.as_str().parse().expect("uri");
+    for (name, value) in headers {
+        request.headers_mut().insert(
+            reqwest::header::HeaderName::from_static(name),
+            reqwest::header::HeaderValue::from_static(value),
+        );
+    }
     let requests = server.requests.clone();
     let hold = tokio::spawn(async move {
         yield_until(
@@ -565,12 +675,38 @@ async fn azure_request(
         .await;
     });
     let started = Instant::now();
-    let result = client.execute(request(body)).await;
-    if result.is_ok() {
-        server.answers.fetch_add(1, Ordering::SeqCst);
-    }
+    let mut failure = None;
+    let result = control
+        .run(
+            async {
+                let outcome = async {
+                    let response = client.execute(request).await?;
+                    server.answers.fetch_add(1, Ordering::SeqCst);
+                    let (parts, body) = response.into_parts();
+                    Ok::<_, object_store::client::HttpError>((
+                        parts.status,
+                        parts.headers,
+                        body.bytes().await?,
+                    ))
+                }
+                .await;
+                outcome.map_err(|error| {
+                    let mapped = transport_failure(&error, ErrorPhase::Commit, true);
+                    failure = Some(error);
+                    mapped
+                })
+            },
+            ErrorPhase::Commit,
+            true,
+        )
+        .await;
+    let elapsed = started.elapsed();
     hold.await.expect("request reached the server");
-    (result, started.elapsed())
+    match (result, failure) {
+        (Ok(answer), _) => (Ok(answer), elapsed),
+        (Err(_), Some(error)) => (Err(error), elapsed),
+        (Err(error), None) => panic!("the operation control failed first: {error:?}"),
+    }
 }
 
 /// Azure requests go through `object_store`, which sees a single client:
@@ -579,8 +715,11 @@ async fn azure_request(
 #[cfg(feature = "azure")]
 #[tokio::test]
 async fn an_azure_upload_answered_within_the_limit_succeeds() {
+    let server = server(vec![Reply::Now, Reply::After(Duration::from_secs(200))]).await;
     let (result, elapsed) = azure_request(
-        vec![Reply::Now, Reply::After(Duration::from_secs(200))],
+        &server,
+        reqwest::Method::PUT,
+        &[],
         object_store::PutPayload::from_static(b"x").into(),
     )
     .await;
@@ -592,7 +731,8 @@ async fn an_azure_upload_answered_within_the_limit_succeeds() {
 /// an `object_store` timeout from the inactivity clock.
 #[cfg(feature = "azure")]
 async fn unanswered_azure_request(body: object_store::client::HttpRequestBody) {
-    let (result, elapsed) = azure_request(vec![Reply::Now, Reply::Never], body).await;
+    let server = server(vec![Reply::Now, Reply::Never]).await;
+    let (result, elapsed) = azure_request(&server, reqwest::Method::PUT, &[], body).await;
     let error = result.expect_err("timeout");
     assert_eq!(error.kind(), object_store::client::HttpErrorKind::Timeout);
     assert!(inactivity_in_chain(&error), "{error:?}");
@@ -611,6 +751,173 @@ async fn an_unanswered_azure_upload_ends_at_the_limit() {
 #[tokio::test]
 async fn an_unanswered_azure_request_without_a_body_ends_at_the_limit() {
     unanswered_azure_request(object_store::client::HttpRequestBody::empty()).await;
+}
+
+/// Sends `request` through `watched::send` and the operation control, as
+/// `WebDAV`, GCS and Azure file uploads do, and returns the whole answer.
+async fn send_and_read(server: &Server, request: reqwest::RequestBuilder) -> Answer {
+    let control = ExecutionControl::default();
+    let target = server.requests.load(Ordering::SeqCst) + 1;
+    let requests = server.requests.clone();
+    let hold = tokio::spawn(async move {
+        yield_until(
+            || requests.load(Ordering::SeqCst) >= target,
+            "the request never reached the server",
+        )
+        .await;
+    });
+    let answer = control
+        .run(
+            async {
+                let response = crate::watched::send(request, Some(LIMIT))
+                    .await
+                    .map_err(|error| transport_failure(&*error, ErrorPhase::Read, false))?;
+                server.answers.fetch_add(1, Ordering::SeqCst);
+                let status = response.status();
+                let headers = response.headers().clone();
+                let body = response
+                    .bytes()
+                    .await
+                    .map_err(|error| transport_failure(&error, ErrorPhase::Read, false))?;
+                Ok((status, headers, body))
+            },
+            ErrorPhase::Read,
+            false,
+        )
+        .await
+        .expect("answer");
+    hold.await.expect("request reached the server");
+    answer
+}
+
+const PROPFIND_BODY: &str = "<?xml version=\"1.0\"?><d:propfind xmlns:d=\"DAV:\"/>";
+const MULTI_STATUS: Reply = Reply::Fixed {
+    head: "HTTP/1.1 207 Multi-Status\r\nContent-Type: application/xml\r\nContent-Length: 17\r\n\r\n",
+    body: b"<d:multistatus/>\n",
+};
+const HEAD_ANSWER: Reply = Reply::Fixed {
+    head: "HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\n",
+    body: b"",
+};
+const PARTIAL: Reply = Reply::Fixed {
+    head: "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 2-5/10\r\nContent-Length: 4\r\n\r\n",
+    body: b"2345",
+};
+
+fn assert_propfind(server: &Server, answer: &Answer) {
+    let request = server.last();
+    assert_eq!(request.method, "PROPFIND");
+    assert_eq!(request.header("depth"), Some("1"));
+    assert_eq!(request.header("content-type"), Some("application/xml"));
+    assert_eq!(request.body, PROPFIND_BODY.as_bytes());
+    assert_eq!(answer.0.as_u16(), 207);
+    assert_eq!(&answer.2[..], b"<d:multistatus/>\n");
+}
+
+fn assert_head(server: &Server, answer: &Answer) {
+    assert_eq!(server.last().method, "HEAD");
+    assert_eq!(answer.0.as_u16(), 200);
+    assert_eq!(
+        answer
+            .1
+            .get(reqwest::header::CONTENT_LENGTH)
+            .map(reqwest::header::HeaderValue::as_bytes),
+        Some(&b"100"[..])
+    );
+    assert!(answer.2.is_empty());
+}
+
+fn assert_range(server: &Server, answer: &Answer) {
+    let request = server.last();
+    assert_eq!(request.method, "GET");
+    assert_eq!(request.header("range"), Some("bytes=2-5"));
+    assert_eq!(answer.0.as_u16(), 206);
+    assert_eq!(&answer.2[..], b"2345");
+}
+
+/// A PROPFIND keeps its method, headers and XML body through the adapter, and
+/// its answer arrives whole.
+#[tokio::test]
+async fn a_propfind_goes_through_the_adapter_unchanged() {
+    let server = server(vec![Reply::Now, MULTI_STATUS]).await;
+    let (client, _, url) = warm_client(&server, &ExecutionControl::default()).await;
+    let method = reqwest::Method::from_bytes(b"PROPFIND").expect("method");
+    let request = client
+        .request(method, url)
+        .header("Depth", "1")
+        .header("Content-Type", "application/xml")
+        .body(PROPFIND_BODY);
+    let answer = send_and_read(&server, request).await;
+    assert_propfind(&server, &answer);
+}
+
+/// A HEAD answer declaring a length has no body, and reading it does not wait
+/// for one.
+#[tokio::test]
+async fn a_head_answer_with_a_length_has_no_body() {
+    let server = server(vec![Reply::Now, HEAD_ANSWER]).await;
+    let (client, _, url) = warm_client(&server, &ExecutionControl::default()).await;
+    let started = Instant::now();
+    let answer = send_and_read(&server, client.head(url)).await;
+    assert_head(&server, &answer);
+    assert_eq!(started.elapsed(), Duration::ZERO);
+}
+
+/// A ranged GET keeps its `Range` header and gets the partial body.
+#[tokio::test]
+async fn a_ranged_get_keeps_its_range() {
+    let server = server(vec![Reply::Now, PARTIAL]).await;
+    let (client, _, url) = warm_client(&server, &ExecutionControl::default()).await;
+    let request = client.get(url).header("Range", "bytes=2-5");
+    let answer = send_and_read(&server, request).await;
+    assert_range(&server, &answer);
+}
+
+/// The same three requests through the conversion `object_store` uses.
+#[cfg(feature = "azure")]
+#[tokio::test]
+async fn object_store_requests_go_through_the_conversion_unchanged() {
+    let server = server(vec![Reply::Now, MULTI_STATUS]).await;
+    let method = reqwest::Method::from_bytes(b"PROPFIND").expect("method");
+    let (answer, _) = azure_request(
+        &server,
+        method,
+        &[("depth", "1"), ("content-type", "application/xml")],
+        PROPFIND_BODY.to_owned().into(),
+    )
+    .await;
+    assert_propfind(&server, &answer.expect("propfind"));
+}
+
+/// A HEAD answer with a length through the `object_store` conversion.
+#[cfg(feature = "azure")]
+#[tokio::test]
+async fn an_object_store_head_with_a_length_has_no_body() {
+    let server = server(vec![Reply::Now, HEAD_ANSWER]).await;
+    let (answer, elapsed) = azure_request(
+        &server,
+        reqwest::Method::HEAD,
+        &[],
+        object_store::client::HttpRequestBody::empty(),
+    )
+    .await;
+    assert_head(&server, &answer.expect("head"));
+    assert_eq!(elapsed, Duration::ZERO);
+}
+
+/// A ranged GET through the `object_store` conversion.
+#[cfg(feature = "azure")]
+#[tokio::test]
+async fn an_object_store_ranged_get_keeps_its_range() {
+    let server = server(vec![Reply::Now, PARTIAL]).await;
+    let (answer, _) = azure_request(
+        &server,
+        reqwest::Method::GET,
+        &[("range", "bytes=2-5")],
+        object_store::client::HttpRequestBody::empty(),
+    )
+    .await;
+    assert_range(&server, &answer.expect("range"));
 }
 
 /// A transport error is `timeout` only when the client gave up waiting, with

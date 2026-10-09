@@ -9,7 +9,7 @@
 //! of `plenora-storage-providers/src/watched.rs`, kept in step with it, because
 //! the adapters implement `http_body::Body`, which must not cross the public API
 //! of `plenora-storage-core`.
-use bytes::Bytes;
+use bytes::{Buf, Bytes};
 use http_body::{Body, Frame, SizeHint};
 use plenora_storage_core::{Inactivity, InactivityTimeout};
 use std::{
@@ -26,8 +26,10 @@ use tokio::time::Sleep;
 /// clock follows the socket.
 const PIECE: usize = 64 * 1024;
 
-/// A request body whose frames re-arm the clock as the transport takes them,
-/// split into pieces of at most [`PIECE`] bytes.
+/// A request body whose data re-arms the clock as the transport takes it,
+/// split into pieces of at most [`PIECE`] bytes. Only non-empty data is
+/// progress: empty frames, trailers, the end of the body and errors leave the
+/// clock running.
 pub struct RequestBody<B> {
     inner: B,
     inactivity: Inactivity,
@@ -63,18 +65,21 @@ impl<B: Body<Data = Bytes> + Unpin> Body for RequestBody<B> {
     ) -> Poll<Option<Result<Frame<Bytes>, B::Error>>> {
         let this = &mut *self;
         if let Some(rest) = this.rest.take() {
-            this.inactivity.touch();
             let piece = this.piece(rest);
+            this.inactivity.touch();
             return Poll::Ready(Some(Ok(Frame::data(piece))));
         }
         match Pin::new(&mut this.inner).poll_frame(cx) {
-            Poll::Ready(Some(Ok(frame))) => {
-                this.inactivity.touch();
-                Poll::Ready(Some(Ok(match frame.into_data() {
-                    Ok(data) => Frame::data(this.piece(data)),
-                    Err(frame) => frame,
-                })))
-            }
+            Poll::Ready(Some(Ok(frame))) => Poll::Ready(Some(Ok(match frame.into_data() {
+                Ok(data) => {
+                    let piece = this.piece(data);
+                    if !piece.is_empty() {
+                        this.inactivity.touch();
+                    }
+                    Frame::data(piece)
+                }
+                Err(frame) => frame,
+            }))),
             other => other,
         }
     }
@@ -108,7 +113,9 @@ pub enum BodyFailure<E> {
     Inactive(InactivityTimeout),
 }
 
-/// A response body that fails once nothing arrives for the whole limit.
+/// A response body that fails once no data arrives for the whole limit.
+/// Only non-empty data is progress: empty frames, trailers, the end of the
+/// body and errors leave the clock running.
 pub struct ResponseBody<B: Body, E> {
     inner: B,
     inactivity: Inactivity,
@@ -140,14 +147,21 @@ impl<B: Body + Unpin, E> Body for ResponseBody<B, E> {
         cx: &mut Context<'_>,
     ) -> Poll<Option<Result<Frame<B::Data>, E>>> {
         let this = &mut *self;
+        let convert = this.convert;
         match Pin::new(&mut this.inner).poll_frame(cx) {
-            Poll::Ready(frame) => {
-                this.inactivity.touch();
-                let convert = this.convert;
-                Poll::Ready(
-                    frame.map(|frame| frame.map_err(|error| convert(BodyFailure::Inner(error)))),
-                )
+            Poll::Ready(Some(Ok(frame))) => {
+                if frame.data_ref().is_some_and(|data| data.remaining() > 0) {
+                    this.inactivity.touch();
+                } else if let Poll::Ready(timeout) = this.inactivity.poll_idle(&mut this.timer, cx)
+                {
+                    return Poll::Ready(Some(Err(convert(BodyFailure::Inactive(timeout)))));
+                }
+                Poll::Ready(Some(Ok(frame)))
             }
+            Poll::Ready(Some(Err(error))) => {
+                Poll::Ready(Some(Err(convert(BodyFailure::Inner(error)))))
+            }
+            Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => this
                 .inactivity
                 .poll_idle(&mut this.timer, cx)
@@ -245,3 +259,7 @@ fn http_error(error: reqwest::Error) -> object_store::client::HttpError {
     };
     HttpError::new(kind, error.without_url())
 }
+
+#[cfg(test)]
+#[path = "watched_tests.rs"]
+mod tests;

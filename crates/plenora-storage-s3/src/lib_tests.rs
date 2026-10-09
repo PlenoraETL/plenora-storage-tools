@@ -97,9 +97,11 @@ mod fake_s3 {
         pub address: SocketAddr,
         /// Request heads received, on any connection.
         pub requests: Arc<AtomicUsize>,
-        /// Answers and download bytes the client has received; the tests
-        /// count them.
+        /// Download bytes the client has received; the tests count them.
         pub received: Arc<AtomicUsize>,
+        /// Answers whose head the client has seen and that no later request
+        /// acknowledges; the tests count them.
+        pub answers: Arc<AtomicUsize>,
         task: tokio::task::JoinHandle<()>,
     }
 
@@ -122,30 +124,72 @@ mod fake_s3 {
         let address = listener.local_addr().expect("address");
         let requests = Arc::new(AtomicUsize::new(0));
         let received = Arc::new(AtomicUsize::new(0));
-        let (counter, delivered) = (requests.clone(), received.clone());
+        let answers = Arc::new(AtomicUsize::new(0));
+        let observed = Observed {
+            requests: requests.clone(),
+            received: received.clone(),
+            answers: answers.clone(),
+        };
         let task = tokio::spawn(async move {
             let mut connections = tokio::task::JoinSet::new();
             loop {
                 let (socket, _) = listener.accept().await.expect("accept");
-                connections.spawn(serve(socket, script, counter.clone(), delivered.clone()));
+                connections.spawn(serve(socket, script, observed.clone()));
             }
         });
         Server {
             address,
             requests,
             received,
+            answers,
             task,
         }
     }
 
     const OBJECT_HEADERS: &str = "Last-Modified: Thu, 01 Jan 2026 00:00:00 GMT\r\nETag: \"e\"\r\n";
 
-    async fn serve(
-        mut socket: TcpStream,
-        script: Script,
+    /// What the server sees of the client's progress.
+    #[derive(Clone)]
+    struct Observed {
         requests: Arc<AtomicUsize>,
         received: Arc<AtomicUsize>,
-    ) {
+        answers: Arc<AtomicUsize>,
+    }
+
+    impl Observed {
+        /// Keeps virtual time still after an answer until the client has
+        /// observed it: it starts its next request, on this connection or
+        /// another, or the test records that the answer arrived. Paused time
+        /// would otherwise jump to the next timer while the answer is still
+        /// in the socket. Fails the test after 10 s of real time.
+        async fn until_observed(&self, socket: &TcpStream, requests: usize, answers: usize) {
+            let started = std::time::Instant::now();
+            let mut byte = [0_u8; 1];
+            loop {
+                let next_request = std::future::poll_fn(|cx| {
+                    let mut buffer = tokio::io::ReadBuf::new(&mut byte);
+                    std::task::Poll::Ready(socket.poll_peek(cx, &mut buffer).is_ready())
+                })
+                .await;
+                if next_request
+                    || self.requests.load(Ordering::SeqCst) > requests
+                    || self.answers.load(Ordering::SeqCst) > answers
+                {
+                    return;
+                }
+                assert!(
+                    started.elapsed() < Duration::from_secs(10),
+                    "the client never observed an answer"
+                );
+                tokio::task::yield_now().await;
+            }
+        }
+    }
+
+    async fn serve(mut socket: TcpStream, script: Script, observed: Observed) {
+        let Observed {
+            requests, received, ..
+        } = observed.clone();
         while let Some((method, target, length)) = read_head(&mut socket).await {
             requests.fetch_add(1, Ordering::SeqCst);
             let part = method == "PUT" && target.contains("partNumber=");
@@ -199,7 +243,12 @@ mod fake_s3 {
                     let head = format!(
                         "HTTP/1.1 200 OK\r\n{OBJECT_HEADERS}Content-Length: {count}\r\n\r\n"
                     );
+                    let seen = (
+                        requests.load(Ordering::SeqCst),
+                        observed.answers.load(Ordering::SeqCst),
+                    );
                     socket.write_all(head.as_bytes()).await.expect("head");
+                    observed.until_observed(&socket, seen.0, seen.1).await;
                     let base = received.load(Ordering::SeqCst);
                     for sent in 1..=count {
                         tokio::time::sleep(every).await;
@@ -217,7 +266,12 @@ mod fake_s3 {
                     continue;
                 }
             };
+            let seen = (
+                requests.load(Ordering::SeqCst),
+                observed.answers.load(Ordering::SeqCst),
+            );
             socket.write_all(answer.as_bytes()).await.expect("answer");
+            observed.until_observed(&socket, seen.0, seen.1).await;
         }
     }
 
@@ -338,6 +392,9 @@ async fn warm_store(
         .head(&object_store::path::Path::from("object"))
         .await
         .expect("warm-up");
+    server
+        .answers
+        .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     tokio::time::pause();
     store
 }
@@ -362,6 +419,7 @@ fn hold_time_until(server: &fake_s3::Server, count: usize) -> tokio::task::JoinH
 /// the operation control as the provider runs it, with the (virtual) time it
 /// took.
 async fn multipart_upload(
+    server: &fake_s3::Server,
     store: &object_store::aws::AmazonS3,
     control: &plenora_storage_core::ExecutionControl,
     size: usize,
@@ -387,8 +445,12 @@ async fn multipart_upload(
                 upload
                     .complete()
                     .await
-                    .map(drop)
-                    .map_err(|error| super::map_store_error(error, ErrorPhase::Commit, true))
+                    .map_err(|error| super::map_store_error(error, ErrorPhase::Commit, true))?;
+                // The completion is the last answer: no request follows it.
+                server
+                    .answers
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                Ok(())
             },
             ErrorPhase::Commit,
             true,
@@ -425,7 +487,7 @@ async fn without_deadline_an_s3_part_that_keeps_moving_is_not_cut() {
     let control = plenora_storage_core::ExecutionControl::default();
     let store = warm_store(&server, &control).await;
     let hold = hold_time_until(&server, 3);
-    let (result, elapsed) = multipart_upload(&store, &control, 32 * 1024 * 1024).await;
+    let (result, elapsed) = multipart_upload(&server, &store, &control, 32 * 1024 * 1024).await;
     result.expect("upload");
     assert!(
         elapsed >= std::time::Duration::from_secs(800),
@@ -445,7 +507,7 @@ async fn without_deadline_an_s3_part_the_server_stops_reading_ends_at_the_limit(
     let control = plenora_storage_core::ExecutionControl::default();
     let store = warm_store(&server, &control).await;
     let hold = hold_time_until(&server, 3);
-    let (result, elapsed) = multipart_upload(&store, &control, 32 * 1024 * 1024).await;
+    let (result, elapsed) = multipart_upload(&server, &store, &control, 32 * 1024 * 1024).await;
     assert_mutating_timeout(&result.expect_err("timeout"));
     assert!(elapsed >= LIMIT, "{elapsed:?}");
     assert!(
@@ -467,7 +529,7 @@ async fn an_unanswered_s3_completion_ends_at_the_limit() {
     let control = plenora_storage_core::ExecutionControl::default();
     let store = warm_store(&server, &control).await;
     let hold = hold_time_until(&server, 4);
-    let (result, elapsed) = multipart_upload(&store, &control, 1024).await;
+    let (result, elapsed) = multipart_upload(&server, &store, &control, 1024).await;
     assert_mutating_timeout(&result.expect_err("timeout"));
     assert!(elapsed >= LIMIT, "{elapsed:?}");
     assert!(
@@ -490,7 +552,7 @@ async fn an_s3_multipart_upload_may_wait_until_the_deadline() {
         .with_deadline(std::time::Instant::now() + std::time::Duration::from_secs(600));
     let store = warm_store(&server, &control).await;
     let hold = hold_time_until(&server, 3);
-    let (result, elapsed) = multipart_upload(&store, &control, 1024).await;
+    let (result, elapsed) = multipart_upload(&server, &store, &control, 1024).await;
     assert_mutating_timeout(&result.expect_err("timeout"));
     assert!(
         elapsed >= std::time::Duration::from_secs(590),
@@ -505,8 +567,8 @@ async fn an_s3_multipart_upload_may_wait_until_the_deadline() {
 
 /// Downloads the object through the operation control without a deadline.
 async fn download(
+    server: &fake_s3::Server,
     store: &object_store::aws::AmazonS3,
-    received: &std::sync::atomic::AtomicUsize,
 ) -> (
     plenora_storage_core::StorageResult<usize>,
     std::time::Duration,
@@ -522,13 +584,18 @@ async fn download(
                     .get(&path)
                     .await
                     .map_err(|error| super::map_store_error(error, ErrorPhase::Read, false))?;
+                server
+                    .answers
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 let mut body = object.into_stream();
                 let mut length = 0;
                 while let Some(chunk) = futures_util::StreamExt::next(&mut body).await {
                     let chunk = chunk
                         .map_err(|error| super::map_store_error(error, ErrorPhase::Read, false))?;
                     length += chunk.len();
-                    received.fetch_add(chunk.len(), std::sync::atomic::Ordering::SeqCst);
+                    server
+                        .received
+                        .fetch_add(chunk.len(), std::sync::atomic::Ordering::SeqCst);
                 }
                 Ok(length)
             },
@@ -547,7 +614,7 @@ async fn without_deadline_a_silent_s3_download_ends_at_the_limit() {
     let server = fake_s3::start(fake_s3::IDLE);
     let store = warm_store(&server, &plenora_storage_core::ExecutionControl::default()).await;
     let hold = hold_time_until(&server, 2);
-    let (result, elapsed) = download(&store, &server.received).await;
+    let (result, elapsed) = download(&server, &store).await;
     let error = result.expect_err("timeout");
     assert_eq!(
         (error.category, error.remote_effect, error.retry),
@@ -575,7 +642,7 @@ async fn without_deadline_an_s3_download_that_keeps_moving_is_not_cut() {
     });
     let store = warm_store(&server, &plenora_storage_core::ExecutionControl::default()).await;
     let hold = hold_time_until(&server, 2);
-    let (result, elapsed) = download(&store, &server.received).await;
+    let (result, elapsed) = download(&server, &store).await;
     assert_eq!(result.expect("download"), 6);
     assert!(
         elapsed >= std::time::Duration::from_secs(600),

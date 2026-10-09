@@ -514,15 +514,23 @@ async fn smb_connection_failures_on_several_addresses_keep_their_cause() {
     assert_eq!(error.category, ErrorCategory::Io);
 }
 
-/// The same loop with the real dialler: two loopback ports nobody listens
-/// on refuse, and the connection fails as `io`, not `timeout`.
+/// The same loop with the real dialler: two loopback ports held by sockets
+/// that are bound but not listening, so they stay reserved for the whole test
+/// and refuse every connection. The connection fails as `io`, not `timeout`.
 #[tokio::test]
 async fn refused_smb_connections_are_io() {
-    let mut addresses = Vec::new();
+    let mut held = Vec::new();
     for _ in 0..2 {
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
-        addresses.push(listener.local_addr().expect("address"));
+        let socket = tokio::net::TcpSocket::new_v4().expect("socket");
+        socket
+            .bind(std::net::SocketAddr::from(([127, 0, 0, 1], 0)))
+            .expect("bind");
+        held.push(socket);
     }
+    let addresses: Vec<_> = held
+        .iter()
+        .map(|socket| socket.local_addr().expect("address"))
+        .collect();
     let error = first_connection(&addresses, |address| async move {
         smb2::client::connection::Connection::connect(
             &address.to_string(),
@@ -537,6 +545,7 @@ async fn refused_smb_connections_are_io() {
         (error.category, error.phase),
         (ErrorCategory::Io, ErrorPhase::Connect)
     );
+    drop(held);
 }
 
 /// The response timeout is the time remaining, never zero, and the declared
