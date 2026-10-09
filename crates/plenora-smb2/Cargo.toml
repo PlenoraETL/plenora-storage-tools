@@ -80,7 +80,8 @@ env_logger = "=0.11.11"
 proptest = "=1.11.0"
 # JSON round trips of the serde feature in tests.
 serde_json.workspace = true
-tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "net", "io-util"] }
+# test-util: paused time drives the response-deadline tests deterministically.
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "net", "io-util", "test-util"] }
 
 [lints]
 workspace = true

@@ -5,6 +5,7 @@ mod publication;
 use crate::{
     common::{
         Backend, ProviderFactory, Reader, failure, invalid, limit_error, page, parse, select,
+        transport_failure,
     },
     http,
 };
@@ -60,14 +61,15 @@ impl ProviderFactory for Gcs {
     ) -> StorageResult<Box<dyn Backend>> {
         let cfg: GcsConnectionConfig = parse(connection)?;
         let root = http::endpoint(&cfg.endpoint, context.policy)?;
-        let client = http::Connector::new(&root, context)
-            .await?
+        let connector = http::Connector::new(&root, context).await?;
+        let client = connector
             .client()
-            .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Connect, false))?;
+            .map_err(|error| transport_failure(&error, ErrorPhase::Connect, false))?;
         let material = credentials.resolve(&connection.credential_ref)?;
         Ok(Box::new(GcsBackend {
             root,
             client,
+            idle: connector.idle(),
             bucket: cfg.bucket,
             token: material.required("bearer_token")?.to_owned(),
         }))
@@ -76,6 +78,8 @@ impl ProviderFactory for Gcs {
 struct GcsBackend {
     root: Url,
     client: Client,
+    /// Inactivity limit of every request (see `crate::watched`).
+    idle: Option<std::time::Duration>,
     bucket: String,
     token: String,
 }
@@ -101,11 +105,12 @@ impl GcsBackend {
         self.client.request(method, url).bearer_auth(&self.token)
     }
     async fn object(&self, key: &str) -> StorageResult<Object> {
-        let response = send(
-            self.request(Method::GET, self.url(Some(key), false)?),
-            false,
-        )
-        .await?;
+        let response = self
+            .send(
+                self.request(Method::GET, self.url(Some(key), false)?),
+                false,
+            )
+            .await?;
         let object: Object = json(response).await?;
         if object.name != key {
             return Err(invalid("GCS_OBJECT_NAME_MISMATCH"));
@@ -149,13 +154,23 @@ impl Reader for GcsReader {
         self.response
             .chunk()
             .await
-            .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Read, false))
+            .map_err(|error| transport_failure(&error, ErrorPhase::Read, false))
     }
 }
-async fn send(request: RequestBuilder, mutating: bool) -> StorageResult<Response> {
-    let response = request.send().await.map_err(|_| {
-        failure(
-            ErrorCategory::Io,
+impl GcsBackend {
+    /// Sends a request under the operation's inactivity limit.
+    async fn send(&self, request: RequestBuilder, mutating: bool) -> StorageResult<Response> {
+        send(request, self.idle, mutating).await
+    }
+}
+async fn send(
+    request: RequestBuilder,
+    idle: Option<std::time::Duration>,
+    mutating: bool,
+) -> StorageResult<Response> {
+    let response = crate::watched::send(request, idle).await.map_err(|error| {
+        transport_failure(
+            &*error,
             if mutating {
                 ErrorPhase::Commit
             } else {
@@ -189,7 +204,7 @@ async fn json<T: DeserializeOwned>(mut response: Response) -> StorageResult<T> {
     while let Some(chunk) = response
         .chunk()
         .await
-        .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Read, false))?
+        .map_err(|error| transport_failure(&error, ErrorPhase::Read, false))?
     {
         if data.len().saturating_add(chunk.len()) > 8 * 1024 * 1024 {
             return Err(limit_error());

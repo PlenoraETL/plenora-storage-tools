@@ -4,7 +4,7 @@ mod publication;
 use crate::{
     common::{
         Backend, ProviderFactory, Reader, failure, invalid, limit_error, metadata, page, parse,
-        select,
+        select, transport_failure,
     },
     http,
 };
@@ -51,10 +51,10 @@ impl ProviderFactory for WebDav {
     ) -> StorageResult<Box<dyn Backend>> {
         let cfg: WebDavConnectionConfig = parse(c)?;
         let root = http::endpoint(&cfg.endpoint, x.policy)?;
-        let client = http::Connector::new(&root, x)
-            .await?
+        let connector = http::Connector::new(&root, x).await?;
+        let client = connector
             .client()
-            .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Connect, false))?;
+            .map_err(|error| transport_failure(&error, ErrorPhase::Connect, false))?;
         let credential = credentials.resolve(&c.credential_ref)?;
         let auth = if let Some(token) = credential.optional("bearer_token") {
             Auth::Bearer(token.to_owned())
@@ -64,7 +64,12 @@ impl ProviderFactory for WebDav {
                 credential.required("password")?.to_owned(),
             )
         };
-        Ok(Box::new(Dav { root, client, auth }))
+        Ok(Box::new(Dav {
+            root,
+            client,
+            idle: connector.idle(),
+            auth,
+        }))
     }
 }
 enum Auth {
@@ -74,6 +79,8 @@ enum Auth {
 struct Dav {
     root: Url,
     client: Client,
+    /// Inactivity limit of every request (see `crate::watched`).
+    idle: Option<std::time::Duration>,
     auth: Auth,
 }
 struct DavReader {
@@ -85,7 +92,7 @@ impl Reader for DavReader {
         self.response
             .chunk()
             .await
-            .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Read, false))
+            .map_err(|error| transport_failure(&error, ErrorPhase::Read, false))
     }
 }
 impl Dav {
@@ -112,11 +119,18 @@ impl Dav {
             Auth::Bearer(token) => request.bearer_auth(token),
         }
     }
+    /// Sends a request under the operation's inactivity limit.
+    async fn send(&self, request: RequestBuilder) -> Result<Response, crate::watched::BoxError> {
+        crate::watched::send(request, self.idle).await
+    }
     async fn properties(&self, key: &str, depth: &str) -> StorageResult<Vec<DavEntry>> {
-        let response = self.request(Method::from_bytes(b"PROPFIND").map_err(|_| invalid("METHOD_INVALID"))?,self.url(key)?)
+        let request = self.request(Method::from_bytes(b"PROPFIND").map_err(|_| invalid("METHOD_INVALID"))?,self.url(key)?)
             .header("Depth",depth).header("Content-Type","application/xml")
-            .body("<?xml version=\"1.0\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:resourcetype/><d:getcontentlength/><d:getetag/></d:prop></d:propfind>")
-            .send().await.map_err(|_| failure(ErrorCategory::Io,ErrorPhase::Read,false))?;
+            .body("<?xml version=\"1.0\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:resourcetype/><d:getcontentlength/><d:getetag/></d:prop></d:propfind>");
+        let response = self
+            .send(request)
+            .await
+            .map_err(|error| transport_failure(&*error, ErrorPhase::Read, false))?;
         let mut response = checked(response, false)?;
         if response.status() != StatusCode::MULTI_STATUS {
             return Err(failure(ErrorCategory::Protocol, ErrorPhase::Read, false));
@@ -125,7 +139,7 @@ impl Dav {
         while let Some(chunk) = response
             .chunk()
             .await
-            .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Read, false))?
+            .map_err(|error| transport_failure(&error, ErrorPhase::Read, false))?
         {
             if data.len().saturating_add(chunk.len()) > 8 * 1024 * 1024 {
                 return Err(limit_error());

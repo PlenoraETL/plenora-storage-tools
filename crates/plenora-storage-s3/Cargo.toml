@@ -13,7 +13,9 @@ readme = "../../README.md"
 [dependencies]
 hex.workspace = true
 async-trait.workspace = true
+bytes.workspace = true
 futures-util.workspace = true
+http-body.workspace = true
 object_store.workspace = true
 plenora-storage-core = { path = "../plenora-storage-core", version = "3.0.0" }
 reqwest.workspace = true
@@ -26,7 +28,9 @@ tokio.workspace = true
 url.workspace = true
 
 [dev-dependencies]
-tokio.workspace = true
+# Paused time lets the request-timeout tests wait minutes of server silence
+# deterministically, without real sleeps.
+tokio = { workspace = true, features = ["test-util"] }
 
 [lints]
 workspace = true

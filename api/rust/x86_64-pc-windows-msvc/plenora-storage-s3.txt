@@ -215,3 +215,4 @@ impl<T> typenum::type_operators::Same for plenora_storage_s3::S3Provider
 pub type plenora_storage_s3::S3Provider::Output = T
 pub const plenora_storage_s3::CONFIG_CONTRACT: &str
 pub const plenora_storage_s3::PROVIDER_ID: &str
+pub const plenora_storage_s3::READ_TIMEOUT_WITHOUT_DEADLINE: core::time::Duration

@@ -90,6 +90,11 @@ pub fn map_store_error(
         if let Some(error) = cause.downcast_ref::<StorageError>() {
             return error.clone();
         }
+        // A request the HTTP client gave up waiting for is a timeout with the
+        // effect of the operation; before 3.0.0 it was a generic failure.
+        if is_timeout(cause) {
+            return request_timeout_error(phase, mutating);
+        }
         let Some(source) = cause.source() else {
             break;
         };
@@ -157,4 +162,39 @@ pub fn map_store_error(
         ),
     };
     StorageError::new(category, phase, effect, retry, code, message).with_provider(PROVIDER_ID)
+}
+
+/// A request the HTTP client gave up waiting for. Without a mutation nothing
+/// happened and the retry is safe; during one the outcome is unknown.
+pub fn request_timeout_error(phase: ErrorPhase, mutating: bool) -> StorageError {
+    StorageError::new(
+        ErrorCategory::Timeout,
+        phase,
+        if mutating {
+            RemoteEffect::Unknown
+        } else {
+            RemoteEffect::None
+        },
+        if mutating {
+            RetryDisposition::RequiresRecovery
+        } else {
+            RetryDisposition::Safe
+        },
+        "S3_REQUEST_TIMED_OUT",
+        "S3 request timed out",
+    )
+    .with_provider(PROVIDER_ID)
+}
+
+/// Whether one error in a chain reports that a request timed out.
+fn is_timeout(error: &(dyn std::error::Error + 'static)) -> bool {
+    error
+        .downcast_ref::<reqwest::Error>()
+        .is_some_and(reqwest::Error::is_timeout)
+        || error
+            .downcast_ref::<object_store::client::HttpError>()
+            .is_some_and(|error| error.kind() == object_store::client::HttpErrorKind::Timeout)
+        || error
+            .downcast_ref::<std::io::Error>()
+            .is_some_and(|error| error.kind() == std::io::ErrorKind::TimedOut)
 }

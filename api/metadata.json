@@ -173,6 +173,8 @@
         "azure": [
           "dep:object_store",
           "dep:reqwest",
+          "dep:http",
+          "dep:http-body",
           "dep:rustls",
           "dep:quick-xml",
           "dep:url",
@@ -192,6 +194,8 @@
         ],
         "gcs": [
           "dep:reqwest",
+          "dep:http",
+          "dep:http-body",
           "dep:rustls",
           "dep:url"
         ],
@@ -203,6 +207,8 @@
         ],
         "webdav": [
           "dep:reqwest",
+          "dep:http",
+          "dep:http-body",
           "dep:rustls",
           "dep:quick-xml",
           "dep:url",

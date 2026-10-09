@@ -2404,6 +2404,8 @@ dependencies = [
  "futures-util",
  "hex",
  "hmac",
+ "http",
+ "http-body",
  "object_store",
  "percent-encoding",
  "plenora-smb2",
@@ -2438,8 +2440,10 @@ name = "plenora-storage-s3"
 version = "3.0.0"
 dependencies = [
  "async-trait",
+ "bytes",
  "futures-util",
  "hex",
+ "http-body",
  "object_store",
  "plenora-storage-core",
  "quick-xml 0.42.0",

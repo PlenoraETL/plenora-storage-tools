@@ -2,7 +2,7 @@
 
 use super::{
     AzureConnectionConfig, ErrorCategory, ErrorPhase, PutRequest, StorageResult, failure, http,
-    invalid,
+    invalid, transport_failure,
 };
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use hmac::{Hmac, KeyInit, Mac};
@@ -60,7 +60,7 @@ impl FileUpload {
         let client = self
             .connector
             .client()
-            .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Connect, false))?;
+            .map_err(|error| transport_failure(&error, ErrorPhase::Connect, false))?;
         let mut url = self.root.clone();
         {
             let mut path = url
@@ -113,15 +113,15 @@ impl FileUpload {
             HeaderValue::from_str(&authorization).map_err(|_| invalid("AZURE_SIGNING_FAILED"))?;
         authorization.set_sensitive(true);
         headers.insert("authorization", authorization);
-        let response = client
+        let request = client
             .put(url)
             .headers(headers)
             .body(reqwest::Body::wrap_stream(
                 tokio_util::io::ReaderStream::new(file),
-            ))
-            .send()
+            ));
+        let response = crate::watched::send(request, self.connector.idle())
             .await
-            .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Commit, true))?;
+            .map_err(|error| transport_failure(&*error, ErrorPhase::Commit, true))?;
         let category = match response.status().as_u16() {
             201 => return Ok(()),
             401 => ErrorCategory::Authentication,

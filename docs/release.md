@@ -154,6 +154,48 @@ nel job `product-quality` della CI.
   recuperabili da un runner pulito. La sua licenza AGPL-3.0 resta nell'immagine
   di test; MinIO non è incluso negli asset Storage Tools. Non estendere il claim ad AWS o ad altri server senza
   eseguire la matrice del documento release-readiness.
+- Le richieste HTTP (WebDAV, Azure, GCS), S3 e SMB attendono il server al più
+  per il tempo che resta alla deadline dell'operazione; l'apertura della
+  connessione resta limitata a 10 s per HTTP e a 5 s per S3 e SMB, o al tempo
+  residuo se è minore. Senza deadline:
+  - ogni richiesta HTTP o S3, lettura o scrittura, fallisce dopo 300 s di
+    inattività (`HTTP_READ_TIMEOUT_WITHOUT_DEADLINE`,
+    `READ_TIMEOUT_WITHOUT_DEADLINE`): nessun pezzo del corpo preso dal
+    trasporto, nessuna risposta, nessun dato della risposta. Il tempo si
+    riarma solo con dati veri: a ogni pezzo non vuoto inviato (al più 64 KiB)
+    e a ogni dato non vuoto ricevuto; frame vuoti, trailer, fine del corpo ed
+    errori non contano. Continua a correre dopo la fine del corpo,
+    nell'attesa della risposta. Non
+    c'è un limite alla durata complessiva: un upload o un download che
+    continua ad avanzare non è mai interrotto. Lo stesso limite vale per le
+    mutazioni senza corpo (DELETE, MKCOL, `UploadPartCopy`, completamento del
+    multipart);
+  - nessun corpo viene rimandato: i retry interni di `object_store` (S3 e
+    Azure) sono configurati a zero e reqwest ha i retry disattivati, quindi
+    una richiesta fallita viene riportata e mai ripetuta dall'adattatore o dal
+    client;
+  - limite intrinseco: un pezzo conta come progresso quando il trasporto lo
+    ha preso, non quando il server lo ha ricevuto. Un server che smette di
+    leggere viene rilevato solo dopo che i buffer dei socket si sono
+    riempiti, quindi fino a 300 s dopo l'ultimo pezzo che vi è entrato;
+  - una richiesta SMB fallisce dopo 30 s di silenzio del server
+    (`SMB_RESPONSE_TIMEOUT_WITHOUT_DEADLINE`); ogni `STATUS_PENDING` riavvia
+    l'attesa, e su una connessione che il keepalive dimostra viva una richiesta
+    senza risposta attende sei volte tanto (180 s).
+  Allo scadere l'errore è `timeout`: effetto `none` e retry `safe` senza
+  mutazione, `unknown` e `requires_recovery` durante una scrittura. Per SMB
+  questo vale anche quando la libreria dichiara il server non responsivo
+  (`ServerUnresponsive`), quando una richiesta non riesce a partire in tempo,
+  quando l'attesa di crediti scade e quando la connessione TCP esaurisce il
+  tempo su ogni indirizzo (`timeout` in `connect`, `none`, `safe`). Un rifiuto
+  o un altro errore su uno qualunque degli indirizzi rende la connessione `io`,
+  indipendentemente dall'ordine degli indirizzi. Una richiesta che i crediti
+  della connessione non possono coprire, senza risposte in arrivo che ne
+  portino altri, fallisce subito come `resource_limit`
+  (`SMB_CREDITS_EXHAUSTED`), non come `timeout`.
+- Dopo un upload multipart S3 fallito, la pulizia (`abort_multipart`) ha un
+  budget proprio di 10 s: può quindi durare fino a 10 s oltre la deadline
+  dell'operazione.
 - FTP è in chiaro e richiede autorizzazione esplicita. FTPS esplicito verifica
   il certificato TLS; SFTP usa pin SHA-256 con password oppure chiave privata
   OpenSSH, anche cifrata. Il resolver fornisce `username` e una sola modalità:

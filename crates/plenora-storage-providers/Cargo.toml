@@ -13,10 +13,10 @@ readme = "../../README.md"
 default = ["full"]
 full = ["local", "azure", "gcs", "smb", "webdav"]
 local = ["dep:cap-std"]
-azure = ["dep:object_store", "dep:reqwest", "dep:rustls", "dep:quick-xml", "dep:url", "dep:base64", "dep:hmac", "dep:time"]
-gcs = ["dep:reqwest", "dep:rustls", "dep:url"]
+azure = ["dep:object_store", "dep:reqwest", "dep:http", "dep:http-body", "dep:rustls", "dep:quick-xml", "dep:url", "dep:base64", "dep:hmac", "dep:time"]
+gcs = ["dep:reqwest", "dep:http", "dep:http-body", "dep:rustls", "dep:url"]
 smb = ["dep:smb2"]
-webdav = ["dep:reqwest", "dep:rustls", "dep:quick-xml", "dep:url", "dep:percent-encoding"]
+webdav = ["dep:reqwest", "dep:http", "dep:http-body", "dep:rustls", "dep:quick-xml", "dep:url", "dep:percent-encoding"]
 
 [dependencies]
 hex.workspace = true
@@ -28,6 +28,8 @@ time = { workspace = true, optional = true }
 percent-encoding = { version = "=2.3.2", optional = true }
 cap-std = { workspace = true, optional = true }
 futures-util.workspace = true
+http = { workspace = true, optional = true }
+http-body = { workspace = true, optional = true }
 object_store = { version = "=0.14.2", default-features = false, features = ["azure"], optional = true }
 plenora-storage-core = { path = "../plenora-storage-core", version = "3.0.0" }
 quick-xml = { workspace = true, optional = true }
@@ -41,6 +43,13 @@ smb2 = { workspace = true, optional = true }
 tokio.workspace = true
 tokio-util.workspace = true
 url = { workspace = true, optional = true }
+
+[dev-dependencies]
+# Paused time lets the request-timeout tests wait minutes of server silence
+# deterministically, without real sleeps.
+tokio = { workspace = true, features = ["test-util"] }
+# The SMB response-timeout test drives a connection over the in-memory mock.
+smb2 = { workspace = true, features = ["testing"] }
 
 [lints]
 workspace = true

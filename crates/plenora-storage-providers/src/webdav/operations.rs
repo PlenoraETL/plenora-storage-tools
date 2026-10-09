@@ -4,7 +4,7 @@ use super::{
     BTreeMap, BTreeSet, Backend, Bytes, Dav, DavReader, ErrorCategory, ErrorPhase, Method,
     ObjectMetadata, ProviderListRequest, ProviderListResult, PutRequest, Reader, StorageError,
     StorageResult, async_trait, checked, directory_may_contain, failure, invalid, limit_error,
-    metadata, page, select,
+    metadata, page, select, transport_failure,
 };
 
 #[async_trait]
@@ -65,10 +65,9 @@ impl Backend for Dav {
     async fn get(&mut self, key: &str) -> StorageResult<(ObjectMetadata, Box<dyn Reader>)> {
         let meta = self.stat(key).await?;
         let response = self
-            .request(Method::GET, self.url(key)?)
-            .send()
+            .send(self.request(Method::GET, self.url(key)?))
             .await
-            .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Read, false))?;
+            .map_err(|error| transport_failure(&*error, ErrorPhase::Read, false))?;
         Ok((
             meta,
             Box::new(DavReader {
@@ -97,11 +96,12 @@ impl Backend for Dav {
                 StorageError::unsupported("WebDAV file deletion requires a strong ETag")
             })?;
         let response = self
-            .request(Method::DELETE, self.url(key)?)
-            .header("If-Match", etag)
-            .send()
+            .send(
+                self.request(Method::DELETE, self.url(key)?)
+                    .header("If-Match", etag),
+            )
             .await
-            .map_err(|_| failure(ErrorCategory::Io, ErrorPhase::Commit, true))?;
+            .map_err(|error| transport_failure(&*error, ErrorPhase::Commit, true))?;
         checked(response, true)?;
         Ok(())
     }

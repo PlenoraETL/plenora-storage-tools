@@ -2502,6 +2502,7 @@ pub plenora_storage_core::ExecutionControl::deadline: core::option::Option<std::
 impl plenora_storage_core::ExecutionControl
 pub fn plenora_storage_core::ExecutionControl::check(&self, phase: plenora_storage_core::ErrorPhase, mutating: bool) -> plenora_storage_core::StorageResult<()>
 pub fn plenora_storage_core::ExecutionControl::new(cancellation: plenora_storage_core::CancellationToken) -> Self
+pub fn plenora_storage_core::ExecutionControl::remaining(&self) -> core::option::Option<core::time::Duration>
 pub async fn plenora_storage_core::ExecutionControl::run<T, F>(&self, future: F, phase: plenora_storage_core::ErrorPhase, mutating: bool) -> plenora_storage_core::StorageResult<T> where F: core::future::future::Future<Output = plenora_storage_core::StorageResult<T>> + core::marker::Send
 pub fn plenora_storage_core::ExecutionControl::with_deadline(self, deadline: std::time::Instant) -> Self
 impl core::clone::Clone for plenora_storage_core::ExecutionControl
@@ -3011,6 +3012,209 @@ impl<T> core::mem::SizedTypeProperties for plenora_storage_core::GetRequest
 impl<T> serde_core::de::DeserializeOwned for plenora_storage_core::GetRequest where T: for<'de> serde_core::de::Deserialize<'de>
 impl<T> typenum::type_operators::Same for plenora_storage_core::GetRequest
 pub type plenora_storage_core::GetRequest::Output = T
+pub struct plenora_storage_core::Inactivity
+impl plenora_storage_core::Inactivity
+pub async fn plenora_storage_core::Inactivity::guard<F: core::future::future::Future>(&self, future: F) -> core::result::Result<<F as core::future::future::Future>::Output, plenora_storage_core::InactivityTimeout>
+pub const fn plenora_storage_core::Inactivity::limit(&self) -> core::option::Option<core::time::Duration>
+pub fn plenora_storage_core::Inactivity::new(limit: core::option::Option<core::time::Duration>) -> Self
+pub fn plenora_storage_core::Inactivity::poll_idle(&self, timer: &mut core::option::Option<core::pin::Pin<alloc::boxed::Box<tokio::time::sleep::Sleep>>>, cx: &mut core::task::wake::Context<'_>) -> core::task::poll::Poll<plenora_storage_core::InactivityTimeout>
+pub fn plenora_storage_core::Inactivity::touch(&self)
+impl core::clone::Clone for plenora_storage_core::Inactivity
+pub fn plenora_storage_core::Inactivity::clone(&self) -> plenora_storage_core::Inactivity
+impl core::fmt::Debug for plenora_storage_core::Inactivity
+pub fn plenora_storage_core::Inactivity::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for plenora_storage_core::Inactivity
+impl core::marker::Send for plenora_storage_core::Inactivity
+impl core::marker::Sync for plenora_storage_core::Inactivity
+impl core::marker::Unpin for plenora_storage_core::Inactivity
+impl core::marker::UnsafeUnpin for plenora_storage_core::Inactivity
+impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::Inactivity
+impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::Inactivity
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::Inactivity
+pub type plenora_storage_core::Inactivity::Output = typenum::bit::B1
+pub fn plenora_storage_core::Inactivity::is_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Greater> for plenora_storage_core::Inactivity
+pub type plenora_storage_core::Inactivity::Output = typenum::bit::B0
+pub fn plenora_storage_core::Inactivity::is_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Less> for plenora_storage_core::Inactivity
+pub type plenora_storage_core::Inactivity::Output = typenum::bit::B0
+pub fn plenora_storage_core::Inactivity::is_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal> for plenora_storage_core::Inactivity
+pub type plenora_storage_core::Inactivity::Output = typenum::bit::B1
+pub fn plenora_storage_core::Inactivity::is_greater_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater> for plenora_storage_core::Inactivity
+pub type plenora_storage_core::Inactivity::Output = typenum::bit::B1
+pub fn plenora_storage_core::Inactivity::is_greater_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less> for plenora_storage_core::Inactivity
+pub type plenora_storage_core::Inactivity::Output = typenum::bit::B0
+pub fn plenora_storage_core::Inactivity::is_greater_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Equal> for plenora_storage_core::Inactivity
+pub type plenora_storage_core::Inactivity::Output = typenum::bit::B0
+pub fn plenora_storage_core::Inactivity::is_greater_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Greater> for plenora_storage_core::Inactivity
+pub type plenora_storage_core::Inactivity::Output = typenum::bit::B1
+pub fn plenora_storage_core::Inactivity::is_greater_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Less> for plenora_storage_core::Inactivity
+pub type plenora_storage_core::Inactivity::Output = typenum::bit::B0
+pub fn plenora_storage_core::Inactivity::is_greater_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Equal> for plenora_storage_core::Inactivity
+pub type plenora_storage_core::Inactivity::Output = typenum::bit::B1
+pub fn plenora_storage_core::Inactivity::is_less_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Greater> for plenora_storage_core::Inactivity
+pub type plenora_storage_core::Inactivity::Output = typenum::bit::B0
+pub fn plenora_storage_core::Inactivity::is_less_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Less> for plenora_storage_core::Inactivity
+pub type plenora_storage_core::Inactivity::Output = typenum::bit::B1
+pub fn plenora_storage_core::Inactivity::is_less_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Equal> for plenora_storage_core::Inactivity
+pub type plenora_storage_core::Inactivity::Output = typenum::bit::B0
+pub fn plenora_storage_core::Inactivity::is_less_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Greater> for plenora_storage_core::Inactivity
+pub type plenora_storage_core::Inactivity::Output = typenum::bit::B0
+pub fn plenora_storage_core::Inactivity::is_less_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Less> for plenora_storage_core::Inactivity
+pub type plenora_storage_core::Inactivity::Output = typenum::bit::B1
+pub fn plenora_storage_core::Inactivity::is_less_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Equal> for plenora_storage_core::Inactivity
+pub type plenora_storage_core::Inactivity::Output = typenum::bit::B0
+pub fn plenora_storage_core::Inactivity::is_not_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Greater> for plenora_storage_core::Inactivity
+pub type plenora_storage_core::Inactivity::Output = typenum::bit::B1
+pub fn plenora_storage_core::Inactivity::is_not_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Less> for plenora_storage_core::Inactivity
+pub type plenora_storage_core::Inactivity::Output = typenum::bit::B1
+pub fn plenora_storage_core::Inactivity::is_not_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Less>>::Output
+impl<T, U> core::convert::Into<U> for plenora_storage_core::Inactivity where U: core::convert::From<T>
+pub fn plenora_storage_core::Inactivity::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for plenora_storage_core::Inactivity where U: core::convert::Into<T>
+pub type plenora_storage_core::Inactivity::Error = core::convert::Infallible
+pub fn plenora_storage_core::Inactivity::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for plenora_storage_core::Inactivity where U: core::convert::TryFrom<T>
+pub type plenora_storage_core::Inactivity::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn plenora_storage_core::Inactivity::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for plenora_storage_core::Inactivity where T: core::clone::Clone
+pub type plenora_storage_core::Inactivity::Owned = T
+pub fn plenora_storage_core::Inactivity::clone_into(&self, target: &mut T)
+pub fn plenora_storage_core::Inactivity::to_owned(&self) -> T
+impl<T> core::any::Any for plenora_storage_core::Inactivity where T: 'static + ?core::marker::Sized
+pub fn plenora_storage_core::Inactivity::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for plenora_storage_core::Inactivity where T: ?core::marker::Sized
+pub fn plenora_storage_core::Inactivity::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for plenora_storage_core::Inactivity where T: ?core::marker::Sized
+pub fn plenora_storage_core::Inactivity::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for plenora_storage_core::Inactivity where T: core::clone::Clone
+pub unsafe fn plenora_storage_core::Inactivity::clone_to_uninit(&self, dest: *mut u8)
+impl<T> core::convert::From<T> for plenora_storage_core::Inactivity
+pub fn plenora_storage_core::Inactivity::from(t: T) -> T
+impl<T> core::mem::SizedTypeProperties for plenora_storage_core::Inactivity
+impl<T> typenum::type_operators::Same for plenora_storage_core::Inactivity
+pub type plenora_storage_core::Inactivity::Output = T
+pub struct plenora_storage_core::InactivityTimeout
+impl core::clone::Clone for plenora_storage_core::InactivityTimeout
+pub fn plenora_storage_core::InactivityTimeout::clone(&self) -> plenora_storage_core::InactivityTimeout
+impl core::clone::TrivialClone for plenora_storage_core::InactivityTimeout
+impl core::cmp::Eq for plenora_storage_core::InactivityTimeout
+pub fn plenora_storage_core::InactivityTimeout::assert_fields_are_eq(&self)
+impl core::cmp::PartialEq for plenora_storage_core::InactivityTimeout
+pub fn plenora_storage_core::InactivityTimeout::eq(&self, other: &plenora_storage_core::InactivityTimeout) -> bool
+impl core::convert::From<plenora_storage_core::InactivityTimeout> for core::io::error::Error
+pub fn core::io::error::Error::from(timeout: plenora_storage_core::InactivityTimeout) -> Self
+impl core::error::Error for plenora_storage_core::InactivityTimeout
+impl core::fmt::Debug for plenora_storage_core::InactivityTimeout
+pub fn plenora_storage_core::InactivityTimeout::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for plenora_storage_core::InactivityTimeout
+pub fn plenora_storage_core::InactivityTimeout::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for plenora_storage_core::InactivityTimeout
+impl core::marker::StructuralPartialEq for plenora_storage_core::InactivityTimeout
+impl core::marker::Freeze for plenora_storage_core::InactivityTimeout
+impl core::marker::Send for plenora_storage_core::InactivityTimeout
+impl core::marker::Sync for plenora_storage_core::InactivityTimeout
+impl core::marker::Unpin for plenora_storage_core::InactivityTimeout
+impl core::marker::UnsafeUnpin for plenora_storage_core::InactivityTimeout
+impl core::panic::unwind_safe::RefUnwindSafe for plenora_storage_core::InactivityTimeout
+impl core::panic::unwind_safe::UnwindSafe for plenora_storage_core::InactivityTimeout
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Equal> for plenora_storage_core::InactivityTimeout
+pub type plenora_storage_core::InactivityTimeout::Output = typenum::bit::B1
+pub fn plenora_storage_core::InactivityTimeout::is_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Greater> for plenora_storage_core::InactivityTimeout
+pub type plenora_storage_core::InactivityTimeout::Output = typenum::bit::B0
+pub fn plenora_storage_core::InactivityTimeout::is_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsEqualPrivate<B, typenum::Less> for plenora_storage_core::InactivityTimeout
+pub type plenora_storage_core::InactivityTimeout::Output = typenum::bit::B0
+pub fn plenora_storage_core::InactivityTimeout::is_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal> for plenora_storage_core::InactivityTimeout
+pub type plenora_storage_core::InactivityTimeout::Output = typenum::bit::B1
+pub fn plenora_storage_core::InactivityTimeout::is_greater_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater> for plenora_storage_core::InactivityTimeout
+pub type plenora_storage_core::InactivityTimeout::Output = typenum::bit::B1
+pub fn plenora_storage_core::InactivityTimeout::is_greater_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less> for plenora_storage_core::InactivityTimeout
+pub type plenora_storage_core::InactivityTimeout::Output = typenum::bit::B0
+pub fn plenora_storage_core::InactivityTimeout::is_greater_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Equal> for plenora_storage_core::InactivityTimeout
+pub type plenora_storage_core::InactivityTimeout::Output = typenum::bit::B0
+pub fn plenora_storage_core::InactivityTimeout::is_greater_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Greater> for plenora_storage_core::InactivityTimeout
+pub type plenora_storage_core::InactivityTimeout::Output = typenum::bit::B1
+pub fn plenora_storage_core::InactivityTimeout::is_greater_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsGreaterPrivate<B, typenum::Less> for plenora_storage_core::InactivityTimeout
+pub type plenora_storage_core::InactivityTimeout::Output = typenum::bit::B0
+pub fn plenora_storage_core::InactivityTimeout::is_greater_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsGreaterPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Equal> for plenora_storage_core::InactivityTimeout
+pub type plenora_storage_core::InactivityTimeout::Output = typenum::bit::B1
+pub fn plenora_storage_core::InactivityTimeout::is_less_or_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Greater> for plenora_storage_core::InactivityTimeout
+pub type plenora_storage_core::InactivityTimeout::Output = typenum::bit::B0
+pub fn plenora_storage_core::InactivityTimeout::is_less_or_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessOrEqualPrivate<B, typenum::Less> for plenora_storage_core::InactivityTimeout
+pub type plenora_storage_core::InactivityTimeout::Output = typenum::bit::B1
+pub fn plenora_storage_core::InactivityTimeout::is_less_or_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessOrEqualPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Equal> for plenora_storage_core::InactivityTimeout
+pub type plenora_storage_core::InactivityTimeout::Output = typenum::bit::B0
+pub fn plenora_storage_core::InactivityTimeout::is_less_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsLessPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Greater> for plenora_storage_core::InactivityTimeout
+pub type plenora_storage_core::InactivityTimeout::Output = typenum::bit::B0
+pub fn plenora_storage_core::InactivityTimeout::is_less_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsLessPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsLessPrivate<B, typenum::Less> for plenora_storage_core::InactivityTimeout
+pub type plenora_storage_core::InactivityTimeout::Output = typenum::bit::B1
+pub fn plenora_storage_core::InactivityTimeout::is_less_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsLessPrivate<B, typenum::Less>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Equal> for plenora_storage_core::InactivityTimeout
+pub type plenora_storage_core::InactivityTimeout::Output = typenum::bit::B0
+pub fn plenora_storage_core::InactivityTimeout::is_not_equal_private(self, _: B, _: typenum::Equal) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Equal>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Greater> for plenora_storage_core::InactivityTimeout
+pub type plenora_storage_core::InactivityTimeout::Output = typenum::bit::B1
+pub fn plenora_storage_core::InactivityTimeout::is_not_equal_private(self, _: B, _: typenum::Greater) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Greater>>::Output
+impl<A, B> typenum::private::IsNotEqualPrivate<B, typenum::Less> for plenora_storage_core::InactivityTimeout
+pub type plenora_storage_core::InactivityTimeout::Output = typenum::bit::B1
+pub fn plenora_storage_core::InactivityTimeout::is_not_equal_private(self, _: B, _: typenum::Less) -> <A as typenum::private::IsNotEqualPrivate<B, typenum::Less>>::Output
+impl<T, U> core::convert::Into<U> for plenora_storage_core::InactivityTimeout where U: core::convert::From<T>
+pub fn plenora_storage_core::InactivityTimeout::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for plenora_storage_core::InactivityTimeout where U: core::convert::Into<T>
+pub type plenora_storage_core::InactivityTimeout::Error = core::convert::Infallible
+pub fn plenora_storage_core::InactivityTimeout::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for plenora_storage_core::InactivityTimeout where U: core::convert::TryFrom<T>
+pub type plenora_storage_core::InactivityTimeout::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn plenora_storage_core::InactivityTimeout::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for plenora_storage_core::InactivityTimeout where T: core::clone::Clone
+pub type plenora_storage_core::InactivityTimeout::Owned = T
+pub fn plenora_storage_core::InactivityTimeout::clone_into(&self, target: &mut T)
+pub fn plenora_storage_core::InactivityTimeout::to_owned(&self) -> T
+impl<T> alloc::string::ToString for plenora_storage_core::InactivityTimeout where T: core::fmt::Display + ?core::marker::Sized
+pub fn plenora_storage_core::InactivityTimeout::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for plenora_storage_core::InactivityTimeout where T: 'static + ?core::marker::Sized
+pub fn plenora_storage_core::InactivityTimeout::type_id(&self) -> core::any::TypeId
+impl<T> core::asserting::Printable for plenora_storage_core::InactivityTimeout where T: core::marker::Copy + core::fmt::Debug
+impl<T> core::borrow::Borrow<T> for plenora_storage_core::InactivityTimeout where T: ?core::marker::Sized
+pub fn plenora_storage_core::InactivityTimeout::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for plenora_storage_core::InactivityTimeout where T: ?core::marker::Sized
+pub fn plenora_storage_core::InactivityTimeout::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for plenora_storage_core::InactivityTimeout where T: core::clone::Clone
+pub unsafe fn plenora_storage_core::InactivityTimeout::clone_to_uninit(&self, dest: *mut u8)
+impl<T> core::convert::From<T> for plenora_storage_core::InactivityTimeout
+pub fn plenora_storage_core::InactivityTimeout::from(t: T) -> T
+impl<T> core::mem::SizedTypeProperties for plenora_storage_core::InactivityTimeout
+impl<T> typenum::type_operators::Same for plenora_storage_core::InactivityTimeout
+pub type plenora_storage_core::InactivityTimeout::Output = T
 pub struct plenora_storage_core::IntegrityMetadata
 pub plenora_storage_core::IntegrityMetadata::algorithm: alloc::string::String
 pub plenora_storage_core::IntegrityMetadata::value: alloc::string::String

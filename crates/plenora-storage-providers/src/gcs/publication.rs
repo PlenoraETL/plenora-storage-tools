@@ -1,6 +1,6 @@
 //! Upload and copy publication, including cleanup and ambiguous commit outcomes.
 
-use super::{Bytes, GcsBackend, Method, Object, PutRequest, StorageResult, invalid, json, send};
+use super::{Bytes, GcsBackend, Method, Object, PutRequest, StorageResult, invalid, json};
 use futures_util::{Stream, StreamExt};
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
@@ -109,18 +109,19 @@ async fn publish(
             .chain(payload)
             .chain(futures_util::stream::iter([Ok(end)])),
     );
-    let response = send(
-        provider
-            .request(Method::POST, url)
-            .header(
-                "Content-Type",
-                format!("multipart/related; boundary={boundary}"),
-            )
-            .header("Content-Length", length)
-            .body(body),
-        true,
-    )
-    .await?;
+    let response = provider
+        .send(
+            provider
+                .request(Method::POST, url)
+                .header(
+                    "Content-Type",
+                    format!("multipart/related; boundary={boundary}"),
+                )
+                .header("Content-Length", length)
+                .body(body),
+            true,
+        )
+        .await?;
     let object: Object = json(response)
         .await
         .map_err(|error| error.cleanup_unconfirmed("upload_response_invalid"))?;

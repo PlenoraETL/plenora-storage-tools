@@ -5,8 +5,13 @@ use object_store::client::{HttpError, HttpErrorKind, HttpRequest, HttpResponse, 
 use plenora_storage_core::{StorageResult, validate_object_key};
 use serde::Deserialize;
 
+/// The HTTP service `object_store` runs Azure requests on: every request goes
+/// through `crate::watched` with the operation's inactivity limit.
 #[derive(Debug)]
-pub struct ValidatingClient(pub reqwest::Client);
+pub struct ValidatingClient {
+    pub client: reqwest::Client,
+    pub idle: Option<std::time::Duration>,
+}
 
 #[async_trait]
 impl HttpService for ValidatingClient {
@@ -16,7 +21,7 @@ impl HttpService for ValidatingClient {
                 url::form_urlencoded::parse(query.as_bytes())
                     .any(|(name, value)| name == "comp" && value == "list")
             });
-        let response = self.0.call(request).await?;
+        let response = crate::watched::call(&self.client, self.idle, request).await?;
         if !listing || !response.status().is_success() {
             return Ok(response);
         }

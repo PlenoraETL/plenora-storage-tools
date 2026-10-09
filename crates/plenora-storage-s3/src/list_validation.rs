@@ -15,8 +15,13 @@ use crate::{PROVIDER_ID, unrepresentable_key_error};
 // memory when a nonconforming endpoint sends an oversized XML response.
 const MAX_LIST_RESPONSE_BYTES: usize = 32 * 1_024 * 1_024;
 
+/// The HTTP service `object_store` runs S3 requests on: every request goes
+/// through `watched` with the operation's inactivity limit.
 #[derive(Debug)]
-pub struct ValidatingClient(pub reqwest::Client);
+pub struct ValidatingClient {
+    pub client: reqwest::Client,
+    pub idle: Option<std::time::Duration>,
+}
 
 #[async_trait]
 impl HttpService for ValidatingClient {
@@ -26,7 +31,7 @@ impl HttpService for ValidatingClient {
                 url::form_urlencoded::parse(query.as_bytes())
                     .any(|(name, value)| name == "list-type" && value == "2")
             });
-        let response = self.0.call(request).await?;
+        let response = crate::watched::call(&self.client, self.idle, request).await?;
         if !is_listing || !response.status().is_success() {
             return Ok(response);
         }
