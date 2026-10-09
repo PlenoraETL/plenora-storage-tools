@@ -23,6 +23,7 @@ from versioning import parse_version, workspace_version
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS = {'linux': 'x86_64-unknown-linux-gnu', 'windows': 'x86_64-pc-windows-msvc'}
+LOCAL_PHASES = ('workflows', 'download', 'assemble', 'prepare-vm', 'qualify-windows', 'qualify-vm', 'seal')
 
 
 def one(folder, name):
@@ -123,6 +124,11 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
     with exclusive(output):
         campaign = Campaign(output, identity)
         validate_transport_resume(campaign.state, connect_host, reason)
+        campaign.validate_retries(retries, LOCAL_PHASES)
+        from run_vm_campaign import PHASES as VM_PHASES
+        unknown = sorted(set(vm_retries) - set(VM_PHASES))
+        if unknown:
+            raise ValueError('unknown VM phase in retry: ' + ', '.join(unknown))
 
         def phase(name, action):
             print('Phase:', name, flush=True)
@@ -191,6 +197,33 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
             compose = (f'cd {q(remote_root)} && docker compose -p {q(project)} -f docker-compose.yml '
                        '-f compose.extended.yml -f .fixtures/compose.campaign.json')
 
+            def fixtures(path, label, *, recreate):
+                """Run the fixture preparation scripts on the VM and wait for them.
+
+                With `recreate` every fixture container is recreated: the
+                stateless servers (Azurite, fake GCS, WebDAV, SMB, FTPS) start
+                empty, and the others restart on their data volumes, which the
+                qualification cleans as it goes."""
+                attempt = '.fixtures/' + label + '-' + path.name
+                script = ('#!/usr/bin/env bash\nset -euo pipefail\ncd ' + q(remote_root) + '\n'
+                          + f"exec >{attempt}.log 2>&1\ntrap 'printf \"%s\\n\" \"$?\" >{attempt}.exit' EXIT\n"
+                          + 'export COMPOSE_PROJECT_NAME=' + q(project) + '\n'
+                          + 'export PLENORA_FIXTURE_HOST=' + q(config['host']) + '\n'
+                          + ('export PLENORA_FIXTURE_RECREATE=1\n' if recreate else '')
+                          + 'bash scripts/prepare-fixtures.sh\nbash scripts/prepare-extended-fixtures.sh\n')
+                remote.write(remote_root + '/.fixtures/' + label + '.sh', script)
+                remote.run(f'cd {q(remote_root)} && (nohup bash .fixtures/{label}.sh >/dev/null 2>&1 </dev/null & echo started)')
+                deadline = time.monotonic() + 1800
+                while time.monotonic() < deadline:
+                    result = remote.run(f'cd {q(remote_root)} && if test -f {attempt}.exit; then cat {attempt}.exit; else echo running; fi')
+                    if result != 'running':
+                        remote.download(remote_root + '/' + attempt + '.log', path / (label + '.log'))
+                        if result != '0':
+                            raise ValueError('fixture preparation failed')
+                        return
+                    time.sleep(10)
+                raise TimeoutError('fixture preparation timed out')
+
             def prepare(path):
                 bundle = path / 'source.bundle'
                 logged(['git', 'bundle', 'create', str(bundle), 'HEAD'], path, cwd=ROOT)
@@ -214,25 +247,7 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
                 remote.run('mkdir -p ' + q(remote_root + '/.fixtures/baseline'))
                 remote.upload(baseline, remote_root + '/.fixtures/baseline/plenora-storage')
                 remote.run('chmod +x ' + q(remote_root + '/.fixtures/baseline/plenora-storage'))
-                attempt = '.fixtures/prepare-' + path.name
-                script = ('#!/usr/bin/env bash\nset -euo pipefail\ncd ' + q(remote_root) + '\n'
-                          + f"exec >{attempt}.log 2>&1\ntrap 'printf \"%s\\n\" \"$?\" >{attempt}.exit' EXIT\n"
-                          + 'export COMPOSE_PROJECT_NAME=' + q(project) + '\n'
-                          + 'export PLENORA_FIXTURE_HOST=' + q(config['host']) + '\n'
-                          + 'bash scripts/prepare-fixtures.sh\nbash scripts/prepare-extended-fixtures.sh\n')
-                remote.write(remote_root + '/.fixtures/prepare.sh', script)
-                remote.run(f'cd {q(remote_root)} && (nohup bash .fixtures/prepare.sh >/dev/null 2>&1 </dev/null & echo started)')
-                deadline = time.monotonic() + 1800
-                while time.monotonic() < deadline:
-                    result = remote.run(f'cd {q(remote_root)} && if test -f {attempt}.exit; then cat {attempt}.exit; else echo running; fi')
-                    if result != 'running':
-                        remote.download(remote_root + '/' + attempt + '.log', path / 'prepare.log')
-                        if result != '0':
-                            raise ValueError('fixture preparation failed')
-                        break
-                    time.sleep(10)
-                else:
-                    raise TimeoutError('fixture preparation timed out')
+                fixtures(path, 'prepare', recreate=False)
                 remote.download(remote_root + '/.fixtures/extended/server.crt', path / 'fixture-ca.crt')
                 remote.download(remote_root + '/.fixtures/sftp-fingerprint', path / 'host-pin')
 
@@ -253,6 +268,15 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
                     host_key = remote.client.get_transport().get_remote_server_key()
                     write_json(path / 'transport.json', {'logical_host': config['host'], 'connect_host': connect_host,
                                'host_key_sha256': hashlib.sha256(host_key.asbytes()).hexdigest(), 'reason': reason})
+                # Every VM attempt starts on recreated fixtures, so the
+                # performance phase never measures servers that earlier work
+                # left with accumulated state. The reset is recorded with the
+                # attempt.
+                started = time.time()
+                fixtures(path, 'fixture-reset', recreate=True)
+                write_json(path / 'fixture-reset.json', {'recreated': True, 'started_unix': started,
+                                                         'finished_unix': time.time(),
+                                                         'reason': 'fresh fixtures before the VM runner'})
                 archive = path / 'linux-input.tar.gz'
                 with tarfile.open(archive, 'w:gz') as stream:
                     stream.add(assembled / 'dist' / version / TARGETS['linux'], arcname='dist/' + version + '/' + TARGETS['linux'])

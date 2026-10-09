@@ -27,6 +27,17 @@ def compare(baseline, candidate, binary, policy):
     require(set(candidate['environment']) == {'machine', 'kernel', 'cpu_count', 'cpu_model', 'fixture_sha256'},
             'performance environment is incomplete')
     require(baseline['rounds'] == candidate['rounds'], 'performance sample counts differ')
+    # A paired run measures both binaries alternately; its two reports must
+    # name each other and record the same order. Unpaired reports, as earlier
+    # campaigns produced, are compared as before.
+    pairs = [report.get('paired_measurement') for report in (baseline, candidate)]
+    if any(pairs):
+        require(all(pairs) and pairs[0]['role'] == 'baseline' and pairs[1]['role'] == 'candidate'
+                and pairs[0]['partner_campaign_id'] == candidate['campaign_id']
+                and pairs[1]['partner_campaign_id'] == baseline['campaign_id']
+                and pairs[0]['order_scheme'] == pairs[1]['order_scheme']
+                and pairs[0]['order'] == pairs[1]['order'] and pairs[0]['order'],
+                'paired performance reports do not describe the same alternated run')
 
     def samples(report):
         result = defaultdict(list)

@@ -15,6 +15,11 @@ from versioning import parse_version
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = 'x86_64-unknown-linux-gnu'
+PERFORMANCE_ORDER = 'ABBA'
+PHASES = ('qualify-linux', 'install-sdk', 'performance-ab', 'performance-compare', 'transfers-large',
+          'transfers-workers4', 'transfers-workers16', 'spooled-large', 'spooled-workers4', 'spooled-workers16',
+          'soak')
+
 
 
 def identity(folder, baseline):
@@ -28,7 +33,7 @@ def identity(folder, baseline):
         raise ValueError('campaign distribution bytes differ from manifest')
     return {'source_revision': revision, 'version': manifest['version'], 'artifacts': subjects,
             'baseline_binary_sha256': digest(baseline), 'soak_seconds': SOAK_DURATION_SECONDS,
-            'performance_rounds': 30, 'large_transfer_rounds': 2}
+            'performance_rounds': 30, 'performance_order': PERFORMANCE_ORDER, 'large_transfer_rounds': 2}
 
 
 def run(folder, baseline, output, retries, reason, backend_data):
@@ -49,6 +54,7 @@ def run(folder, baseline, output, retries, reason, backend_data):
     subject['space_locations'] = {label: str(path.resolve()) for label, path in spaces.items()}
     with exclusive(output):
         campaign = Campaign(output, subject)
+        campaign.validate_retries(retries, PHASES)
 
         def phase(name, action):
             return campaign.phase(name, action, retry=name in retries, reason=reason)
@@ -57,13 +63,17 @@ def run(folder, baseline, output, retries, reason, backend_data):
             logged([str(python), str(ROOT / 'scripts' / script), *map(str, arguments)],
                    path, cwd=ROOT, env=environment)
 
-        def transfers(path, *, size, workers, rounds, environment=env, spool_uploads=False):
+        def transfers(path, *, size, workers, rounds, spool_uploads=False, paired=False):
             space = inspect(spaces, size, workers, spool_uploads=spool_uploads)
             write_json(path / 'disk-space.json', space)
             if space['status'] != 'PASS':
                 raise ValueError('insufficient transfer headroom; no transfer started')
+            # A paired run measures baseline and candidate alternately, slot by
+            # slot, so a drift of the environment weighs the same on both.
+            pair = (['--baseline-binary', baseline, '--baseline-output', path / 'baseline.json',
+                     '--output', path / 'candidate.json'] if paired else ['--output', path / 'report.json'])
             command(path, 'qualify_transfers.py', '--bytes', size, '--workers', workers, '--rounds', rounds,
-                    '--output', path / 'report.json', *(['--spool-uploads'] if spool_uploads else []), environment=environment)
+                    *pair, *(['--spool-uploads'] if spool_uploads else []))
 
         def qualify(path):
             copy = path / 'dist' / subject['version'] / TARGET
@@ -79,11 +89,11 @@ def run(folder, baseline, output, retries, reason, backend_data):
             write_json(path / 'wheel.json', {'sha256': digest(wheel)})
 
         installed = phase('install-sdk', sdk)
-        old = phase('performance-baseline', lambda path: transfers(path, size=1024**2, workers=4, rounds=30,
-                      environment=dict(env, PLENORA_CLI_BIN=str(baseline))))
-        new = phase('performance-candidate', lambda path: transfers(path, size=1024**2, workers=4, rounds=30))
+        paired = phase('performance-ab', lambda path: transfers(path, size=1024**2, workers=4, rounds=30,
+                                                                paired=True))
+        old, new = paired / 'baseline.json', paired / 'candidate.json'
         comparison = phase('performance-compare', lambda path: command(path, 'check_performance.py',
-                           old / 'report.json', new / 'report.json', '--output', path / 'report.json'))
+                           old, new, '--output', path / 'report.json'))
         large = phase('transfers-large', lambda path: transfers(path, size=GIB, workers=1, rounds=2))
         four = phase('transfers-workers4', lambda path: transfers(path, size=1024**2, workers=4, rounds=2))
         sixteen = phase('transfers-workers16', lambda path: transfers(path, size=1024**2, workers=16, rounds=1))
@@ -98,8 +108,8 @@ def run(folder, baseline, output, retries, reason, backend_data):
                      '--interval-seconds', 30, '--duration-seconds', SOAK_DURATION_SECONDS,
                      *(['--both-upload-modes'] if spooled else []),
                      '--output', path / 'report.json', python=installed / 'sdk/bin/python'))
-        selected = {'performance/baseline.json': old / 'report.json',
-                    'performance/candidate.json': new / 'report.json', 'performance/report.json': comparison / 'report.json',
+        selected = {'performance/baseline.json': old,
+                    'performance/candidate.json': new, 'performance/report.json': comparison / 'report.json',
                     'transfers/large.json': large / 'report.json', 'transfers/workers4.json': four / 'report.json',
                     'transfers/workers16.json': sixteen / 'report.json', 'soak/report.json': soak / 'report.json', **prepared}
         for name, source in selected.items():

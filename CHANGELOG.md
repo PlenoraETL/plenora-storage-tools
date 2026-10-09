@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Release campaign tooling: the VM runner measures baseline and candidate in one `performance-ab` phase, alternated slot by slot in an ABBA order recorded in both reports, so an environment drift during the measurement weighs the same on both binaries; the comparison, budget and criteria are unchanged, and the comparison rejects paired reports that do not describe the same run. Every `qualify-vm` attempt starts on recreated fixtures (`PLENORA_FIXTURE_RECREATE=1`, recorded in `fixture-reset.json`). A retry of a passed or unknown phase, local or VM, is refused with an error instead of being ignored: passed evidence is never remeasured. No product code changes.
 - Make the plenora-smb2 KDC UDP-to-TCP fallback test deterministic: the exchange takes the UDP and TCP endpoints separately internally (`send_to_kdc` still uses one address for both), so the test binds its two mock servers on independent ephemeral ports instead of retrying to find one port free for both protocols, which failed intermittently on Windows (WSAEACCES).
 
 ## 3.0.0 — 2026-10-06

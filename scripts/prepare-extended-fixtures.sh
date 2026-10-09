@@ -23,7 +23,11 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 2 \
   -subj '/CN=ftps' -addext "$fixture_san" \
   -addext 'basicConstraints=critical,CA:FALSE' >.fixtures/extended/certificate-generation.log 2>&1
 docker compose -f docker-compose.yml -f compose.extended.yml build ftps
-docker compose -f docker-compose.yml -f compose.extended.yml up -d azure gcs ftps webdav smb
+# PLENORA_FIXTURE_RECREATE=1 recreates the containers: the in-memory servers
+# start empty and every server serves the certificate generated above.
+recreate=()
+if [ "${PLENORA_FIXTURE_RECREATE:-0}" = 1 ]; then recreate=(--force-recreate); fi
+docker compose -f docker-compose.yml -f compose.extended.yml up -d "${recreate[@]}" azure gcs ftps webdav smb
 for attempt in $(seq 1 30); do
   if docker compose -f docker-compose.yml -f compose.extended.yml run --rm --no-deps azure-init; then break; fi
   if [ "$attempt" = 30 ]; then exit 1; fi

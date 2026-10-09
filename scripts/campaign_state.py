@@ -71,11 +71,28 @@ class Campaign:
     def save(self):
         write_json(self.path, self.state)
 
+    def validate_retries(self, names, known):
+        """A retry names a known phase whose last attempt did not pass.
+
+        Passed evidence is immutable: rerunning a passed phase would let a
+        campaign keep measuring until a result suits it. A retry of a passed or
+        unknown phase is refused before anything runs, never ignored.
+        """
+        for name in names:
+            if name not in known:
+                raise ValueError(f'unknown phase in retry: {name}')
+            attempts = self.state['phases'].get(name, [])
+            if attempts and attempts[-1]['status'] == 'PASS':
+                raise ValueError(f'retry of a passed phase is refused: {name}; passed evidence is never '
+                                 'remeasured, start a new campaign to measure again')
+
     def phase(self, name, action, *, retry=False, reason=None):
         """Actions write evidence inside their attempt; failed evidence is never reused."""
         if not re.fullmatch(r'[a-z][a-z0-9-]{0,63}', name):
             raise ValueError('invalid phase name')
         attempts = self.state['phases'].setdefault(name, [])
+        if attempts and attempts[-1]['status'] == 'PASS' and retry:
+            raise ValueError(f'retry of a passed phase is refused: {name}')
         if attempts and attempts[-1]['status'] == 'PASS':
             previous = attempts[-1]
             folder = self.folder / name / str(len(attempts))
