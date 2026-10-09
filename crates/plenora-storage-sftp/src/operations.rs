@@ -4,9 +4,9 @@ use super::{
     AsyncRead, AsyncWrite, AsyncWriteExt, BTreeMap, CONFIG_CONTRACT, CopyRequest, DeleteRequest,
     DeleteResult, ErrorCategory, ErrorPhase, GetRequest, ObjectMetadata, OperationContext,
     PROVIDER_ID, ProviderCapabilities, ProviderConnection, ProviderListRequest, ProviderListResult,
-    PutRequest, RawSftpSession, SftpProvider, StatRequest, StorageError, StorageProvider,
-    StorageResult, TestResult, TransferResult, async_trait, copy_with_control,
-    directory_may_contain, key_matches_prefix, list_limit, map_sftp_error, map_ssh_connect_error,
+    PutRequest, SftpProvider, StatRequest, StorageError, StorageProvider, StorageResult,
+    TestResult, TransferResult, async_trait, copy_with_control, directory_may_contain,
+    key_matches_prefix, list_limit, map_sftp_error, map_ssh_connect_error, open_raw_session,
     parse_config, public_metadata, relative_key, remote_path, scan_directory, transfer_io_error,
     transfer_result, validate_key, validate_prefix,
 };
@@ -128,7 +128,7 @@ impl StorageProvider for SftpProvider {
                         .request_subsystem(true, "sftp")
                         .await
                         .map_err(map_ssh_connect_error)?;
-                    let listing = RawSftpSession::new(channel.into_stream());
+                    let listing = open_raw_session(channel.into_stream(), context.control);
                     listing
                         .init()
                         .await

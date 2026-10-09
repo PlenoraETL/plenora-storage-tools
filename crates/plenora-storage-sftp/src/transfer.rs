@@ -6,8 +6,8 @@ use super::{
     OperationContext, Ordering, PROVIDER_ID, Packet, ProviderListRequest, RawSftpSession,
     RemoteEffect, RetryDisposition, Rfc3339, SftpError, SftpSession, Sha256, StatusCode,
     StorageError, StorageResult, SystemTime, TEMPORARY_NAME_NONCE, TransferResult,
-    configuration_error, list_scan_limit_error, map_sftp_error, transfer_io_error,
-    transfer_limit_error, validate_key,
+    configuration_error, list_scan_limit_error, map_sftp_error, stream_error, transfer_limit_error,
+    validate_key,
 };
 
 pub async fn qualify_atomic_session(session: &RawSftpSession) -> StorageResult<()> {
@@ -228,7 +228,7 @@ where
                     source
                         .read(&mut buffer)
                         .await
-                        .map_err(|_| transfer_io_error(ErrorPhase::Read, mutating))
+                        .map_err(|error| stream_error(&error, ErrorPhase::Read, mutating))
                 },
                 ErrorPhase::Read,
                 mutating,
@@ -249,7 +249,7 @@ where
                     destination
                         .write_all(&buffer[..read])
                         .await
-                        .map_err(|_| transfer_io_error(ErrorPhase::Write, mutating))
+                        .map_err(|error| stream_error(&error, ErrorPhase::Write, mutating))
                 },
                 ErrorPhase::Write,
                 mutating,
