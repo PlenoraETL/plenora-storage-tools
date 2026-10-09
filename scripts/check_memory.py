@@ -18,11 +18,18 @@ RESERVE_BYTES = 2 * GIB
 
 
 def available(meminfo=Path('/proc/meminfo')):
-    """MemAvailable in bytes, as the kernel estimates it for new work."""
-    for line in meminfo.read_text().splitlines():
-        if line.startswith('MemAvailable:'):
-            return int(line.split()[1]) * 1024
-    raise ValueError('MemAvailable is not reported')
+    """MemAvailable in bytes, as the kernel estimates it for new work.
+
+    Exactly one MemAvailable line, a non-negative integer in kB: anything else
+    is refused rather than guessed.
+    """
+    rows = [line.split() for line in meminfo.read_text().splitlines() if line.startswith('MemAvailable:')]
+    if len(rows) != 1:
+        raise ValueError('MemAvailable is missing or repeated')
+    fields = rows[0]
+    if len(fields) != 3 or fields[2] != 'kB' or not fields[1].isdigit():
+        raise ValueError('MemAvailable is not a number of kB')
+    return int(fields[1]) * 1024
 
 
 def inspect(free, peak=GCS_PEAK_BYTES, reserve=RESERVE_BYTES):

@@ -139,32 +139,60 @@ LOCK_HELD, RUNNER_ACTIVE = 75, 76
 
 FIXTURE_STATE = '.fixtures/campaign/fixture-state.json'
 CONTROLLER_OWNER = '.fixtures/controller-owner'
+# Held by the VM runner container for its whole life (run_vm_campaign.py).
+RUNNER_LOCK = '.runner.lock'
+RUNNER_LOCK_MOUNT = '/campaign-runner.lock'
+
+
+class CampaignBusy(Exception):
+    """Another controller, or the runner a controller left behind, holds the
+    VM; nothing was touched. The process exits with LOCK_HELD."""
 
 
 def campaign_lock_command(vm_root, remote_root, nonce):
-    """The VM side of the campaign lock: flock on the dedicated VM root,
-    held by a process that lives as long as the controller's channel.
+    """The VM side of the campaign lock.
 
-    It records the controller's nonce in CONTROLLER_OWNER, which the runner
-    checks, prints `locked` and waits on standard input; when the controller
-    closes the channel or disappears, the process ends and the lock is free.
-    A second controller gets exit code LOCK_HELD at once, touching nothing.
+    Two locks on the dedicated VM root, both with flock:
+
+    - `.campaign.lock`, held by this command's process for as long as the
+      controller's channel is open; a second controller gets LOCK_HELD;
+    - RUNNER_LOCK, held by a VM runner container for its whole life, also
+      after its controller is gone. The command takes it only to record the
+      controller's nonce in CONTROLLER_OWNER, then releases it; while a runner
+      holds it the command exits with LOCK_HELD and writes nothing.
+
+    A runner takes RUNNER_LOCK first and then checks that CONTROLLER_OWNER is
+    its controller's nonce: a runner started late by a controller that has
+    lost the VM finds another nonce and refuses. A controller therefore never
+    uploads or changes anything while any runner lives, and no runner
+    measures for a controller that no longer holds the VM.
     """
     q = shlex.quote
     owner = f'{remote_root}/{CONTROLLER_OWNER}'
-    holder = ('printf "%s\\n" "$1" >"$2.pending" && mv "$2.pending" "$2" && echo locked && exec cat >/dev/null')
-    return (f'mkdir -p {q(vm_root)} {q(remote_root + "/.fixtures")} && '
-            f'exec flock -n -E {LOCK_HELD} {q(vm_root + "/.campaign.lock")} sh -c {q(holder)} lock {q(nonce)} {q(owner)}')
+    record = 'printf "%s\\n" "$1" >"$2.pending" && mv "$2.pending" "$2"'
+    holder = (f'flock -n -E {LOCK_HELD} "$3" sh -c {q(record)} owner "$1" "$2" || exit $?; '
+              'echo locked; exec cat >/dev/null')
+    return (f'mkdir -p {q(vm_root)} {q(remote_root + "/.fixtures")} && touch {q(vm_root + "/" + RUNNER_LOCK)} && '
+            f'exec flock -n -E {LOCK_HELD} {q(vm_root + "/.campaign.lock")} sh -c {q(holder)} lock {q(nonce)} '
+            f'{q(owner)} {q(vm_root + "/" + RUNNER_LOCK)}')
 
 
 @contextmanager
 def campaign_lock(remote, vm_root, remote_root):
-    """Hold the VM campaign lock for the duration of the block; yields the nonce."""
+    """Hold the VM campaign lock for the duration of the block; yields the nonce.
+
+    Raises CampaignBusy when another controller or a surviving runner holds
+    the VM, and RuntimeError when the lock command fails for any other reason.
+    """
     nonce = uuid.uuid4().hex
     channel, first = remote.hold(campaign_lock_command(vm_root, remote_root, nonce))
     try:
         if first != 'locked':
-            raise ValueError('another controller holds the campaign lock of this VM root; nothing was touched')
+            code = channel.recv_exit_status()
+            if code == LOCK_HELD:
+                raise CampaignBusy('another controller, or a VM runner still running, holds this VM root; '
+                                   'nothing was touched')
+            raise RuntimeError(f'the VM campaign lock could not be taken (exit code {code}); nothing was touched')
         yield nonce
     finally:
         channel.close()
@@ -371,15 +399,12 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
 
         assembled = phase('assemble', assemble)
         remote = Remote(config, connect_host=connect_host)
+        lock = None
         try:
             compose = (f'cd {q(remote_root)} && docker compose -p {q(project)} -f docker-compose.yml '
                        '-f compose.extended.yml -f .fixtures/compose.campaign.json')
 
             def prepare(path):
-                with campaign_lock(remote, config['vm_root'], remote_root):
-                    prepare_locked(path)
-
-            def prepare_locked(path):
                 bundle = path / 'source.bundle'
                 logged(['git', 'bundle', 'create', str(bundle), 'HEAD'], path, cwd=ROOT)
                 remote.run('mkdir -p ' + q(remote_root))
@@ -394,7 +419,8 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
                     'volumes': [remote_root + ':/workspace', remote_root + '/.fixtures/runner-target:/workspace/target',
                                 'campaign-registry:/usr/local/cargo/registry',
                                 remote_root + '/.fixtures/baseline:/baseline:ro',
-                                'minio-data:/fixture-disks/minio:ro', 'sftp-data:/fixture-disks/sftp:ro', 'ftp-data:/fixture-disks/ftp:ro']}},
+                                'minio-data:/fixture-disks/minio:ro', 'sftp-data:/fixture-disks/sftp:ro', 'ftp-data:/fixture-disks/ftp:ro',
+                                f"{config['vm_root'].rstrip('/')}/{RUNNER_LOCK}:{RUNNER_LOCK_MOUNT}"]}},
                     'volumes': {'campaign-registry': {'external': True, 'name': config['registry_volume']}}}
                 # Override the target mounts explicitly; the Compose service defines
                 # the same destinations, which Compose replaces by target path.
@@ -406,6 +432,11 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
                 remote.download(remote_root + '/.fixtures/extended/server.crt', path / 'fixture-ca.crt')
                 remote.download(remote_root + '/.fixtures/sftp-fingerprint', path / 'host-pin')
 
+            # One lock covers every phase that uses the VM fixtures: their
+            # preparation, the Windows qualification against them and the VM
+            # attempt up to the end of its runner.
+            lock = campaign_lock(remote, config['vm_root'], remote_root)
+            controller = lock.__enter__()
             prepared = phase('prepare-vm', prepare)
 
             def windows(path):
@@ -418,13 +449,6 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
             windows_result = phase('qualify-windows', windows)
 
             def vm(path):
-                # The lock covers everything this attempt puts on the VM, from
-                # the fixture reset and the distribution to the end of the
-                # runner, which checks that its controller holds it.
-                with campaign_lock(remote, config['vm_root'], remote_root) as controller:
-                    vm_locked(path, controller)
-
-            def vm_locked(path, controller):
                 if connect_host:
                     import hashlib
                     host_key = remote.client.get_transport().get_remote_server_key()
@@ -444,6 +468,7 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
                 command = ['python3', 'scripts/run_vm_campaign.py', f'dist/{version}/{TARGETS["linux"]}',
                            '--baseline-binary', '/baseline/plenora-storage', '--output', '.fixtures/campaign',
                            '--fixture-nonce', nonce, '--controller-nonce', controller,
+                           '--runner-lock', RUNNER_LOCK_MOUNT,
                            '--backend-data', '/fixture-disks/minio', '--backend-data', '/fixture-disks/sftp', '--backend-data', '/fixture-disks/ftp']
                 for name in vm_retries:
                     command.extend(['--retry-phase', name])
@@ -476,6 +501,8 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
                     stream.extractall(path, filter='data')
 
             vm_result = phase('qualify-vm', vm)
+            lock.__exit__(None, None, None)
+            lock = None
 
             def seal(path):
                 release = path / 'dist' / version
@@ -497,7 +524,19 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
             sealed = phase('seal', seal)
             print('Qualified bundle:', sealed / 'qualification-input.tar.gz', flush=True)
         finally:
+            if lock is not None:
+                lock.__exit__(None, None, None)
             remote.client.close()
+
+
+def entrypoint(action):
+    """Run the campaign; a busy VM exits with LOCK_HELD, distinct from a failure."""
+    try:
+        action()
+    except CampaignBusy as busy:
+        print('campaign not started:', busy, file=sys.stderr)
+        return LOCK_HELD
+    return 0
 
 
 if __name__ == '__main__':
@@ -509,4 +548,5 @@ if __name__ == '__main__':
     parser.add_argument('--retry-reason')
     parser.add_argument('--connect-host', help='New TCP address of the same known SSH host, only after Windows qualification passed')
     args = parser.parse_args()
-    run(args.config, args.output, args.retry_phase, args.retry_reason, args.vm_retry_phase, args.connect_host)
+    sys.exit(entrypoint(lambda: run(args.config, args.output, args.retry_phase, args.retry_reason,
+                                    args.vm_retry_phase, args.connect_host)))

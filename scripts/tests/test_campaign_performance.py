@@ -501,53 +501,93 @@ class FixtureScriptBehaviourTests(unittest.TestCase):
             run_vm_campaign.check_fixture_state(self.root / '.fixtures/campaign', 'c' * 32)
 
 
+RUNNER = """import sys
+sys.path.insert(0, sys.argv[1])
+import run_vm_campaign
+with run_vm_campaign.runner_lock(sys.argv[2]):
+    print('running', flush=True)
+    sys.stdin.read()
+"""
+
+
 class CampaignLockTests(unittest.TestCase):
     class Channel:
-        def __init__(self):
-            self.closed = False
+        def __init__(self, code=0):
+            self.closed, self.code = False, code
 
         def close(self):
             self.closed = True
 
-    class Holder:
-        """Hands out the lock to the first holder only, as flock does."""
+        def recv_exit_status(self):
+            return self.code
 
-        def __init__(self):
-            self.held, self.channels = False, []
+    class Holder:
+        """Hands out the lock to the first holder only, as flock does; a
+        refused holder ends with `refusal` as its exit code."""
+
+        def __init__(self, refusal=release_campaign.LOCK_HELD):
+            self.held, self.channels, self.refusal = False, [], refusal
 
         def hold(self, command):
-            channel = CampaignLockTests.Channel()
-            self.channels.append(channel)
             if self.held:
+                channel = CampaignLockTests.Channel(self.refusal)
+                self.channels.append(channel)
                 return channel, ''
             self.held = True
+            channel = CampaignLockTests.Channel()
+            self.channels.append(channel)
             return channel, 'locked'
 
     def test_a_second_controller_is_refused_and_the_first_releases_on_exit(self):
         remote = self.Holder()
         with release_campaign.campaign_lock(remote, '/srv', '/srv/root') as nonce:
             self.assertEqual(len(nonce), 32)
-            with self.assertRaises(ValueError):
+            with self.assertRaises(release_campaign.CampaignBusy):
                 with release_campaign.campaign_lock(remote, '/srv', '/srv/root'):
                     self.fail('second controller acquired the lock')
             self.assertTrue(remote.channels[1].closed)
             self.assertFalse(remote.channels[0].closed)
         self.assertTrue(remote.channels[0].closed)
 
+    def test_only_contention_is_reported_as_busy(self):
+        remote = self.Holder(refusal=1)
+        with release_campaign.campaign_lock(remote, '/srv', '/srv/root'):
+            with self.assertRaises(RuntimeError) as failure:
+                with release_campaign.campaign_lock(remote, '/srv', '/srv/root'):
+                    self.fail('acquired')
+            self.assertNotIsInstance(failure.exception, release_campaign.CampaignBusy)
+
+    def test_a_busy_vm_exits_with_the_lock_code(self):
+        def busy():
+            raise release_campaign.CampaignBusy('held')
+        self.assertEqual(release_campaign.entrypoint(busy), release_campaign.LOCK_HELD)
+        self.assertEqual(release_campaign.entrypoint(lambda: None), 0)
+
+        def broken():
+            raise RuntimeError('lock command failed')
+        with self.assertRaises(RuntimeError):
+            release_campaign.entrypoint(broken)
+
+    def lock(self, root, nonce):
+        import subprocess
+        return subprocess.Popen(['sh', '-c', release_campaign.campaign_lock_command(
+            str(root / 'q'), str(root / 'q/run'), nonce)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+
+    def runner(self, root):
+        import subprocess
+        return subprocess.Popen([sys.executable, '-c', RUNNER, str(ROOT / 'scripts'), str(root / 'q/.runner.lock')],
+                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+
     @unittest.skipUnless(sys.platform != 'win32' and shutil.which('flock'), 'needs flock')
     def test_the_vm_command_admits_one_holder_and_records_its_nonce(self):
-        import subprocess
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            first = subprocess.Popen(['sh', '-c', release_campaign.campaign_lock_command(
-                str(root / 'q'), str(root / 'q/run'), 'first')], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                text=True)
+            first = self.lock(root, 'first')
             try:
                 self.assertEqual(first.stdout.readline().strip(), 'locked')
-                second = subprocess.run(['sh', '-c', release_campaign.campaign_lock_command(
-                    str(root / 'q'), str(root / 'q/run'), 'second')], stdin=subprocess.DEVNULL,
-                    capture_output=True, text=True)
-                self.assertEqual(second.returncode, release_campaign.LOCK_HELD)
+                second = self.lock(root, 'second')
+                second.stdin.close()
+                self.assertEqual(second.wait(10), release_campaign.LOCK_HELD)
                 owner = root / 'q/run/.fixtures/controller-owner'
                 self.assertEqual(owner.read_text().strip(), 'first')
                 run_vm_campaign.check_controller('first', owner)
@@ -556,12 +596,44 @@ class CampaignLockTests(unittest.TestCase):
             finally:
                 first.stdin.close()
                 first.wait(10)
-            third = subprocess.Popen(['sh', '-c', release_campaign.campaign_lock_command(
-                str(root / 'q'), str(root / 'q/run'), 'third')], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                text=True)
+            third = self.lock(root, 'third')
             self.assertEqual(third.stdout.readline().strip(), 'locked')
             third.stdin.close()
             third.wait(10)
+
+    @unittest.skipUnless(sys.platform != 'win32' and shutil.which('flock'), 'needs flock')
+    def test_a_runner_outliving_its_controller_keeps_every_other_controller_out(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            owner = root / 'q/run/.fixtures/controller-owner'
+            controller_a = self.lock(root, 'a')
+            self.assertEqual(controller_a.stdout.readline().strip(), 'locked')
+            runner_a = self.runner(root)
+            try:
+                self.assertEqual(runner_a.stdout.readline().strip(), 'running')
+                run_vm_campaign.check_controller('a', owner)
+                # Controller A dies; its runner goes on.
+                controller_a.stdin.close()
+                controller_a.wait(10)
+                controller_b = self.lock(root, 'b')
+                controller_b.stdin.close()
+                self.assertEqual(controller_b.wait(10), release_campaign.LOCK_HELD)
+                self.assertEqual(owner.read_text().strip(), 'a', 'controller B changed the VM')
+            finally:
+                runner_a.stdin.close()
+                runner_a.wait(10)
+            # Once the runner ends, B takes the VM, and a runner that A starts
+            # late finds B's nonce and refuses to measure.
+            controller_b = self.lock(root, 'b')
+            try:
+                self.assertEqual(controller_b.stdout.readline().strip(), 'locked')
+                self.assertEqual(owner.read_text().strip(), 'b')
+                with run_vm_campaign.runner_lock(root / 'q/.runner.lock'):
+                    with self.assertRaises(ValueError):
+                        run_vm_campaign.check_controller('a', owner)
+            finally:
+                controller_b.stdin.close()
+                controller_b.wait(10)
 
 
 class MemoryTests(unittest.TestCase):
@@ -575,9 +647,13 @@ class MemoryTests(unittest.TestCase):
             meminfo = Path(temporary) / 'meminfo'
             meminfo.write_text('MemTotal: 16000000 kB\nMemAvailable: 1024 kB\n')
             self.assertEqual(check_memory.available(meminfo), 1024 * 1024)
-            meminfo.write_text('MemTotal: 16000000 kB\n')
-            with self.assertRaises(ValueError):
-                check_memory.available(meminfo)
+            for broken in ('MemTotal: 16000000 kB\n', 'MemAvailable: 1024 MB\n', 'MemAvailable: 1024\n',
+                           'MemAvailable: 1024 kB\nMemAvailable: 2048 kB\n', 'MemAvailable: -1 kB\n',
+                           'MemAvailable: x kB\n'):
+                with self.subTest(broken=broken):
+                    meminfo.write_text(broken)
+                    with self.assertRaises(ValueError):
+                        check_memory.available(meminfo)
 
 
 class Server:
@@ -621,10 +697,12 @@ class TlsFtpServer:
     """A minimal explicit-TLS FTP server: AUTH TLS, login, PBSZ/PROT and one
     passive NLST over TLS, enough for a real handshake on both channels."""
 
-    def __init__(self, certificate, key):
+    def __init__(self, certificate, key, data=None):
         import ssl
         self.context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         self.context.load_cert_chain(certificate, key)
+        self.data_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        self.data_context.load_cert_chain(*(data or (certificate, key)))
         self.listener = socket.create_server(('127.0.0.1', 0))
         self.port = self.listener.getsockname()[1]
         threading.Thread(target=self.serve, daemon=True).start()
@@ -674,7 +752,7 @@ class TlsFtpServer:
             elif command == 'NLST':
                 data, _ = data_listener.accept()
                 send('150 listing')
-                data = self.context.wrap_socket(data, server_side=True)
+                data = self.data_context.wrap_socket(data, server_side=True)
                 data.sendall(b'file\r\n')
                 data.unwrap().close()
                 send('226 done')
@@ -711,9 +789,9 @@ class FtpsHandshakeTests(unittest.TestCase):
     def tearDown(self):
         self.folder.cleanup()
 
-    def probe(self, served, ca, name):
+    def probe(self, served, ca, name, data=None):
         import check_fixtures
-        server = TlsFtpServer(*served)
+        server = TlsFtpServer(*served, data=data)
         try:
             check_fixtures.ftp_list('127.0.0.1', server.port, 'user', 'secret', tls_ca=ca, tls_name=name)
         finally:
@@ -726,6 +804,11 @@ class FtpsHandshakeTests(unittest.TestCase):
         import check_fixtures
         with self.assertRaises(check_fixtures.ProbeFailure):
             self.probe(self.stranger, self.trusted[0], 'fixture.invalid')
+
+    def test_a_wrong_certificate_on_the_data_channel_alone_fails(self):
+        import check_fixtures
+        with self.assertRaises(check_fixtures.ProbeFailure):
+            self.probe(self.trusted, self.trusted[0], 'fixture.invalid', data=self.stranger)
 
     def test_a_certificate_for_another_name_fails(self):
         import check_fixtures

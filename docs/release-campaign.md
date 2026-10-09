@@ -133,16 +133,38 @@ prodotto confronti rossi che un A/B alternato smentiva.
 
 ### Lock di campagna sulla VM
 
-Un solo controller alla volta lavora su una radice VM (`vm_root`). All'inizio
-di `prepare-vm` e di ogni tentativo `qualify-vm`, prima di caricare bundle,
-binari, override o distribuzioni, il controller acquisisce con `flock` il lock
-`<vm_root>/.campaign.lock`. Lo tiene un processo sulla VM legato al canale SSH
-del controller, fino alla fine del runner: se il controller termina o perde la
-connessione, il processo finisce e il lock si libera. Un secondo controller
-fallisce subito, senza toccare nulla. Il titolare registra il suo nonce in
-`.fixtures/controller-owner`; il runner, nel suo container, verifica che sia il
-nonce del controller che l'ha avviato (`--controller-nonce`) e altrimenti si
-ferma senza misurare.
+Un solo controller alla volta lavora su una radice VM (`vm_root`), e mai mentre
+un runner è vivo. I lock sono due, entrambi `flock` sulla radice:
+
+- `.campaign.lock`: il controller lo acquisisce prima di `prepare-vm`, cioè
+  prima di caricare bundle, binari, override o distribuzioni, e lo tiene per
+  tutte le fasi che usano le fixture della VM: preparazione, qualifica Windows
+  e tentativo `qualify-vm` fino alla fine del runner. Lo tiene un processo
+  sulla VM legato al canale SSH del controller;
+- `.runner.lock`: il runner, nel suo container, lo tiene per tutta la vita,
+  anche dopo la morte del suo controller. Il controller lo prende solo per un
+  istante, per registrare il proprio nonce in `.fixtures/controller-owner`, e
+  lo rilascia subito.
+
+Se un altro controller o un runner superstite tiene uno dei due lock, il
+controller si ferma prima di toccare qualsiasi cosa e il processo esce con il
+codice 75, distinto da un errore; un fallimento del comando di lock per altri
+motivi è riportato come tale. Il runner prende `.runner.lock` e poi verifica
+che `controller-owner` sia il nonce del controller che l'ha avviato
+(`--controller-nonce`): un runner avviato in ritardo da un controller che ha
+perso la VM trova un altro nonce e si ferma senza misurare. Finché un runner
+vive nessun controller può scrivere un nuovo owner, quindi il controllo
+all'ingresso basta per tutta la misura.
+
+Limite dichiarato: il lock del controller si libera quando sulla VM il canale
+SSH si chiude. Se il controller termina, la connessione si chiude subito; in
+una partizione di rete il controller smette di lavorare, ma il server SSH della
+VM se ne accorge solo con i propri keepalive (`TCPKeepAlive`, e
+`ClientAliveInterval` se configurato): fino ad allora il lock resta tenuto e un
+altro controller viene rifiutato. È il verso sicuro, perché due controller non
+possono mai lavorare insieme; per liberarlo prima occorre verificare che il
+controller non sia più attivo e terminare il processo `flock` che tiene
+`.campaign.lock`.
 
 ### Fixture ricreate prima del runner
 
@@ -181,8 +203,9 @@ con quel codice. In ordine:
 
 Prima di modificare qualsiasi fixture, ogni preparazione scrive in
 `fixture-state.json` il proprio nonce con stato `in-progress`: una preparazione
-che si ferma in qualunque punto invalida quindi sempre la ricevuta precedente,
-e nessun runner la accetta. Prima di ricreare, il reset controlla anche la
+che si ferma dopo questo punto invalida la ricevuta precedente, e nessun runner
+la accetta. Le uscite precedenti al marcatore (lock occupato, runner ancora in
+esecuzione) non toccano le fixture e lasciano valida la ricevuta precedente. Prima di ricreare, il reset controlla anche la
 memoria disponibile (`scripts/check_memory.py`): il fixture GCS in memoria
 tiene sorgente e copia del trasferimento spooled da 1 GiB, un picco di circa
 2 GiB, e serve una riserva di altri 2 GiB per le altre fixture e il runner. Lo

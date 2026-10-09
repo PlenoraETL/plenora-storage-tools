@@ -1,5 +1,6 @@
 """Qualify exact Linux distributions with resumable, separately recorded attempts."""
 import argparse
+from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
@@ -65,6 +66,28 @@ def check_fixture_state(output, nonce):
                          'nothing was measured')
 
 
+@contextmanager
+def runner_lock(path):
+    """Hold the VM runner lock for the runner's whole life.
+
+    The controllers' lock command needs this lock to record a new owner, so
+    while this runner lives no controller takes the VM, even after this
+    runner's own controller is gone; it is checked once, at entry, together
+    with the owner (check_controller), and holding it makes later checks
+    unnecessary.
+    """
+    import fcntl
+    with open(path, 'a+b') as lock:
+        try:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            raise ValueError('another VM campaign runner holds this VM; nothing was measured') from None
+        try:
+            yield
+        finally:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+
 def check_controller(nonce, owner=None):
     """The controller that started this runner still holds the VM campaign lock."""
     owner = owner or ROOT / '.fixtures/controller-owner'
@@ -76,7 +99,13 @@ def check_controller(nonce, owner=None):
         raise ValueError('the VM campaign lock is not held by the controller of this runner; nothing was measured')
 
 
-def run(folder, baseline, output, retries, reason, backend_data, fixture_nonce, controller_nonce):
+def run(folder, baseline, output, retries, reason, backend_data, fixture_nonce, controller_nonce, lock_path):
+    with runner_lock(lock_path):
+        check_controller(controller_nonce)
+        measure(folder, baseline, output, retries, reason, backend_data, fixture_nonce)
+
+
+def measure(folder, baseline, output, retries, reason, backend_data, fixture_nonce):
     if sys.platform != 'linux':
         raise ValueError('VM campaign requires Linux')
     folder, baseline, output = folder.resolve(), baseline.resolve(), output.resolve()
@@ -93,7 +122,6 @@ def run(folder, baseline, output, retries, reason, backend_data, fixture_nonce, 
               **{f'backend-{index}': path for index, path in enumerate(backend_data)}}
     subject['space_locations'] = {label: str(path.resolve()) for label, path in spaces.items()}
     with exclusive(output):
-        check_controller(controller_nonce)
         check_fixture_state(output, fixture_nonce)
         campaign = Campaign(output, subject)
         campaign.validate_retries(retries, phases_for(subject['version']))
@@ -193,6 +221,8 @@ if __name__ == '__main__':
                         help='nonce of the fixture reset of this attempt, checked before measuring')
     parser.add_argument('--controller-nonce', required=True,
                         help='nonce of the controller holding the VM campaign lock, checked before measuring')
+    parser.add_argument('--runner-lock', required=True, type=Path,
+                        help='VM runner lock file, held for the whole run')
     args = parser.parse_args()
     run(args.distribution, args.baseline_binary, args.output, args.retry_phase, args.retry_reason, args.backend_data,
-        args.fixture_nonce, args.controller_nonce)
+        args.fixture_nonce, args.controller_nonce, args.runner_lock)
