@@ -7,7 +7,12 @@
     "maximum": 10
   },
   "minimum_timing_budget_seconds": {
-    "median": 0.010,
-    "p95": 0.020
+    "median": 0.01,
+    "p95": 0.02
+  },
+  "stability_allowance": {
+    "median_percent": 5,
+    "minimum_seconds": 0.01,
+    "rationale": "Half of the median budget, with the same 10 ms floor as the comparison. On the accepted 2.1.0 campaign, a quiet host, a 5 ms floor flagged azure copy (5.45 ms between halves) as unreliable; with 10 ms the accepted campaign gives no alarm. Still caught: drifts of 10 ms or more on short operations (smb copy -10.6 ms, webdav copy -10.3 ms in the 3.0.0 runs) and of more than 5 % on long ones (ftp and ftps -5/-7 % in the 3.0.0 run, ftp +6/+26 % in the failed 2.1.0 VM run). Not caught: shifts under 10 ms on operations shorter than 200 ms, such as the +25/+32 % (5-7 ms) of azure and smb in that failed run."
   }
 }

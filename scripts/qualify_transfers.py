@@ -19,6 +19,7 @@ import tempfile
 import uuid
 
 from fixture_connections import ATOMIC, BUFFERED, PROVIDERS, ROOT, fixture
+from performance_order import SCHEME as PAIRED_ORDER, paired_order
 
 
 class OperationFailure(AssertionError):
@@ -165,6 +166,18 @@ def roundtrip(binary, provider, source, source_hash, size, root, timeout, rss_li
     return {'provider': provider, 'mode': mode, 'payload_bytes': size, 'status': 'PASS', 'measurements': measures}
 
 
+def new_report(binary, args):
+    return {'schema_version': 1, 'binary_sha256': digest(binary), 'platform': sys.platform,
+            'campaign_id': str(uuid.uuid4()), 'started_utc': datetime.now(timezone.utc).isoformat(),
+            'environment': measurement_environment(),
+            'source_revision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
+            'dirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()),
+            'memory_measurement': 'Linux RUSAGE_CHILDREN per fresh wrapper; includes process startup',
+            'payload_bytes': args.bytes, 'workers': args.workers, 'rounds': args.rounds,
+            'spool_uploads': args.spool_uploads,
+            'rss_limit_bytes': args.rss_limit_mib * 1024**2, 'status': 'RUNNING', 'results': []}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--bytes', type=int, default=1024**3)
@@ -175,24 +188,37 @@ def main():
     parser.add_argument('--timeout', type=float, default=600)
     parser.add_argument('--rss-limit-mib', type=int, default=256)
     parser.add_argument('--output', type=Path, default=ROOT / 'target/release-readiness/large-transfers.json')
+    parser.add_argument('--baseline-binary', type=Path,
+                        help='measure this binary too, alternated with the candidate slot by slot')
+    parser.add_argument('--baseline-output', type=Path, help='report of the baseline binary in a paired run')
     args = parser.parse_args()
     providers = args.providers.split(',')
     if sys.platform != 'linux' or not set(providers) <= set(PROVIDERS) or min(args.bytes, args.workers, args.rounds, args.timeout, args.rss_limit_mib) <= 0:
         parser.error('requires Linux, known fixture providers and positive resource limits')
-    binary = Path(os.environ.get('PLENORA_CLI_BIN', ROOT / 'target/release/plenora-storage')).resolve()
-    report = {'schema_version': 1, 'binary_sha256': digest(binary), 'platform': sys.platform,
-              'campaign_id': str(uuid.uuid4()), 'started_utc': datetime.now(timezone.utc).isoformat(),
-              'environment': measurement_environment(),
-              'source_revision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
-              'dirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()),
-              'memory_measurement': 'Linux RUSAGE_CHILDREN per fresh wrapper; includes process startup',
-              'payload_bytes': args.bytes, 'workers': args.workers, 'rounds': args.rounds,
-              'spool_uploads': args.spool_uploads,
-              'rss_limit_bytes': args.rss_limit_mib * 1024**2, 'status': 'RUNNING', 'results': []}
-    args.output.parent.mkdir(parents=True, exist_ok=True)
+    if (args.baseline_binary is None) != (args.baseline_output is None):
+        parser.error('a paired run needs both --baseline-binary and --baseline-output')
+    if args.baseline_binary is not None and args.rounds % 4:
+        parser.error('a paired run needs a multiple of four rounds, so every provider runs first equally often')
+    binaries = {'candidate': Path(os.environ.get('PLENORA_CLI_BIN', ROOT / 'target/release/plenora-storage')).resolve()}
+    outputs = {'candidate': args.output}
+    if args.baseline_binary is not None:
+        binaries['baseline'] = args.baseline_binary.resolve()
+        outputs['baseline'] = args.baseline_output
+    reports = {name: new_report(binary, args) for name, binary in binaries.items()}
+    order = None
+    if len(binaries) == 2:
+        order = paired_order(args.rounds, providers)
+        for name, report in reports.items():
+            other = 'baseline' if name == 'candidate' else 'candidate'
+            report['paired_measurement'] = {'role': name, 'order_scheme': PAIRED_ORDER,
+                                            'partner_campaign_id': reports[other]['campaign_id'],
+                                            'order': order}
+    for path in outputs.values():
+        path.parent.mkdir(parents=True, exist_ok=True)
 
     def save():
-        args.output.write_text(json.dumps(report, indent=2) + '\n')
+        for name, report in reports.items():
+            outputs[name].write_text(json.dumps(report, indent=2) + '\n')
 
     save()
     try:
@@ -201,25 +227,36 @@ def main():
             (root / 'storage').mkdir()
             source = root / 'payload'
             source_hash = payload(source, args.bytes)
-            report['payload_sha256'] = source_hash
+            for report in reports.values():
+                report['payload_sha256'] = source_hash
+            slots = iter(order or [])
             with ThreadPoolExecutor(max_workers=args.workers) as pool:
                 for iteration in range(args.rounds):
                     for provider in providers:
-                        # A new shared directory makes the mkdir race repeatable
-                        # across concurrent writers, even on reused fixtures.
-                        shared_parent = 'qualification/large-' + uuid.uuid4().hex
-                        tasks = [pool.submit(roundtrip, binary, provider, source, source_hash, args.bytes,
-                                             root, args.timeout, report['rss_limit_bytes'], 64 * 1024**2, shared_parent, args.spool_uploads)
-                                 for _ in range(args.workers)]
-                        for task in tasks:
-                            result = task.result()
-                            result['round'] = iteration
-                            report['results'].append(result)
-                            save()
-                        print(f'PASS {provider}: {args.workers} workers, round {iteration + 1}', flush=True)
-        report['status'] = 'PASS'
+                        if order is None:
+                            sequence = ['candidate']
+                        else:
+                            first = next(slots)['first']
+                            sequence = [first, 'baseline' if first == 'candidate' else 'candidate']
+                        for name in sequence:
+                            # A new shared directory makes the mkdir race repeatable
+                            # across concurrent writers, even on reused fixtures.
+                            shared_parent = 'qualification/large-' + uuid.uuid4().hex
+                            tasks = [pool.submit(roundtrip, binaries[name], provider, source, source_hash, args.bytes,
+                                                 root, args.timeout, reports[name]['rss_limit_bytes'], 64 * 1024**2,
+                                                 shared_parent, args.spool_uploads)
+                                     for _ in range(args.workers)]
+                            for task in tasks:
+                                result = task.result()
+                                result['round'] = iteration
+                                reports[name]['results'].append(result)
+                                save()
+                            print(f'PASS {provider} ({name}): {args.workers} workers, round {iteration + 1}', flush=True)
+        for report in reports.values():
+            report['status'] = 'PASS'
     except BaseException:
-        report['status'] = 'FAIL'
+        for report in reports.values():
+            report['status'] = 'FAIL'
         raise
     finally:
         save()

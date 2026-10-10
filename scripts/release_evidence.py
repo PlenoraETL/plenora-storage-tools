@@ -56,8 +56,11 @@ def clean_source(report, revision, revision_key='source_revision', dirty_key='di
             'evidence must describe the final clean source revision')
 
 
-def validate_transfers(report, binary, *, size, workers, rounds, spool_uploads=False):
+def validate_transfers(report, binary, *, size, workers, rounds, spool_uploads=False, paired_allowed=False):
     require(report.get('spool_uploads', False) is spool_uploads, 'transfer upload strategy differs')
+    # Pairing is validated with both performance reports (performance_order);
+    # any other transfer report must not carry it.
+    require(paired_allowed or 'paired_measurement' not in report, 'transfer report declares an unexpected pairing')
     require(report['status'] == 'PASS' and report['binary_sha256'] == binary,
             'transfer evidence failed or describes another binary')
     require(report['platform'] == 'linux' and report['payload_bytes'] == size
@@ -86,6 +89,13 @@ def validate_transfers(report, binary, *, size, workers, rounds, spool_uploads=F
             require(measure['status'] == 'PASS'
                     and 0 < measure['peak_rss_bytes'] <= report['rss_limit_bytes']
                     and measure['elapsed_seconds'] > 0, 'invalid transfer measurement')
+
+
+def require_paired_performance(version_core, baseline, candidate):
+    """From 3.0.0 performance evidence comes from one alternated run."""
+    if version_core >= (3, 0, 0):
+        require('paired_measurement' in baseline and 'paired_measurement' in candidate,
+                'performance evidence must come from a paired alternated run')
 
 
 def validate_soak(report, wheel, version, minimum_seconds=SOAK_DURATION_SECONDS, *, both_upload_modes=False):
@@ -231,6 +241,7 @@ already checked by verify_release.py. No caller-supplied waiver is accepted.
     evidence.read('performance/candidate.json', performance['candidate_sha256'])
     clean_source(candidate, revision)
     performance_policy = json.loads((ROOT / 'scripts/performance-policy.json').read_text())
+    require_paired_performance(version_core, baseline, candidate)
     actual = compare(baseline, candidate, linux['binary_sha256'], performance_policy)
     require(actual['status'] == 'PASS' and all(performance[key] == value for key, value in actual.items()),
             'performance report differs or budget failed')

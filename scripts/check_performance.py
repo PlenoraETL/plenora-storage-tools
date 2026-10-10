@@ -5,10 +5,13 @@ import hashlib
 import json
 import math
 from pathlib import Path
+import sys
 from statistics import median
 from uuid import UUID
 
 ROOT = Path(__file__).resolve().parents[1]
+# Exit code of an unreliable measurement, distinct from a regression (1).
+UNRELIABLE_EXIT = 3
 
 
 def compare(baseline, candidate, binary, policy):
@@ -17,7 +20,7 @@ def compare(baseline, candidate, binary, policy):
     for report in (baseline, candidate):
         require(str(UUID(report['campaign_id'])) == report['campaign_id'], 'invalid performance campaign identity')
         validate_transfers(report, report['binary_sha256'], size=1024**2, workers=4,
-                           rounds=policy['minimum_rounds'])
+                           rounds=policy['minimum_rounds'], paired_allowed=True)
         require(report['dirty'] is False and len(report['source_revision']) == 40,
                 'performance campaigns require clean identified source')
     require(candidate['binary_sha256'] == binary, 'performance used another candidate binary')
@@ -27,6 +30,12 @@ def compare(baseline, candidate, binary, policy):
     require(set(candidate['environment']) == {'machine', 'kernel', 'cpu_count', 'cpu_model', 'fixture_sha256'},
             'performance environment is incomplete')
     require(baseline['rounds'] == candidate['rounds'], 'performance sample counts differ')
+    # A paired run measures both binaries alternately; its two reports must
+    # name each other and record the ABBA order of their rounds and providers.
+    # Reports without the field, as earlier campaigns produced, compare as before.
+    from fixture_connections import PROVIDERS
+    from performance_order import validate_pairing
+    paired = validate_pairing(baseline, candidate, PROVIDERS)
 
     def samples(report):
         result = defaultdict(list)
@@ -59,8 +68,47 @@ def compare(baseline, candidate, binary, policy):
                                 baseline=previous, candidate=current, regression_percent=delta,
                                 allowed_maximum=allowed,
                                 status='PASS' if current <= allowed else 'FAIL'))
-    return {'status': 'PASS' if all(r['status'] == 'PASS' for r in results) else 'FAIL',
-            'binary_sha256': binary, 'policy': policy, 'results': results}
+    status = 'PASS' if all(r['status'] == 'PASS' for r in results) else 'FAIL'
+    comparison = {'status': status, 'binary_sha256': binary, 'policy': policy, 'results': results}
+    if paired:
+        stability = [row for report, role in ((baseline, 'baseline'), (candidate, 'candidate'))
+                     for row in stability_checks(report, role, policy)]
+        comparison['stability'] = stability
+        if any(row['status'] != 'STABLE' for row in stability):
+            # Not a verdict on the candidate: the environment changed during
+            # the measurement, so neither PASS nor a regression can be read.
+            comparison['status'] = UNRELIABLE
+    return comparison
+
+
+UNRELIABLE = 'UNRELIABLE'
+
+
+def stability_checks(report, role, policy):
+    """Median elapsed time of each provider and operation in the first and in
+    the second half of the rounds, for one binary of a paired run.
+
+    The allowance is `stability_allowance` of the policy: half of the median
+    budget (5 %) with the comparison's own 10 ms floor. A binary that moves
+    more than that against itself during the run means the environment moved,
+    and ABBA balances a drift but not a jump between the two runs of a pair.
+    The policy file records why the floor is 10 ms and not 5 ms.
+    """
+    halves = defaultdict(lambda: ([], []))
+    middle = report['rounds'] / 2
+    for row in report['results']:
+        for measure in row['measurements']:
+            halves[(row['provider'], measure['operation'])][row['round'] >= middle].append(measure['elapsed_seconds'])
+    percent = policy['stability_allowance']['median_percent']
+    floor = policy['stability_allowance']['minimum_seconds']
+    checks = []
+    for (provider, operation), (first, second) in sorted(halves.items()):
+        early, late = median(first), median(second)
+        allowance = max(early * percent / 100, floor)
+        checks.append({'role': role, 'provider': provider, 'operation': operation, 'first_half': early,
+                       'second_half': late, 'allowance': allowance,
+                       'status': 'STABLE' if abs(late - early) <= allowance else 'UNSTABLE'})
+    return checks
 
 
 def main():
@@ -80,6 +128,10 @@ def main():
         report['candidate_sha256'] = hashlib.sha256(args.candidate.read_bytes()).hexdigest()
     finally:
         args.output.write_text(json.dumps(report, indent=2, allow_nan=False) + '\n', encoding='utf-8')
+    if report['status'] == UNRELIABLE:
+        print('performance measurement unreliable: a binary changed against itself between the first and the '
+              'second half of the run; repeat the campaign on a stable host', file=sys.stderr)
+        raise SystemExit(UNRELIABLE_EXIT)
     if report['status'] != 'PASS':
         raise SystemExit('performance regression budget exceeded')
 
