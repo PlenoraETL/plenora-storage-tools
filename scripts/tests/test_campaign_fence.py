@@ -529,33 +529,166 @@ class InputTests(unittest.TestCase):
                 run_vm_campaign.fenced_phase(campaign, fence, 'performance-ab', measured)
             self.assertEqual(campaign.state['phases']['performance-ab'][-1]['status'], 'FAIL')
 
-    def test_the_controller_seals_only_evidence_of_its_own_binaries(self):
-        folder = Path(self.temporary.name)
-        linux = folder / 'linux'
-        linux.mkdir()
-        (linux / 'plenora-storage').write_text('candidate')
-        (linux / 'release-manifest.json').write_text(json.dumps({'artifacts': [{'name': 'plenora-storage'}]}))
-        identity = {'revision': 'r' * 40, 'baseline_sha256': 'b' * 64}
-        candidate = digest(linux / 'plenora-storage')
+    def test_measured_bytes_come_from_private_copies(self):
+        with tempfile.TemporaryDirectory() as root:
+            folder = self.inputs / 'dist/3.0.0/x'
+            private, candidate, baseline, copies = run_vm_campaign.private_inputs(
+                folder, self.baseline, self.inputs, self.expected, root=Path(root))
+            self.assertEqual(set(copies), {'baseline/plenora-storage', 'dist/3.0.0/x/plenora-storage'})
+            self.assertTrue(private.is_relative_to(Path(root)))
+            # Replaced on the host during a measurement, then restored.
+            self.baseline.write_text('swapped')
+            (folder / 'plenora-storage').write_text('swapped')
+            self.assertEqual((baseline.read_text(), (candidate / 'plenora-storage').read_text()), ('old', 'new'))
+            run_vm_campaign.check_private(copies, self.expected)
+            self.baseline.write_text('old')
+            (folder / 'plenora-storage').write_text('new')
+            # A change that reaches a private copy is detected at the next fence.
+            baseline.write_text('changed')
+            with self.assertRaises(ValueError):
+                run_vm_campaign.check_private(copies, self.expected)
 
-        def selected(baseline_sha, inputs, report_baseline):
-            result = folder / 'result'
-            shutil.rmtree(result, ignore_errors=True)
-            performance = result / 'selected/gates/performance'
-            performance.mkdir(parents=True)
-            (performance / 'baseline.json').write_text(json.dumps({'binary_sha256': report_baseline}))
-            (performance / 'candidate.json').write_text(json.dumps({'binary_sha256': candidate}))
-            (result / 'selected/report.json').write_text(json.dumps({
-                'status': 'PASS', 'inputs': inputs,
-                'identity': {'source_revision': 'r' * 40, 'baseline_binary_sha256': baseline_sha,
-                             'artifacts': {'plenora-storage': candidate}}}))
-            return result
+    @unittest.skipIf(sys.platform == 'win32', 'the runner holds a flock')
+    def test_the_runner_measures_the_private_copies_and_removes_them(self):
+        campaign_dir = Path(self.temporary.name) / '.campaign'
+        campaign_dir.mkdir()
+        (campaign_dir / 'lock').write_text('')
+        (campaign_dir / 'epoch').write_text(EPOCH + '\n')
+        seen = {}
 
-        release_campaign.check_selected(selected('b' * 64, self.expected, 'b' * 64), identity, linux, self.expected)
-        for arguments in (('c' * 64, self.expected, 'b' * 64), ('b' * 64, {}, 'b' * 64),
-                          ('b' * 64, self.expected, 'c' * 64)):
-            with self.subTest(arguments=arguments), self.assertRaises(ValueError):
-                release_campaign.check_selected(selected(*arguments), identity, linux, self.expected)
+        def measure(folder, baseline, private, *arguments):
+            fence = arguments[-3]
+            seen.update(folder=folder, baseline=baseline, private=private)
+            self.assertEqual((folder / 'plenora-storage').read_text(), 'new')
+            self.baseline.write_text('swapped on the host')
+            self.assertEqual(baseline.read_text(), 'old')
+            with self.assertRaises(ValueError):
+                fence()
+            self.baseline.write_text('old')
+            fence()
+        with patch.object(run_vm_campaign, 'measure', measure):
+            run_vm_campaign.run(self.inputs / 'dist/3.0.0/x', self.baseline, Path(self.temporary.name) / 'out', [],
+                                None, [], 'n0nce', campaign_dir, EPOCH, self.inputs, self.expected)
+        self.assertTrue(seen['folder'].is_relative_to(seen['private']))
+        self.assertTrue(seen['baseline'].is_relative_to(seen['private']))
+        self.assertFalse(seen['private'].is_relative_to(self.inputs))
+        self.assertFalse(seen['private'].exists())
+
+    def test_inputs_already_replaced_when_copied_stop_the_run(self):
+        self.baseline.write_text('swapped before the copy')
+        with tempfile.TemporaryDirectory() as root, self.assertRaises(ValueError):
+            run_vm_campaign.private_inputs(self.inputs / 'dist/3.0.0/x', self.baseline, self.inputs, self.expected,
+                                           root=Path(root))
+
+    def test_selected_evidence_must_be_what_its_phase_recorded(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            campaign = Campaign(output / 'ledger', {'subject': 'same'})
+            folder = campaign.phase('soak', lambda path: (path / 'report.json').write_text('measured'))
+            sources = {'gates/soak/report.json': (folder, folder / 'report.json')}
+            files = run_vm_campaign.select_evidence(campaign, output / 'first', sources)
+            self.assertEqual(files, {'gates/soak/report.json': digest(folder / 'report.json')})
+            (folder / 'report.json').write_text('rewritten after the phase passed')
+            with self.assertRaises(ValueError):
+                run_vm_campaign.select_evidence(campaign, output / 'second', sources)
+            with self.assertRaises(ValueError):
+                run_vm_campaign.select_evidence(campaign, output / 'third',
+                                                {'gates/x.json': (folder, folder / 'unrecorded.json')})
+
+
+class SelectedEvidenceTests(unittest.TestCase):
+    """The controller seals only the inventoried evidence of this attempt, of its own binaries."""
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.folder = Path(self.temporary.name)
+        self.linux = self.folder / 'linux'
+        self.linux.mkdir()
+        (self.linux / 'plenora-storage').write_text('candidate')
+        self.candidate = digest(self.linux / 'plenora-storage')
+        (self.linux / 'release-manifest.json').write_text(json.dumps(
+            {'artifacts': [{'name': 'plenora-storage', 'sha256': self.candidate}]}))
+        self.identity = {'revision': 'r' * 40, 'baseline_sha256': 'b' * 64}
+        self.expected = {'baseline/plenora-storage': 'b' * 64}
+
+    def tearDown(self):
+        self.temporary.cleanup()
+
+    def result(self, *, epoch=EPOCH, nonce='n0nce', baseline_sha='b' * 64, inputs=None, report_baseline='b' * 64,
+               ledger_epoch=EPOCH):
+        """A downloaded attempt: selected evidence, its report and the runner ledger."""
+        result = self.folder / 'result'
+        shutil.rmtree(result, ignore_errors=True)
+        selected = result / 'selected'
+        for name, value in (('gates/performance/baseline.json', {'binary_sha256': report_baseline}),
+                            ('gates/performance/candidate.json', {'binary_sha256': self.candidate}),
+                            ('linux-qualification/qualification.json', {'status': 'PASS'})):
+            (selected / name).parent.mkdir(parents=True, exist_ok=True)
+            (selected / name).write_text(json.dumps(value))
+        files = {path.relative_to(selected).as_posix(): digest(path)
+                 for path in sorted(selected.rglob('*')) if path.is_file()}
+        (selected / 'report.json').write_text(json.dumps({
+            'status': 'PASS', 'inputs': self.expected if inputs is None else inputs, 'epoch': epoch,
+            'fixture_nonce': nonce, 'files': files,
+            'identity': {'source_revision': 'r' * 40, 'baseline_binary_sha256': baseline_sha,
+                         'artifacts': {'plenora-storage': self.candidate}}}))
+        (result / 'vm-campaign.json').write_text(json.dumps(
+            {'selected': {'report_sha256': digest(selected / 'report.json'), 'epoch': ledger_epoch}}))
+        return result
+
+    def check(self, result):
+        release_campaign.check_selected(result, self.identity, self.linux, self.expected,
+                                        result / 'vm-campaign.json', EPOCH, 'n0nce')
+
+    def test_only_this_attempts_complete_evidence_of_its_binaries_passes(self):
+        self.check(self.result())
+        older = '6-' + '1' * 32
+        for options in ({'baseline_sha': 'c' * 64}, {'inputs': {}}, {'report_baseline': 'c' * 64},
+                        {'epoch': older, 'ledger_epoch': older}, {'nonce': 'other'}):
+            with self.subTest(options=options), self.assertRaises(ValueError):
+                self.check(self.result(**options))
+
+    def test_an_earlier_valid_report_in_place_of_this_one_is_refused(self):
+        older = '6-' + '1' * 32
+        historical = self.result(epoch=older, ledger_epoch=older)
+        report = (historical / 'selected/report.json').read_bytes()
+        current = self.result()
+        (current / 'selected/report.json').write_bytes(report)
+        with self.assertRaises(ValueError):
+            self.check(current)
+
+    def test_a_report_other_than_the_one_in_the_ledger_is_refused(self):
+        # Same epoch, nonce and files, otherwise valid: still not the report
+        # whose digest the runner recorded in its ledger.
+        result = self.result()
+        path = result / 'selected/report.json'
+        path.write_text(json.dumps({**json.loads(path.read_text()), 'note': 'written later'}))
+        with self.assertRaises(ValueError):
+            self.check(result)
+
+    def test_a_file_more_less_or_changed_is_refused(self):
+        def extra(selected):
+            (selected / 'gates/extra.json').write_text('{}')
+
+        def missing(selected):
+            (selected / 'linux-qualification/qualification.json').unlink()
+
+        def changed(selected):
+            (selected / 'linux-qualification/qualification.json').write_text('{"status": "FAIL"}')
+        for change in (extra, missing, changed):
+            with self.subTest(change=change.__name__):
+                result = self.result()
+                change(result / 'selected')
+                with self.assertRaises(ValueError):
+                    self.check(result)
+
+    def test_a_distribution_differing_from_its_verified_manifest_is_not_sealed(self):
+        copy = self.folder / 'copy'
+        shutil.copytree(self.linux, copy)
+        release_campaign.check_distribution(copy, self.linux)
+        (copy / 'plenora-storage').write_text('replaced')
+        with self.assertRaises(ValueError):
+            release_campaign.check_distribution(copy, self.linux)
 
 
 STUB_DOCKER = """#!/usr/bin/env bash

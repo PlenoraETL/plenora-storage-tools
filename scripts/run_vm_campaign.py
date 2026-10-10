@@ -6,6 +6,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tempfile
 import venv
 
 from campaign_fence import held
@@ -17,6 +18,9 @@ from performance_order import SCHEME
 from versioning import parse_version
 
 ROOT = Path(__file__).resolve().parents[1]
+# The container's own filesystem: no host directory is mounted there, so
+# only Docker or root in the container can change what the runner keeps in it.
+PRIVATE_ROOT = Path('/tmp')
 TARGET = 'x86_64-unknown-linux-gnu'
 PERFORMANCE_ORDER = SCHEME
 # A multiple of four, so ABBA gives every provider the same number of first
@@ -85,6 +89,77 @@ def check_inputs(inputs, expected, baseline):
         raise ValueError('campaign inputs differ from the ones the controller uploaded; nothing is recorded')
 
 
+def private_inputs(folder, baseline, inputs, expected, root=PRIVATE_ROOT):
+    """Copy the candidate distribution and the baseline into a directory of
+    this container that no host directory reaches, and check every copy
+    against the digest the controller expects.
+
+    Returns the private directory, the candidate folder, the baseline binary
+    and the copies by input name. Every measurement uses only these copies:
+    a file replaced on the host and restored during a phase never reaches a
+    measured byte. A copy that differs from the expected digest, because the
+    host file had already changed, stops the run.
+    """
+    folder, inputs = Path(folder).resolve(), Path(inputs).resolve()
+    prefix = folder.relative_to(inputs).as_posix() + '/'
+    private = Path(tempfile.mkdtemp(prefix='plenora-campaign-', dir=root))
+    candidate, baseline_copy = private / 'candidate', private / 'baseline' / 'plenora-storage'
+    candidate.mkdir()
+    baseline_copy.parent.mkdir()
+    copies = {}
+    for name in sorted(expected):
+        if not name.startswith(prefix):
+            continue
+        relative = name[len(prefix):]
+        if '/' in relative:
+            raise ValueError('the candidate distribution must be a flat directory')
+        shutil.copyfile(folder / relative, candidate / relative)
+        copies[name] = candidate / relative
+    shutil.copyfile(baseline, baseline_copy)
+    copies['baseline/plenora-storage'] = baseline_copy
+    check_private(copies, expected)
+    for binary in (candidate / 'plenora-storage', baseline_copy):
+        binary.chmod(0o755)
+    return private, candidate, baseline_copy, copies
+
+
+def check_private(copies, expected):
+    """The private copies still have the digests the controller expects."""
+    if not copies or any(digest(path) != expected.get(name) for name, path in copies.items()):
+        raise ValueError('a private copy of the campaign inputs differs from the uploaded inputs; nothing is recorded')
+
+
+def recorded_digest(campaign, folder, source):
+    """Digest of `source` as the ledger recorded it when the phase of `folder` passed."""
+    folder = Path(folder)
+    attempts = campaign.state['phases'].get(folder.parent.name, [])
+    index = int(folder.name) - 1
+    if not 0 <= index < len(attempts) or attempts[index]['status'] != 'PASS':
+        raise ValueError('selected evidence does not come from a passed phase')
+    recorded = attempts[index]['files'].get(Path(source).relative_to(folder).as_posix())
+    if recorded is None:
+        raise ValueError('selected evidence was not recorded when its phase passed')
+    return recorded
+
+
+def select_evidence(campaign, output, sources):
+    """Copy every selected file under `output/selected` and require the
+    digest recorded when its phase passed; returns the digests by path
+    under `selected/`. `sources` maps that path to (phase folder, source)."""
+    files = {}
+    for name, (folder, source) in sorted(sources.items()):
+        recorded = recorded_digest(campaign, folder, source)
+        destination = output / 'selected' / name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if not destination.exists():
+            shutil.copyfile(source, destination)
+        if digest(destination) != recorded:
+            raise ValueError('selected evidence differs from the evidence recorded when its phase passed; '
+                             'use a new collection directory')
+        files[name] = recorded
+    return files
+
+
 def input_fence(epoch_fence, inputs, expected, baseline):
     """The runner's fence: the admission epoch, then every input digest."""
     def fence():
@@ -117,13 +192,24 @@ def run(folder, baseline, output, retries, reason, backend_data, fixture_nonce, 
     # Every check of the epoch also checks every input against its digest, so
     # each phase is measured on exactly the inputs of this attempt, before
     # and after.
+    # Then everything is measured from private copies of the inputs, checked
+    # again at every fence.
     with held(campaign_dir, epoch) as epoch_fence:
-        fence = input_fence(epoch_fence, inputs, expected, baseline)
-        fence()
-        measure(folder, baseline, output, retries, reason, backend_data, fixture_nonce, fence, expected)
+        host_fence = input_fence(epoch_fence, inputs, expected, baseline)
+        host_fence()
+        private, candidate, private_baseline, copies = private_inputs(folder, baseline, inputs, expected)
+        try:
+            def fence():
+                host_fence()
+                check_private(copies, expected)
+            measure(candidate, private_baseline, private, output, retries, reason, backend_data, fixture_nonce,
+                    fence, expected, epoch)
+        finally:
+            shutil.rmtree(private)
 
 
-def measure(folder, baseline, output, retries, reason, backend_data, fixture_nonce, fence, expected):
+def measure(folder, baseline, private, output, retries, reason, backend_data, fixture_nonce, fence, expected,
+            epoch):
     if sys.platform != 'linux':
         raise ValueError('VM campaign requires Linux')
     folder, baseline, output = folder.resolve(), baseline.resolve(), output.resolve()
@@ -170,19 +256,32 @@ def measure(folder, baseline, output, retries, reason, backend_data, fixture_non
                     *pair, *(['--spool-uploads'] if spool_uploads else []))
 
         def qualify(path):
-            copy = path / 'dist' / subject['version'] / TARGET
+            # Qualified in the private directory; only its reports become
+            # evidence of the phase.
+            copy = private / 'qualify' / subject['version'] / TARGET
             shutil.copytree(folder, copy)
             command(path, 'qualify_target.py', copy)
+            reports = path / 'dist' / subject['version'] / TARGET
+            reports.mkdir(parents=True)
+            for report in copy.glob('*.json'):
+                shutil.copyfile(report, reports / report.name)
 
         qualified = phase('qualify-linux', qualify)
+        sdk_environment = private / 'sdk'
+
+        def installed_python(log_folder):
+            """The SDK installed from the private wheel into the private directory."""
+            if not sdk_environment.exists():
+                venv.EnvBuilder(with_pip=True).create(sdk_environment)
+                logged([str(sdk_environment / 'bin/python'), '-m', 'pip', 'install', '--no-index', str(wheel)],
+                       log_folder, cwd=ROOT, name='sdk-install.log')
+            return sdk_environment / 'bin/python'
 
         def sdk(path):
-            venv.EnvBuilder(with_pip=True).create(path / 'sdk')
-            python = path / 'sdk/bin/python'
-            logged([str(python), '-m', 'pip', 'install', '--no-index', str(wheel)], path, cwd=ROOT)
+            installed_python(path)
             write_json(path / 'wheel.json', {'sha256': digest(wheel)})
 
-        installed = phase('install-sdk', sdk)
+        phase('install-sdk', sdk)
         paired = phase('performance-ab', lambda path: transfers(path, size=1024**2, workers=4,
                                                                 rounds=PERFORMANCE_ROUNDS, paired=True))
         old, new = paired / 'baseline.json', paired / 'candidate.json'
@@ -201,30 +300,25 @@ def measure(folder, baseline, output, retries, reason, backend_data, fixture_non
         soak = phase('soak', lambda path: command(path, 'stress_python.py', '--wheel', wheel, '--workers', 4,
                      '--interval-seconds', 30, '--duration-seconds', SOAK_DURATION_SECONDS,
                      *(['--both-upload-modes'] if spooled else []),
-                     '--output', path / 'report.json', python=installed / 'sdk/bin/python'))
+                     '--output', path / 'report.json', python=installed_python(private)))
         selected = {'performance/baseline.json': old,
                     'performance/candidate.json': new, 'performance/report.json': comparison / 'report.json',
                     'transfers/large.json': large / 'report.json', 'transfers/workers4.json': four / 'report.json',
                     'transfers/workers16.json': sixteen / 'report.json', 'soak/report.json': soak / 'report.json', **prepared}
-        for name, source in selected.items():
-            destination = output / 'selected/gates' / name
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            if destination.exists() and digest(destination) != digest(source):
-                raise ValueError('selected evidence differs; use a new collection directory')
-            if not destination.exists():
-                shutil.copyfile(source, destination)
+        sources = {'gates/' + name: (source.parent, source) for name, source in selected.items()}
         qualified_target = qualified / 'dist' / subject['version'] / TARGET
-        reports = output / 'selected/linux-qualification'
-        reports.mkdir(parents=True, exist_ok=True)
-        for source in qualified_target.glob('*.json'):
-            destination = reports / source.name
-            if destination.exists() and digest(destination) != digest(source):
-                raise ValueError('selected qualification differs')
-            if not destination.exists():
-                shutil.copyfile(source, destination)
+        for source in sorted(qualified_target.glob('*.json')):
+            sources['linux-qualification/' + source.name] = (qualified, source)
+        # Every selected file has the digest the ledger recorded when its
+        # phase passed; the report lists them all and is bound to this
+        # attempt's epoch and fixture reset, and the ledger records its digest.
+        files = select_evidence(campaign, output, sources)
         fence()
-        write_json(output / 'selected/report.json', {'status': 'PASS', 'identity': subject, 'inputs': expected,
-                   'files': {name: digest(path) for name, path in selected.items()}})
+        report = output / 'selected/report.json'
+        write_json(report, {'status': 'PASS', 'identity': subject, 'inputs': expected, 'epoch': epoch,
+                            'fixture_nonce': fixture_nonce, 'files': files})
+        campaign.state['selected'] = {'report_sha256': digest(report), 'epoch': epoch}
+        campaign.save()
         print('PASS complete VM campaign; selected evidence is ready for final validation')
 
 

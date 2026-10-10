@@ -294,15 +294,39 @@ def expected_inputs(files):
     return {name: digest(path) for name, path in sorted(files.items())}
 
 
-def check_selected(result, identity, linux, expected):
-    """The runner's selected evidence measured exactly this campaign's binaries.
+def check_distribution(folder, reference):
+    """Every artifact of `folder` has the digest in the manifest of `reference`,
+    the distribution verified when it was assembled."""
+    manifest = json.loads((reference / 'release-manifest.json').read_text())
+    if any(digest(folder / row['name']) != row['sha256'] for row in manifest['artifacts']):
+        raise ValueError('a distribution differs from its verified manifest; nothing is sealed')
 
-    `linux` is the local Linux distribution and `expected` the input digests
-    given to the runner: the runner's identity and the binary digests of the
-    paired performance reports must match them, so a VM input replaced by
-    another controller cannot pass.
+
+def check_selected(result, identity, linux, expected, ledger, epoch, nonce):
+    """The runner's selected evidence is this attempt's, complete, and
+    measured exactly this campaign's binaries.
+
+    `linux` is the local Linux distribution, `expected` the input digests
+    given to the runner, `ledger` the runner's downloaded ledger and `epoch`
+    and `nonce` those of this attempt. Every file under `selected/` must be
+    listed in the report with its digest, and nothing else; the report must
+    be the one whose digest the ledger recorded, of this epoch and fixture
+    reset, so an earlier valid report put in its place is refused; and the
+    identity and the binary digests of the paired performance reports must
+    match the campaign's.
     """
-    report = json.loads((result / 'selected/report.json').read_text())
+    selected = result / 'selected'
+    report_path = selected / 'report.json'
+    if any(path.is_symlink() for path in selected.rglob('*')):
+        raise ValueError('the VM evidence contains a link; nothing is sealed')
+    found = {path.relative_to(selected).as_posix(): digest(path) for path in sorted(selected.rglob('*'))
+             if path.is_file() and path != report_path}
+    recorded = json.loads(Path(ledger).read_text()).get('selected', {})
+    report = json.loads(report_path.read_text())
+    if (report.get('files') != found or recorded.get('report_sha256') != digest(report_path)
+            or recorded.get('epoch') != epoch or report.get('epoch') != epoch
+            or report.get('fixture_nonce') != nonce):
+        raise ValueError('the VM evidence is not the inventoried evidence of this attempt; nothing is sealed')
     subject = report.get('identity', {})
     manifest = json.loads((linux / 'release-manifest.json').read_text())
     artifacts = {row['name']: digest(linux / row['name']) for row in manifest['artifacts']}
@@ -540,7 +564,7 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
                 # Last checks before the attempt can pass: the evidence is of
                 # this campaign's binaries, and the admission still held the
                 # VM after the download.
-                check_selected(path, identity, linux, expected)
+                check_selected(path, identity, linux, expected, path / 'vm-campaign.json', session.epoch, nonce)
                 session.check(remote)
 
             vm_result = phase('qualify-vm', vm)
@@ -550,6 +574,12 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
             def seal(path):
                 release = path / 'dist' / version
                 shutil.copytree(assembled / 'dist' / version, release)
+                # The sealed distributions, and the Windows one that was
+                # qualified, are byte for byte the verified ones.
+                for target in TARGETS.values():
+                    check_distribution(release / target, assembled / 'dist' / version / target)
+                check_distribution(windows_result / 'dist' / version / TARGETS['windows'],
+                                   assembled / 'dist' / version / TARGETS['windows'])
                 evidence = path / 'evidence'
                 shutil.copytree(assembled / 'evidence', evidence)
                 gates = ['performance', 'transfers', 'soak']

@@ -196,11 +196,86 @@ override di Compose con i mount. Il controller calcola il digest di ogni file e
 li passa tutti al runner sulla riga di comando (`--expected-inputs`). Il
 runner verifica che nella directory ci siano esattamente quei file con quei
 digest, e che il binario di baseline montato abbia il suo, prima di iniziare e
-a ogni controllo dell'epoca, quindi prima e dopo ogni fase. Il report
-selezionato riporta i digest, e il controller, dopo averlo scaricato, verifica
-che descriva i suoi binari: identità del runner, digest attesi, binari dei due
-report di prestazioni. Solo dopo un ultimo controllo dell'epoca il tentativo
-può passare.
+a ogni controllo dell'epoca, quindi prima e dopo ogni fase.
+
+Il runner non misura i file dell'host. All'avvio copia distribuzione e baseline
+in una directory privata del container (`/tmp` del container, che nessun mount
+raggiunge), verifica ogni copia contro il digest atteso e da lì in poi usa solo
+le copie: binari, wheel, qualifica Linux e SDK installato. Le copie vengono
+riverificate a ogni controllo dell'epoca. Una sostituzione sull'host seguita dal
+ripristino non tocca i byte misurati; una sostituzione già avvenuta al momento
+della copia ferma il runner.
+
+Ogni file selezionato deve avere il digest che il ledger ha registrato quando la
+sua fase è passata. Il report selezionato elenca tutti i file sotto `selected/`
+con il loro digest, compresi i report della qualifica Linux, e porta l'epoca e
+il nonce del reset del tentativo; il ledger registra il digest del report. Il
+controller, dopo il download, ricalcola i digest di ogni file sotto `selected/`
+e richiede:
+
+- lo stesso insieme di file del report, con gli stessi digest;
+- un report con il digest registrato nel ledger scaricato, con l'epoca e il
+  nonce di questo tentativo;
+- che il report descriva i suoi binari: identità del runner, digest attesi,
+  binari dei due report di prestazioni.
+
+Solo dopo un ultimo controllo dell'epoca il tentativo può passare. Prima del
+sigillo il controller riverifica, contro il manifest verificato all'assemblaggio,
+le distribuzioni da sigillare e la copia Windows qualificata.
+
+#### Modello di minaccia
+
+Lo strumento si difende anche da chi può **scrivere sulla VM** i file della
+campagna: la radice VM, cioè il checkout, `.fixtures` e `.campaign`, senza
+privilegi su Docker e senza root. Restano fuori dal modello:
+
+- chi ha privilegi su Docker (il gruppo `docker` equivale a root) o è root sulla
+  VM o nel container del runner: può cambiare il filesystem privato del
+  container, i volumi delle fixture e i processi;
+- chi controlla l'host del controller.
+
+La connessione è autenticata dalla host key verificata.
+
+**Coperto contro chi scrive sulla VM:**
+
+- i byte misurati: binario candidato, baseline e wheel sono copie private
+  verificate, e anche la qualifica Linux e l'SDK usano solo quelle copie;
+- un input sostituito prima della copia: il runner si ferma;
+- un report storico valido messo al posto di quello del tentativo: è rifiutato
+  per digest nel ledger, epoca e nonce;
+- un file di evidenza aggiunto, tolto o cambiato dopo la selezione: è rifiutato;
+- un file selezionato diverso da quello inventariato quando la sua fase è
+  passata: il runner lo rifiuta prima di scrivere il report;
+- una distribuzione sigillata diversa da quella verificata.
+
+**Non coperto contro chi scrive sulla VM**, dichiarato:
+
+- **Il codice del runner.** Il runner e gli script che lancia girano dal
+  checkout sull'host (`/workspace`). Il runner verifica all'avvio che il
+  checkout sia pulito e alla revisione attesa, ma uno script cambiato dopo quel
+  controllo, o un file interno di Git, gira con i privilegi del runner e può
+  produrre evidenze false ma coerenti.
+- **Le evidenze in transito.** Le evidenze passano per la directory dell'host
+  `.fixtures/campaign`. Chi scrive può sostituirle fra la scrittura di un report
+  e l'inventario della fase, oppure, dopo la fine del runner, insieme a report e
+  ledger, in modo coerente con l'epoca e il nonce correnti, che sulla VM sono
+  leggibili. I controlli del controller rilevano le sostituzioni incoerenti, non
+  una contraffazione coerente.
+- **Le fasi riprese da un tentativo precedente.** Il loro inventario viene dal
+  ledger sull'host.
+- **Il protocollo di ammissione.** `.campaign` coordina i processi della
+  campagna e non è una difesa: chi scrive può rompere l'esclusione o il lease, e
+  due campagne possono misurare insieme sulle stesse fixture.
+- **I file di configurazione delle fixture nel checkout**, cioè certificati,
+  chiavi e script di preparazione.
+
+**Condizione di rientro**, per estendere la garanzia al risultato:
+
+- eseguire il runner da una copia privata del sorgente, verificata contro un
+  digest passato dal controller;
+- far uscire le evidenze dal filesystem privato del container con `docker cp`,
+  con l'inventario tenuto in memoria dal runner, invece che dalla directory
+  dell'host.
 
 #### Processi locali e lease
 
