@@ -690,6 +690,32 @@ class PrivateRootTests(unittest.TestCase):
         self.assertEqual(list(elsewhere.iterdir()), [])
         open_level.chmod(0o700)
 
+    def test_a_path_with_a_control_or_unexpected_character_is_refused_before_anything(self):
+        # A newline would end a line reader early and leave the levels after
+        # it unchecked: every character outside the allowed set is refused.
+        for name in ('a\nb', 'a b', 'a\tb', 'a$b', 'a\\b'):
+            with self.subTest(name=name):
+                self.assertEqual(self.check(f'{self.base}/{name}/root').returncode, 1)
+        self.assertEqual(list(self.base.iterdir()), [])
+        for root in ('/srv/a\nb/campaign', '/srv/a b/campaign', '/srv/\u00e9/campaign'):
+            with self.subTest(root=root), tempfile.TemporaryDirectory() as temporary:
+                path = Path(temporary) / 'campaign.json'
+                path.write_text(json.dumps({'vm_root': root, 'candidate_run': '1', 'ci_run': '2'}))
+                with self.assertRaises(ValueError):
+                    release_campaign.configuration(path)
+
+    def test_a_listing_that_fails_or_is_not_a_mode_string_is_a_refusal(self):
+        bin_folder = self.top / 'bin'
+        bin_folder.mkdir()
+        for body in ('exit 2', 'echo unexpected; exit 0'):
+            with self.subTest(body=body):
+                (bin_folder / 'ls').write_text('#!/bin/sh\n' + body + '\n')
+                (bin_folder / 'ls').chmod(0o755)
+                command = (f'PATH={bin_folder}:$PATH ' +
+                           campaign_fence.private_root_command(str(self.base / 'root'), str(self.top)))
+                result = subprocess.run(command, shell=True, capture_output=True, text=True)
+                self.assertEqual((result.returncode, result.stdout.strip()), (1, ''))
+
     def test_a_root_of_another_user_or_open_to_others_is_refused_unchanged(self):
         root = self.base / 'root'
         root.mkdir()
@@ -848,6 +874,19 @@ class StreamTests(unittest.TestCase):
                     with self.assertRaises(RuntimeError):
                         self.remote(output, error).stream('docker logs c', path)
                     self.assertEqual(list(Path(temporary).iterdir()), [])
+
+    def test_no_partial_file_survives_a_stopped_or_failed_transfer(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'runner.log'
+            # Left by a controller stopped half way: never kept by the next transfer.
+            path.with_name('runner.log.partial').write_bytes(b'stale')
+            self.remote(self.Output([b'fresh'], 0)).stream('docker logs c', path)
+            self.assertEqual(sorted(item.name for item in Path(temporary).iterdir()), ['runner.log'])
+            path.unlink()
+            with patch.object(Path, 'replace', side_effect=OSError('rename failed')):
+                with self.assertRaises(RuntimeError):
+                    self.remote(self.Output([b'fresh'], 0)).stream('docker logs c', path)
+            self.assertEqual(list(Path(temporary).iterdir()), [])
 
     def test_a_truncated_export_is_never_taken_for_evidence(self):
         import io
@@ -1089,7 +1128,7 @@ class ProtocolCase(unittest.TestCase):
         return self.end(process)
 
     def epoch(self):
-        return (self.directory / 'epoch').read_text()
+        return (self.directory / 'epoch').read_bytes().decode('ascii')
 
 
 class AdmissionProtocolTests(ProtocolCase):
@@ -1177,7 +1216,8 @@ class AdmissionProtocolTests(ProtocolCase):
         self.end(first)
         limit = campaign_fence.COUNTER_LIMIT
         for content in (None, '', 'x\n', '01-' + '0' * 32 + '\n', epoch, epoch + '\n\n',
-                        f'{limit}-' + '0' * 32 + '\n'):
+                        f'{limit}-' + '0' * 32 + '\n', epoch + '\n\0', epoch[:4] + '\0' + epoch[4:] + '\n',
+                        epoch + '\r\n', epoch + '\0'):
             with self.subTest(content=content):
                 if content is None:
                     (self.directory / 'epoch').unlink()
@@ -1215,8 +1255,10 @@ class AdmissionProtocolTests(ProtocolCase):
         second, _ = self.admitted(lease=0)
         self.assertGreaterEqual(time.monotonic() - started, 2)
         self.end(second)
-        (self.directory / 'lease').write_text('garbage\n')
-        self.assertEqual(self.refused(), 1)
+        for content in ('garbage\n', 'none\n\0', 'no\0ne\n', 'none\0'):
+            with self.subTest(content=content):
+                (self.directory / 'lease').write_bytes(content.encode('ascii'))
+                self.assertEqual(self.refused(), 1)
 
     def test_every_renewal_extends_the_lease(self):
         controller, _ = self.admitted(lease=5)

@@ -21,8 +21,11 @@ host key già approvate; la password viene richiesta interattivamente e non
 viene salvata. In alternativa specificare una chiave con `ssh_key`.
 
 La radice VM (`vm_root`) deve essere privata dell'utente SSH. Prima di ogni
-ammissione il coordinatore controlla che il percorso configurato sia canonico:
-assoluto, senza componenti `.`, `..` o vuote. Poi lo percorre dall'alto, da
+ammissione il coordinatore controlla che il percorso configurato contenga solo
+lettere ASCII, cifre, `.`, `_`, `-` e `/` (nessun carattere di controllo, spazio o
+newline, sia nella configurazione sia sulla VM) e che sia canonico: assoluto,
+senza componenti `.`, `..` o vuote. Poi lo percorre dall'alto, componente per
+componente e senza leggere righe, da
 `/` alla radice, e verifica ogni directory che esiste prima di guardare o
 creare qualcosa sotto di essa. Ogni directory, esaminata come tale e mai
 attraverso un link, deve:
@@ -30,7 +33,8 @@ attraverso un link, deve:
 - appartenere a root o all'utente;
 - non essere un link;
 - non essere scrivibile da gruppo o da altri;
-- non avere una ACL.
+- non avere una ACL. La rileva il `+` nel modo di `ls -ld`; un `ls` o uno `stat`
+  che falliscono, o che non danno un risultato riconoscibile, sono un rifiuto.
 
 Un livello che manca viene creato con modo `700` sotto `umask 077`, quindi non è
 mai aperto ad altri, nemmeno per un istante; se nel frattempo compare, la
@@ -196,8 +200,8 @@ preparata a parte con lock, primo gettone e lease vuoto, poi rinominata in modo
 atomico. In una directory esistente un gettone o un lease assente, illeggibile
 o malformato (formato stretto, newline finale esatto) è un errore, mai una
 ripartenza da zero. Ogni controllo dell'epoca confronta i byte: il gettone e
-un solo newline. Il runner legge il file in binario; gli script lo confrontano
-con `cmp`, perché in una variabile della shell andrebbero persi i byte NUL e i
+un solo newline. Il runner legge il file in binario; gli script e l'ammissione,
+anche per il lease, lo confrontano con `cmp`, perché in una variabile della shell andrebbero persi i byte NUL e i
 newline finali; il controller delimita il contenuto con un marcatore, perché
 l'output del comando remoto viene ripulito dagli spazi.
 

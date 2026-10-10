@@ -20,8 +20,8 @@ import tarfile
 import time
 import uuid
 
-from campaign_fence import (FENCED, LABEL, LOCK_HELD, CampaignBusy, CampaignFenced, admission, check_owned,
-                           check_private_root, fence_lines, supervised)
+from campaign_fence import (FENCED, LABEL, LOCK_HELD, ROOT_PATH, CampaignBusy, CampaignFenced, admission,
+                           check_owned, check_private_root, fence_lines, supervised)
 from campaign_state import Campaign, digest, exclusive, logged, write_json
 from versioning import parse_version, workspace_version
 
@@ -103,19 +103,22 @@ class Remote:
         no file and raises RuntimeError.
         """
         partial = path.with_name(path.name + '.partial')
+        # A leftover of a controller stopped half way is truncated by the
+        # open below and then renamed or removed, never kept.
         try:
             _, out, err = self.client.exec_command(command, timeout=timeout)
             with open(partial, 'wb') as stream:
                 shutil.copyfileobj(out, stream)
             err.read()
             code = out.channel.recv_exit_status()
+            if not code:
+                partial.replace(path)
         except Exception as error:  # every failure of the transfer is the same failure
             partial.unlink(missing_ok=True)
             raise RuntimeError('dedicated VM transfer interrupted') from error
         if code:
-            partial.unlink()
+            partial.unlink(missing_ok=True)
             raise RuntimeError('dedicated VM command failed')
-        partial.replace(path)
 
     def download(self, remote, path):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -132,6 +135,8 @@ def configuration(path):
     for key in ('candidate_run', 'ci_run'):
         if not re.fullmatch(r'[0-9]+', str(config[key])):
             raise ValueError('invalid workflow identifier')
+    if not isinstance(config['vm_root'], str) or not re.fullmatch(ROOT_PATH, config['vm_root']):
+        raise ValueError('VM root may contain only letters, digits, dot, underscore, dash and slash')
     root = PurePosixPath(config['vm_root'])
     if not root.is_absolute() or '..' in root.parts or len(root.parts) < 4:
         raise ValueError('VM root must be an explicit dedicated absolute directory')

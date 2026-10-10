@@ -97,17 +97,30 @@ class CampaignLost(RuntimeError):
 # never what a link points to: `fail` exits 1 with a message, `trusted`
 # accepts a directory that belongs to root or to this user, `owned` a
 # directory or regular file that belongs to this user; neither may be a link,
-# be writable by group or others or carry an access control list.
+# be writable by group or others or carry an access control list. Every
+# command they run is checked: a failure is a refusal, never a pass.
 OWNERSHIP_LINES = [
     'fail() { echo "$1" >&2; exit 1; }',
-    'unshared() { local mode; mode=$(stat -c %a -- "$1"); '
+    'owner() { local value; value=$(stat -c %u -- "$1") || fail "cannot inspect $1"; '
+    '[[ "$value" =~ ^[0-9]+$ ]] || fail "cannot inspect $1"; printf %s "$value"; }',
+    # The eleventh character of `ls -ld` is `+` when the path has an access
+    # control list; a listing that fails or is not a mode string is refused.
+    'unshared() { local mode listing; mode=$(stat -c %a -- "$1") || fail "cannot inspect $1"; '
+    '[[ "$mode" =~ ^[0-7]{3,4}$ ]] || fail "cannot inspect $1"; '
     '(( (8#$mode & 8#022) == 0 )) || fail "$1 is writable by other users"; '
-    'case "$(ls -ld -- "$1")" in ??????????+*) fail "$1 has an access control list";; esac; }',
-    'trusted() { [ ! -L "$1" ] && [ -d "$1" ] || fail "$1 is a link or not a directory"; '
-    'case "$(stat -c %u -- "$1")" in 0|"$(id -u)") ;; *) fail "$1 belongs to another user";; esac; unshared "$1"; }',
-    'owned() { [ ! -L "$1" ] && { [ -d "$1" ] || [ -f "$1" ]; } || fail "$1 is a link or not a file or directory"; '
-    '[ "$(stat -c %u -- "$1")" = "$(id -u)" ] || fail "$1 belongs to another user"; unshared "$1"; }',
+    'listing=$(ls -ld -- "$1") || fail "cannot list $1"; '
+    '[[ "$listing" =~ ^[-dl][-rwxsStT]{9}([^-rwxsStT]|$) ]] || fail "cannot list $1"; '
+    '[ "${listing:10:1}" != + ] || fail "$1 has an access control list"; }',
+    'trusted() { local value; [ ! -L "$1" ] && [ -d "$1" ] || fail "$1 is a link or not a directory"; '
+    'value=$(owner "$1"); { [ "$value" = 0 ] || [ "$value" = "$(id -u)" ]; } || fail "$1 belongs to another user"; '
+    'unshared "$1"; }',
+    'owned() { local value; [ ! -L "$1" ] && { [ -d "$1" ] || [ -f "$1" ]; } '
+    '|| fail "$1 is a link or not a file or directory"; '
+    'value=$(owner "$1"); [ "$value" = "$(id -u)" ] || fail "$1 belongs to another user"; unshared "$1"; }',
 ]
+# Characters allowed in the VM root path, controller and VM alike: no
+# control character, no space, nothing a shell or a line reader could split.
+ROOT_PATH = r'[A-Za-z0-9._/-]+'
 
 
 def owned_command(paths):
@@ -158,8 +171,11 @@ def admission_command(vm_root, lease=LEASE_SECONDS + LEASE_MARGIN):
         'token() { local hex; hex=$(od -An -N16 -tx1 /dev/urandom | tr -d " \\n"); '
         '[[ "$hex" =~ ^[0-9a-f]{32}$ ]] || { echo "random source failed" >&2; exit 1; }; printf %s "$1-$hex"; }',
         'write() { printf "%s\\n" "$2" >"$directory/$1.pending"; mv "$directory/$1.pending" "$directory/$1"; }',
-        'strict() { local value; value=$(cat "$directory/$1"); '
-        '[[ "$value" =~ $2 ]] && [ "$(wc -c <"$directory/$1")" -eq $(( ${#value} + 1 )) ] '
+        # The value must match the pattern and the file must hold exactly it
+        # and one newline, compared byte for byte: a command substitution
+        # alone would drop NUL bytes and trailing newlines.
+        'strict() { local value; value=$(cat "$directory/$1") || { echo "unreadable campaign $1" >&2; exit 1; }; '
+        '[[ "$value" =~ $2 ]] && printf "%s\\n" "$value" | cmp -s - "$directory/$1" '
         '|| { echo "malformed campaign $1" >&2; exit 1; }; printf %s "$value"; }',
         f"epoch_pattern='^{EPOCH}$'",
         "lease_pattern='^(none|[0-9a-f-]{36} [0-9]{1,12})$'",
@@ -234,6 +250,8 @@ def private_root_command(vm_root, top='/'):
         'root=$1',
         'top=$2',
         *OWNERSHIP_LINES,
+        f'[[ "$root" =~ ^{ROOT_PATH}$ && "$top" =~ ^{ROOT_PATH}$ ]] '
+        '|| fail "the VM root path contains a character outside letters, digits, dot, underscore, dash and slash"',
         '[[ "$root" == /* && "$root" != */ && "$root/" != *//* && "$root/" != */./* && "$root/" != */../* ]] '
         '|| fail "the VM root path is not canonical"',
         'if [ "$top" = / ]; then current=; rest=${root#/}; else',
@@ -241,8 +259,10 @@ def private_root_command(vm_root, top='/'):
         '  current=$top; rest=${root#"$top"/}',
         'fi',
         'trusted "${current:-/}"',
-        'IFS=/ read -r -a parts <<<"$rest"',
-        'for part in "${parts[@]}"; do',
+        # Component by component with parameter expansion: no line reader.
+        'while [ -n "$rest" ]; do',
+        '  part=${rest%%/*}',
+        '  if [ "$part" = "$rest" ]; then rest=; else rest=${rest#*/}; fi',
         '  current="$current/$part"',
         '  if test -e "$current" || test -L "$current"; then',
         '    trusted "$current"',
@@ -250,6 +270,7 @@ def private_root_command(vm_root, top='/'):
         '    mkdir -m 700 -- "$current" || fail "$current appeared while it was being created"',
         '  fi',
         'done',
+        '[ "$current" = "$root" ] || fail "the VM root path was not walked to its end"',
         '[ "$(stat -c "%u %a" -- "$root")" = "$(id -u) 700" ] || fail "the VM root must belong to this user with mode 700"',
         'echo private',
     ])
