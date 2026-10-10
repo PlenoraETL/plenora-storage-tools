@@ -104,23 +104,72 @@ class CampaignLost(RuntimeError):
 # must have exactly the three base entries. Without `getfacl` (package
 # `acl`) nothing is accepted.
 OWNERSHIP_LINES = [
-    'fail() { echo "$1" >&2; exit 1; }',
-    'command -v getfacl >/dev/null || fail "getfacl is missing: install the acl package on the VM"',
-    'owner() { local value; value=$(stat -c %u -- "$1") || fail "cannot inspect $1"; '
-    '[[ "$value" =~ ^[0-9]+$ ]] || fail "cannot inspect $1"; printf %s "$value"; }',
+    'fail() { echo "campaign-refusal: $1" >&2; exit 1; }',
+    'command -v getfacl >/dev/null || fail acl-missing',
+    'owner() { local value; value=$(stat -c %u -- "$1") || fail cannot-inspect; '
+    '[[ "$value" =~ ^[0-9]+$ ]] || fail cannot-inspect; printf %s "$value"; }',
     'base_acl=$\'^user::[-r][-w][-x]\\ngroup::[-r][-w][-x]\\nother::[-r][-w][-x]$\'',
-    'unshared() { local mode acl; mode=$(stat -c %a -- "$1") || fail "cannot inspect $1"; '
-    '[[ "$mode" =~ ^[0-7]{3,4}$ ]] || fail "cannot inspect $1"; '
-    '(( (8#$mode & 8#022) == 0 )) || fail "$1 is writable by other users"; '
-    'acl=$(getfacl --absolute-names --omit-header -- "$1") || fail "cannot read the access control list of $1"; '
-    '[[ "$acl" =~ $base_acl ]] || fail "$1 has an access control list beyond its mode"; }',
-    'trusted() { local value; [ ! -L "$1" ] && [ -d "$1" ] || fail "$1 is a link or not a directory"; '
-    'value=$(owner "$1"); { [ "$value" = 0 ] || [ "$value" = "$(id -u)" ]; } || fail "$1 belongs to another user"; '
+    'unshared() { local mode acl; mode=$(stat -c %a -- "$1") || fail cannot-inspect; '
+    '[[ "$mode" =~ ^[0-7]{3,4}$ ]] || fail cannot-inspect; '
+    '(( (8#$mode & 8#022) == 0 )) || fail writable-by-others; '
+    'acl=$(getfacl --absolute-names --omit-header -- "$1") || fail acl-unreadable; '
+    '[[ "$acl" =~ $base_acl ]] || fail acl; }',
+    'trusted() { local value; [ ! -L "$1" ] && [ -d "$1" ] || fail not-a-directory; '
+    'value=$(owner "$1"); { [ "$value" = 0 ] || [ "$value" = "$(id -u)" ]; } || fail foreign-owner; '
     'unshared "$1"; }',
     'owned() { local value; [ ! -L "$1" ] && { [ -d "$1" ] || [ -f "$1" ]; } '
-    '|| fail "$1 is a link or not a file or directory"; '
-    'value=$(owner "$1"); [ "$value" = "$(id -u)" ] || fail "$1 belongs to another user"; unshared "$1"; }',
+    '|| fail not-a-file; '
+    'value=$(owner "$1"); [ "$value" = "$(id -u)" ] || fail foreign-owner; unshared "$1"; }',
 ]
+# The reason of a refusal travels as a fixed code on standard error, never
+# as a path or a value; the controller turns it into one of these messages.
+REFUSALS = {
+    'acl-missing': 'getfacl is missing on the VM: install the acl package',
+    'acl-unreadable': 'the access control list of a path could not be read',
+    'acl': 'a path has an access control list beyond its mode',
+    'cannot-inspect': 'the owner or the mode of a path could not be read',
+    'writable-by-others': 'a path is writable by group or others',
+    'not-a-directory': 'a path is a link or not a directory',
+    'not-a-file': 'a path is a link or not a file or directory',
+    'foreign-owner': 'a path belongs to another user',
+    'characters': 'the VM root path contains a character outside letters, digits, dot, underscore, dash and slash',
+    'not-canonical': 'the VM root path is not canonical',
+    'outside-top': 'the VM root is not below the top of the check',
+    'appeared': 'a directory of the VM root path appeared while it was being created',
+    'not-walked': 'the VM root path was not walked to its end',
+    'root-mode': 'the VM root must belong to the campaign user with mode 700',
+}
+
+
+class RemoteFailure(RuntimeError):
+    """A VM command that exited with an error. Its standard error is kept
+    apart (`stderr`), never in the message; read it only with `refusal`."""
+
+    def __init__(self, message, stderr=''):
+        super().__init__(message)
+        self.stderr = stderr
+
+
+def refusal(stderr):
+    """The fixed message of the last refusal code in `stderr`, or None."""
+    codes = re.findall(r'^campaign-refusal: ([a-z-]+)$', stderr or '', re.MULTILINE)
+    if not codes:
+        return None
+    return REFUSALS.get(codes[-1], 'an unrecognized refusal of the VM check')
+
+
+def run_check(remote, command, expected, what):
+    """Run a VM check: return quietly on `expected`, raise ValueError with the
+    reason the VM gave, as a fixed message, otherwise."""
+    try:
+        answer = remote.run(command)
+    except RemoteFailure as failure:
+        reason = refusal(failure.stderr) or 'the check failed without a recognized reason'
+        raise ValueError(f'{what}: {reason}') from None
+    if answer != expected:
+        raise ValueError(f'{what}: the check gave an unexpected answer')
+
+
 # Characters allowed in the VM root path, controller and VM alike: no
 # control character, no space, nothing a shell or a line reader could split.
 ROOT_PATH = r'[A-Za-z0-9._/-]+'
@@ -136,12 +185,7 @@ def owned_command(paths):
 
 def check_owned(remote, paths):
     """Refuse campaign state on the VM that is not exclusively this user's; see `owned_command`."""
-    try:
-        answer = remote.run(owned_command(paths))
-    except RuntimeError:
-        answer = None
-    if answer != 'owned':
-        raise ValueError('campaign state on the VM is a link, belongs to another user or is writable by others')
+    run_check(remote, owned_command(paths), 'owned', 'campaign state on the VM was refused')
 
 
 def admission_command(vm_root, lease=LEASE_SECONDS + LEASE_MARGIN):
@@ -254,11 +298,11 @@ def private_root_command(vm_root, top='/'):
         'top=$2',
         *OWNERSHIP_LINES,
         f'[[ "$root" =~ ^{ROOT_PATH}$ && "$top" =~ ^{ROOT_PATH}$ ]] '
-        '|| fail "the VM root path contains a character outside letters, digits, dot, underscore, dash and slash"',
+        '|| fail characters',
         '[[ "$root" == /* && "$root" != */ && "$root/" != *//* && "$root/" != */./* && "$root/" != */../* ]] '
-        '|| fail "the VM root path is not canonical"',
+        '|| fail not-canonical',
         'if [ "$top" = / ]; then current=; rest=${root#/}; else',
-        '  [[ "$root" == "$top"/* ]] || fail "the VM root is not below the top of the check"',
+        '  [[ "$root" == "$top"/* ]] || fail outside-top',
         '  current=$top; rest=${root#"$top"/}',
         'fi',
         'trusted "${current:-/}"',
@@ -270,11 +314,11 @@ def private_root_command(vm_root, top='/'):
         '  if test -e "$current" || test -L "$current"; then',
         '    trusted "$current"',
         '  else',
-        '    mkdir -m 700 -- "$current" || fail "$current appeared while it was being created"',
+        '    mkdir -m 700 -- "$current" || fail appeared',
         '  fi',
         'done',
-        '[ "$current" = "$root" ] || fail "the VM root path was not walked to its end"',
-        '[ "$(stat -c "%u %a" -- "$root")" = "$(id -u) 700" ] || fail "the VM root must belong to this user with mode 700"',
+        '[ "$current" = "$root" ] || fail not-walked',
+        '[ "$(stat -c "%u %a" -- "$root")" = "$(id -u) 700" ] || fail root-mode',
         'echo private',
     ])
     return f'bash -c {shlex.quote(script)} private {shlex.quote(vm_root)} {shlex.quote(top)}'
@@ -282,13 +326,8 @@ def private_root_command(vm_root, top='/'):
 
 def check_private_root(remote, vm_root):
     """Refuse a VM root that another user could write; see `private_root_command`."""
-    try:
-        answer = remote.run(private_root_command(vm_root))
-    except RuntimeError:
-        answer = None
-    if answer != 'private':
-        raise ValueError('the VM root, or a directory above it, can be written by another user, belongs to '
-                         'another user or is a link; nothing was created below it')
+    run_check(remote, private_root_command(vm_root), 'private',
+              'the VM root was refused, nothing was created below the refused directory')
 
 
 class Session:

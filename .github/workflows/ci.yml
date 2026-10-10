@@ -41,7 +41,16 @@ jobs:
           name: source-consumer-linux
           path: target/source-bundle/
       - run: python3 -m pip install -r scripts/requirements-quality.txt
+      # The campaign checks read access control lists with getfacl: the
+      # tests use the one of the system package `acl`, installed here and
+      # verified (test_campaign_fence.RealAclToolTests).
+      - run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends acl
+          dpkg -S "$(readlink -f "$(command -v getfacl)")" | grep -q '^acl: '
       - run: python3 -m unittest discover -s scripts/tests -v
+        env:
+          PLENORA_REQUIRE_REAL_ACL: '1'
       - run: python3 scripts/render_sbom.py target/storage-sbom.cdx.json
       - run: python3 scripts/render_sbom.py target/storage-sbom.cdx.json --check
       - run: python3 scripts/render_sbom.py target/qualification-sbom.cdx.json --qualification

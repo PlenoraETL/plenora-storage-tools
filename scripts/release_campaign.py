@@ -20,8 +20,8 @@ import tarfile
 import time
 import uuid
 
-from campaign_fence import (FENCED, LABEL, LOCK_HELD, ROOT_PATH, CampaignBusy, CampaignFenced, admission,
-                           check_owned, check_private_root, fence_lines, supervised)
+from campaign_fence import (FENCED, LABEL, LOCK_HELD, ROOT_PATH, CampaignBusy, CampaignFenced, RemoteFailure,
+                           admission, check_owned, check_private_root, fence_lines, supervised)
 from campaign_state import Campaign, digest, exclusive, logged, write_json
 from versioning import parse_version, workspace_version
 
@@ -66,11 +66,14 @@ class Remote:
         self.client.get_transport().set_keepalive(30)
 
     def run(self, command):
+        """Run `command` on the VM and return its stripped output. A failure
+        raises RemoteFailure, which keeps the command's standard error apart
+        from its message, for the checks that read a refusal code from it."""
         _, out, err = self.client.exec_command(command, timeout=60)
         text = out.read().decode()
-        err.read()
+        errors = err.read().decode(errors='replace')
         if out.channel.recv_exit_status():
-            raise RuntimeError('dedicated VM command failed')
+            raise RemoteFailure('dedicated VM command failed', errors)
         return text.strip()
 
     def hold(self, command, timeout):
@@ -98,9 +101,10 @@ class Remote:
         they are; nothing is written on the VM.
 
         `path` appears only when the command succeeded and its whole output
-        arrived: a failed command, a lost connection or an output cut short
-        (the channel then ends without an exit status, reported as -1) leaves
-        no file and raises RuntimeError.
+        arrived. A command that failed, or an output cut short (the channel
+        then ends without an exit status, reported as -1), raises
+        RemoteFailure; a transfer that broke raises RuntimeError. Neither
+        leaves a file.
         """
         partial = path.with_name(path.name + '.partial')
 
@@ -119,14 +123,14 @@ class Remote:
             _, out, err = self.client.exec_command(command, timeout=timeout)
             with open(partial, 'wb') as stream:
                 shutil.copyfileobj(out, stream)
-            err.read()
+            errors = err.read().decode(errors='replace')
             code = out.channel.recv_exit_status()
             if not code:
                 partial.replace(path)
         except Exception as error:  # every failure of the transfer is the same failure
             raise RuntimeError('dedicated VM transfer interrupted (' + type(error).__name__ + ')' + discard()) from None
         if code:
-            raise RuntimeError('dedicated VM command failed' + discard())
+            raise RemoteFailure('dedicated VM command failed' + discard(), errors)
 
     def download(self, remote, path):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -357,6 +361,23 @@ def runner_bootstrap(work, inputs, bundle, revision, fixtures):
                   f'printf "%s  %s\\n" {q(value)} "$work/source/.fixtures/"{q(name)} | sha256sum -c --quiet -']
     lines.append('test -z "$(git -C "$work/source" status --porcelain)"')
     return lines
+
+
+def export_runner_output(remote, container, folder):
+    """Export the runner's output from its container into `folder` and extract it.
+
+    A failed `docker cp` most often means that the runner stopped before its
+    output existed: it becomes a ValueError that keeps the whole diagnosis of
+    the failure, by type only. A broken transfer is not that and keeps its own
+    error.
+    """
+    archive = folder / 'runner-output.tar'
+    try:
+        remote.stream('docker cp ' + shlex.quote(container + ':' + RUNNER_OUTPUT) + ' -', archive)
+    except RemoteFailure as failure:
+        raise ValueError('the runner output could not be exported (' + str(failure) + '); the runner may have '
+                         'stopped before creating it, inspect runner.log') from None
+    return extract_runner_output(archive, folder)
 
 
 def extract_runner_output(archive, folder):
@@ -651,11 +672,7 @@ def run(config_path, output, retries, reason, connect_host=None):
                 # Logs and evidence come straight from the container, through
                 # this connection: no file on the VM is their source.
                 remote.stream('docker logs ' + q(container) + ' 2>&1', path / 'runner.log')
-                try:
-                    remote.stream('docker cp ' + q(container + ':' + RUNNER_OUTPUT) + ' -', path / 'runner-output.tar')
-                except RuntimeError:
-                    raise ValueError('the VM runner stopped before creating its evidence; inspect runner.log') from None
-                runner = extract_runner_output(path / 'runner-output.tar', path)
+                runner = export_runner_output(remote, container, path)
                 session.check(remote)
                 if status['ExitCode']:
                     raise ValueError('VM campaign failed; inspect runner.log and the exported runner ledger, then '
