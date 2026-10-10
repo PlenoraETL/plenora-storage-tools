@@ -131,10 +131,10 @@ campagna della 3.0.0 un rallentamento dell'host durante la misura, e poi un
 fixture GCS che rallentava nel tempo, sono ricaduti sul candidato e hanno
 prodotto confronti rossi che un A/B alternato smentiva.
 
-### Ammissione ed epoca sulla VM
+### Ammissione, epoca e lease sulla VM
 
 Una sola campagna alla volta lavora su una radice VM (`vm_root`), qualunque sia
-la revisione qualificata. Il protocollo (`scripts/campaign_fence.py`) usa due
+la revisione qualificata. Il protocollo (`scripts/campaign_fence.py`) usa tre
 file in `<realpath(vm_root)>/.campaign/`, gli stessi per ogni checkout remoto
 della stessa radice:
 
@@ -146,66 +146,156 @@ della stessa radice:
   fixture (il wrapper apre il descrittore e i figli lo ereditano, anche se il
   controller muore) e il runner, che apre lo stesso file nel suo container
   attraverso un mount in sola lettura della directory;
-- `epoch`, un contatore che l'ammissione incrementa sotto il lock esclusivo.
-  Ogni attività riceve l'epoca della propria ammissione, prende il lock
-  condiviso e la verifica prima di iniziare, prima di ogni scrittura (stato e
-  ricevuta delle fixture, report selezionato) e alla fine di ogni fase
-  misurata, prima di registrarla come superata. Il controller la verifica
-  sulla VM prima di ogni caricamento, prima di avviare il runner, dopo averne
-  scaricato le evidenze e alla fine della qualifica Windows. Un'epoca cambiata
-  è un errore esplicito (`CampaignFenced`, codice 77 negli script) e il
-  risultato non viene registrato: la fase in corso resta `FAIL`.
+- `epoch`, un gettone `<contatore>-<casuale>` che ogni ammissione sostituisce
+  sotto il lock esclusivo: il contatore cresce di uno, con controllo
+  dell'overflow, e la parte casuale di 128 bit fa sì che un gettone non si
+  ripeta mai, nemmeno se la directory venisse ricreata. Ogni attività riceve
+  il gettone della propria ammissione, prende il lock condiviso e lo verifica
+  prima di iniziare, prima di ogni scrittura (stato e ricevuta delle fixture,
+  report selezionato) e alla fine di ogni fase misurata, prima di registrarla
+  come superata. Il controller lo verifica sulla VM prima di ogni
+  caricamento, prima di avviare il runner, dopo averne scaricato le evidenze e
+  alla fine della qualifica Windows. Un gettone cambiato è un errore esplicito
+  (`CampaignFenced`, codice 77 negli script) e il risultato non viene
+  registrato: la fase in corso resta `FAIL`;
+- `lease`, la scadenza del lease del controller sull'orologio di boot della
+  VM, descritta sotto.
+
+La directory nasce una sola volta, al primo avvio, quando non esiste: viene
+preparata a parte con lock, primo gettone e lease vuoto, poi rinominata in modo
+atomico. In una directory esistente un gettone o un lease assente, illeggibile
+o malformato (formato stretto, newline finale esatto) è un errore, mai una
+ripartenza da zero.
 
 L'ammissione rifiuta anche finché esiste un container runner di questa radice
-(etichetta Docker `plenora.campaign`) che non ha ancora preso il lock. Un
-rifiuto, dell'ammissione o di una preparazione, non tocca niente ed esce con il
-codice 75 (`CampaignBusy`); ogni altro errore del lock, compreso un `flock` che
-fallisce per un motivo diverso dalla contesa, viene riportato come tale. Sulla
+(etichetta Docker `plenora.campaign`) che non ha ancora preso il lock; se
+`docker ps` fallisce, l'ammissione fallisce con un errore invece di leggere
+«nessun container». Un rifiuto per contesa, dell'ammissione o di una
+preparazione, non tocca niente ed esce con il codice 75 (`CampaignBusy`):
+`flock` viene chiamato con `-E 75`, quindi ogni altro suo errore conserva il
+proprio codice e viene riportato come tale. Un 75 restituito dallo script di
+preparazione, che non lo usa mai per un rifiuto, diventa un fallimento. Sulla
 VM non si termina nessun processo: un'attività superstite non viene uccisa,
 l'ammissione si rifiuta finché vive.
 
-La qualifica Windows gira sul controller, ma solo finché l'ammissione vive: il
-controller controlla il canale ogni secondo e, se cade, termina il
-sottoprocesso (lo uccide dopo 10 secondi) e fallisce con `CampaignLost`, senza
-registrare il risultato; finita la qualifica, verifica l'epoca sulla VM.
+`flock` converte un lock rilasciandolo e riprendendolo. Se in quell'istante
+un'altra ammissione entra, la prima riprende il condiviso accanto a lei: per
+questo, sotto il condiviso, l'ammissione rilegge il gettone prima di
+annunciarsi, e se non è più il suo esce con 75 senza aver annunciato niente.
 
-**Impedito per costruzione**: due ammissioni contemporanee; un'ammissione
-mentre vive un'attività di un'ammissione precedente (controller, preparazione
-staccata con `nohup`, runner), anche se il suo controller è morto o qualifica
-un'altra revisione in un'altra `remote_root`; un'ammissione mentre un runner
-etichettato è stato creato ma non ha ancora preso il lock.
+#### Input per epoca
 
-**Soltanto rilevato**: il lavoro di un controller che ha perso l'ammissione
-senza saperlo, per esempio in una partizione di rete dopo la quale il server
-SSH ha chiuso il canale e un altro controller è stato ammesso. Le sue attività
-che partono dopo la nuova ammissione trovano un'epoca diversa e si fermano
-prima di toccare qualcosa; quelle già in corso falliscono al controllo
-successivo (prossima scrittura o fine fase) e il loro risultato non viene
-registrato. Fra il controllo dell'epoca e la scrittura che segue resta una
-finestra: un caricamento o una scrittura già partiti possono completarsi dopo
-la nuova ammissione. Se le due campagne qualificano revisioni diverse quella
-scrittura finisce nella `remote_root` della vecchia (`<vm_root>/<versione>-<revisione>`),
-che la nuova non legge. Se qualificano la stessa revisione la `remote_root` è
-la stessa e la finestra non è chiusa dal protocollo: il runner verifica solo
-che i binari corrispondano al manifest caricato con loro. Per questo due
-controller della stessa revisione non si avviano sulla stessa VM. La
-conversione del lock da esclusivo a condiviso non è atomica in `flock`: se
-un'altra ammissione lo prende in quell'istante, la prima esce con 75 e vale
-l'epoca più recente.
+Ogni tentativo `qualify-vm` carica i suoi input in una directory della
+propria epoca, `.fixtures/inputs/<gettone>/`, creata vuota (una directory che
+esiste già è un errore): binario di baseline, archivio e distribuzione Linux,
+override di Compose con i mount. Il controller calcola il digest di ogni file e
+li passa tutti al runner sulla riga di comando (`--expected-inputs`). Il
+runner verifica che nella directory ci siano esattamente quei file con quei
+digest, e che il binario di baseline montato abbia il suo, prima di iniziare e
+a ogni controllo dell'epoca, quindi prima e dopo ogni fase. Il report
+selezionato riporta i digest, e il controller, dopo averlo scaricato, verifica
+che descriva i suoi binari: identità del runner, digest attesi, binari dei due
+report di prestazioni. Solo dopo un ultimo controllo dell'epoca il tentativo
+può passare.
+
+#### Processi locali e lease
+
+La qualifica Windows gira sul controller, in un albero di processi che il
+controller può terminare per intero. Su Windows il processo parte sospeso,
+viene assegnato a un job object con `KILL_ON_JOB_CLOSE` e solo dopo riprende,
+quindi nessun discendente nasce fuori dal job, e il job muore anche se muore
+il controller. Su POSIX guida un nuovo process group. La terminazione è
+verificata: il controller attende che nel job, o nel gruppo, non resti alcun
+processo, altrimenti fallisce con un errore esplicito. I discendenti rimasti
+dopo la fine normale del comando vengono terminati allo stesso modo.
+
+Prima di iniziare la qualifica Windows il controller ricrea tutte le fixture
+sotto la propria ammissione, con un reset come quello di `qualify-vm`, e usa
+la CA e il fingerprint appena generati. Ogni preparazione, anche quella di
+`prepare-vm`, ricrea tutti i container, quindi nessuna connessione di
+un'attività precedente sopravvive e certificati, CA e fingerprint SFTP cambiano.
+
+Le credenziali delle fixture invece non ruotano. Sono le credenziali di test
+pubbliche, fisse negli script di qualifica che producono le evidenze. Il fake
+GCS non ha autenticazione, e Azurite usa la chiave di account fissa
+dell'emulatore. Un client superstite potrebbe quindi riconnettersi. Al posto
+della rotazione c'è un **lease**:
+
+- il controller lo rinnova ogni 10 secondi sul canale di ammissione (riga
+  `renew`, risposta `renewed`), e lo considera valido per 60 secondi da
+  quando ha **inviato** l'ultimo rinnovo confermato;
+- la VM registra in `lease` la scadenza a 60 + 30 secondi da quando lo ha
+  **ricevuto**, sull'orologio di boot (`/proc/uptime`), con l'identificativo
+  del boot;
+- se un rinnovo fallisce, il canale si chiude o il lease scade, il controller
+  termina tutto l'albero locale (verificato) e fallisce con `CampaignLost`;
+- l'ammissione successiva, ottenuto il lock esclusivo, attende la scadenza
+  registrata prima di fare qualsiasi altra cosa. Dopo un riavvio della VM l'età
+  dell'ultimo lease non è nota e attende l'intera durata.
+
+**Assunzione sugli orologi**, l'unica del protocollo: sull'intervallo di un
+lease, il clock monotono del controller e l'orologio di boot della VM
+differiscono meno del margine (30 s) meno il tempo di terminazione
+dell'albero (al più 10 s) e un ciclo di controllo (1 s). Inoltre il
+controller non viene sospeso durante una campagna: i suoi processi
+riprenderebbero prima del controllo successivo. Non serve che gli orologi
+siano sincronizzati, solo che non divergano di quasi 20 s in 90 s.
+
+#### Impedito e rilevato
+
+**Impedito per costruzione**, senza assunzioni sugli orologi:
+
+- due ammissioni contemporanee;
+- un'ammissione mentre vive un'attività di un'ammissione precedente
+  (controller, preparazione staccata con `nohup`, runner) che tiene il
+  descrittore del lock, anche se il suo controller è morto o qualifica
+  un'altra revisione in un'altra `remote_root`;
+- un'ammissione mentre un runner etichettato è stato creato ma non ha ancora
+  preso il lock;
+- un'ammissione annunciata con un gettone non più suo dopo la conversione del
+  lock;
+- un runner che misura input diversi da quelli caricati dal suo controller
+  per la sua epoca, compreso un caricamento della stessa revisione terminato
+  in ritardo da un altro controller: finisce nella directory di un'altra
+  epoca, e un file cambiato o aggiunto nella propria fa fallire il controllo
+  successivo;
+- evidenze sigillate che non descrivono i binari della campagna;
+- dopo la morte del controller, un discendente locale ancora vivo (il job
+  object lo termina).
+
+**Impedito sotto l'assunzione sugli orologi**: processi locali della qualifica
+Windows ancora attivi quando un'altra campagna viene ammessa dopo una
+partizione di rete.
+
+**Soltanto rilevato**:
+
+- il lavoro sulla VM di un'attività che ha perso l'ammissione. Le sue
+  scritture successive si fermano all'epoca, e quelle già partite non entrano
+  nelle evidenze della nuova campagna, perché gli input stanno in un'altra
+  directory e lo stato delle fixture è legato al nonce del reset;
+- un discendente di una preparazione che chiude il descrittore del lock e
+  sopravvive al suo wrapper. Nessuno script di questo repository lo fa: un
+  processo così non trattiene l'ammissione successiva, le sue scritture
+  passano dal controllo dell'epoca e vengono fermate, e le fixture vengono
+  comunque ricreate prima di ogni misura;
+- un'epoca cambiata fuori dal protocollo, ricreando a mano `.campaign`. Il
+  gettone nuovo ha un'altra parte casuale, quindi ogni attività precedente
+  viene fermata al primo controllo.
 
 Limite dichiarato: il lock del controller si libera quando sulla VM il canale
 SSH si chiude. Se il controller termina, la connessione si chiude subito; in
 una partizione di rete il server SSH della VM se ne accorge solo con i propri
 keepalive (`TCPKeepAlive`, e `ClientAliveInterval` se configurato): fino ad
 allora il lock resta tenuto e un altro controller viene rifiutato, il verso
-sicuro. Il controller, dal suo lato, smette di lavorare appena vede il canale
-chiuso.
+sicuro. Il controller, dal suo lato, smette di lavorare al primo rinnovo
+fallito.
 
 ### Fixture ricreate prima del runner
 
-All'inizio di ogni tentativo `qualify-vm` il coordinatore riesegue la
-preparazione delle fixture con `PLENORA_FIXTURE_RECREATE=1`. Ogni preparazione,
-anche quella di `prepare-vm`, ha un nonce unico, registrato nel tentativo
+All'inizio di ogni tentativo `qualify-vm`, e prima della qualifica Windows, il
+coordinatore esegue un reset delle fixture. Ogni preparazione, anche quella di
+`prepare-vm`, ricrea i container con `PLENORA_FIXTURE_RECREATE=1` e ha un nonce
+unico, registrato nel tentativo
 locale (`<etichetta>-nonce.json`) e usato nei nomi dei file di segnale sulla
 VM: un segnale lasciato da un'esecuzione precedente non viene mai letto come
 quello corrente. Il wrapper registra sempre il codice d'uscita reale ed esce
@@ -213,7 +303,8 @@ con quel codice. In ordine:
 
 1. il wrapper prende in modo condiviso il lock di ammissione e poi, in modo
    esclusivo, `.fixtures/campaign/campaign.lock` del checkout: se un lock è
-   occupato si ferma prima di toccare qualcosa (codice 75). Lo script verifica
+   occupato si ferma prima di toccare qualcosa (codice 75); un altro errore di
+   `flock` conserva il proprio codice. Lo script verifica
    l'epoca all'avvio, prima del marcatore `in-progress`, prima di ricreare e
    prima di registrare la ricevuta: un'epoca cambiata lo ferma con il codice
    77. In entrambi i casi la campagna termina con un errore esplicito;

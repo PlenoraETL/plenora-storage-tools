@@ -66,6 +66,33 @@ def check_fixture_state(output, nonce):
                          'nothing was measured')
 
 
+def check_inputs(inputs, expected, baseline):
+    """Every file of this attempt's input directory, and nothing else, has the
+    digest the controller expects; so has the baseline binary as mounted.
+
+    The directory belongs to the epoch of this runner's admission; a file of
+    another controller in it, or a changed byte, stops the run before its
+    result can be recorded.
+    """
+    inputs = Path(inputs)
+    found = {}
+    for path in sorted(inputs.rglob('*')):
+        if path.is_symlink() or not (path.is_dir() or path.is_file()):
+            raise ValueError('campaign inputs contain an entry that is not a regular file; nothing is recorded')
+        if path.is_file():
+            found[path.relative_to(inputs).as_posix()] = digest(path)
+    if found != expected or digest(baseline) != expected.get('baseline/plenora-storage'):
+        raise ValueError('campaign inputs differ from the ones the controller uploaded; nothing is recorded')
+
+
+def input_fence(epoch_fence, inputs, expected, baseline):
+    """The runner's fence: the admission epoch, then every input digest."""
+    def fence():
+        epoch_fence()
+        check_inputs(inputs, expected, baseline)
+    return fence
+
+
 def fenced_phase(campaign, fence, name, action, *, retry=False, reason=None):
     """Run one phase only while this runner's admission holds the VM.
 
@@ -82,15 +109,21 @@ def fenced_phase(campaign, fence, name, action, *, retry=False, reason=None):
     return campaign.phase(name, guarded, retry=retry, reason=reason)
 
 
-def run(folder, baseline, output, retries, reason, backend_data, fixture_nonce, campaign_dir, epoch):
+def run(folder, baseline, output, retries, reason, backend_data, fixture_nonce, campaign_dir, epoch, inputs,
+        expected):
     # Shared hold of the VM campaign lock for the whole run, then the epoch of
     # this runner's admission (campaign_fence): no controller is admitted while
     # this runner lives, and a runner started after another admission stops.
-    with held(campaign_dir, epoch) as fence:
-        measure(folder, baseline, output, retries, reason, backend_data, fixture_nonce, fence)
+    # Every check of the epoch also checks every input against its digest, so
+    # each phase is measured on exactly the inputs of this attempt, before
+    # and after.
+    with held(campaign_dir, epoch) as epoch_fence:
+        fence = input_fence(epoch_fence, inputs, expected, baseline)
+        fence()
+        measure(folder, baseline, output, retries, reason, backend_data, fixture_nonce, fence, expected)
 
 
-def measure(folder, baseline, output, retries, reason, backend_data, fixture_nonce, fence):
+def measure(folder, baseline, output, retries, reason, backend_data, fixture_nonce, fence, expected):
     if sys.platform != 'linux':
         raise ValueError('VM campaign requires Linux')
     folder, baseline, output = folder.resolve(), baseline.resolve(), output.resolve()
@@ -190,7 +223,7 @@ def measure(folder, baseline, output, retries, reason, backend_data, fixture_non
             if not destination.exists():
                 shutil.copyfile(source, destination)
         fence()
-        write_json(output / 'selected/report.json', {'status': 'PASS', 'identity': subject,
+        write_json(output / 'selected/report.json', {'status': 'PASS', 'identity': subject, 'inputs': expected,
                    'files': {name: digest(path) for name, path in selected.items()}})
         print('PASS complete VM campaign; selected evidence is ready for final validation')
 
@@ -207,7 +240,10 @@ if __name__ == '__main__':
                         help='nonce of the fixture reset of this attempt, checked before measuring')
     parser.add_argument('--campaign-dir', required=True, type=Path,
                         help='VM campaign directory with the admission lock and epoch (campaign_fence)')
-    parser.add_argument('--epoch', required=True, type=int, help='epoch of the admission that started this runner')
+    parser.add_argument('--epoch', required=True, help='epoch of the admission that started this runner')
+    parser.add_argument('--inputs', required=True, type=Path, help='input directory of this attempt')
+    parser.add_argument('--expected-inputs', required=True, type=json.loads,
+                        help='JSON object: digest of every file of the input directory, by relative path')
     args = parser.parse_args()
     run(args.distribution, args.baseline_binary, args.output, args.retry_phase, args.retry_reason, args.backend_data,
-        args.fixture_nonce, args.campaign_dir, args.epoch)
+        args.fixture_nonce, args.campaign_dir, args.epoch, args.inputs, args.expected_inputs)

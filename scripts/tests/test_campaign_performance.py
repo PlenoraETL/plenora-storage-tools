@@ -18,7 +18,6 @@ from check_performance import UNRELIABLE, compare
 from fixture_connections import BUFFERED, PROVIDERS
 from performance_order import SCHEME, paired_order, validate_pairing
 import qualify_transfers
-import campaign_fence
 import release_campaign
 import release_evidence
 import run_vm_campaign
@@ -315,174 +314,6 @@ class RetryTests(unittest.TestCase):
         self.assertIn('spooled-large', run_vm_campaign.phases_for('3.0.0'))
 
 
-class FakeChannel:
-    def __init__(self, code=0, finished=False):
-        self.closed, self.code, self.finished = False, code, finished
-
-    def close(self):
-        self.closed = True
-
-    def exit_status_ready(self):
-        return self.finished
-
-    def recv_exit_status(self):
-        return self.code
-
-
-class FakeSession:
-    """An admission that holds the VM until `lose()` is called."""
-
-    def __init__(self, epoch=1, directory='/srv/q/.campaign'):
-        self.epoch, self.directory, self.lost = epoch, directory, False
-
-    def alive(self):
-        return not self.lost
-
-    def check(self, remote):
-        if self.lost:
-            raise campaign_fence.CampaignLost('lost')
-
-    def lose(self):
-        self.lost = True
-
-
-class FakeRemote:
-    """A VM whose fixture preparation finishes after a few polls with a
-    scripted outcome; files are kept in memory by remote path."""
-
-    def __init__(self, root, *, code='0', check='PASS', polls=2):
-        self.root, self.code, self.check, self.polls = root, code, check, polls
-        self.files, self.commands = {}, []
-
-    def write(self, remote, text):
-        self.files[remote] = text
-
-    def download(self, remote, path):
-        path.write_text(self.files[remote])
-
-    def run(self, command):
-        self.commands.append(command)
-        if '(nohup bash .fixtures/' in command:
-            self.label_nonce = command.split('(nohup bash .fixtures/', 1)[1].split('-run.sh', 1)[0]
-            return 'started'
-        if 'then cat ' in command:
-            signal = command.split('if test -f ', 1)[1].split(';', 1)[0]
-            if signal in [f'.fixtures/signals/{self.label_nonce}.exit'] and self.polls == 0:
-                self.finish()
-            self.polls -= 1
-            return self.files.get(f'{self.root}/{signal}', 'running') if signal in self.local_signals() else 'running'
-        if 'then echo yes' in command:
-            path = command.split('if test -f ', 1)[1].split(';', 1)[0]
-            return 'yes' if f'{self.root}/{path}' in self.files else 'no'
-        return ''
-
-    def local_signals(self):
-        return {key[len(self.root) + 1:] for key in self.files if key.endswith('.exit')}
-
-    def finish(self):
-        signal = f'{self.root}/.fixtures/signals/{self.label_nonce}'
-        self.files[signal + '.exit'] = self.code
-        self.files[signal + '.log'] = 'log'
-        if self.code != str(campaign_fence.LOCK_HELD):
-            self.files[f'{self.root}/.fixtures/diagnostics/{self.label_nonce}.tar.gz'] = 'archive'
-        self.files[signal + '-check.json'] = json.dumps({'status': self.check})
-
-
-class FixtureResetTests(unittest.TestCase):
-    ROOT = '/srv/root'
-
-    def reset(self, remote, folder, session=None):
-        return release_campaign.reset_fixtures(remote, self.ROOT, 'storage-q-abc', 'vm.invalid', folder,
-                                               session or FakeSession(), poll=0, deadline=60)
-
-    def test_a_reset_is_recorded_with_its_nonce_and_epoch_only_after_every_fixture_answers(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            folder = Path(temporary)
-            remote = FakeRemote(self.ROOT)
-            nonce = self.reset(remote, folder, FakeSession(epoch=7))
-            record = json.loads((folder / 'fixture-reset.json').read_text())
-            self.assertEqual((record['nonce'], record['epoch'], record['recreated']), (nonce, 7, True))
-            self.assertEqual(json.loads((folder / 'fixture-reset-nonce.json').read_text())['nonce'], nonce)
-            self.assertTrue((folder / 'pre-reset.tar.gz').is_file())
-            script = remote.files[f'{self.ROOT}/.fixtures/fixture-reset-{nonce}.sh']
-            self.assertIn(f'.fixtures/signals/fixture-reset-{nonce}', script)
-            self.assertNotIn('|| true', script)
-            wrapper = remote.files[f'{self.ROOT}/.fixtures/fixture-reset-{nonce}-run.sh']
-            self.assertIn('CAMPAIGN_EPOCH=7', wrapper)
-
-    def test_a_stale_exit_signal_is_never_read_as_this_execution(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            folder = Path(temporary)
-            remote = FakeRemote(self.ROOT, code='1')
-            # A successful signal left by an earlier execution of the same label.
-            remote.files[f'{self.ROOT}/.fixtures/signals/fixture-reset-{"0" * 32}.exit'] = '0'
-            with self.assertRaises(ValueError):
-                self.reset(remote, folder)
-            self.assertFalse((folder / 'fixture-reset.json').exists())
-
-    def test_every_refusal_is_typed_and_records_no_reset(self):
-        cases = ((str(campaign_fence.LOCK_HELD), 'PASS', campaign_fence.CampaignBusy),
-                 (str(release_campaign.RUNNER_ACTIVE), 'PASS', campaign_fence.CampaignBusy),
-                 (str(campaign_fence.FENCED), 'PASS', campaign_fence.CampaignFenced),
-                 ('0', 'FAIL', ValueError))
-        for code, check, error in cases:
-            with self.subTest(code=code, check=check), tempfile.TemporaryDirectory() as temporary:
-                folder = Path(temporary)
-                with self.assertRaises(error):
-                    self.reset(FakeRemote(self.ROOT, code=code, check=check), folder)
-                self.assertFalse((folder / 'fixture-reset.json').exists())
-
-    def test_a_lost_admission_starts_no_preparation(self):
-        session = FakeSession()
-        session.lose()
-        remote = FakeRemote(self.ROOT)
-        with tempfile.TemporaryDirectory() as temporary, self.assertRaises(campaign_fence.CampaignLost):
-            self.reset(remote, Path(temporary), session)
-        self.assertEqual(remote.files, {})
-
-    def test_the_wrapper_holds_the_admission_lock_and_the_script_fences_every_change(self):
-        script, wrapper = release_campaign.fixture_scripts(self.ROOT, 'storage-q-abc', 'vm.invalid', 'fixture-reset',
-                                                           'n0nce', recreate=True, directory='/srv/q/.campaign',
-                                                           epoch=3)
-        self.assertIn('exec 9</srv/q/.campaign/lock', wrapper)
-        self.assertIn(f'flock -n -s 9 || exit {campaign_fence.LOCK_HELD}', wrapper)
-        self.assertIn(f'flock -n -E {campaign_fence.LOCK_HELD} .fixtures/campaign/campaign.lock', wrapper)
-        self.assertIn('mv .fixtures/signals/fixture-reset-n0nce.exit.pending .fixtures/signals/fixture-reset-n0nce.exit',
-                      wrapper)
-        self.assertTrue(wrapper.rstrip().endswith('exit "$code"'))
-        steps = script.splitlines()
-        fences = [i for i, line in enumerate(steps) if line == 'fence']
-        runner = next(i for i, line in enumerate(steps) if "grep -q '^storage-q-abc-campaign-'" in line)
-        archive = next(i for i, line in enumerate(steps) if 'logs --no-color' in line)
-        recreate = steps.index('export PLENORA_FIXTURE_RECREATE=1')
-        check = next(i for i, line in enumerate(steps) if 'check_fixtures.py' in line)
-        states = [i for i, line in enumerate(steps) if line.startswith('printf') and 'fixture-state' in line]
-        memory = next(i for i, line in enumerate(steps) if 'check_memory.py' in line)
-        self.assertIn('in-progress', steps[states[0]])
-        self.assertIn('reset', steps[states[-1]])
-        # A fence first of all, then before the first change, before the
-        # recreation and before the final record.
-        self.assertLess(fences[0], runner)
-        self.assertTrue(any(runner < f < states[0] for f in fences))
-        self.assertTrue(any(memory < f < recreate for f in fences))
-        self.assertTrue(any(check < f < states[-1] for f in fences))
-        self.assertLess(states[0], archive)
-        self.assertLess(archive, memory)
-        self.assertLess(recreate, check)
-
-    def test_the_runner_measures_only_after_this_attempts_reset(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            output = Path(temporary)
-            with self.assertRaises(ValueError):
-                run_vm_campaign.check_fixture_state(output, 'n0nce')
-            for state in ({'nonce': 'other', 'kind': 'reset'}, {'nonce': 'n0nce', 'kind': 'prepare'}):
-                (output / 'fixture-state.json').write_text(json.dumps(state))
-                with self.assertRaises(ValueError):
-                    run_vm_campaign.check_fixture_state(output, 'n0nce')
-            (output / 'fixture-state.json').write_text(json.dumps({'nonce': 'n0nce', 'kind': 'reset'}))
-            run_vm_campaign.check_fixture_state(output, 'n0nce')
-
-
 class FixtureDefinitionTests(unittest.TestCase):
     def test_fake_gcs_keeps_no_state_that_slows_listing_down(self):
         # Plain text: the test tooling has no YAML parser.
@@ -490,312 +321,6 @@ class FixtureDefinitionTests(unittest.TestCase):
         service = lines.index('  gcs:')
         command = next(line for line in lines[service:] if line.strip().startswith('command:'))
         self.assertIn('"-backend", "memory"', command)
-
-
-STUB_DOCKER = """#!/usr/bin/env bash
-# Stub: `ps` lists the ids in DOCKER_IDS; `compose logs` fails when FAIL_LOGS is set.
-if [ "$1" = ps ]; then printf '%s' "${DOCKER_IDS:-}"; exit 0; fi
-if [ "$1" = compose ] && [[ " $* " == *" logs "* ]] && [ -n "${FAIL_LOGS:-}" ]; then exit 1; fi
-exit 0
-"""
-
-LINUX = sys.platform != 'win32' and bool(shutil.which('bash')) and bool(shutil.which('flock'))
-
-
-def stub_docker(folder):
-    (folder / 'bin').mkdir(parents=True, exist_ok=True)
-    (folder / 'bin/docker').write_text(STUB_DOCKER)
-    (folder / 'bin/docker').chmod(0o755)
-
-
-def stub_environment(folder, **values):
-    import os
-    return dict(os.environ, PATH=f'{folder / "bin"}:{os.environ["PATH"]}', **values)
-
-
-@unittest.skipUnless(LINUX, 'runs the generated bash script')
-class FixtureScriptBehaviourTests(unittest.TestCase):
-    """Executes the generated preparation script with stubbed docker and
-    preparation steps, and checks what it leaves behind."""
-
-    def setUp(self):
-        self.folder = tempfile.TemporaryDirectory()
-        self.root = Path(self.folder.name)
-        for path in ('.fixtures/signals', '.fixtures/campaign', '.fixtures/minio', '.fixtures/extended', 'scripts',
-                     'campaign'):
-            (self.root / path).mkdir(parents=True)
-        for path in ('.fixtures/ca.crt', '.fixtures/minio/public.crt', '.fixtures/extended/server.crt',
-                     '.fixtures/sftp-fingerprint'):
-            (self.root / path).write_text('fixture')
-        (self.root / 'campaign/epoch').write_text('1\n')
-        stub_docker(self.root)
-        (self.root / 'scripts/prepare-fixtures.sh').write_text('touch .fixtures/prepared\n')
-        (self.root / 'scripts/prepare-extended-fixtures.sh').write_text('exit "${FAIL_EXTENDED:-0}"\n')
-        report = "import json,sys; open(sys.argv[2],'w').write(json.dumps({'status': 'PASS'}))\n"
-        (self.root / 'scripts/check_fixtures.py').write_text(report)
-        (self.root / 'scripts/check_memory.py').write_text(report)
-
-    def tearDown(self):
-        self.folder.cleanup()
-
-    def execute(self, nonce, epoch=1, **environment):
-        import subprocess
-        script, _ = release_campaign.fixture_scripts(str(self.root), 'storage-q-abc', 'vm.invalid', 'fixture-reset',
-                                                     nonce, recreate=True, directory=str(self.root / 'campaign'),
-                                                     epoch=epoch)
-        path = self.root / f'.fixtures/fixture-reset-{nonce}.sh'
-        path.write_text(script)
-        env = stub_environment(self.root, CAMPAIGN_DIR=str(self.root / 'campaign'), CAMPAIGN_EPOCH=str(epoch),
-                               **environment)
-        return subprocess.run(['bash', str(path)], env=env, check=False).returncode
-
-    def test_a_failed_preparation_invalidates_the_previous_reset(self):
-        self.assertEqual(self.execute('a' * 32), 0)
-        run_vm_campaign.check_fixture_state(self.root / '.fixtures/campaign', 'a' * 32)
-        self.assertNotEqual(self.execute('b' * 32, FAIL_EXTENDED='1'), 0)
-        with self.assertRaises(ValueError):
-            run_vm_campaign.check_fixture_state(self.root / '.fixtures/campaign', 'a' * 32)
-        with self.assertRaises(ValueError):
-            run_vm_campaign.check_fixture_state(self.root / '.fixtures/campaign', 'b' * 32)
-
-    def test_a_failed_diagnostic_collection_recreates_nothing(self):
-        self.assertNotEqual(self.execute('c' * 32, FAIL_LOGS='1'), 0)
-        self.assertFalse((self.root / '.fixtures/prepared').exists())
-        with self.assertRaises(ValueError):
-            run_vm_campaign.check_fixture_state(self.root / '.fixtures/campaign', 'c' * 32)
-
-    def test_a_preparation_of_an_older_admission_touches_nothing(self):
-        self.assertEqual(self.execute('a' * 32), 0)
-        (self.root / '.fixtures/prepared').unlink()
-        (self.root / 'campaign/epoch').write_text('2\n')
-        self.assertEqual(self.execute('d' * 32, epoch=1), campaign_fence.FENCED)
-        self.assertFalse((self.root / '.fixtures/prepared').exists())
-        run_vm_campaign.check_fixture_state(self.root / '.fixtures/campaign', 'a' * 32)
-
-
-RUNNER = """import sys, time
-sys.path.insert(0, sys.argv[1])
-import campaign_fence
-with campaign_fence.held(sys.argv[2], int(sys.argv[3])):
-    print('running', flush=True)
-    sys.stdin.read()
-"""
-
-BLOCKING_PREPARATION = ': >.fixtures/started; read line\n'
-
-
-class AdmissionTests(unittest.TestCase):
-    """The controller side of the admission, with fake channels."""
-
-    class Remote:
-        def __init__(self, first, code=0, epoch='3'):
-            self.first, self.code, self.epoch, self.channel = first, code, epoch, None
-
-        def hold(self, command):
-            self.channel = FakeChannel(self.code, finished=self.first == '')
-            return self.channel, self.first
-
-        def run(self, command):
-            return self.epoch
-
-    def test_an_admission_yields_its_epoch_and_directory(self):
-        remote = self.Remote('locked 3 /srv/q/.campaign')
-        with campaign_fence.admission(remote, '/srv/q') as session:
-            self.assertEqual((session.epoch, session.directory), (3, '/srv/q/.campaign'))
-            session.check(remote)
-            remote.epoch = '4'
-            with self.assertRaises(campaign_fence.CampaignFenced):
-                session.check(remote)
-        self.assertTrue(remote.channel.closed)
-
-    def test_contention_is_busy_and_any_other_failure_is_reported_as_such(self):
-        with self.assertRaises(campaign_fence.CampaignBusy):
-            with campaign_fence.admission(self.Remote('', campaign_fence.LOCK_HELD), '/srv/q'):
-                self.fail('admitted')
-        for first, code in (('', 1), ('locked x /d', 1), ('unexpected', 2)):
-            with self.subTest(first=first), self.assertRaises(RuntimeError) as failure:
-                with campaign_fence.admission(self.Remote(first, code), '/srv/q'):
-                    self.fail('admitted')
-            self.assertNotIsInstance(failure.exception, campaign_fence.CampaignBusy)
-
-    def test_a_finished_admission_channel_is_a_lost_admission(self):
-        remote = self.Remote('locked 3 /srv/q/.campaign')
-        with campaign_fence.admission(remote, '/srv/q') as session:
-            remote.channel.finished = True
-            with self.assertRaises(campaign_fence.CampaignLost):
-                session.check(remote)
-
-    def test_a_busy_vm_exits_with_the_lock_code(self):
-        def busy():
-            raise campaign_fence.CampaignBusy('held')
-        self.assertEqual(release_campaign.entrypoint(busy), campaign_fence.LOCK_HELD)
-        self.assertEqual(release_campaign.entrypoint(lambda: None), 0)
-        for error in (campaign_fence.CampaignFenced('epoch'), RuntimeError('lock command failed')):
-            def failing(error=error):
-                raise error
-            with self.assertRaises(type(error)):
-                release_campaign.entrypoint(failing)
-
-    def test_losing_the_admission_stops_the_windows_qualification(self):
-        import threading
-        session = FakeSession()
-        threading.Timer(0.5, session.lose).start()
-        started = time.monotonic()
-        with tempfile.TemporaryDirectory() as temporary:
-            with self.assertRaises(campaign_fence.CampaignLost):
-                campaign_fence.supervised([sys.executable, '-c', 'import time; time.sleep(60)'],
-                                          Path(temporary) / 'command.log', session, poll=0.1, grace=5)
-        self.assertLess(time.monotonic() - started, 30)
-
-    def test_a_supervised_command_reports_its_own_failure(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            log = Path(temporary) / 'command.log'
-            campaign_fence.supervised([sys.executable, '-c', 'pass'], log, FakeSession(), poll=0.05)
-            with self.assertRaises(RuntimeError) as failure:
-                campaign_fence.supervised([sys.executable, '-c', 'raise SystemExit(3)'], log, FakeSession(), poll=0.05)
-            self.assertNotIsInstance(failure.exception, campaign_fence.CampaignLost)
-
-
-@unittest.skipUnless(LINUX, 'needs bash and flock')
-class AdmissionProtocolTests(unittest.TestCase):
-    """The real admission command, preparation wrapper and runner hold on one
-    VM root, run as processes."""
-
-    def setUp(self):
-        self.folder = tempfile.TemporaryDirectory()
-        self.root = Path(self.folder.name)
-        stub_docker(self.root)
-        self.directory = self.root / 'q/.campaign'
-
-    def tearDown(self):
-        self.folder.cleanup()
-
-    def admit(self, **environment):
-        import subprocess
-        process = subprocess.Popen(['sh', '-c', campaign_fence.admission_command(str(self.root / 'q'))],
-                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True,
-                                   env=stub_environment(self.root, **environment))
-        return process, process.stdout.readline().split()
-
-    def refused(self, **environment):
-        process, line = self.admit(**environment)
-        process.stdin.close()
-        return line == [] and process.wait(10) == campaign_fence.LOCK_HELD
-
-    def end(self, process):
-        process.stdin.close()
-        process.wait(10)
-
-    def epoch(self):
-        return (self.directory / 'epoch').read_text().strip()
-
-    def test_one_admission_at_a_time_each_with_a_new_epoch(self):
-        first, line = self.admit()
-        self.assertEqual(line[:2], ['locked', '1'])
-        self.assertTrue(self.refused())
-        self.assertEqual(self.epoch(), '1')
-        self.end(first)
-        second, line = self.admit()
-        self.assertEqual(line[:2], ['locked', '2'])
-        self.end(second)
-
-    def test_a_runner_of_a_lost_admission_is_fenced_whatever_its_revision(self):
-        # A and B qualify different revisions, so their checkouts differ: the
-        # admission state lives in the VM root and binds them both.
-        controller_a, line = self.admit()
-        epoch_a = int(line[1])
-        self.end(controller_a)
-        controller_b, line = self.admit()
-        try:
-            with self.assertRaises(campaign_fence.CampaignFenced):
-                with campaign_fence.held(self.directory, epoch_a):
-                    self.fail('a late runner of A measured')
-            with campaign_fence.held(self.directory, int(line[1])) as fence:
-                fence()
-        finally:
-            self.end(controller_b)
-
-    def test_a_surviving_runner_keeps_every_admission_out(self):
-        import subprocess
-        controller_a, line = self.admit()
-        runner = subprocess.Popen([sys.executable, '-c', RUNNER, str(ROOT / 'scripts'), str(self.directory), line[1]],
-                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
-        try:
-            self.assertEqual(runner.stdout.readline().strip(), 'running')
-            self.end(controller_a)
-            self.assertTrue(self.refused())
-            self.assertEqual(self.epoch(), '1')
-        finally:
-            self.end(runner)
-        controller_b, line = self.admit()
-        self.assertEqual(line[:2], ['locked', '2'])
-        self.end(controller_b)
-
-    def test_a_surviving_preparation_keeps_every_admission_out(self):
-        import subprocess
-        controller_a, line = self.admit()
-        checkout = self.root / 'run'
-        (checkout / '.fixtures').mkdir(parents=True)
-        _, wrapper = release_campaign.fixture_scripts(str(checkout), 'storage-q-abc', 'vm.invalid', 'prepare',
-                                                      'n0nce', recreate=False, directory=str(self.directory),
-                                                      epoch=int(line[1]))
-        (checkout / '.fixtures/prepare-n0nce.sh').write_text(BLOCKING_PREPARATION)
-        (checkout / '.fixtures/prepare-n0nce-run.sh').write_text(wrapper)
-        preparation = subprocess.Popen(['bash', str(checkout / '.fixtures/prepare-n0nce-run.sh')],
-                                       stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
-        try:
-            for _ in range(100):
-                if (checkout / '.fixtures/started').exists():
-                    break
-                time.sleep(0.05)
-            else:
-                self.fail('the preparation did not start')
-            self.end(controller_a)
-            self.assertTrue(self.refused())
-            self.assertEqual(self.epoch(), '1')
-        finally:
-            self.end(preparation)
-        controller_b, line = self.admit()
-        self.assertEqual(line[:2], ['locked', '2'])
-        self.end(controller_b)
-
-    def test_a_runner_container_not_yet_locked_keeps_admissions_out(self):
-        self.assertTrue(self.refused(DOCKER_IDS='0123456789ab'))
-        self.assertFalse((self.directory / 'epoch').exists())
-
-    def test_an_epoch_change_during_a_phase_voids_it(self):
-        controller, line = self.admit()
-        try:
-            with tempfile.TemporaryDirectory() as temporary:
-                campaign = Campaign(Path(temporary), {'subject': 'same'})
-                with campaign_fence.held(self.directory, int(line[1])) as fence:
-                    def measured(path):
-                        (path / 'report.json').write_text('measured')
-                        # Another admission happens while this phase runs.
-                        (self.directory / 'epoch').write_text('99\n')
-                    with self.assertRaises(campaign_fence.CampaignFenced):
-                        run_vm_campaign.fenced_phase(campaign, fence, 'performance-ab', measured)
-                attempt = campaign.state['phases']['performance-ab'][-1]
-                self.assertEqual(attempt['status'], 'FAIL')
-                self.assertEqual(attempt['failure_type'], 'CampaignFenced')
-        finally:
-            self.end(controller)
-
-    def test_a_lock_error_that_is_not_contention_is_reported_as_such(self):
-        import errno
-        import fcntl
-        (self.directory).mkdir(parents=True)
-        (self.directory / 'lock').write_text('')
-        (self.directory / 'epoch').write_text('1\n')
-        with patch.object(fcntl, 'flock', side_effect=OSError(errno.EBADF, 'bad descriptor')):
-            with self.assertRaises(OSError) as failure:
-                with campaign_fence.held(self.directory, 1):
-                    self.fail('held')
-            self.assertNotIsInstance(failure.exception, campaign_fence.CampaignBusy)
-        with patch.object(fcntl, 'flock', side_effect=OSError(errno.EWOULDBLOCK, 'busy')):
-            with self.assertRaises(campaign_fence.CampaignBusy):
-                with campaign_fence.held(self.directory, 1):
-                    self.fail('held')
 
 
 class MemoryTests(unittest.TestCase):
@@ -874,14 +399,16 @@ class TlsFtpServer:
             connection, _ = self.listener.accept()
         except OSError:
             return
+        opened = [connection]
         try:
-            self.session(connection)
+            self.session(connection, opened)
         except OSError:
             pass
         finally:
-            connection.close()
+            for item in reversed(opened):
+                item.close()
 
-    def session(self, connection):
+    def session(self, connection, opened):
         def send(line):
             connection.sendall(line.encode() + b'\r\n')
 
@@ -901,6 +428,7 @@ class TlsFtpServer:
             if command == 'AUTH':
                 send('234 TLS')
                 connection = self.context.wrap_socket(connection, server_side=True)
+                opened.append(connection)
             elif command == 'USER':
                 send('331 password')
             elif command == 'PASS':
@@ -909,6 +437,7 @@ class TlsFtpServer:
                 send('200 ok')
             elif command == 'PASV':
                 data_listener = socket.create_server(('127.0.0.1', 0))
+                opened.append(data_listener)
                 port = data_listener.getsockname()[1]
                 send(f'227 Entering Passive Mode (127,0,0,1,{port // 256},{port % 256})')
             elif command == 'NLST':

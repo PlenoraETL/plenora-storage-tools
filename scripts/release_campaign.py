@@ -67,12 +67,14 @@ class Remote:
         return text.strip()
 
     def hold(self, command):
-        """Start `command` on its own channel and return the channel with the
-        first line it prints. The command keeps running while the channel is
-        open; closing the channel, or losing the connection, ends it."""
+        """Start `command` on its own channel and return the channel, its line
+        reader and the first line it prints. The command keeps running while
+        the channel is open; closing the channel, or losing the connection,
+        ends it."""
         channel = self.client.get_transport().open_session()
         channel.exec_command(command)
-        return channel, channel.makefile('r').readline().strip()
+        reader = channel.makefile('r')
+        return channel, reader, reader.readline().strip()
 
     def upload(self, path, remote):
         with self.client.open_sftp() as sftp:
@@ -140,7 +142,7 @@ RUNNER_ACTIVE = 76
 
 
 FIXTURE_STATE = '.fixtures/campaign/fixture-state.json'
-def fixture_scripts(remote_root, project, host, label, nonce, *, recreate, directory, epoch):
+def fixture_scripts(remote_root, project, host, label, nonce, *, reset, directory, epoch):
     """The fixture preparation script of one execution, and the wrapper that runs it.
 
     Every execution has its own `nonce`, which names its signal files: a signal
@@ -150,17 +152,21 @@ def fixture_scripts(remote_root, project, host, label, nonce, *, recreate, direc
     is admitted while the preparation lives; it also holds the campaign's
     ledger lock, so the preparation never overlaps this campaign's runner.
     When a lock is held it exits with LOCK_HELD before the script touches
-    anything. The script checks the admission `epoch` at its start, before
-    changing fixtures and before its final record, and exits with FENCED once
-    another controller was admitted. The wrapper always records the real exit
-    code and exits with it. The script ends by recording its nonce in
-    FIXTURE_STATE, which the runner checks before it measures anything.
+    anything; any other lock error keeps its own code, and a LOCK_HELD from
+    the script itself, which never refuses with it, becomes a failure. The
+    script checks the admission `epoch` at its start, before changing
+    fixtures and before its final record, and exits with FENCED once another
+    controller was admitted. The wrapper always records the real exit code
+    and exits with it. Every preparation recreates every fixture container,
+    so no connection of an earlier activity survives it, and regenerates
+    certificates and the SFTP fingerprint. The script ends by recording its
+    nonce in FIXTURE_STATE, which the runner checks before it measures
+    anything.
 
-    With `recreate` the script also refuses (RUNNER_ACTIVE) while a runner
-    container of this campaign is running, archives the fixtures' state, logs
-    and certificates (a failed collection stops it before anything is
-    recreated), recreates every fixture container and checks that every
-    fixture serves requests.
+    A `reset` also refuses (RUNNER_ACTIVE) while a runner container of this
+    campaign is running, archives the fixtures' state, logs and certificates
+    first (a failed collection stops it before anything is recreated), checks
+    the memory for the fixtures and then that every fixture serves requests.
     """
     q = shlex.quote
 
@@ -171,13 +177,13 @@ def fixture_scripts(remote_root, project, host, label, nonce, *, recreate, direc
     signal = '.fixtures/signals/' + label + '-' + nonce
     diagnostics = '.fixtures/diagnostics/' + label + '-' + nonce
     compose_all = 'docker compose -f docker-compose.yml -f compose.extended.yml'
-    kind = 'reset' if recreate else 'prepare'
+    kind = 'reset' if reset else 'prepare'
     lines = ['#!/usr/bin/env bash', 'set -euo pipefail', 'cd ' + q(remote_root),
              f'exec >{signal}.log 2>&1',
              'export COMPOSE_PROJECT_NAME=' + q(project),
              'export PLENORA_FIXTURE_HOST=' + q(host),
              *fence_lines(), 'fence']
-    if recreate:
+    if reset:
         lines += [
             f"if docker ps --format '{{{{.Names}}}}' | grep -q {q('^' + project + '-campaign-')}; then",
             f"  echo 'a VM runner container of this campaign is still running'; exit {RUNNER_ACTIVE}",
@@ -193,20 +199,24 @@ def fixture_scripts(remote_root, project, host, label, nonce, *, recreate, direc
             f'.fixtures/sftp-fingerprint; do cp "$file" {diagnostics}/; done',
             f'tar -czf {diagnostics}.tar.gz -C {diagnostics} .',
             f'python3 scripts/check_memory.py --output {signal}-memory.json',
-            'fence',
-            'export PLENORA_FIXTURE_RECREATE=1']
+            'fence']
     else:
         lines += ['fence', *state_lines('in-progress')]
-    lines += ['bash scripts/prepare-fixtures.sh', 'bash scripts/prepare-extended-fixtures.sh']
-    if recreate:
+    lines += ['export PLENORA_FIXTURE_RECREATE=1',
+              'bash scripts/prepare-fixtures.sh', 'bash scripts/prepare-extended-fixtures.sh']
+    if reset:
         lines += [f'python3 scripts/check_fixtures.py --output {signal}-check.json']
     lines += ['fence', *state_lines(kind)]
     wrapper = (f'cd {q(remote_root)} && mkdir -p .fixtures/campaign .fixtures/signals || exit 1\n'
                '(\n'
                f'  exec 9<{q(directory + "/lock")} || exit 1\n'
-               f'  flock -n -s 9 || exit {LOCK_HELD}\n'
-               f'  CAMPAIGN_DIR={q(directory)} CAMPAIGN_EPOCH={q(str(epoch))} exec flock -n -E {LOCK_HELD} '
-               f'.fixtures/campaign/campaign.lock bash .fixtures/{label}-{nonce}.sh\n'
+               f'  flock -n -E {LOCK_HELD} -s 9 || exit $?\n'
+               '  exec 8>>.fixtures/campaign/campaign.lock || exit 1\n'
+               f'  flock -n -E {LOCK_HELD} -x 8 || exit $?\n'
+               f'  CAMPAIGN_DIR={q(directory)} CAMPAIGN_EPOCH={q(epoch)} bash .fixtures/{label}-{nonce}.sh\n'
+               '  code=$?\n'
+               f'  if [ "$code" -eq {LOCK_HELD} ]; then exit 1; fi\n'
+               '  exit "$code"\n'
                ')\n'
                'code=$?\n'
                f'printf \'%s\\n\' "$code" >{signal}.exit.pending && mv {signal}.exit.pending {signal}.exit\n'
@@ -214,7 +224,7 @@ def fixture_scripts(remote_root, project, host, label, nonce, *, recreate, direc
     return '\n'.join(lines) + '\n', wrapper + '\n'
 
 
-def run_preparation(remote, remote_root, project, host, label, folder, *, recreate, session, poll=10, deadline=1800):
+def run_preparation(remote, remote_root, project, host, label, folder, *, reset, session, poll=10, deadline=1800):
     """Run one fixture preparation on the VM and wait for its own exit signal.
 
     Returns the execution's nonce, also recorded in `folder`. Raises
@@ -226,7 +236,7 @@ def run_preparation(remote, remote_root, project, host, label, folder, *, recrea
     nonce = uuid.uuid4().hex
     write_json(folder / (label + '-nonce.json'), {'nonce': nonce})
     signal = '.fixtures/signals/' + label + '-' + nonce
-    script, wrapper = fixture_scripts(remote_root, project, host, label, nonce, recreate=recreate,
+    script, wrapper = fixture_scripts(remote_root, project, host, label, nonce, reset=reset,
                                       directory=session.directory, epoch=session.epoch)
     remote.write(f'{remote_root}/.fixtures/{label}-{nonce}.sh', script)
     remote.write(f'{remote_root}/.fixtures/{label}-{nonce}-run.sh', wrapper)
@@ -248,11 +258,11 @@ def run_preparation(remote, remote_root, project, host, label, folder, *, recrea
     remote.download(f'{remote_root}/{signal}.log', folder / (label + '.log'))
     if result == str(RUNNER_ACTIVE):
         raise CampaignBusy('a VM runner container of this campaign is still running; nothing was recreated')
-    if recreate:
+    if reset:
         diagnostics = '.fixtures/diagnostics/' + label + '-' + nonce + '.tar.gz'
         if remote.run(f'cd {quoted} && if test -f {diagnostics}; then echo yes; else echo no; fi') == 'yes':
             remote.download(f'{remote_root}/{diagnostics}', folder / 'pre-reset.tar.gz')
-    if recreate and remote.run(f'cd {quoted} && if test -f {signal}-check.json; then echo yes; else echo no; fi') == 'yes':
+    if reset and remote.run(f'cd {quoted} && if test -f {signal}-check.json; then echo yes; else echo no; fi') == 'yes':
         remote.download(f'{remote_root}/{signal}-check.json', folder / 'fixture-check.json')
     if result != '0':
         raise ValueError('fixture preparation failed')
@@ -260,9 +270,9 @@ def run_preparation(remote, remote_root, project, host, label, folder, *, recrea
 
 
 def reset_fixtures(remote, remote_root, project, host, folder, session, **timing):
-    """Recreate every fixture before a VM attempt and record it only when all serve requests."""
+    """Recreate every fixture before qualifying against them and record it only when all serve requests."""
     started = time.time()
-    nonce = run_preparation(remote, remote_root, project, host, 'fixture-reset', folder, recreate=True,
+    nonce = run_preparation(remote, remote_root, project, host, 'fixture-reset', folder, reset=True,
                             session=session, **timing)
     check = json.loads((folder / 'fixture-check.json').read_text())
     if check.get('status') != 'PASS':
@@ -273,6 +283,34 @@ def reset_fixtures(remote, remote_root, project, host, folder, session, **timing
                                                'diagnostics': 'pre-reset.tar.gz',
                                                'reason': 'fresh fixtures before the VM runner'})
     return nonce
+
+
+def expected_inputs(files):
+    """Expected digest of every file of an attempt's input directory, by relative path."""
+    return {name: digest(path) for name, path in sorted(files.items())}
+
+
+def check_selected(result, identity, linux, expected):
+    """The runner's selected evidence measured exactly this campaign's binaries.
+
+    `linux` is the local Linux distribution and `expected` the input digests
+    given to the runner: the runner's identity and the binary digests of the
+    paired performance reports must match them, so a VM input replaced by
+    another controller cannot pass.
+    """
+    report = json.loads((result / 'selected/report.json').read_text())
+    subject = report.get('identity', {})
+    manifest = json.loads((linux / 'release-manifest.json').read_text())
+    artifacts = {row['name']: digest(linux / row['name']) for row in manifest['artifacts']}
+    performance = result / 'selected/gates/performance'
+    baseline = json.loads((performance / 'baseline.json').read_text())
+    candidate = json.loads((performance / 'candidate.json').read_text())
+    if (report.get('status') != 'PASS' or subject.get('source_revision') != identity['revision']
+            or subject.get('baseline_binary_sha256') != identity['baseline_sha256']
+            or subject.get('artifacts') != artifacts or report.get('inputs') != expected
+            or baseline.get('binary_sha256') != identity['baseline_sha256']
+            or candidate.get('binary_sha256') != digest(linux / 'plenora-storage')):
+        raise ValueError('the VM evidence does not describe this campaign\'s binaries; nothing is sealed')
 
 
 def run(config_path, output, retries, reason, vm_retries, connect_host=None):
@@ -362,9 +400,6 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
         remote = Remote(config, connect_host=connect_host)
         held = None
         try:
-            compose = (f'cd {q(remote_root)} && docker compose -p {q(project)} -f docker-compose.yml '
-                       '-f compose.extended.yml -f .fixtures/compose.campaign.json')
-
             def prepare(path):
                 bundle = path / 'source.bundle'
                 logged(['git', 'bundle', 'create', str(bundle), 'HEAD'], path, cwd=ROOT)
@@ -377,21 +412,7 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
                 # Move the transport bundle into ignored campaign storage after checkout.
                 remote.run(f'cd {q(remote_root)} && mv source.bundle .fixtures/source.bundle')
                 remote.run(f'cd {q(remote_root)} && test -z "$(git status --porcelain)"')
-                override = {'services': {'storage-rust': {'image': config['runner_image'],
-                    'volumes': [remote_root + ':/workspace', remote_root + '/.fixtures/runner-target:/workspace/target',
-                                'campaign-registry:/usr/local/cargo/registry',
-                                remote_root + '/.fixtures/baseline:/baseline:ro',
-                                'minio-data:/fixture-disks/minio:ro', 'sftp-data:/fixture-disks/sftp:ro', 'ftp-data:/fixture-disks/ftp:ro',
-                                session.directory + ':/campaign:ro']}},
-                    'volumes': {'campaign-registry': {'external': True, 'name': config['registry_volume']}}}
-                # Override the target mounts explicitly; the Compose service defines
-                # the same destinations, which Compose replaces by target path.
-                session.check(remote)
-                remote.write(remote_root + '/.fixtures/compose.campaign.json', json.dumps(override))
-                remote.run('mkdir -p ' + q(remote_root + '/.fixtures/baseline'))
-                remote.upload(baseline, remote_root + '/.fixtures/baseline/plenora-storage')
-                remote.run('chmod +x ' + q(remote_root + '/.fixtures/baseline/plenora-storage'))
-                run_preparation(remote, remote_root, project, config['host'], 'prepare', path, recreate=False,
+                run_preparation(remote, remote_root, project, config['host'], 'prepare', path, reset=False,
                                 session=session)
                 remote.download(remote_root + '/.fixtures/extended/server.crt', path / 'fixture-ca.crt')
                 remote.download(remote_root + '/.fixtures/sftp-fingerprint', path / 'host-pin')
@@ -401,17 +422,23 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
             # attempt up to the end of its runner (campaign_fence).
             held = admission(remote, config['vm_root'])
             session = held.__enter__()
-            prepared = phase('prepare-vm', prepare)
+            phase('prepare-vm', prepare)
 
             def windows(path):
                 folder = path / 'dist' / version / TARGETS['windows']
                 shutil.copytree(assembled / 'dist' / version / TARGETS['windows'], folder)
-                # Stopped as soon as the admission ends, and checked against
-                # the epoch on the VM at the end: a qualification during which
-                # another controller could reach the fixtures is not recorded.
+                # Fixtures recreated by this admission: no connection of an
+                # earlier activity survives, and certificates are new.
+                reset_fixtures(remote, remote_root, project, config['host'], path, session)
+                remote.download(remote_root + '/.fixtures/extended/server.crt', path / 'fixture-ca.crt')
+                remote.download(remote_root + '/.fixtures/sftp-fingerprint', path / 'host-pin')
+                # The whole local process tree lives only while the admission
+                # and its lease do, and the epoch is checked on the VM at the
+                # end: a qualification during which another controller could
+                # reach the fixtures is not recorded.
                 supervised([sys.executable, str(ROOT / 'scripts/qualify_target.py'), str(folder), '--fixture-host',
-                            config['host'], '--ftps-ca', str(prepared / 'fixture-ca.crt'), '--host-pin',
-                            str(prepared / 'host-pin')],
+                            config['host'], '--ftps-ca', str(path / 'fixture-ca.crt'), '--host-pin',
+                            str(path / 'host-pin')],
                            path / 'command.log', session, cwd=ROOT, env=dict(os.environ, PLENORA_WEBDAV_PORT='8088'))
                 session.check(remote)
 
@@ -428,17 +455,49 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
                 # left with accumulated state. The reset is recorded with the
                 # attempt, and only once every fixture answered.
                 nonce = reset_fixtures(remote, remote_root, project, config['host'], path, session)
+                # Every input of this attempt lives in a directory of this
+                # epoch, which no other admission writes, and the runner gets
+                # the digest of every file in it: an upload of another
+                # controller, finished late, can neither land in it nor pass.
+                inputs = '.fixtures/inputs/' + session.epoch
+                linux = assembled / 'dist' / version / TARGETS['linux']
+                distribution = f'dist/{version}/{TARGETS["linux"]}'
                 archive = path / 'linux-input.tar.gz'
                 with tarfile.open(archive, 'w:gz') as stream:
-                    stream.add(assembled / 'dist' / version / TARGETS['linux'], arcname='dist/' + version + '/' + TARGETS['linux'])
+                    stream.add(linux, arcname=distribution)
+                override = {'services': {'storage-rust': {'image': config['runner_image'],
+                    'volumes': [remote_root + ':/workspace', remote_root + '/.fixtures/runner-target:/workspace/target',
+                                'campaign-registry:/usr/local/cargo/registry',
+                                remote_root + '/' + inputs + '/baseline:/baseline:ro',
+                                'minio-data:/fixture-disks/minio:ro', 'sftp-data:/fixture-disks/sftp:ro', 'ftp-data:/fixture-disks/ftp:ro',
+                                session.directory + ':/campaign:ro']}},
+                    'volumes': {'campaign-registry': {'external': True, 'name': config['registry_volume']}}}
+                # Override the target mounts explicitly; the Compose service defines
+                # the same destinations, which Compose replaces by target path.
+                (path / 'compose.campaign.json').write_text(json.dumps(override), encoding='utf-8')
+                if any(item.is_dir() for item in linux.iterdir()):
+                    raise ValueError('the Linux distribution must be a flat directory')
+                expected = expected_inputs({'baseline/plenora-storage': baseline,
+                                            'linux-input.tar.gz': archive,
+                                            'compose.campaign.json': path / 'compose.campaign.json',
+                                            **{f'{distribution}/{item.name}': item for item in linux.iterdir()}})
+                write_json(path / 'expected-inputs.json', expected)
+                remote_inputs = remote_root + '/' + inputs
                 session.check(remote)
-                remote.upload(archive, remote_root + '/.fixtures/linux-input.tar.gz')
-                remote.run(f'cd {q(remote_root)} && tar -xzf .fixtures/linux-input.tar.gz && chmod +x dist/{q(version)}/{TARGETS["linux"]}/plenora-storage')
+                remote.run(f'mkdir -p {q(remote_root + "/.fixtures/inputs")} && mkdir {q(remote_inputs)} {q(remote_inputs + "/baseline")}')
+                remote.upload(baseline, remote_inputs + '/baseline/plenora-storage')
+                remote.upload(archive, remote_inputs + '/linux-input.tar.gz')
+                remote.upload(path / 'compose.campaign.json', remote_inputs + '/compose.campaign.json')
+                remote.run(f'cd {q(remote_inputs)} && tar -xzf linux-input.tar.gz && '
+                           f'chmod +x baseline/plenora-storage {q(distribution + "/plenora-storage")}')
+                compose = (f'cd {q(remote_root)} && docker compose -p {q(project)} -f docker-compose.yml '
+                           f'-f compose.extended.yml -f {q(inputs + "/compose.campaign.json")}')
                 container = project + '-campaign-' + path.name
-                command = ['python3', 'scripts/run_vm_campaign.py', f'dist/{version}/{TARGETS["linux"]}',
+                command = ['python3', 'scripts/run_vm_campaign.py', f'{inputs}/{distribution}',
                            '--baseline-binary', '/baseline/plenora-storage', '--output', '.fixtures/campaign',
+                           '--inputs', inputs, '--expected-inputs', json.dumps(expected, sort_keys=True),
                            '--fixture-nonce', nonce, '--campaign-dir', '/campaign',
-                           '--epoch', str(session.epoch),
+                           '--epoch', session.epoch,
                            '--backend-data', '/fixture-disks/minio', '--backend-data', '/fixture-disks/sftp', '--backend-data', '/fixture-disks/ftp']
                 for name in vm_retries:
                     command.extend(['--retry-phase', name])
@@ -474,6 +533,11 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
                 remote.download(remote_root + '/.fixtures/selected.tar.gz', path / 'selected.tar.gz')
                 with tarfile.open(path / 'selected.tar.gz') as stream:
                     stream.extractall(path, filter='data')
+                # Last checks before the attempt can pass: the evidence is of
+                # this campaign's binaries, and the admission still held the
+                # VM after the download.
+                check_selected(path, identity, linux, expected)
+                session.check(remote)
 
             vm_result = phase('qualify-vm', vm)
             held.__exit__(None, None, None)
