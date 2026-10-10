@@ -1,6 +1,5 @@
 """Qualify exact Linux distributions with resumable, separately recorded attempts."""
 import argparse
-from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
@@ -9,6 +8,7 @@ import subprocess
 import sys
 import venv
 
+from campaign_fence import held
 from campaign_state import Campaign, digest, exclusive, logged, write_json
 from check_disk_space import GIB, inspect
 from check_memory import available as available_memory, inspect as inspect_memory
@@ -66,46 +66,31 @@ def check_fixture_state(output, nonce):
                          'nothing was measured')
 
 
-@contextmanager
-def runner_lock(path):
-    """Hold the VM runner lock for the runner's whole life.
+def fenced_phase(campaign, fence, name, action, *, retry=False, reason=None):
+    """Run one phase only while this runner's admission holds the VM.
 
-    The controllers' lock command needs this lock to record a new owner, so
-    while this runner lives no controller takes the VM, even after this
-    runner's own controller is gone; it is checked once, at entry, together
-    with the owner (check_controller), and holding it makes later checks
-    unnecessary.
+    The epoch is checked before the phase starts and again when its action
+    ends, before the phase can be recorded as passed: a phase that ran while
+    another controller was admitted is recorded as failed and raises
+    CampaignFenced, never kept as evidence.
     """
-    import fcntl
-    with open(path, 'a+b') as lock:
-        try:
-            fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
-            raise ValueError('another VM campaign runner holds this VM; nothing was measured') from None
-        try:
-            yield
-        finally:
-            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+    fence()
+
+    def guarded(path):
+        action(path)
+        fence()
+    return campaign.phase(name, guarded, retry=retry, reason=reason)
 
 
-def check_controller(nonce, owner=None):
-    """The controller that started this runner still holds the VM campaign lock."""
-    owner = owner or ROOT / '.fixtures/controller-owner'
-    try:
-        holder = owner.read_text(encoding='utf-8').strip()
-    except OSError:
-        holder = None
-    if holder != nonce:
-        raise ValueError('the VM campaign lock is not held by the controller of this runner; nothing was measured')
+def run(folder, baseline, output, retries, reason, backend_data, fixture_nonce, campaign_dir, epoch):
+    # Shared hold of the VM campaign lock for the whole run, then the epoch of
+    # this runner's admission (campaign_fence): no controller is admitted while
+    # this runner lives, and a runner started after another admission stops.
+    with held(campaign_dir, epoch) as fence:
+        measure(folder, baseline, output, retries, reason, backend_data, fixture_nonce, fence)
 
 
-def run(folder, baseline, output, retries, reason, backend_data, fixture_nonce, controller_nonce, lock_path):
-    with runner_lock(lock_path):
-        check_controller(controller_nonce)
-        measure(folder, baseline, output, retries, reason, backend_data, fixture_nonce)
-
-
-def measure(folder, baseline, output, retries, reason, backend_data, fixture_nonce):
+def measure(folder, baseline, output, retries, reason, backend_data, fixture_nonce, fence):
     if sys.platform != 'linux':
         raise ValueError('VM campaign requires Linux')
     folder, baseline, output = folder.resolve(), baseline.resolve(), output.resolve()
@@ -127,7 +112,7 @@ def measure(folder, baseline, output, retries, reason, backend_data, fixture_non
         campaign.validate_retries(retries, phases_for(subject['version']))
 
         def phase(name, action):
-            return campaign.phase(name, action, retry=name in retries, reason=reason)
+            return fenced_phase(campaign, fence, name, action, retry=name in retries, reason=reason)
 
         def command(path, script, *arguments, environment=env, python=sys.executable):
             logged([str(python), str(ROOT / 'scripts' / script), *map(str, arguments)],
@@ -204,6 +189,7 @@ def measure(folder, baseline, output, retries, reason, backend_data, fixture_non
                 raise ValueError('selected qualification differs')
             if not destination.exists():
                 shutil.copyfile(source, destination)
+        fence()
         write_json(output / 'selected/report.json', {'status': 'PASS', 'identity': subject,
                    'files': {name: digest(path) for name, path in selected.items()}})
         print('PASS complete VM campaign; selected evidence is ready for final validation')
@@ -219,10 +205,9 @@ if __name__ == '__main__':
     parser.add_argument('--retry-reason')
     parser.add_argument('--fixture-nonce', required=True,
                         help='nonce of the fixture reset of this attempt, checked before measuring')
-    parser.add_argument('--controller-nonce', required=True,
-                        help='nonce of the controller holding the VM campaign lock, checked before measuring')
-    parser.add_argument('--runner-lock', required=True, type=Path,
-                        help='VM runner lock file, held for the whole run')
+    parser.add_argument('--campaign-dir', required=True, type=Path,
+                        help='VM campaign directory with the admission lock and epoch (campaign_fence)')
+    parser.add_argument('--epoch', required=True, type=int, help='epoch of the admission that started this runner')
     args = parser.parse_args()
     run(args.distribution, args.baseline_binary, args.output, args.retry_phase, args.retry_reason, args.backend_data,
-        args.fixture_nonce, args.controller_nonce, args.runner_lock)
+        args.fixture_nonce, args.campaign_dir, args.epoch)

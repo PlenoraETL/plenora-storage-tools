@@ -131,40 +131,75 @@ campagna della 3.0.0 un rallentamento dell'host durante la misura, e poi un
 fixture GCS che rallentava nel tempo, sono ricaduti sul candidato e hanno
 prodotto confronti rossi che un A/B alternato smentiva.
 
-### Lock di campagna sulla VM
+### Ammissione ed epoca sulla VM
 
-Un solo controller alla volta lavora su una radice VM (`vm_root`), e mai mentre
-un runner è vivo. I lock sono due, entrambi `flock` sulla radice:
+Una sola campagna alla volta lavora su una radice VM (`vm_root`), qualunque sia
+la revisione qualificata. Il protocollo (`scripts/campaign_fence.py`) usa due
+file in `<realpath(vm_root)>/.campaign/`, gli stessi per ogni checkout remoto
+della stessa radice:
 
-- `.campaign.lock`: il controller lo acquisisce prima di `prepare-vm`, cioè
-  prima di caricare bundle, binari, override o distribuzioni, e lo tiene per
-  tutte le fasi che usano le fixture della VM: preparazione, qualifica Windows
-  e tentativo `qualify-vm` fino alla fine del runner. Lo tiene un processo
-  sulla VM legato al canale SSH del controller;
-- `.runner.lock`: il runner, nel suo container, lo tiene per tutta la vita,
-  anche dopo la morte del suo controller. Il controller lo prende solo per un
-  istante, per registrare il proprio nonce in `.fixtures/controller-owner`, e
-  lo rilascia subito.
+- `lock`, un `flock`. Il controller viene **ammesso** solo prendendolo in modo
+  esclusivo, cosa che il kernel concede solo se nessun processo lo tiene in
+  alcun modo; poi lo converte in condiviso e lo tiene finché resta aperto il
+  suo canale SSH. Lo tengono condiviso, per tutta la loro vita, anche tutte le
+  attività che toccano input, fixture o misure: ogni preparazione delle
+  fixture (il wrapper apre il descrittore e i figli lo ereditano, anche se il
+  controller muore) e il runner, che apre lo stesso file nel suo container
+  attraverso un mount in sola lettura della directory;
+- `epoch`, un contatore che l'ammissione incrementa sotto il lock esclusivo.
+  Ogni attività riceve l'epoca della propria ammissione, prende il lock
+  condiviso e la verifica prima di iniziare, prima di ogni scrittura (stato e
+  ricevuta delle fixture, report selezionato) e alla fine di ogni fase
+  misurata, prima di registrarla come superata. Il controller la verifica
+  sulla VM prima di ogni caricamento, prima di avviare il runner, dopo averne
+  scaricato le evidenze e alla fine della qualifica Windows. Un'epoca cambiata
+  è un errore esplicito (`CampaignFenced`, codice 77 negli script) e il
+  risultato non viene registrato: la fase in corso resta `FAIL`.
 
-Se un altro controller o un runner superstite tiene uno dei due lock, il
-controller si ferma prima di toccare qualsiasi cosa e il processo esce con il
-codice 75, distinto da un errore; un fallimento del comando di lock per altri
-motivi è riportato come tale. Il runner prende `.runner.lock` e poi verifica
-che `controller-owner` sia il nonce del controller che l'ha avviato
-(`--controller-nonce`): un runner avviato in ritardo da un controller che ha
-perso la VM trova un altro nonce e si ferma senza misurare. Finché un runner
-vive nessun controller può scrivere un nuovo owner, quindi il controllo
-all'ingresso basta per tutta la misura.
+L'ammissione rifiuta anche finché esiste un container runner di questa radice
+(etichetta Docker `plenora.campaign`) che non ha ancora preso il lock. Un
+rifiuto, dell'ammissione o di una preparazione, non tocca niente ed esce con il
+codice 75 (`CampaignBusy`); ogni altro errore del lock, compreso un `flock` che
+fallisce per un motivo diverso dalla contesa, viene riportato come tale. Sulla
+VM non si termina nessun processo: un'attività superstite non viene uccisa,
+l'ammissione si rifiuta finché vive.
+
+La qualifica Windows gira sul controller, ma solo finché l'ammissione vive: il
+controller controlla il canale ogni secondo e, se cade, termina il
+sottoprocesso (lo uccide dopo 10 secondi) e fallisce con `CampaignLost`, senza
+registrare il risultato; finita la qualifica, verifica l'epoca sulla VM.
+
+**Impedito per costruzione**: due ammissioni contemporanee; un'ammissione
+mentre vive un'attività di un'ammissione precedente (controller, preparazione
+staccata con `nohup`, runner), anche se il suo controller è morto o qualifica
+un'altra revisione in un'altra `remote_root`; un'ammissione mentre un runner
+etichettato è stato creato ma non ha ancora preso il lock.
+
+**Soltanto rilevato**: il lavoro di un controller che ha perso l'ammissione
+senza saperlo, per esempio in una partizione di rete dopo la quale il server
+SSH ha chiuso il canale e un altro controller è stato ammesso. Le sue attività
+che partono dopo la nuova ammissione trovano un'epoca diversa e si fermano
+prima di toccare qualcosa; quelle già in corso falliscono al controllo
+successivo (prossima scrittura o fine fase) e il loro risultato non viene
+registrato. Fra il controllo dell'epoca e la scrittura che segue resta una
+finestra: un caricamento o una scrittura già partiti possono completarsi dopo
+la nuova ammissione. Se le due campagne qualificano revisioni diverse quella
+scrittura finisce nella `remote_root` della vecchia (`<vm_root>/<versione>-<revisione>`),
+che la nuova non legge. Se qualificano la stessa revisione la `remote_root` è
+la stessa e la finestra non è chiusa dal protocollo: il runner verifica solo
+che i binari corrispondano al manifest caricato con loro. Per questo due
+controller della stessa revisione non si avviano sulla stessa VM. La
+conversione del lock da esclusivo a condiviso non è atomica in `flock`: se
+un'altra ammissione lo prende in quell'istante, la prima esce con 75 e vale
+l'epoca più recente.
 
 Limite dichiarato: il lock del controller si libera quando sulla VM il canale
 SSH si chiude. Se il controller termina, la connessione si chiude subito; in
-una partizione di rete il controller smette di lavorare, ma il server SSH della
-VM se ne accorge solo con i propri keepalive (`TCPKeepAlive`, e
-`ClientAliveInterval` se configurato): fino ad allora il lock resta tenuto e un
-altro controller viene rifiutato. È il verso sicuro, perché due controller non
-possono mai lavorare insieme; per liberarlo prima occorre verificare che il
-controller non sia più attivo e terminare il processo `flock` che tiene
-`.campaign.lock`.
+una partizione di rete il server SSH della VM se ne accorge solo con i propri
+keepalive (`TCPKeepAlive`, e `ClientAliveInterval` se configurato): fino ad
+allora il lock resta tenuto e un altro controller viene rifiutato, il verso
+sicuro. Il controller, dal suo lato, smette di lavorare appena vede il canale
+chiuso.
 
 ### Fixture ricreate prima del runner
 
@@ -176,9 +211,12 @@ VM: un segnale lasciato da un'esecuzione precedente non viene mai letto come
 quello corrente. Il wrapper registra sempre il codice d'uscita reale ed esce
 con quel codice. In ordine:
 
-1. lo script gira sotto il lock del runner VM (`.fixtures/campaign/campaign.lock`):
-   se un runner o un'altra preparazione lo tiene, si ferma prima di toccare
-   qualcosa (codice 75) e la campagna termina con un errore esplicito;
+1. il wrapper prende in modo condiviso il lock di ammissione e poi, in modo
+   esclusivo, `.fixtures/campaign/campaign.lock` del checkout: se un lock è
+   occupato si ferma prima di toccare qualcosa (codice 75). Lo script verifica
+   l'epoca all'avvio, prima del marcatore `in-progress`, prima di ricreare e
+   prima di registrare la ricevuta: un'epoca cambiata lo ferma con il codice
+   77. In entrambi i casi la campagna termina con un errore esplicito;
 2. se un container runner di questa campagna è ancora in esecuzione, si ferma
    con un errore esplicito (codice 76). Non viene terminato nessun processo;
 3. archivia stato dei container, log delle fixture, certificati e fingerprint
@@ -204,8 +242,8 @@ con quel codice. In ordine:
 Prima di modificare qualsiasi fixture, ogni preparazione scrive in
 `fixture-state.json` il proprio nonce con stato `in-progress`: una preparazione
 che si ferma dopo questo punto invalida la ricevuta precedente, e nessun runner
-la accetta. Le uscite precedenti al marcatore (lock occupato, runner ancora in
-esecuzione) non toccano le fixture e lasciano valida la ricevuta precedente. Prima di ricreare, il reset controlla anche la
+la accetta. Le uscite precedenti al marcatore (lock occupato, epoca cambiata, runner
+ancora in esecuzione) non toccano le fixture e lasciano valida la ricevuta precedente. Prima di ricreare, il reset controlla anche la
 memoria disponibile (`scripts/check_memory.py`): il fixture GCS in memoria
 tiene sorgente e copia del trasferimento spooled da 1 GiB, un picco di circa
 2 GiB, e serve una riserva di altri 2 GiB per le altre fixture e il runner. Lo
@@ -219,14 +257,14 @@ cui il controller raggiunge la VM, non l'identità verificata, e la verifica non
 viene mai disattivata.
 
 Solo se tutte le fixture rispondono il tentativo registra `fixture-reset.json`
-con `recreated: true` e il nonce, insieme a `fixture-check.json` e
+con `recreated: true`, il nonce e l'epoca, insieme a `fixture-check.json` e
 `fixture-reset.log`; altrimenti il tentativo fallisce prima di avviare il
-runner. Il runner riceve il nonce (`--fixture-nonce`) e, appena acquisito il
-lock, verifica che `fixture-state.json` riporti proprio quel reset: se è stata
-eseguita un'altra preparazione dopo, si ferma senza misurare. Si è scelta la
-verifica del nonce invece di tenere il lock dalla preparazione all'avvio del
-runner: il lock è di un processo, e il runner parte in un container separato
-che non può ereditarlo.
+runner. Il runner riceve il nonce (`--fixture-nonce`) e l'epoca (`--epoch`) e,
+appena acquisito il lock condiviso e verificata l'epoca, verifica che `fixture-state.json` riporti proprio quel reset: se è stata
+eseguita un'altra preparazione dopo, si ferma senza misurare. Fra la fine della
+preparazione e l'avvio del runner il lock di ammissione resta tenuto dal
+controller, quindi nessun'altra campagna può preparare nel frattempo; la
+verifica del nonce copre una preparazione successiva della stessa campagna.
 
 ## Ripresa, tentativi e spazio
 
@@ -252,8 +290,8 @@ python scripts/release_campaign.py --config target/campaign.json --output target
 I tentativi precedenti restano presenti. Il retry crea una nuova directory,
 non modifica i report falliti. Se il controller si interrompe mentre il runner
 remoto è ancora attivo, attendere e controllare quel runner prima di avviare
-un retry: il lock Linux impedisce campagne sovrapposte, ma non interrompe da
-solo un processo remoto. I report selezionati per il bundle devono passare
+un retry: l'ammissione si rifiuta finché quel runner vive, ma non lo
+interrompe. I report selezionati per il bundle devono passare
 nuovamente i validatori finali.
 
 Dalla 2.1, se cambia soltanto l'indirizzo della stessa VM dopo un riavvio,
