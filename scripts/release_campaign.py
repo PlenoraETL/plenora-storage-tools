@@ -66,12 +66,13 @@ class Remote:
             raise RuntimeError('dedicated VM command failed')
         return text.strip()
 
-    def hold(self, command):
+    def hold(self, command, timeout):
         """Start `command` on its own channel and return the channel, its line
-        reader and the first line it prints. The command keeps running while
-        the channel is open; closing the channel, or losing the connection,
-        ends it."""
+        reader and the first line it prints within `timeout` seconds. The
+        command keeps running while the channel is open; closing the channel,
+        or losing the connection, ends it."""
         channel = self.client.get_transport().open_session()
+        channel.settimeout(timeout)
         channel.exec_command(command)
         reader = channel.makefile('r')
         return channel, reader, reader.readline().strip()
@@ -185,7 +186,10 @@ def fixture_scripts(remote_root, project, host, label, nonce, *, reset, director
              *fence_lines(), 'fence']
     if reset:
         lines += [
-            f"if docker ps --format '{{{{.Names}}}}' | grep -q {q('^' + project + '-campaign-')}; then",
+            # A failed listing is an error, never an empty list.
+            f"containers=$(docker ps --format '{{{{.Names}}}}') "
+            "|| { echo 'cannot list the running containers'; exit 1; }",
+            f'if grep -q {q("^" + project + "-campaign-")} <<<"$containers"; then',
             f"  echo 'a VM runner container of this campaign is still running'; exit {RUNNER_ACTIVE}",
             'fi',
             # From here on the fixtures may change: a preparation that stops

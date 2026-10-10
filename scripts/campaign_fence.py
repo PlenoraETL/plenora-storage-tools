@@ -55,14 +55,29 @@ LABEL = 'plenora.campaign'
 # long as the controller host is not suspended during a campaign, since its
 # processes would resume before its next check. After a VM reboot the age of
 # the last lease is unknown and the admission waits the whole duration.
+#
+# The supervisor checks the lease every POLL_SECONDS and never renews once
+# its validity has elapsed (a stall past the end of the lease cannot be
+# hidden by a later successful renewal). What it cannot prevent is a stall of
+# its own while the local tree keeps running: the protocol assumes that the
+# supervisor is never delayed by more than STALL_SECONDS, so that a poll,
+# the stall and the kill fit in the margin together with the clock drift
+# (POLL_SECONDS + STALL_SECONDS + KILL_SECONDS < LEASE_MARGIN).
 LEASE_SECONDS = 60
 LEASE_MARGIN = 30
 RENEW_SECONDS = 10
 KILL_SECONDS = 10
+POLL_SECONDS = 1
+STALL_SECONDS = 9
+# Bounded waits on the admission channel: the first line may come after the
+# wait for a previous lease; the exit status of a refused admission at once.
+ADMISSION_SECONDS = 3600 + 120
+EXIT_SECONDS = 30
 # The longest wait an admission accepts for a recorded lease: a larger value
 # is not a lease this protocol wrote.
 LEASE_WAIT_LIMIT = 3600
 COUNTER_LIMIT = 999999999999999999
+ERROR_NO_MORE_FILES = 18
 EPOCH = r'(0|[1-9][0-9]{0,17})-[0-9a-f]{32}'
 
 
@@ -171,9 +186,16 @@ class Session:
         return (not self.channel.closed and not self.channel.exit_status_ready()
                 and self.clock() < self.lease_until)
 
-    def renew(self):
-        """Extend the lease through the admission process, or raise CampaignLost."""
+    def renew(self, *, strict=False):
+        """Extend the lease through the admission process, or raise CampaignLost.
+
+        `strict`, while local work runs: once the validity of the last
+        confirmed renewal has elapsed nothing is sent and the lease is lost,
+        whatever the admission would answer now.
+        """
         sent = self.clock()
+        if strict and sent >= self.lease_until:
+            raise CampaignLost('the lease ended before it was renewed; local work stops')
         try:
             if self.channel.closed or self.channel.exit_status_ready():
                 raise EOFError
@@ -186,10 +208,16 @@ class Session:
         self.lease_until = sent + self.lease
 
     def check(self, remote):
-        """Fail unless this admission still holds the VM, checked on the VM."""
+        """Fail unless this admission still holds the VM, checked on the VM.
+
+        No local work runs here, so a lease that lapsed between two checks is
+        renewed. The epoch is compared byte for byte: the file is framed by a
+        marker on both sides, so no whitespace is lost on the way.
+        """
         self.renew()
-        current = remote.run(f'cat {shlex.quote(self.directory + "/epoch")}')
-        if current != self.epoch:
+        path = shlex.quote(self.directory + '/epoch')
+        current = remote.run(f'printf x && cat {path} && printf x')
+        if current != 'x' + self.epoch + '\nx':
             raise CampaignFenced('another controller was admitted on this VM; this campaign stops and its '
                                  'pending result is not recorded')
 
@@ -202,10 +230,15 @@ def admission(remote, vm_root, *, clock=time.monotonic):
     failure of the admission command.
     """
     granted = clock()
-    channel, reader, first = remote.hold(admission_command(vm_root))
+    channel, reader, first = remote.hold(admission_command(vm_root), ADMISSION_SECONDS)
     try:
         fields = first.split(' ', 2)
         if len(fields) != 3 or fields[0] != 'locked' or not re.fullmatch(EPOCH, fields[1]):
+            limit = time.monotonic() + EXIT_SECONDS
+            while not channel.exit_status_ready():
+                if time.monotonic() >= limit:
+                    raise RuntimeError('the VM admission neither started nor ended; nothing was touched')
+                time.sleep(0.05)
             code = channel.recv_exit_status()
             if code == LOCK_HELD:
                 raise CampaignBusy('another controller, or an activity it left on the VM, holds this VM root; '
@@ -242,7 +275,7 @@ class ProcessTree:
                 self.job.adopt(self.process.pid)
             except BaseException:
                 self.process.kill()
-                self.process.wait()
+                self.process.wait(KILL_SECONDS)
                 self.job.close()
                 raise
         else:
@@ -250,21 +283,24 @@ class ProcessTree:
                                             start_new_session=True)
 
     def terminate(self, deadline=KILL_SECONDS):
-        """Kill every process of the tree and wait until none is left, or raise."""
+        """Kill every process of the tree and wait until none is left, or
+        raise; every wait shares the one `deadline`."""
+        limit = time.monotonic() + deadline
         if self.job is not None:
             self.job.terminate()
-            self.process.wait()
             remaining = self.job.active
         else:
             try:
                 os.killpg(self.process.pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
-            self.process.wait()
 
             def remaining():
                 return _group_alive(self.process.pid)
-        limit = time.monotonic() + deadline
+        try:
+            self.process.wait(max(0.0, limit - time.monotonic()))
+        except subprocess.TimeoutExpired:
+            raise RuntimeError('the local process did not terminate; stop it before any new admission') from None
         while remaining():
             if time.monotonic() >= limit:
                 raise RuntimeError('the local process tree did not terminate; stop it before any new admission')
@@ -355,6 +391,23 @@ class _Job:
             raise OSError(self.ctypes.get_last_error(), name + ' failed')
         return result
 
+    def close_handle(self, handle, name):
+        self.call(self.kernel.CloseHandle(handle), 'CloseHandle of ' + name)
+
+    def threads(self, snapshot, entry):
+        """(owner process, thread) of every thread in a snapshot; the end of
+        the list is ERROR_NO_MORE_FILES, any other failure an error."""
+        ctypes = self.ctypes
+        more = self.kernel.Thread32First(snapshot, ctypes.byref(entry))
+        while True:
+            if not more:
+                error = ctypes.get_last_error()
+                if error != ERROR_NO_MORE_FILES:
+                    raise OSError(error, 'thread enumeration failed')
+                return
+            yield entry.th32OwnerProcessID, entry.th32ThreadID
+            more = self.kernel.Thread32Next(snapshot, ctypes.byref(entry))
+
     def adopt(self, pid):
         """Assign the suspended process `pid` to the job, then resume its only thread."""
         ctypes, wintypes, kernel = self.ctypes, self.wintypes, self.kernel
@@ -362,7 +415,7 @@ class _Job:
         try:
             self.call(kernel.AssignProcessToJobObject(self.handle, process), 'AssignProcessToJobObject')
         finally:
-            kernel.CloseHandle(process)
+            self.close_handle(process, 'process')
 
         class Entry(ctypes.Structure):
             _fields_ = [('dwSize', wintypes.DWORD), ('cntUsage', wintypes.DWORD), ('th32ThreadID', wintypes.DWORD),
@@ -376,19 +429,17 @@ class _Job:
         try:
             entry = Entry()
             entry.dwSize = ctypes.sizeof(Entry)
-            more = kernel.Thread32First(snapshot, ctypes.byref(entry))
-            while more:
-                if entry.th32OwnerProcessID == pid:
-                    thread = self.call(kernel.OpenThread(0x0002, False, entry.th32ThreadID), 'OpenThread')
+            for owner, identifier in self.threads(snapshot, entry):
+                if owner == pid:
+                    thread = self.call(kernel.OpenThread(0x0002, False, identifier), 'OpenThread')
                     try:
                         if kernel.ResumeThread(thread) == 0xFFFFFFFF:
                             raise OSError(ctypes.get_last_error(), 'ResumeThread failed')
                     finally:
-                        kernel.CloseHandle(thread)
+                        self.close_handle(thread, 'thread')
                     resumed += 1
-                more = kernel.Thread32Next(snapshot, ctypes.byref(entry))
         finally:
-            kernel.CloseHandle(snapshot)
+            self.close_handle(snapshot, 'snapshot')
         if resumed != 1:
             raise OSError(errno.ESRCH, 'the suspended process does not have exactly one thread')
 
@@ -411,20 +462,26 @@ class _Job:
         return accounting.ActiveProcesses
 
     def close(self):
+        """Close the job, which kills what is left in it; a failed close keeps
+        the handle and raises, so it is never taken for closed."""
         if self.handle:
-            self.kernel.CloseHandle(self.handle)
+            self.close_handle(self.handle, 'job')
             self.handle = None
 
 
-def supervised(command, log, session, *, cwd=None, env=None, poll=1.0, renew_every=RENEW_SECONDS):
+def supervised(command, log, session, *, cwd=None, env=None, poll=POLL_SECONDS, renew_every=RENEW_SECONDS):
     """Run a local command, and all its descendants, for as long as the admission lives.
 
-    The lease is renewed before the start and every `renew_every` seconds. If
-    a renewal fails, or the admission or its lease ends, the whole process
-    tree is killed (verified) and CampaignLost is raised. When the command
+    The lease is renewed before the start and every `renew_every` seconds,
+    and checked before every renewal: once its validity has elapsed, for
+    example after a stall of this supervisor, nothing is renewed. If a
+    renewal fails, or the admission or its lease ends, the whole process tree
+    is killed (verified) and CampaignLost is raised. When the command
     ends its leftover descendants are killed as well; a failing command
     raises RuntimeError as `logged` does.
     """
+    # Nothing local runs yet, so a lease that lapsed since the last check of
+    # the admission is renewed; from the start on, renewals are strict.
     session.renew()
     with open(log, 'wb') as stream:
         tree = ProcessTree(command, cwd=cwd, env=env, stdout=stream)
@@ -433,12 +490,12 @@ def supervised(command, log, session, *, cwd=None, env=None, poll=1.0, renew_eve
         try:
             renewed = time.monotonic()
             while tree.process.poll() is None:
-                if time.monotonic() - renewed >= renew_every:
-                    session.renew()
-                    renewed = time.monotonic()
                 if not session.alive():
                     raise CampaignLost('the campaign admission or its lease ended during a local qualification; '
                                        'its process tree was killed and its result is not recorded')
+                if time.monotonic() - renewed >= renew_every:
+                    session.renew(strict=True)
+                    renewed = time.monotonic()
                 time.sleep(poll)
         finally:
             try:
@@ -485,8 +542,10 @@ def held(directory, epoch):
 
 def fence_lines(directory_variable='CAMPAIGN_DIR', epoch_variable='CAMPAIGN_EPOCH'):
     """Shell function `fence` for preparation scripts: exits with FENCED once
-    the epoch changed, and with 1 if it cannot be read."""
-    return [f'fence() {{ local current; current=$(cat "${directory_variable}/epoch") '
+    the epoch file is not exactly the epoch and one newline, and with 1 if it
+    cannot be read. The trailing marker keeps the newlines that a command
+    substitution would remove."""
+    return [f'fence() {{ local current; current=$(cat "${directory_variable}/epoch" && printf x) '
             f'|| {{ echo "campaign epoch unreadable" >&2; exit 1; }}; '
-            f'test "$current" = "${epoch_variable}" '
+            f'test "$current" = "${epoch_variable}"$\'\\nx\' '
             f'|| {{ echo "campaign epoch changed" >&2; exit {FENCED}; }}; }}']

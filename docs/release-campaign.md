@@ -165,12 +165,16 @@ La directory nasce una sola volta, al primo avvio, quando non esiste: viene
 preparata a parte con lock, primo gettone e lease vuoto, poi rinominata in modo
 atomico. In una directory esistente un gettone o un lease assente, illeggibile
 o malformato (formato stretto, newline finale esatto) è un errore, mai una
-ripartenza da zero.
+ripartenza da zero. Ogni controllo dell'epoca confronta i byte: il gettone e
+un solo newline. Gli script delimitano il contenuto con un marcatore, perché
+la command substitution toglierebbe i newline finali, e il controller fa lo
+stesso sul comando remoto, il cui output viene ripulito dagli spazi.
 
 L'ammissione rifiuta anche finché esiste un container runner di questa radice
 (etichetta Docker `plenora.campaign`) che non ha ancora preso il lock; se
 `docker ps` fallisce, l'ammissione fallisce con un errore invece di leggere
-«nessun container». Un rifiuto per contesa, dell'ammissione o di una
+«nessun container». Lo stesso vale per il controllo dei runner nel reset delle
+fixture (codice 1, distinto dal rifiuto con 76). Un rifiuto per contesa, dell'ammissione o di una
 preparazione, non tocca niente ed esce con il codice 75 (`CampaignBusy`):
 `flock` viene chiamato con `-E 75`, quindi ogni altro suo errore conserva il
 proprio codice e viene riportato come tale. Un 75 restituito dallo script di
@@ -204,10 +208,16 @@ La qualifica Windows gira sul controller, in un albero di processi che il
 controller può terminare per intero. Su Windows il processo parte sospeso,
 viene assegnato a un job object con `KILL_ON_JOB_CLOSE` e solo dopo riprende,
 quindi nessun discendente nasce fuori dal job, e il job muore anche se muore
-il controller. Su POSIX guida un nuovo process group. La terminazione è
-verificata: il controller attende che nel job, o nel gruppo, non resti alcun
-processo, altrimenti fallisce con un errore esplicito. I discendenti rimasti
-dopo la fine normale del comando vengono terminati allo stesso modo.
+il controller. La terminazione è verificata: il controller attende che nel
+job non resti alcun processo, altrimenti fallisce con un errore esplicito. I
+discendenti rimasti dopo la fine normale del comando vengono terminati allo
+stesso modo. Ogni attesa ha un limite: la terminazione condivide un unico
+budget di 10 secondi.
+
+Il controller gira solo su Windows. Il ramo POSIX dello stesso codice, usato
+nei test, guida un nuovo process group e la sua garanzia vale **solo per il
+gruppo**: un discendente che chiama `setsid()` ne esce e sopravvive a
+`killpg`.
 
 Prima di iniziare la qualifica Windows il controller ricrea tutte le fixture
 sotto la propria ammissione, con un reset come quello di `qualify-vm`, e usa
@@ -229,17 +239,26 @@ della rotazione c'è un **lease**:
   del boot;
 - se un rinnovo fallisce, il canale si chiude o il lease scade, il controller
   termina tutto l'albero locale (verificato) e fallisce con `CampaignLost`;
+- mentre l'albero locale gira, il supervisore controlla il lease prima di
+  ogni rinnovo e non rinnova mai un lease già scaduto sul proprio clock
+  monotono: dopo uno stallo oltre la scadenza termina l'albero e fallisce,
+  anche se un rinnovo adesso riuscirebbe;
 - l'ammissione successiva, ottenuto il lock esclusivo, attende la scadenza
   registrata prima di fare qualsiasi altra cosa. Dopo un riavvio della VM l'età
   dell'ultimo lease non è nota e attende l'intera durata.
 
-**Assunzione sugli orologi**, l'unica del protocollo: sull'intervallo di un
-lease, il clock monotono del controller e l'orologio di boot della VM
-differiscono meno del margine (30 s) meno il tempo di terminazione
-dell'albero (al più 10 s) e un ciclo di controllo (1 s). Inoltre il
-controller non viene sospeso durante una campagna: i suoi processi
-riprenderebbero prima del controllo successivo. Non serve che gli orologi
-siano sincronizzati, solo che non divergano di quasi 20 s in 90 s.
+**Assunzioni su orologi e ritardi**, le uniche del protocollo:
+
+- il supervisore non resta fermo per più di 9 secondi
+  (`STALL_SECONDS`) mentre l'albero locale gira, perché uno stallo che lascia
+  correre i processi non si può impedire, solo limitare;
+- sull'intervallo di un lease, il clock monotono del controller e l'orologio
+  di boot della VM differiscono meno di quanto avanza del margine (30 s)
+  dopo il ciclo di controllo (1 s), lo stallo massimo (9 s) e la
+  terminazione (10 s);
+- il controller non viene sospeso durante una campagna: i suoi processi
+  riprenderebbero prima del controllo successivo. Non serve che gli orologi
+siano sincronizzati, solo che non divergano di circa 10 s in 90 s.
 
 #### Impedito e rilevato
 
@@ -261,11 +280,12 @@ siano sincronizzati, solo che non divergano di quasi 20 s in 90 s.
   successivo;
 - evidenze sigillate che non descrivono i binari della campagna;
 - dopo la morte del controller, un discendente locale ancora vivo (il job
-  object lo termina).
+  object lo termina);
+- il rinnovo di un lease già scaduto mentre l'albero locale gira.
 
-**Impedito sotto l'assunzione sugli orologi**: processi locali della qualifica
-Windows ancora attivi quando un'altra campagna viene ammessa dopo una
-partizione di rete.
+**Impedito sotto le assunzioni su orologi e ritardi**: processi locali della
+qualifica Windows ancora attivi quando un'altra campagna viene ammessa dopo
+una partizione di rete.
 
 **Soltanto rilevato**:
 

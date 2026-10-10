@@ -28,8 +28,9 @@ LINUX = sys.platform != 'win32' and bool(shutil.which('bash')) and bool(shutil.w
 
 
 class FakeChannel:
-    def __init__(self, code=0, finished=False):
+    def __init__(self, code=0, finished=False, clock=None):
         self.closed, self.code, self.finished, self.sent = False, code, finished, []
+        self.clock, self.sent_at = clock, []
 
     def close(self):
         self.closed = True
@@ -47,6 +48,8 @@ class FakeChannel:
         if self.closed:
             raise OSError('closed')
         self.sent.append(data)
+        if self.clock:
+            self.sent_at.append(self.clock())
 
 
 class FakeReader:
@@ -66,7 +69,7 @@ class FakeSession:
     def alive(self):
         return not self.lost
 
-    def renew(self):
+    def renew(self, strict=False):
         if self.renewals is not None:
             if self.renewals == 0:
                 raise campaign_fence.CampaignLost('lost')
@@ -206,15 +209,19 @@ class SessionTests(unittest.TestCase):
     """The controller side of the admission, with fake channels and clock."""
 
     class Remote:
-        def __init__(self, first, code=0, epoch=EPOCH, replies=()):
-            self.first, self.code, self.epoch, self.replies, self.channel = first, code, epoch, replies, None
+        def __init__(self, first, code=0, content=EPOCH + '\n', replies=(), finished=None):
+            self.first, self.code, self.content, self.replies, self.channel = first, code, content, replies, None
+            # A refused admission has ended by the time its channel closes.
+            self.finished = not first.startswith(f'locked {EPOCH} ') if finished is None else finished
 
-        def hold(self, command):
-            self.channel = FakeChannel(self.code, finished=not self.first.startswith('locked'))
+        def hold(self, command, timeout):
+            self.timeout = timeout
+            self.channel = FakeChannel(self.code, finished=self.finished)
             return self.channel, FakeReader(self.replies), self.first
 
         def run(self, command):
-            return self.epoch
+            # Remote.run strips its output; the command frames the file.
+            return ('x' + self.content + 'x').strip()
 
     def test_an_admission_yields_its_epoch_and_renews_its_lease_at_every_check(self):
         now = [100.0]
@@ -225,11 +232,31 @@ class SessionTests(unittest.TestCase):
             now[0] = 150.0
             session.check(remote)
             self.assertEqual(session.lease_until, 150.0 + campaign_fence.LEASE_SECONDS)
-            remote.epoch = '8-' + '1' * 32
+            remote.content = '8-' + '1' * 32 + '\n'
             with self.assertRaises(campaign_fence.CampaignFenced):
                 session.check(remote)
             self.assertEqual(remote.channel.sent, [b'renew\n'] * 2)
+            self.assertEqual(remote.timeout, campaign_fence.ADMISSION_SECONDS)
         self.assertTrue(remote.channel.closed)
+
+    def test_the_epoch_is_compared_byte_for_byte(self):
+        for content in (EPOCH, EPOCH + '\n\n', ' ' + EPOCH + '\n', EPOCH + ' \n'):
+            with self.subTest(content=content):
+                remote = self.Remote(f'locked {EPOCH} /srv/q/.campaign', content=content, replies=['renewed\n'])
+                with campaign_fence.admission(remote, '/srv/q') as session:
+                    with self.assertRaises(campaign_fence.CampaignFenced):
+                        session.check(remote)
+
+    def test_a_strict_renewal_after_the_end_of_the_lease_sends_nothing(self):
+        now = [0.0]
+        remote = self.Remote(f'locked {EPOCH} /srv/q/.campaign', replies=['renewed\n'] * 2)
+        with campaign_fence.admission(remote, '/srv/q', clock=lambda: now[0]) as session:
+            now[0] = campaign_fence.LEASE_SECONDS
+            with self.assertRaises(campaign_fence.CampaignLost):
+                session.renew(strict=True)
+            self.assertEqual(remote.channel.sent, [])
+            session.renew()
+            self.assertEqual(session.lease_until, 2 * campaign_fence.LEASE_SECONDS)
 
     def test_the_lease_ends_on_the_controller_clock_without_renewal(self):
         now = [0.0]
@@ -263,6 +290,13 @@ class SessionTests(unittest.TestCase):
                 with campaign_fence.admission(self.Remote(first, code), '/srv/q'):
                     self.fail('admitted')
             self.assertNotIsInstance(failure.exception, campaign_fence.CampaignBusy)
+
+    def test_an_admission_that_neither_starts_nor_ends_is_an_error_in_bounded_time(self):
+        with patch.object(campaign_fence, 'EXIT_SECONDS', 0.2):
+            with self.assertRaises(RuntimeError) as failure:
+                with campaign_fence.admission(self.Remote('', finished=False), '/srv/q'):
+                    self.fail('admitted')
+        self.assertNotIsInstance(failure.exception, campaign_fence.CampaignBusy)
 
     def test_a_busy_vm_exits_with_the_lock_code(self):
         def busy():
@@ -338,6 +372,26 @@ class ProcessTreeTests(unittest.TestCase):
         self.assertLess(elapsed, 30)
         self.assert_stopped(beat)
 
+    def test_a_stall_past_the_lease_renews_nothing_and_kills_the_whole_tree(self):
+        import threading
+        now = [0.0]
+        channel = FakeChannel(clock=lambda: now[0])
+        session = campaign_fence.Session(channel, FakeReader(['renewed\n'] * 1000), EPOCH, '/srv/q/.campaign',
+                                         0.0, clock=lambda: now[0])
+        beat = Path(self.temporary.name) / 'beat'
+        stalled = campaign_fence.LEASE_SECONDS + 1
+
+        def stall():
+            wait_for(lambda: beat.exists() and beat.stat().st_size > 2, 30)
+            # The supervisor wakes up after the end of its lease.
+            now[0] = stalled
+        threading.Thread(target=stall, daemon=True).start()
+        _, error, _ = self.run_child(session, 'sleep', renew_every=0.0)
+        self.assertIsInstance(error, campaign_fence.CampaignLost)
+        self.assertTrue(channel.sent_at)
+        self.assertTrue(all(sent < stalled for sent in channel.sent_at), 'renewed after the end of the lease')
+        self.assert_stopped(beat)
+
     def test_a_failed_renewal_kills_the_whole_tree(self):
         session = FakeSession(renewals=1)
         beat = Path(self.temporary.name) / 'beat'
@@ -362,6 +416,75 @@ class ProcessTreeTests(unittest.TestCase):
         beat, error, _ = self.run_child(session, 'sleep')
         self.assertIsInstance(error, campaign_fence.CampaignLost)
         self.assertFalse(beat.exists())
+
+
+@unittest.skipUnless(sys.platform == 'win32', 'Win32 job object')
+class JobTests(unittest.TestCase):
+    """Failures of the Win32 calls are errors, never taken for success."""
+
+    class Kernel:
+        def __init__(self, real, **overrides):
+            self.real, self.overrides = real, overrides
+
+        def __getattr__(self, name):
+            return self.overrides.get(name) or getattr(self.real, name)
+
+    @staticmethod
+    def failing(code):
+        import ctypes
+
+        def call(*arguments):
+            ctypes.set_last_error(code)
+            return 0
+        return call
+
+    def test_a_failed_close_keeps_the_handle_and_raises(self):
+        job = campaign_fence._Job()
+        real = job.kernel
+        handle = job.handle
+        job.kernel = self.Kernel(real, CloseHandle=self.failing(6))
+        with self.assertRaises(OSError):
+            job.close()
+        self.assertEqual(job.handle, handle)
+        job.kernel = real
+        job.close()
+        self.assertIsNone(job.handle)
+
+    def test_thread_enumeration_ends_only_on_no_more_files(self):
+        import ctypes
+        job = campaign_fence._Job()
+        try:
+            class Entry(ctypes.Structure):
+                _fields_ = [('th32OwnerProcessID', ctypes.c_ulong), ('th32ThreadID', ctypes.c_ulong)]
+
+            def first(snapshot, entry):
+                return 1
+            real = job.kernel
+            for code, expected in ((campaign_fence.ERROR_NO_MORE_FILES, None), (5, OSError)):
+                with self.subTest(code=code):
+                    job.kernel = self.Kernel(real, Thread32First=first, Thread32Next=self.failing(code))
+                    threads = job.threads(None, Entry())
+                    self.assertEqual(next(threads), (0, 0))
+                    if expected:
+                        with self.assertRaises(expected):
+                            next(threads)
+                    else:
+                        self.assertEqual(list(threads), [])
+                    job.kernel = real
+        finally:
+            job.close()
+
+    def test_a_process_tree_lives_in_the_job(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            with open(Path(temporary) / 'log', 'wb') as stream:
+                tree = campaign_fence.ProcessTree([sys.executable, '-c', 'import time; time.sleep(30)'], stdout=stream)
+                try:
+                    self.assertIsNotNone(tree.job)
+                    self.assertEqual(tree.job.active(), 1)
+                    tree.terminate()
+                    self.assertEqual(tree.job.active(), 0)
+                finally:
+                    tree.close()
 
 
 class InputTests(unittest.TestCase):
@@ -675,6 +798,34 @@ class AdmissionProtocolTests(ProtocolCase):
         self.end(controller)
 
 
+@unittest.skipUnless(LINUX, 'runs bash')
+class ByteExactFenceTests(unittest.TestCase):
+    """Every fence accepts only the epoch and exactly one newline."""
+
+    def test_shell_and_runner_fences_compare_every_byte(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            (directory / 'lock').write_text('')
+            script = '\n'.join([*campaign_fence.fence_lines(), 'fence'])
+            environment = dict(os.environ, CAMPAIGN_DIR=str(directory), CAMPAIGN_EPOCH=EPOCH)
+
+            def shell():
+                return subprocess.run(['bash', '-c', script], env=environment, stderr=subprocess.DEVNULL).returncode
+            self.assertEqual(shell(), 1)
+            for content, code in ((EPOCH + '\n', 0), (EPOCH, campaign_fence.FENCED),
+                                  (EPOCH + '\n\n', campaign_fence.FENCED), (EPOCH + ' \n', campaign_fence.FENCED)):
+                with self.subTest(content=content):
+                    (directory / 'epoch').write_text(content)
+                    self.assertEqual(shell(), code)
+                    if code:
+                        with self.assertRaises(campaign_fence.CampaignFenced):
+                            with campaign_fence.held(directory, EPOCH):
+                                self.fail('held')
+                    else:
+                        with campaign_fence.held(directory, EPOCH) as fence:
+                            fence()
+
+
 RUNNER = """import sys
 sys.path.insert(0, sys.argv[1])
 import campaign_fence
@@ -749,6 +900,14 @@ class PreparationProtocolTests(ProtocolCase):
         self.assertFalse((self.checkout / '.fixtures/prepared').exists())
         self.state('a' * 32)
         self.end(controller_b)
+
+    def test_a_failed_container_listing_is_an_error_and_a_runner_a_refusal(self):
+        controller, epoch = self.admitted()
+        self.assertEqual(self.execute('a' * 32, epoch, FAIL_PS='1'), (1, '1'))
+        self.assertEqual(self.execute('b' * 32, epoch, DOCKER_IDS='storage-q-abc-campaign-x\n'),
+                         (release_campaign.RUNNER_ACTIVE, str(release_campaign.RUNNER_ACTIVE)))
+        self.assertFalse((self.checkout / '.fixtures/campaign/fixture-state.json').exists())
+        self.end(controller)
 
     def test_lock_contention_errors_and_a_stray_lock_code_stay_apart(self):
         import fcntl
