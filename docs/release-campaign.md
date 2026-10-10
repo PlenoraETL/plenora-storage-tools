@@ -45,7 +45,10 @@ mai aperto ad altri, nemmeno per un istante; se nel frattempo compare, la
 verifica si ferma. Una directory che esiste non viene mai modificata. La radice
 deve appartenere all'utente con modo `700`.
 
-Se la verifica fallisce, il coordinatore si ferma senza creare niente sotto la
+Se la verifica fallisce, il coordinatore riporta il motivo come messaggio fisso,
+per esempio «getfacl is missing on the VM: install the acl package», senza
+percorsi né valori: lo script sulla VM lo comunica con un codice. Si ferma
+senza creare niente sotto la
 directory rifiutata; restano solo i livelli privati che aveva già creato sopra
 di essa. Per questo la radice non va messa sotto `/tmp` o in directory
 condivise.

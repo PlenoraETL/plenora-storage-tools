@@ -25,6 +25,7 @@ import run_vm_campaign
 ROOT = Path(__file__).resolve().parents[2]
 EPOCH = '7-' + '0' * 32
 LINUX = sys.platform != 'win32' and bool(shutil.which('bash')) and bool(shutil.which('flock'))
+REQUIRE_REAL_ACL = os.environ.get('PLENORA_REQUIRE_REAL_ACL') == '1'
 # The VM checks read access control lists with getfacl (package acl). The CI
 # runner has it; a development machine without it gets a stand-in that
 # reports the three base entries from the mode, so the other checks still
@@ -120,7 +121,8 @@ class FakeRemote:
         self.commands.append(command)
         if ' campaign-owned ' in command:
             if self.unowned:
-                raise RuntimeError('dedicated VM command failed')
+                raise campaign_fence.RemoteFailure('dedicated VM command failed',
+                                                   'campaign-refusal: writable-by-others\n')
             return 'owned'
         if 'umask 077 && mkdir -p' in command:
             return ''
@@ -776,7 +778,7 @@ class PrivateRootTests(unittest.TestCase):
             (tools / name).symlink_to(shutil.which(name))
         result = self.check_with(str(tools))
         self.assertEqual((result.returncode, result.stdout.strip()), (1, ''))
-        self.assertIn('acl package', result.stderr)
+        self.assertIn('campaign-refusal: acl-missing', result.stderr.splitlines())
         self.assertFalse((self.base / 'root').exists())
 
     def test_a_root_of_another_user_or_open_to_others_is_refused_unchanged(self):
@@ -790,13 +792,27 @@ class PrivateRootTests(unittest.TestCase):
             self.assertEqual(subprocess.run(campaign_fence.private_root_command('/usr'), shell=True,
                                             capture_output=True).returncode, 1)
 
-    @unittest.skipUnless(shutil.which('setfacl'), 'needs setfacl')
-    def test_a_root_with_an_access_control_list_is_refused(self):
+    def test_an_access_control_list_alone_makes_an_accepted_root_refused(self):
+        # Required where PLENORA_REQUIRE_REAL_ACL is set (the CI Linux job):
+        # there this test may not be skipped.
+        def unavailable(reason):
+            if REQUIRE_REAL_ACL:
+                self.fail(reason)
+            self.skipTest(reason)
+        if not shutil.which('setfacl'):
+            unavailable('setfacl is missing')
         root = self.base / 'root'
         root.mkdir(mode=0o700)
+        accepted = self.check(root)
+        self.assertEqual((accepted.returncode, accepted.stdout.strip()), (0, 'private'))
         if subprocess.run(['setfacl', '-m', 'u:nobody:r', str(root)]).returncode:
-            self.skipTest('the filesystem has no access control lists')
-        self.assertEqual(self.check(root).returncode, 1)
+            unavailable('the filesystem has no access control lists')
+        refused = self.check(root)
+        self.assertEqual(refused.returncode, 1)
+        # The refusal is the access control list, and nothing else.
+        self.assertEqual(refused.stderr.splitlines(), ['campaign-refusal: acl'])
+        subprocess.run(['setfacl', '-b', str(root)], check=True)
+        self.assertEqual(self.check(root).stdout.strip(), 'private')
 
 
 @unittest.skipUnless(LINUX, 'runs bash')
@@ -826,10 +842,16 @@ class OwnedStateTests(unittest.TestCase):
 
 
 class RealAclToolTests(unittest.TestCase):
-    @unittest.skipUnless(os.environ.get('CI') and sys.platform != 'win32', 'the CI Linux runner')
-    def test_ci_checks_access_control_lists_with_the_real_getfacl(self):
+    @unittest.skipUnless(REQUIRE_REAL_ACL, 'only where PLENORA_REQUIRE_REAL_ACL is set (the CI Linux job)')
+    def test_the_checks_use_getfacl_from_the_system_acl_package(self):
         self.assertIsNotNone(REAL_GETFACL)
         self.assertEqual(shutil.which('getfacl'), REAL_GETFACL)
+        executable = os.path.realpath(REAL_GETFACL)
+        owner = subprocess.run(['dpkg', '-S', executable], capture_output=True, text=True, check=True)
+        self.assertEqual(owner.stdout.split(':', 1)[0], 'acl')
+        self.assertIsNotNone(shutil.which('setfacl'))
+        version = subprocess.run([REAL_GETFACL, '--version'], capture_output=True, text=True, check=True)
+        self.assertRegex(version.stdout, r'^getfacl [0-9]')
 
 
 class PrivateRootControllerTests(unittest.TestCase):
@@ -843,9 +865,35 @@ class PrivateRootControllerTests(unittest.TestCase):
                     raise self.answer
                 return self.answer
         campaign_fence.check_private_root(Remote('private'), '/srv/q')
-        for answer in (RuntimeError('dedicated VM command failed'), ''):
+        for answer in (campaign_fence.RemoteFailure('dedicated VM command failed'), ''):
             with self.subTest(answer=answer), self.assertRaises(ValueError):
                 campaign_fence.check_private_root(Remote(answer), '/srv/q')
+
+    def test_the_operator_gets_the_reason_of_a_refusal_as_a_fixed_message(self):
+        class Remote:
+            def __init__(self, stderr):
+                self.stderr = stderr
+
+            def run(self, command):
+                raise campaign_fence.RemoteFailure('dedicated VM command failed', self.stderr)
+        cases = {
+            'bash: line 3: /srv/secret-path\ncampaign-refusal: acl-missing\n': 'install the acl package',
+            'campaign-refusal: acl\n': 'access control list beyond its mode',
+            'campaign-refusal: something-new\n': 'unrecognized refusal',
+            'stat: cannot stat /srv/secret-path\n': 'without a recognized reason',
+        }
+        for stderr, reason in cases.items():
+            with self.subTest(reason=reason):
+                for check in (lambda remote: campaign_fence.check_private_root(remote, '/srv/q'),
+                              lambda remote: campaign_fence.check_owned(remote, ['/srv/q'])):
+                    with self.assertRaises(ValueError) as failure:
+                        check(Remote(stderr))
+                    self.assertIn(reason, str(failure.exception))
+                    self.assertNotIn('secret-path', str(failure.exception))
+                    self.assertIsNone(failure.exception.__cause__)
+        for code in campaign_fence.REFUSALS:
+            self.assertIn(f'fail {code}', '\n'.join(campaign_fence.OWNERSHIP_LINES)
+                          + campaign_fence.private_root_command('/srv/q'))
 
 
 @unittest.skipUnless(LINUX and shutil.which('git') and shutil.which('sha256sum'), 'runs bash, git and sha256sum')
@@ -998,6 +1046,32 @@ class StreamTests(unittest.TestCase):
             (folder / 'runner-output.tar').write_bytes(buffer.getvalue()[:9000])
             with self.assertRaises(Exception):
                 release_campaign.extract_runner_output(folder / 'runner-output.tar', folder / 'extracted')
+
+
+class ExportTests(unittest.TestCase):
+    """A failed export keeps its whole diagnosis; a broken transfer is not a stopped runner."""
+
+    class Remote:
+        def __init__(self, error):
+            self.error = error
+
+        def stream(self, command, path):
+            raise self.error
+
+    def test_a_failed_copy_keeps_its_diagnosis_and_a_broken_transfer_its_own_error(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            failure = campaign_fence.RemoteFailure(
+                'dedicated VM command failed; the partial file could not be removed (PermissionError)', 'secret')
+            with self.assertRaises(ValueError) as raised:
+                release_campaign.export_runner_output(self.Remote(failure), 'c', folder)
+            self.assertIn('could not be removed (PermissionError)', str(raised.exception))
+            self.assertNotIn('secret', str(raised.exception))
+            broken = RuntimeError('dedicated VM transfer interrupted (OSError); the partial file could not be removed '
+                                  '(PermissionError)')
+            with self.assertRaises(RuntimeError) as raised:
+                release_campaign.export_runner_output(self.Remote(broken), 'c', folder)
+            self.assertIs(raised.exception, broken)
 
 
 class RunnerOutputTests(unittest.TestCase):
