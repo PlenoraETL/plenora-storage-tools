@@ -88,8 +88,8 @@ class FakeRemote:
     """A VM whose fixture preparation finishes at once with a scripted
     outcome; files are kept in memory by remote path."""
 
-    def __init__(self, root, *, code='0', check='PASS'):
-        self.root, self.code, self.check = root, code, check
+    def __init__(self, root, *, code='0', check='PASS', unowned=False):
+        self.root, self.code, self.check, self.unowned = root, code, check, unowned
         self.files, self.commands = {}, []
 
     def write(self, remote, text):
@@ -100,6 +100,12 @@ class FakeRemote:
 
     def run(self, command):
         self.commands.append(command)
+        if ' campaign-owned ' in command:
+            if self.unowned:
+                raise RuntimeError('dedicated VM command failed')
+            return 'owned'
+        if 'umask 077 && mkdir -p' in command:
+            return ''
         if '(nohup bash .fixtures/' in command:
             label_nonce = command.split('(nohup bash .fixtures/', 1)[1].split('-run.sh', 1)[0]
             signal = f'{self.root}/.fixtures/signals/{label_nonce}'
@@ -149,6 +155,12 @@ class PreparationTests(unittest.TestCase):
                 if error is ValueError:
                     self.assertNotIsInstance(raised.exception, campaign_fence.CampaignBusy)
                 self.assertFalse((folder / 'fixture-reset.json').exists())
+
+    def test_state_that_is_not_exclusively_ours_stops_before_any_script_is_written(self):
+        remote = FakeRemote(self.ROOT, unowned=True)
+        with tempfile.TemporaryDirectory() as temporary, self.assertRaises(ValueError):
+            self.reset(remote, Path(temporary))
+        self.assertEqual(remote.files, {})
 
     def test_a_lost_admission_starts_no_preparation(self):
         session = FakeSession()
@@ -240,7 +252,8 @@ class SessionTests(unittest.TestCase):
         self.assertTrue(remote.channel.closed)
 
     def test_the_epoch_is_compared_byte_for_byte(self):
-        for content in (EPOCH, EPOCH + '\n\n', ' ' + EPOCH + '\n', EPOCH + ' \n'):
+        for content in (EPOCH, EPOCH + '\n\n', ' ' + EPOCH + '\n', EPOCH + ' \n', EPOCH + '\r\n',
+                        EPOCH + '\n\0'):
             with self.subTest(content=content):
                 remote = self.Remote(f'locked {EPOCH} /srv/q/.campaign', content=content, replies=['renewed\n'])
                 with campaign_fence.admission(remote, '/srv/q') as session:
@@ -642,6 +655,52 @@ class PrivateRootTests(unittest.TestCase):
         self.assertEqual(self.check(f'{self.base}/./root').returncode, 1)
         self.assertEqual(self.check(root).returncode, 0)
 
+    def test_missing_levels_are_private_from_the_start_whatever_the_umask(self):
+        # The window between creating a level and restricting it does not
+        # exist: each level is created with mode 700 even under umask 000.
+        root = self.base / 'a' / 'b' / 'root'
+        command = 'umask 000 && ' + campaign_fence.private_root_command(str(root), str(self.top))
+        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        self.assertEqual((result.returncode, result.stdout.strip()), (0, 'private'))
+        for level in (self.base / 'a', self.base / 'a' / 'b', root):
+            self.assertEqual(level.stat().st_mode & 0o777, 0o700)
+
+    def test_an_existing_level_is_checked_before_anything_below_it_and_never_changed(self):
+        # A level placed by someone else before the check: open to others,
+        # a link, or a file. Nothing is created below it and it stays as it is.
+        cases = []
+        open_level = self.base / 'open'
+        open_level.mkdir()
+        open_level.chmod(0o777)
+        cases.append((open_level, 0o777))
+        elsewhere = self.top / 'elsewhere'
+        elsewhere.mkdir(mode=0o700)
+        link = self.base / 'link'
+        link.symlink_to(elsewhere)
+        cases.append((link, None))
+        collision = self.base / 'file'
+        collision.write_text('not a directory')
+        cases.append((collision, None))
+        for level, mode in cases:
+            with self.subTest(level=level.name):
+                self.assertEqual(self.check(level / 'root').returncode, 1)
+                self.assertFalse(os.path.lexists(level / 'root'))
+                if mode is not None:
+                    self.assertEqual(level.stat().st_mode & 0o777, mode)
+        self.assertEqual(list(elsewhere.iterdir()), [])
+        open_level.chmod(0o700)
+
+    def test_a_root_of_another_user_or_open_to_others_is_refused_unchanged(self):
+        root = self.base / 'root'
+        root.mkdir()
+        root.chmod(0o755)
+        self.assertEqual(self.check(root).returncode, 1)
+        self.assertEqual(root.stat().st_mode & 0o777, 0o755)
+        if os.geteuid() != 0:
+            # A directory of another user (root) where the VM root should be.
+            self.assertEqual(subprocess.run(campaign_fence.private_root_command('/usr'), shell=True,
+                                            capture_output=True).returncode, 1)
+
     @unittest.skipUnless(shutil.which('setfacl'), 'needs setfacl')
     def test_a_root_with_an_access_control_list_is_refused(self):
         root = self.base / 'root'
@@ -649,6 +708,32 @@ class PrivateRootTests(unittest.TestCase):
         if subprocess.run(['setfacl', '-m', 'u:nobody:r', str(root)]).returncode:
             self.skipTest('the filesystem has no access control lists')
         self.assertEqual(self.check(root).returncode, 1)
+
+
+@unittest.skipUnless(LINUX, 'runs bash')
+class OwnedStateTests(unittest.TestCase):
+    """Campaign state is used only if it is exclusively this user's, checked as itself."""
+
+    def test_links_open_or_foreign_state_is_refused(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            (folder / 'state').write_text('x')
+            (folder / 'state').chmod(0o600)
+            (folder / 'directory').mkdir(mode=0o700)
+
+            def owned(*paths):
+                return subprocess.run(campaign_fence.owned_command([str(path) for path in paths]), shell=True,
+                                      capture_output=True, text=True)
+            self.assertEqual(owned(folder / 'state', folder / 'directory').stdout.strip(), 'owned')
+            (folder / 'link').symlink_to(folder / 'state')
+            (folder / 'open').write_text('x')
+            (folder / 'open').chmod(0o666)
+            refused = [folder / 'link', folder / 'open', folder / 'missing']
+            if os.geteuid() != 0:
+                refused.append(Path('/usr'))
+            for path in refused:
+                with self.subTest(path=path.name):
+                    self.assertEqual(owned(folder / 'state', path).returncode, 1)
 
 
 class PrivateRootControllerTests(unittest.TestCase):
@@ -716,6 +801,69 @@ class RunnerBootstrapTests(unittest.TestCase):
     def test_a_copy_already_present_is_never_reused(self):
         self.work.mkdir()
         self.assertNotEqual(self.start().returncode, 0)
+
+
+class StreamTests(unittest.TestCase):
+    """Remote.stream: the local file appears only for a complete, successful transfer."""
+
+    class Output:
+        def __init__(self, chunks, code, failure=None):
+            self.chunks, self.failure = list(chunks), failure
+            self.channel = type('Channel', (), {'recv_exit_status': lambda channel: code})()
+
+        def read(self, size=-1):
+            if self.chunks:
+                return self.chunks.pop(0)
+            if self.failure:
+                raise self.failure
+            return b''
+
+    def remote(self, output, error=None):
+        class Client:
+            def exec_command(client, command, timeout):
+                if error:
+                    raise error
+                return None, output, self.Output([], 0)
+        remote = release_campaign.Remote.__new__(release_campaign.Remote)
+        remote.client = Client()
+        return remote
+
+    def test_only_a_complete_successful_transfer_leaves_a_file(self):
+        import socket
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'runner-output.tar'
+            self.remote(self.Output([b'whole', b' output'], 0)).stream('docker cp c:/x -', path)
+            self.assertEqual(path.read_bytes(), b'whole output')
+            path.unlink()
+            cases = {
+                # `docker cp` or `docker logs` failing on the VM.
+                'command failed': (self.Output([b'partial'], 1), None),
+                # The connection drops: the channel ends without exit status.
+                'cut short': (self.Output([b'partial'], -1), None),
+                'connection lost': (self.Output([b'partial'], 0, socket.timeout('timed out')), None),
+                'not started': (None, OSError('connection reset')),
+            }
+            for name, (output, error) in cases.items():
+                with self.subTest(case=name):
+                    with self.assertRaises(RuntimeError):
+                        self.remote(output, error).stream('docker logs c', path)
+                    self.assertEqual(list(Path(temporary).iterdir()), [])
+
+    def test_a_truncated_export_is_never_taken_for_evidence(self):
+        import io
+        import tarfile
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            buffer = io.BytesIO()
+            with tarfile.open(fileobj=buffer, mode='w') as stream:
+                for name in ('output/selected/report.json', 'output/campaign.json'):
+                    data = b'{}' * 4096
+                    info = tarfile.TarInfo(name)
+                    info.size = len(data)
+                    stream.addfile(info, io.BytesIO(data))
+            (folder / 'runner-output.tar').write_bytes(buffer.getvalue()[:9000])
+            with self.assertRaises(Exception):
+                release_campaign.extract_runner_output(folder / 'runner-output.tar', folder / 'extracted')
 
 
 class RunnerOutputTests(unittest.TestCase):
@@ -893,7 +1041,10 @@ class ProtocolCase(unittest.TestCase):
         for name, text in (('docker', STUB_DOCKER), ('flock', STUB_FLOCK)):
             (self.root / 'bin' / name).write_text(text)
             (self.root / 'bin' / name).chmod(0o755)
+        # The VM root exists and is private before any admission
+        # (private_root_command).
         self.vm_root = self.root / 'q'
+        self.vm_root.mkdir(mode=0o700)
         self.directory = self.vm_root / '.campaign'
         self.processes = []
 
@@ -951,6 +1102,37 @@ class AdmissionProtocolTests(ProtocolCase):
         second, epoch = self.admitted()
         self.assertRegex(epoch, '^2-[0-9a-f]{32}$')
         self.end(second)
+
+    def test_campaign_state_reached_by_a_link_or_open_to_others_is_refused(self):
+        # Someone else's directory with a plausible lock, epoch and lease,
+        # put in place of the campaign directory.
+        foreign = self.root / 'foreign'
+        foreign.mkdir(mode=0o700)
+        (foreign / 'lock').write_text('')
+        (foreign / 'epoch').write_text('5-' + '0' * 32 + '\n')
+        (foreign / 'lease').write_text('none\n')
+        self.directory.symlink_to(foreign)
+        self.assertEqual(self.refused(), 1)
+        self.assertEqual((foreign / 'epoch').read_text(), '5-' + '0' * 32 + '\n')
+        self.directory.unlink()
+        first, epoch = self.admitted()
+        self.end(first)
+        for name, change in (('lock', 'link'), ('epoch', 'open'), ('lease', 'link')):
+            with self.subTest(name=name, change=change):
+                path = self.directory / name
+                original = path.read_bytes()
+                path.unlink()
+                if change == 'link':
+                    (foreign / name).write_bytes(original)
+                    path.symlink_to(foreign / name)
+                else:
+                    path.write_bytes(original)
+                    path.chmod(0o666)
+                self.assertEqual(self.refused(), 1)
+                path.unlink()
+                path.write_bytes(original)
+                path.chmod(0o600)
+        self.assertEqual(self.epoch(), epoch + '\n')
 
     def test_a_runner_of_a_lost_admission_is_fenced_whatever_its_revision(self):
         # A and B qualify different revisions, in different remote roots: the
@@ -1103,9 +1285,12 @@ class ByteExactFenceTests(unittest.TestCase):
                 return subprocess.run(['bash', '-c', script], env=environment, stderr=subprocess.DEVNULL).returncode
             self.assertEqual(shell(), 1)
             for content, code in ((EPOCH + '\n', 0), (EPOCH, campaign_fence.FENCED),
-                                  (EPOCH + '\n\n', campaign_fence.FENCED), (EPOCH + ' \n', campaign_fence.FENCED)):
+                                  (EPOCH + '\n\n', campaign_fence.FENCED), (EPOCH + ' \n', campaign_fence.FENCED),
+                                  (EPOCH + '\r\n', campaign_fence.FENCED), (EPOCH[:5] + '\0' + EPOCH[5:] + '\n',
+                                                                          campaign_fence.FENCED),
+                                  (EPOCH + '\n\0', campaign_fence.FENCED)):
                 with self.subTest(content=content):
-                    (directory / 'epoch').write_text(content)
+                    (directory / 'epoch').write_bytes(content.encode('ascii'))
                     self.assertEqual(shell(), code)
                     if code:
                         with self.assertRaises(campaign_fence.CampaignFenced):

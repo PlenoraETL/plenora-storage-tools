@@ -20,7 +20,7 @@ import tarfile
 import time
 import uuid
 
-from campaign_fence import (FENCED, LABEL, LOCK_HELD, CampaignBusy, CampaignFenced, admission,
+from campaign_fence import (FENCED, LABEL, LOCK_HELD, CampaignBusy, CampaignFenced, admission, check_owned,
                            check_private_root, fence_lines, supervised)
 from campaign_state import Campaign, digest, exclusive, logged, write_json
 from versioning import parse_version, workspace_version
@@ -95,13 +95,27 @@ class Remote:
 
     def stream(self, command, path, timeout=600):
         """Write the standard output of `command` to the local `path`, bytes as
-        they are; nothing is written on the VM."""
-        _, out, err = self.client.exec_command(command, timeout=timeout)
-        with open(path, 'wb') as stream:
-            shutil.copyfileobj(out, stream)
-        err.read()
-        if out.channel.recv_exit_status():
+        they are; nothing is written on the VM.
+
+        `path` appears only when the command succeeded and its whole output
+        arrived: a failed command, a lost connection or an output cut short
+        (the channel then ends without an exit status, reported as -1) leaves
+        no file and raises RuntimeError.
+        """
+        partial = path.with_name(path.name + '.partial')
+        try:
+            _, out, err = self.client.exec_command(command, timeout=timeout)
+            with open(partial, 'wb') as stream:
+                shutil.copyfileobj(out, stream)
+            err.read()
+            code = out.channel.recv_exit_status()
+        except Exception as error:  # every failure of the transfer is the same failure
+            partial.unlink(missing_ok=True)
+            raise RuntimeError('dedicated VM transfer interrupted') from error
+        if code:
+            partial.unlink()
             raise RuntimeError('dedicated VM command failed')
+        partial.replace(path)
 
     def download(self, remote, path):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -240,10 +254,14 @@ def run_preparation(remote, remote_root, project, host, label, folder, *, reset,
     signal = '.fixtures/signals/' + label + '-' + nonce
     script, wrapper = fixture_scripts(remote_root, project, host, label, nonce, reset=reset,
                                       directory=session.directory, epoch=session.epoch)
+    quoted = shlex.quote(remote_root)
+    remote.run(f'cd {quoted} && umask 077 && mkdir -p .fixtures/signals .fixtures/campaign')
+    check_owned(remote, [remote_root, f'{remote_root}/.fixtures', f'{remote_root}/.fixtures/signals',
+                         f'{remote_root}/.fixtures/campaign'])
     remote.write(f'{remote_root}/.fixtures/{label}-{nonce}.sh', script)
     remote.write(f'{remote_root}/.fixtures/{label}-{nonce}-run.sh', wrapper)
-    quoted = shlex.quote(remote_root)
-    remote.run(f'cd {quoted} && mkdir -p .fixtures/signals && '
+    check_owned(remote, [f'{remote_root}/.fixtures/{label}-{nonce}.sh', f'{remote_root}/.fixtures/{label}-{nonce}-run.sh'])
+    remote.run(f'cd {quoted} && '
                f'(nohup bash .fixtures/{label}-{nonce}-run.sh >/dev/null 2>&1 </dev/null & echo started)')
     limit = time.monotonic() + deadline
     while True:
@@ -468,11 +486,13 @@ def run(config_path, output, retries, reason, connect_host=None):
                 bundle = path / 'source.bundle'
                 logged(['git', 'bundle', 'create', str(bundle), 'HEAD'], path, cwd=ROOT)
                 session.check(remote)
-                remote.run('mkdir -p ' + q(remote_root))
+                remote.run('umask 077 && mkdir -p ' + q(remote_root))
+                check_owned(remote, [remote_root])
                 remote.upload(bundle, remote_root + '/source.bundle')
                 # A dedicated directory may only contain this campaign's checkout.
                 remote.run(f'cd {q(remote_root)} && if test ! -d .git; then git init -q && git fetch -q source.bundle HEAD && git checkout -q --detach FETCH_HEAD; fi')
-                remote.run(f'cd {q(remote_root)} && test "$(git rev-parse HEAD)" = {q(revision)} && test -z "$(git status --porcelain --untracked-files=no)" && mkdir -p .fixtures')
+                remote.run(f'cd {q(remote_root)} && test "$(git rev-parse HEAD)" = {q(revision)} && test -z "$(git status --porcelain --untracked-files=no)" && umask 077 && mkdir -p .fixtures')
+                check_owned(remote, [remote_root, remote_root + '/.fixtures'])
                 # Move the transport bundle into ignored campaign storage after checkout.
                 remote.run(f'cd {q(remote_root)} && mv source.bundle .fixtures/source.bundle')
                 remote.run(f'cd {q(remote_root)} && test -z "$(git status --porcelain)"')
@@ -556,17 +576,21 @@ def run(config_path, output, retries, reason, connect_host=None):
                 write_json(path / 'expected-inputs.json', expected)
                 remote_inputs = remote_root + '/' + inputs
                 session.check(remote)
-                remote.run(f'mkdir -p {q(remote_root + "/.fixtures/inputs")} && mkdir {q(remote_inputs)} '
+                remote.run(f'umask 077 && mkdir -p {q(remote_root + "/.fixtures/inputs")} && mkdir {q(remote_inputs)} '
                            f'{q(remote_inputs + "/baseline")} {q(remote_inputs + "/fixtures")} '
                            f'{q(remote_inputs + "/fixtures/extended")}')
+                check_owned(remote, [remote_root, remote_root + '/.fixtures', remote_root + '/.fixtures/inputs',
+                                     remote_inputs])
                 remote.upload(baseline, remote_inputs + '/baseline/plenora-storage')
                 remote.upload(path / 'source.bundle', remote_inputs + '/source.bundle')
                 for name, local in fixtures.items():
                     remote.upload(local, remote_inputs + '/' + name)
                 remote.upload(archive, remote_inputs + '/linux-input.tar.gz')
                 remote.upload(path / 'compose.campaign.json', remote_inputs + '/compose.campaign.json')
-                remote.run(f'cd {q(remote_inputs)} && tar -xzf linux-input.tar.gz && '
+                remote.run(f'cd {q(remote_inputs)} && umask 077 && tar -xzf linux-input.tar.gz && '
                            f'chmod +x baseline/plenora-storage {q(distribution + "/plenora-storage")}')
+                # Every input is a file of this user where it was put, not a link.
+                check_owned(remote, [remote_inputs + '/' + name for name in sorted(expected)])
                 compose = (f'cd {q(remote_root)} && docker compose -p {q(project)} -f docker-compose.yml '
                            f'-f compose.extended.yml -f {q(inputs + "/compose.campaign.json")}')
                 container = project + '-campaign-' + path.name

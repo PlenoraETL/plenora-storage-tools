@@ -93,6 +93,41 @@ class CampaignLost(RuntimeError):
     """The controller lost its admission or its lease while a local activity was running."""
 
 
+# Shell functions shared by the VM-side checks. They inspect a path itself,
+# never what a link points to: `fail` exits 1 with a message, `trusted`
+# accepts a directory that belongs to root or to this user, `owned` a
+# directory or regular file that belongs to this user; neither may be a link,
+# be writable by group or others or carry an access control list.
+OWNERSHIP_LINES = [
+    'fail() { echo "$1" >&2; exit 1; }',
+    'unshared() { local mode; mode=$(stat -c %a -- "$1"); '
+    '(( (8#$mode & 8#022) == 0 )) || fail "$1 is writable by other users"; '
+    'case "$(ls -ld -- "$1")" in ??????????+*) fail "$1 has an access control list";; esac; }',
+    'trusted() { [ ! -L "$1" ] && [ -d "$1" ] || fail "$1 is a link or not a directory"; '
+    'case "$(stat -c %u -- "$1")" in 0|"$(id -u)") ;; *) fail "$1 belongs to another user";; esac; unshared "$1"; }',
+    'owned() { [ ! -L "$1" ] && { [ -d "$1" ] || [ -f "$1" ]; } || fail "$1 is a link or not a file or directory"; '
+    '[ "$(stat -c %u -- "$1")" = "$(id -u)" ] || fail "$1 belongs to another user"; unshared "$1"; }',
+]
+
+
+def owned_command(paths):
+    """VM command that prints `owned` only if every path is a directory or
+    regular file of this user, not a link, not writable by others."""
+    script = '\n'.join(['set -euo pipefail', *OWNERSHIP_LINES, 'for path in "$@"; do owned "$path"; done',
+                        'echo owned'])
+    return 'bash -c ' + shlex.quote(script) + ' campaign-owned ' + ' '.join(shlex.quote(path) for path in paths)
+
+
+def check_owned(remote, paths):
+    """Refuse campaign state on the VM that is not exclusively this user's; see `owned_command`."""
+    try:
+        answer = remote.run(owned_command(paths))
+    except RuntimeError:
+        answer = None
+    if answer != 'owned':
+        raise ValueError('campaign state on the VM is a link, belongs to another user or is writable by others')
+
+
 def admission_command(vm_root, lease=LEASE_SECONDS + LEASE_MARGIN):
     """The VM side of an admission.
 
@@ -111,6 +146,8 @@ def admission_command(vm_root, lease=LEASE_SECONDS + LEASE_MARGIN):
     script = '\n'.join([
         'set -euo pipefail',
         'shopt -s inherit_errexit',
+        'umask 077',
+        *OWNERSHIP_LINES,
         'root=$(realpath -m -- "$1")',
         'directory="$root/.campaign"',
         f'lease={int(lease)}',
@@ -127,16 +164,19 @@ def admission_command(vm_root, lease=LEASE_SECONDS + LEASE_MARGIN):
         f"epoch_pattern='^{EPOCH}$'",
         "lease_pattern='^(none|[0-9a-f-]{36} [0-9]{1,12})$'",
         'record_lease() { write lease "$(boot) $(( $(boot_clock) + 1 + lease ))"; }',
-        'mkdir -p -- "$root"',
+        # The root exists and was checked private (private_root_command).
+        'owned "$root"',
         # First start only: the directory appears with its lock, first epoch
         # and an empty lease at once, or not at all.
-        'if ! test -e "$directory"; then',
+        'if ! test -e "$directory" && ! test -L "$directory"; then',
         '  staging=$(mktemp -d "$root/.campaign.init.XXXXXXXX")',
         '  : >"$staging/lock"',
         '  printf "%s\\n" "$(token 0)" >"$staging/epoch"',
         '  printf "none\\n" >"$staging/lease"',
         '  mv -T -- "$staging" "$directory" || { rm -rf -- "$staging"; test -d "$directory"; }',
         'fi',
+        # Every piece of state, checked as itself: a link anywhere stops here.
+        'for path in "$directory" "$directory/lock" "$directory/epoch" "$directory/lease"; do owned "$path"; done',
         'exec 9<"$directory/lock"',
         f'flock -n -E {LOCK_HELD} -x 9',
         'previous=$(strict lease "$lease_pattern")',
@@ -175,33 +215,42 @@ def admission_command(vm_root, lease=LEASE_SECONDS + LEASE_MARGIN):
 def private_root_command(vm_root, top='/'):
     """The VM side of the privacy check of `vm_root`, run before the admission.
 
-    Creates the root with mode 700 if it does not exist. Refuses (exit 1)
-    unless the configured path is canonical, without links; the root belongs
-    to this user with mode 700; and every directory from the root up to `/`
-    belongs to root or to this user, is not writable by group or others and
-    has no access control list. Prints `private` when it holds. The walk
-    ends at `top`, which is `/` for every campaign; tests stop it at a
-    directory whose permissions they control.
+    The configured path must be canonical (absolute, no `.`, `..`, empty or
+    trailing components). The check walks down from `top`, `/` for every
+    campaign (tests stop it at a directory whose permissions they control):
+    every directory that exists is checked, by lstat, before anything is
+    looked at or created below it, and must belong to root or to this user,
+    not be a link, not be writable by group or others and have no access
+    control list. A level that does not exist is created with mode 700 under
+    umask 077, so it is never open to others, not even for an instant; if it
+    appears meanwhile, the check stops. Nothing that exists is ever changed.
+    The root itself must belong to this user with mode 700. Prints `private`
+    when it holds; otherwise exits 1, leaving only the private levels it
+    created.
     """
     script = '\n'.join([
         'set -euo pipefail',
+        'umask 077',
         'root=$1',
         'top=$2',
-        'uid=$(id -u)',
-        'fail() { echo "$1" >&2; exit 1; }',
-        'if ! test -e "$root"; then mkdir -p -- "$root"; chmod 700 -- "$root"; fi',
-        '[ "$(realpath -e -- "$root")" = "$root" ] || fail "the VM root path is not canonical or contains a link"',
-        '[ "$(stat -c "%u %a" -- "$root")" = "$uid 700" ] || fail "the VM root must belong to this user with mode 700"',
-        'path=$root',
-        'while :; do',
-        '  read -r owner mode <<<"$(stat -c "%u %a" -- "$path")"',
-        '  { [ "$owner" = 0 ] || [ "$owner" = "$uid" ]; } || fail "a directory of the VM root path belongs to another user"',
-        '  (( (8#$mode & 8#022) == 0 )) || fail "a directory of the VM root path is writable by other users"',
-        '  case "$(ls -ld -- "$path")" in ??????????+*) fail "a directory of the VM root path has an access control list";; esac',
-        '  [ "$path" = "$top" ] && break',
-        '  [ "$path" = / ] && fail "the VM root is not below the top of the check"',
-        '  path=$(dirname -- "$path")',
+        *OWNERSHIP_LINES,
+        '[[ "$root" == /* && "$root" != */ && "$root/" != *//* && "$root/" != */./* && "$root/" != */../* ]] '
+        '|| fail "the VM root path is not canonical"',
+        'if [ "$top" = / ]; then current=; rest=${root#/}; else',
+        '  [[ "$root" == "$top"/* ]] || fail "the VM root is not below the top of the check"',
+        '  current=$top; rest=${root#"$top"/}',
+        'fi',
+        'trusted "${current:-/}"',
+        'IFS=/ read -r -a parts <<<"$rest"',
+        'for part in "${parts[@]}"; do',
+        '  current="$current/$part"',
+        '  if test -e "$current" || test -L "$current"; then',
+        '    trusted "$current"',
+        '  else',
+        '    mkdir -m 700 -- "$current" || fail "$current appeared while it was being created"',
+        '  fi',
         'done',
+        '[ "$(stat -c "%u %a" -- "$root")" = "$(id -u) 700" ] || fail "the VM root must belong to this user with mode 700"',
         'echo private',
     ])
     return f'bash -c {shlex.quote(script)} private {shlex.quote(vm_root)} {shlex.quote(top)}'
@@ -214,8 +263,8 @@ def check_private_root(remote, vm_root):
     except RuntimeError:
         answer = None
     if answer != 'private':
-        raise ValueError('the VM root, or a directory above it, can be written by another user or contains a '
-                         'link; nothing was touched')
+        raise ValueError('the VM root, or a directory above it, can be written by another user, belongs to '
+                         'another user or is a link; nothing was created below it')
 
 
 class Session:
@@ -572,10 +621,10 @@ def held(directory, epoch):
 
         def fence():
             try:
-                current = (directory / 'epoch').read_text(encoding='utf-8')
+                current = (directory / 'epoch').read_bytes()
             except OSError as error:
                 raise RuntimeError('the campaign epoch cannot be read; nothing more is recorded') from error
-            if current != epoch + '\n':
+            if current != (epoch + '\n').encode('ascii'):
                 raise CampaignFenced('another controller was admitted on this VM; this run is void and its '
                                      'result is not recorded')
 
@@ -589,9 +638,9 @@ def held(directory, epoch):
 def fence_lines(directory_variable='CAMPAIGN_DIR', epoch_variable='CAMPAIGN_EPOCH'):
     """Shell function `fence` for preparation scripts: exits with FENCED once
     the epoch file is not exactly the epoch and one newline, and with 1 if it
-    cannot be read. The trailing marker keeps the newlines that a command
-    substitution would remove."""
-    return [f'fence() {{ local current; current=$(cat "${directory_variable}/epoch" && printf x) '
-            f'|| {{ echo "campaign epoch unreadable" >&2; exit 1; }}; '
-            f'test "$current" = "${epoch_variable}"$\'\\nx\' '
-            f'|| {{ echo "campaign epoch changed" >&2; exit {FENCED}; }}; }}']
+    cannot be read. `cmp` compares bytes; a shell variable would lose NUL
+    bytes and trailing newlines."""
+    return [f'fence() {{ local status=0; printf "%s\\n" "${epoch_variable}" '
+            f'| cmp -s - "${directory_variable}/epoch" || status=$?; case $status in 0) ;; '
+            f'1) echo "campaign epoch changed" >&2; exit {FENCED};; '
+            f'*) echo "campaign epoch unreadable" >&2; exit 1;; esac; }}']

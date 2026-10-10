@@ -21,16 +21,34 @@ host key già approvate; la password viene richiesta interattivamente e non
 viene salvata. In alternativa specificare una chiave con `ssh_key`.
 
 La radice VM (`vm_root`) deve essere privata dell'utente SSH. Prima di ogni
-ammissione il coordinatore verifica:
+ammissione il coordinatore controlla che il percorso configurato sia canonico:
+assoluto, senza componenti `.`, `..` o vuote. Poi lo percorre dall'alto, da
+`/` alla radice, e verifica ogni directory che esiste prima di guardare o
+creare qualcosa sotto di essa. Ogni directory, esaminata come tale e mai
+attraverso un link, deve:
 
-- che la radice appartenga a quell'utente con modo `700` (se non esiste la
-  crea così);
-- che il percorso configurato sia canonico, senza link;
-- che ogni directory da lì fino a `/` appartenga a root o all'utente, non sia
-  scrivibile da gruppo o da altri e non abbia una ACL.
+- appartenere a root o all'utente;
+- non essere un link;
+- non essere scrivibile da gruppo o da altri;
+- non avere una ACL.
 
-Altrimenti si ferma senza toccare niente, quindi la radice non va messa sotto
-`/tmp` o in directory condivise.
+Un livello che manca viene creato con modo `700` sotto `umask 077`, quindi non è
+mai aperto ad altri, nemmeno per un istante; se nel frattempo compare, la
+verifica si ferma. Una directory che esiste non viene mai modificata. La radice
+deve appartenere all'utente con modo `700`.
+
+Se la verifica fallisce, il coordinatore si ferma senza creare niente sotto la
+directory rifiutata; restano solo i livelli privati che aveva già creato sopra
+di essa. Per questo la radice non va messa sotto `/tmp` o in directory
+condivise.
+
+Lo stesso controllo, sempre senza seguire link, vale per lo stato che la
+campagna usa sotto la radice: `.campaign` con `lock`, `epoch` e `lease`; la
+directory del checkout; `.fixtures` con le directory dei segnali e dello stato
+delle fixture e gli script di preparazione; la directory degli input di ogni
+tentativo con tutti i suoi file. Ognuno deve essere una directory o un file regolare dell'utente, non un
+link e non scrivibile da altri, altrimenti la campagna si ferma. Le directory
+che la campagna crea nascono sotto `umask 077`.
 
 ## Configurazione e avvio
 
@@ -178,9 +196,10 @@ preparata a parte con lock, primo gettone e lease vuoto, poi rinominata in modo
 atomico. In una directory esistente un gettone o un lease assente, illeggibile
 o malformato (formato stretto, newline finale esatto) è un errore, mai una
 ripartenza da zero. Ogni controllo dell'epoca confronta i byte: il gettone e
-un solo newline. Gli script delimitano il contenuto con un marcatore, perché
-la command substitution toglierebbe i newline finali, e il controller fa lo
-stesso sul comando remoto, il cui output viene ripulito dagli spazi.
+un solo newline. Il runner legge il file in binario; gli script lo confrontano
+con `cmp`, perché in una variabile della shell andrebbero persi i byte NUL e i
+newline finali; il controller delimita il contenuto con un marcatore, perché
+l'output del comando remoto viene ripulito dagli spazi.
 
 L'ammissione rifiuta anche finché esiste un container runner di questa radice
 (etichetta Docker `plenora.campaign`) che non ha ancora preso il lock; se
@@ -279,8 +298,11 @@ La connessione è autenticata dalla host key verificata.
 
 **Coperto contro chi scrive sulla VM:**
 
-- **la configurazione insicura:** una radice che altri potrebbero scrivere fa
-  rifiutare la campagna prima di toccare qualsiasi cosa;
+- **la configurazione insicura:** una radice, o una directory sopra di lei, che
+  altri potrebbero scrivere fa fermare la campagna prima di creare qualcosa
+  sotto di essa;
+- **lo stato sostituito da un link** (per esempio `.campaign` verso una
+  directory di un altro utente) o aperto ad altri: rifiutato;
 - **il codice del runner:** gira solo da un checkout privato del bundle
   verificato;
 - **i file delle fixture letti dal runner** (CA, certificato FTPS, fingerprint
