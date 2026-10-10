@@ -58,8 +58,24 @@ campagna usa sotto la radice: `.campaign` con `lock`, `epoch` e `lease`; la
 directory del checkout; `.fixtures` con le directory dei segnali e dello stato
 delle fixture e gli script di preparazione; la directory degli input di ogni
 tentativo con tutti i suoi file. Ognuno deve essere una directory o un file regolare dell'utente, non un
-link e non scrivibile da altri, altrimenti la campagna si ferma. Le directory
-che la campagna crea nascono sotto `umask 077`.
+link e non scrivibile da altri, altrimenti la campagna si ferma.
+
+Niente di ciò che la campagna crea sulla VM dipende dall'umask dell'account.
+Con il default di Ubuntu, `0002`, i file nascerebbero scrivibili dal gruppo:
+
+- i file caricati dal controller (script di preparazione, bundle, input)
+  ricevono il modo `600` subito dopo la creazione, prima di qualsiasi byte, e
+  il controller ne verifica modo e dimensione;
+- le directory create dal controller e gli input estratti nascono sotto
+  `umask 077`, con i modi dell'archivio ignorati;
+- il checkout e le preparazioni delle fixture girano sotto `umask 022`: niente
+  è scrivibile da gruppo o da altri, e i container delle fixture possono
+  ancora leggere i file che montano.
+
+Dopo il checkout e dopo l'estrazione degli input il controller verifica
+l'intero albero: un solo file o directory scrivibile da gruppo o da altri
+ferma la campagna. Lo stesso vale per un checkout lasciato da una versione
+precedente.
 
 ## Configurazione e avvio
 

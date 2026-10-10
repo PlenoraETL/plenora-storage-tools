@@ -21,7 +21,8 @@ import time
 import uuid
 
 from campaign_fence import (FENCED, LABEL, LOCK_HELD, ROOT_PATH, CampaignBusy, CampaignFenced, RemoteFailure,
-                           admission, check_owned, check_private_root, fence_lines, supervised)
+                           admission, check_owned, check_private_root, check_tree_unshared, fence_lines,
+                           supervised)
 from campaign_state import Campaign, digest, exclusive, logged, write_json
 from versioning import parse_version, workspace_version
 
@@ -87,14 +88,32 @@ class Remote:
         reader = channel.makefile('r')
         return channel, reader, reader.readline().strip()
 
-    def upload(self, path, remote):
-        with self.client.open_sftp() as sftp:
-            sftp.put(str(path), remote)
+    # Every file the controller creates on the VM is set to its mode right
+    # after it is created and before any byte is written: the SFTP server
+    # applies the account's umask, which may leave it writable by the group
+    # (0002 is the Ubuntu default). The mode and the size are checked after.
+    def upload(self, path, remote, mode=0o600):
+        with self.client.open_sftp() as sftp, open(path, 'rb') as source:
+            with sftp.open(remote, 'wb') as stream:
+                stream.chmod(mode)
+                if hasattr(stream, 'set_pipelined'):
+                    stream.set_pipelined(True)
+                shutil.copyfileobj(source, stream, 1024 * 1024)
+            self.created(sftp, remote, mode, Path(path).stat().st_size)
 
-    def write(self, remote, text):
+    def write(self, remote, text, mode=0o600):
+        data = text.encode('utf-8')
         with self.client.open_sftp() as sftp:
-            with sftp.open(remote, 'w') as stream:
-                stream.write(text)
+            with sftp.open(remote, 'wb') as stream:
+                stream.chmod(mode)
+                stream.write(data)
+            self.created(sftp, remote, mode, len(data))
+
+    @staticmethod
+    def created(sftp, remote, mode, size):
+        attributes = sftp.stat(remote)
+        if attributes.st_mode & 0o7777 != mode or attributes.st_size != size:
+            raise RuntimeError('a file created on the VM does not have the expected mode or size')
 
     def stream(self, command, path, timeout=600):
         """Write the standard output of `command` to the local `path`, bytes as
@@ -208,7 +227,7 @@ def fixture_scripts(remote_root, project, host, label, nonce, *, reset, director
     diagnostics = '.fixtures/diagnostics/' + label + '-' + nonce
     compose_all = 'docker compose -f docker-compose.yml -f compose.extended.yml'
     kind = 'reset' if reset else 'prepare'
-    lines = ['#!/usr/bin/env bash', 'set -euo pipefail', 'cd ' + q(remote_root),
+    lines = ['#!/usr/bin/env bash', 'set -euo pipefail', 'umask 022', 'cd ' + q(remote_root),
              f'exec >{signal}.log 2>&1',
              'export COMPOSE_PROJECT_NAME=' + q(project),
              'export PLENORA_FIXTURE_HOST=' + q(host),
@@ -240,7 +259,8 @@ def fixture_scripts(remote_root, project, host, label, nonce, *, reset, director
     if reset:
         lines += [f'python3 scripts/check_fixtures.py --output {signal}-check.json']
     lines += ['fence', *state_lines(kind)]
-    wrapper = (f'cd {q(remote_root)} && mkdir -p .fixtures/campaign .fixtures/signals || exit 1\n'
+    wrapper = ('umask 022\n'
+               f'cd {q(remote_root)} && mkdir -p .fixtures/campaign .fixtures/signals || exit 1\n'
                '(\n'
                f'  exec 9<{q(directory + "/lock")} || exit 1\n'
                f'  flock -n -E {LOCK_HELD} -s 9 || exit $?\n'
@@ -333,6 +353,29 @@ def reset_fixtures(remote, remote_root, project, host, folder, session, **timing
 def expected_inputs(files):
     """Expected digest of every file of an attempt's input directory, by relative path."""
     return {name: digest(path) for name, path in sorted(files.items())}
+
+
+def checkout_command(remote_root, revision):
+    """VM command that checks out `revision` from `source.bundle` in
+    `remote_root`, if not done yet, and verifies it.
+
+    It runs under umask 022: nothing of the checkout is writable by group or
+    others whatever the account's umask, while the fixture containers can
+    still read the files they mount. `tree_unshared_command` checks it after.
+    """
+    q = shlex.quote
+    return (f'cd {q(remote_root)} && umask 022 && if test ! -d .git; then git init -q && git fetch -q source.bundle HEAD '
+            f'&& git checkout -q --detach FETCH_HEAD; fi && test "$(git rev-parse HEAD)" = {q(revision)} '
+            '&& test -z "$(git status --porcelain --untracked-files=no)"')
+
+
+def extract_inputs_command(remote_inputs, distribution):
+    """VM command that extracts the Linux distribution among the inputs and
+    makes the two binaries executable, all private to the account: modes come
+    from umask 077, never from the archive, whatever the account's umask."""
+    q = shlex.quote
+    return (f'cd {q(remote_inputs)} && umask 077 && tar --no-same-permissions -xzf linux-input.tar.gz && '
+            f'chmod u+x baseline/plenora-storage {q(distribution + "/plenora-storage")}')
 
 
 def runner_bootstrap(work, inputs, bundle, revision, fixtures):
@@ -532,9 +575,12 @@ def run(config_path, output, retries, reason, connect_host=None):
                 check_owned(remote, [remote_root])
                 remote.upload(bundle, remote_root + '/source.bundle')
                 # A dedicated directory may only contain this campaign's checkout.
-                remote.run(f'cd {q(remote_root)} && if test ! -d .git; then git init -q && git fetch -q source.bundle HEAD && git checkout -q --detach FETCH_HEAD; fi')
-                remote.run(f'cd {q(remote_root)} && test "$(git rev-parse HEAD)" = {q(revision)} && test -z "$(git status --porcelain --untracked-files=no)" && umask 077 && mkdir -p .fixtures')
+                remote.run(checkout_command(remote_root, revision))
+                remote.run(f'cd {q(remote_root)} && umask 077 && mkdir -p .fixtures')
                 check_owned(remote, [remote_root, remote_root + '/.fixtures'])
+                # Nothing of the checkout, the scripts and configurations the
+                # preparations run, may be writable by group or others.
+                check_tree_unshared(remote, remote_root, remote_root + '/.fixtures')
                 # Move the transport bundle into ignored campaign storage after checkout.
                 remote.run(f'cd {q(remote_root)} && mv source.bundle .fixtures/source.bundle')
                 remote.run(f'cd {q(remote_root)} && test -z "$(git status --porcelain)"')
@@ -629,10 +675,11 @@ def run(config_path, output, retries, reason, connect_host=None):
                     remote.upload(local, remote_inputs + '/' + name)
                 remote.upload(archive, remote_inputs + '/linux-input.tar.gz')
                 remote.upload(path / 'compose.campaign.json', remote_inputs + '/compose.campaign.json')
-                remote.run(f'cd {q(remote_inputs)} && umask 077 && tar -xzf linux-input.tar.gz && '
-                           f'chmod +x baseline/plenora-storage {q(distribution + "/plenora-storage")}')
-                # Every input is a file of this user where it was put, not a link.
+                remote.run(extract_inputs_command(remote_inputs, distribution))
+                # Every input is a file of this user where it was put, not a
+                # link, and nothing in the directory is writable by others.
                 check_owned(remote, [remote_inputs + '/' + name for name in sorted(expected)])
+                check_tree_unshared(remote, remote_inputs)
                 compose = (f'cd {q(remote_root)} && docker compose -p {q(project)} -f docker-compose.yml '
                            f'-f compose.extended.yml -f {q(inputs + "/compose.campaign.json")}')
                 container = project + '-campaign-' + path.name

@@ -947,6 +947,148 @@ class RunnerBootstrapTests(unittest.TestCase):
         self.assertNotEqual(self.start().returncode, 0)
 
 
+class GroupUmask:
+    """Run the block with umask 002, the Ubuntu default with private groups:
+    whatever is created without an explicit mode is writable by the group."""
+
+    def __enter__(self):
+        self.previous = os.umask(0o002)
+
+    def __exit__(self, *details):
+        os.umask(self.previous)
+
+
+class LocalSftp:
+    """An SFTP server on the local filesystem that, like a real one, creates
+    files with the default mode filtered by the process umask."""
+
+    def __init__(self, chmod=True):
+        self.honours_chmod = chmod
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *details):
+        return False
+
+    def open(self, path, mode):
+        stream = open(path, mode)
+        honours = self.honours_chmod
+
+        class File:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *details):
+                stream.close()
+
+            def chmod(self, value):
+                if honours:
+                    os.chmod(path, value)
+
+            def write(self, data):
+                return stream.write(data)
+        return File()
+
+    def stat(self, path):
+        return os.stat(path)
+
+
+@unittest.skipIf(sys.platform == 'win32', 'POSIX modes and umask')
+class PrivateCreationTests(unittest.TestCase):
+    """Everything the controller creates on the VM is private whatever the
+    account's umask: it was not, with 0002, and check_owned stopped the
+    campaign (3.0.0 on 00b087f)."""
+
+    def remote(self, sftp):
+        remote = release_campaign.Remote.__new__(release_campaign.Remote)
+        remote.client = type('Client', (), {'open_sftp': lambda client: sftp})()
+        return remote
+
+    def owned(self, *paths):
+        return subprocess.run(campaign_fence.owned_command([str(path) for path in paths]), shell=True,
+                              capture_output=True, text=True).stdout.strip()
+
+    def test_uploaded_and_written_files_are_private_under_a_group_umask(self):
+        with tempfile.TemporaryDirectory() as temporary, GroupUmask():
+            folder = Path(temporary)
+            (folder / 'local.bin').write_bytes(b'binary' * 1000)
+            remote = self.remote(LocalSftp())
+            remote.upload(folder / 'local.bin', str(folder / 'uploaded.bin'))
+            remote.write(str(folder / 'script.sh'), 'echo prepared\n')
+            for name in ('uploaded.bin', 'script.sh'):
+                self.assertEqual((folder / name).stat().st_mode & 0o777, 0o600)
+            self.assertEqual((folder / 'uploaded.bin').read_bytes(), b'binary' * 1000)
+            if LINUX:
+                self.assertEqual(self.owned(folder / 'uploaded.bin', folder / 'script.sh'), 'owned')
+
+    def test_a_file_left_with_another_mode_is_an_error(self):
+        with tempfile.TemporaryDirectory() as temporary, GroupUmask():
+            folder = Path(temporary)
+            (folder / 'local.bin').write_bytes(b'x')
+            remote = self.remote(LocalSftp(chmod=False))
+            with self.assertRaises(RuntimeError):
+                remote.upload(folder / 'local.bin', str(folder / 'uploaded.bin'))
+            with self.assertRaises(RuntimeError):
+                remote.write(str(folder / 'script.sh'), 'echo prepared\n')
+
+    @unittest.skipUnless(LINUX and shutil.which('git'), 'runs bash and git')
+    def test_the_checkout_is_not_writable_by_the_group_under_a_group_umask(self):
+        with tempfile.TemporaryDirectory() as temporary, GroupUmask():
+            folder = Path(temporary)
+            source = folder / 'source'
+            (source / 'crates/core').mkdir(parents=True)
+            (source / 'crates/core/lib.rs').write_text('pub fn f() {}\n')
+            (source / '.gitignore').write_text('/.fixtures/\n')
+            git = ['git', '-C', str(source), '-c', 'user.name=t', '-c', 'user.email=t@t.invalid']
+            subprocess.run(['git', 'init', '-q', str(source)], check=True)
+            subprocess.run([*git, 'add', '.'], check=True)
+            subprocess.run([*git, 'commit', '-q', '-m', 'source'], check=True)
+            revision = subprocess.check_output([*git, 'rev-parse', 'HEAD'], text=True).strip()
+            root = folder / 'root'
+            root.mkdir(mode=0o700)
+            subprocess.run([*git, 'bundle', 'create', '-q', str(root / 'source.bundle'), 'HEAD'], check=True)
+            (root / 'source.bundle').chmod(0o600)
+            subprocess.run(release_campaign.checkout_command(str(root), revision), shell=True, check=True)
+            (root / '.fixtures').mkdir(mode=0o700)
+            (root / '.fixtures/generated').write_text('left to its own checks')
+            check = campaign_fence.tree_unshared_command(str(root), str(root / '.fixtures'))
+            result = subprocess.run(check, shell=True, capture_output=True, text=True)
+            self.assertEqual((result.returncode, result.stdout.strip()), (0, 'unshared'))
+            self.assertEqual((root / 'crates/core/lib.rs').stat().st_mode & 0o022, 0)
+            # A file of the checkout writable by the group is refused, with its reason.
+            (root / 'crates/core/lib.rs').chmod(0o664)
+            refused = subprocess.run(check, shell=True, capture_output=True, text=True)
+            self.assertEqual(refused.returncode, 1)
+            self.assertEqual(refused.stderr.splitlines(), ['campaign-refusal: writable-by-others'])
+
+    @unittest.skipUnless(LINUX, 'runs bash and tar')
+    def test_extracted_inputs_are_private_under_a_group_umask(self):
+        import tarfile
+        with tempfile.TemporaryDirectory() as temporary, GroupUmask():
+            folder = Path(temporary)
+            distribution = 'dist/3.0.0/x86_64-unknown-linux-gnu'
+            staged = folder / 'staged' / distribution
+            staged.mkdir(parents=True)
+            for name in ('plenora-storage', 'release-manifest.json'):
+                (staged / name).write_text(name)
+                (staged / name).chmod(0o666)
+            # As the controller creates them: umask 077.
+            inputs = folder / 'inputs'
+            inputs.mkdir(mode=0o700)
+            (inputs / 'baseline').mkdir(mode=0o700)
+            (inputs / 'baseline/plenora-storage').write_text('baseline')
+            (inputs / 'baseline/plenora-storage').chmod(0o600)
+            with tarfile.open(inputs / 'linux-input.tar.gz', 'w:gz') as stream:
+                stream.add(folder / 'staged' / 'dist', arcname='dist')
+            (inputs / 'linux-input.tar.gz').chmod(0o600)
+            subprocess.run(release_campaign.extract_inputs_command(str(inputs), distribution), shell=True, check=True)
+            result = subprocess.run(campaign_fence.tree_unshared_command(str(inputs)), shell=True,
+                                    capture_output=True, text=True)
+            self.assertEqual((result.returncode, result.stdout.strip()), (0, 'unshared'))
+            self.assertEqual((inputs / distribution / 'plenora-storage').stat().st_mode & 0o777, 0o700)
+
+
 class StreamTests(unittest.TestCase):
     """Remote.stream: the local file appears only for a complete, successful transfer."""
 
@@ -1545,6 +1687,9 @@ class PreparationProtocolTests(ProtocolCase):
             directory=str(self.directory), epoch=epoch)
         (self.checkout / f'.fixtures/prepare-{nonce}.sh').write_text(script or generated)
         (self.checkout / f'.fixtures/prepare-{nonce}-run.sh').write_text(wrapper)
+        # As Remote.write leaves them: mode 600.
+        for name in (f'prepare-{nonce}.sh', f'prepare-{nonce}-run.sh'):
+            (self.checkout / '.fixtures' / name).chmod(0o600)
         return self.checkout / f'.fixtures/prepare-{nonce}-run.sh'
 
     def execute(self, nonce, epoch, *, script=None, **values):
@@ -1556,6 +1701,15 @@ class PreparationProtocolTests(ProtocolCase):
 
     def state(self, nonce):
         return run_vm_campaign.check_fixture_state(self.checkout / '.fixtures/campaign', nonce)
+
+    def test_everything_a_preparation_creates_is_unshared_under_a_group_umask(self):
+        controller, epoch = self.admitted()
+        with GroupUmask():
+            self.assertEqual(self.execute('a' * 32, epoch), (0, '0'))
+        result = subprocess.run(campaign_fence.tree_unshared_command(str(self.checkout / '.fixtures')), shell=True,
+                                capture_output=True, text=True)
+        self.assertEqual((result.returncode, result.stdout.strip()), (0, 'unshared'))
+        self.end(controller)
 
     def test_a_failed_preparation_invalidates_the_previous_reset(self):
         controller, epoch = self.admitted()

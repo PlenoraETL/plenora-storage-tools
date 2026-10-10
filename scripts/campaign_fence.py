@@ -183,6 +183,31 @@ def owned_command(paths):
     return 'bash -c ' + shlex.quote(script) + ' campaign-owned ' + ' '.join(shlex.quote(path) for path in paths)
 
 
+def tree_unshared_command(root, prune=None):
+    """VM command that prints `unshared` only if no file or directory under
+    `root` (links aside, whose own mode means nothing) is writable by group
+    or others; `prune` is a subtree left to its own checks."""
+    script = '\n'.join([
+        'set -euo pipefail',
+        'fail() { echo "campaign-refusal: $1" >&2; exit 1; }',
+        'root=$1; prune=${2:-}',
+        'if [ -n "$prune" ]; then',
+        '  found=$(find "$root" -xdev -path "$prune" -prune -o ! -type l -perm /022 -print -quit) || fail cannot-inspect',
+        'else',
+        '  found=$(find "$root" -xdev ! -type l -perm /022 -print -quit) || fail cannot-inspect',
+        'fi',
+        '[ -z "$found" ] || fail writable-by-others',
+        'echo unshared',
+    ])
+    return ('bash -c ' + shlex.quote(script) + ' campaign-tree ' + shlex.quote(root)
+            + (' ' + shlex.quote(prune) if prune else ''))
+
+
+def check_tree_unshared(remote, root, prune=None):
+    """Refuse a VM tree with anything writable by group or others; see `tree_unshared_command`."""
+    run_check(remote, tree_unshared_command(root, prune), 'unshared', 'campaign files on the VM were refused')
+
+
 def check_owned(remote, paths):
     """Refuse campaign state on the VM that is not exclusively this user's; see `owned_command`."""
     run_check(remote, owned_command(paths), 'owned', 'campaign state on the VM was refused')
