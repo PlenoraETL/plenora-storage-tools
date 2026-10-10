@@ -184,8 +184,15 @@ def fenced_phase(campaign, fence, name, action, *, retry=False, reason=None):
     return campaign.phase(name, guarded, retry=retry, reason=reason)
 
 
+def require_private(root, output):
+    """The runner runs from, and writes into, the container's own filesystem only."""
+    for path in (root, output):
+        if not Path(path).resolve().is_relative_to(PRIVATE_ROOT):
+            raise ValueError('the VM runner must run from its private checkout and write its private output')
+
+
 def run(folder, baseline, output, retries, reason, backend_data, fixture_nonce, campaign_dir, epoch, inputs,
-        expected):
+        expected, fixture_state):
     # Shared hold of the VM campaign lock for the whole run, then the epoch of
     # this runner's admission (campaign_fence): no controller is admitted while
     # this runner lives, and a runner started after another admission stops.
@@ -202,14 +209,14 @@ def run(folder, baseline, output, retries, reason, backend_data, fixture_nonce, 
             def fence():
                 host_fence()
                 check_private(copies, expected)
-            measure(candidate, private_baseline, private, output, retries, reason, backend_data, fixture_nonce,
-                    fence, expected, epoch)
+            measure(candidate, private_baseline, private, output, fixture_state, retries, reason, backend_data,
+                    fixture_nonce, fence, expected, epoch)
         finally:
             shutil.rmtree(private)
 
 
-def measure(folder, baseline, private, output, retries, reason, backend_data, fixture_nonce, fence, expected,
-            epoch):
+def measure(folder, baseline, private, output, fixture_state, retries, reason, backend_data, fixture_nonce, fence,
+            expected, epoch):
     if sys.platform != 'linux':
         raise ValueError('VM campaign requires Linux')
     folder, baseline, output = folder.resolve(), baseline.resolve(), output.resolve()
@@ -225,8 +232,10 @@ def measure(folder, baseline, private, output, retries, reason, backend_data, fi
     spaces = {'workspace': ROOT, 'temporary': Path('/tmp'),
               **{f'backend-{index}': path for index, path in enumerate(backend_data)}}
     subject['space_locations'] = {label: str(path.resolve()) for label, path in spaces.items()}
-    with exclusive(output):
-        check_fixture_state(output, fixture_nonce)
+    # The fixture state is the VM's, under its preparation lock for the whole
+    # run; the ledger and the evidence are in the private output.
+    with exclusive(fixture_state), exclusive(output):
+        check_fixture_state(fixture_state, fixture_nonce)
         campaign = Campaign(output, subject)
         campaign.validate_retries(retries, phases_for(subject['version']))
 
@@ -335,9 +344,12 @@ if __name__ == '__main__':
     parser.add_argument('--campaign-dir', required=True, type=Path,
                         help='VM campaign directory with the admission lock and epoch (campaign_fence)')
     parser.add_argument('--epoch', required=True, help='epoch of the admission that started this runner')
+    parser.add_argument('--fixture-state', required=True, type=Path,
+                        help='VM directory with the fixture state and its preparation lock')
     parser.add_argument('--inputs', required=True, type=Path, help='input directory of this attempt')
     parser.add_argument('--expected-inputs', required=True, type=json.loads,
                         help='JSON object: digest of every file of the input directory, by relative path')
     args = parser.parse_args()
+    require_private(ROOT, args.output)
     run(args.distribution, args.baseline_binary, args.output, args.retry_phase, args.retry_reason, args.backend_data,
-        args.fixture_nonce, args.campaign_dir, args.epoch, args.inputs, args.expected_inputs)
+        args.fixture_nonce, args.campaign_dir, args.epoch, args.inputs, args.expected_inputs, args.fixture_state)

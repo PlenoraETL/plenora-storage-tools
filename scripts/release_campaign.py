@@ -20,14 +20,21 @@ import tarfile
 import time
 import uuid
 
-from campaign_fence import (FENCED, LABEL, LOCK_HELD, CampaignBusy, CampaignFenced, admission, fence_lines,
-                           supervised)
+from campaign_fence import (FENCED, LABEL, LOCK_HELD, CampaignBusy, CampaignFenced, admission,
+                           check_private_root, fence_lines, supervised)
 from campaign_state import Campaign, digest, exclusive, logged, write_json
 from versioning import parse_version, workspace_version
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS = {'linux': 'x86_64-unknown-linux-gnu', 'windows': 'x86_64-pc-windows-msvc'}
 LOCAL_PHASES = ('workflows', 'download', 'assemble', 'prepare-vm', 'qualify-windows', 'qualify-vm', 'seal')
+# The runner's own directory in the container's filesystem, which no mount
+# reaches: its source, its working files and its evidence.
+RUNNER_WORK = '/tmp/plenora-runner'
+RUNNER_OUTPUT = RUNNER_WORK + '/output'
+# Fixture files generated on the VM that the runner reads, by path under
+# `.fixtures/`: the controller passes their digests with the inputs.
+RUNNER_FIXTURES = ('ca.crt', 'extended/server.crt', 'sftp-fingerprint')
 
 
 def one(folder, name):
@@ -86,6 +93,16 @@ class Remote:
             with sftp.open(remote, 'w') as stream:
                 stream.write(text)
 
+    def stream(self, command, path, timeout=600):
+        """Write the standard output of `command` to the local `path`, bytes as
+        they are; nothing is written on the VM."""
+        _, out, err = self.client.exec_command(command, timeout=timeout)
+        with open(path, 'wb') as stream:
+            shutil.copyfileobj(out, stream)
+        err.read()
+        if out.channel.recv_exit_status():
+            raise RuntimeError('dedicated VM command failed')
+
     def download(self, remote, path):
         path.parent.mkdir(parents=True, exist_ok=True)
         with self.client.open_sftp() as sftp:
@@ -118,25 +135,6 @@ def validate_transport_resume(state, connect_host, reason):
         attempts = phases.get(name, [])
         if not attempts or attempts[-1]['status'] != 'PASS':
             raise ValueError('transport address change requires completed pre-VM qualification')
-
-
-def validate_vm_retries(vm_retries, retries, version):
-    """VM retries reach the runner only through a new qualify-vm attempt.
-
-    Without `--retry-phase qualify-vm` the coordinator would reuse the passed
-    VM attempt and the runner would never see them, so they are refused; a
-    passed qualify-vm is refused by the ledger itself. Names must be phases
-    the runner executes for this version.
-    """
-    if not vm_retries:
-        return
-    if 'qualify-vm' not in retries:
-        raise ValueError('VM phase retries need --retry-phase qualify-vm; otherwise they would be ignored')
-    from run_vm_campaign import phases_for
-    known = phases_for(version)
-    unknown = sorted(set(vm_retries) - set(known))
-    if unknown:
-        raise ValueError('VM phase not executed for this version: ' + ', '.join(unknown))
 
 
 RUNNER_ACTIVE = 76
@@ -294,6 +292,45 @@ def expected_inputs(files):
     return {name: digest(path) for name, path in sorted(files.items())}
 
 
+def runner_bootstrap(work, inputs, bundle, revision, fixtures):
+    """The first lines of the runner container: its own source, verified.
+
+    Copies the source bundle from the input directory `inputs` into `work`,
+    in the container's own filesystem, checks the copy against the digest
+    `bundle` and checks out `revision` from it; then copies every fixture file
+    of `fixtures` (path under `.fixtures/` to digest) into the checkout and
+    checks it. Any difference stops the container before the runner starts:
+    from here on nothing is read from the host source tree.
+    """
+    q = shlex.quote
+    lines = ['set -euo pipefail',
+             f'work={q(work)}',
+             f'inputs={q(inputs)}',
+             'mkdir -- "$work"',
+             'cp -- "$inputs/source.bundle" "$work/source.bundle"',
+             f'printf "%s  %s\\n" {q(bundle)} "$work/source.bundle" | sha256sum -c --quiet -',
+             'git init -q "$work/source"',
+             'git -C "$work/source" fetch -q "$work/source.bundle" HEAD',
+             'git -C "$work/source" checkout -q --detach FETCH_HEAD',
+             f'test "$(git -C "$work/source" rev-parse HEAD)" = {q(revision)}']
+    for name, value in sorted(fixtures.items()):
+        lines += [f'install -D -m 644 -- "$inputs/fixtures/"{q(name)} "$work/source/.fixtures/"{q(name)}',
+                  f'printf "%s  %s\\n" {q(value)} "$work/source/.fixtures/"{q(name)} | sha256sum -c --quiet -']
+    lines.append('test -z "$(git -C "$work/source" status --porcelain)"')
+    return lines
+
+
+def extract_runner_output(archive, folder):
+    """Extract the runner's exported output; returns its directory, which must
+    hold the runner ledger."""
+    with tarfile.open(archive) as stream:
+        stream.extractall(folder, filter='data')
+    output = folder / 'output'
+    if not (output / 'campaign.json').is_file():
+        raise ValueError('the VM runner stopped before creating its ledger; inspect runner.log')
+    return output
+
+
 def check_distribution(folder, reference):
     """Every artifact of `folder` has the digest in the manifest of `reference`,
     the distribution verified when it was assembled."""
@@ -341,7 +378,7 @@ def check_selected(result, identity, linux, expected, ledger, epoch, nonce):
         raise ValueError('the VM evidence does not describe this campaign\'s binaries; nothing is sealed')
 
 
-def run(config_path, output, retries, reason, vm_retries, connect_host=None):
+def run(config_path, output, retries, reason, connect_host=None):
     if sys.platform != 'win32':
         raise ValueError('orchestrator qualifies the Windows distribution locally; use a Windows host')
     config = configuration(config_path)
@@ -361,7 +398,6 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
         campaign = Campaign(output, identity)
         validate_transport_resume(campaign.state, connect_host, reason)
         campaign.validate_retries(retries, LOCAL_PHASES)
-        validate_vm_retries(vm_retries, retries, version)
 
         def phase(name, action):
             print('Phase:', name, flush=True)
@@ -448,6 +484,8 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
             # One admission covers every phase that uses the VM fixtures: their
             # preparation, the Windows qualification against them and the VM
             # attempt up to the end of its runner (campaign_fence).
+            # Nothing on the VM is used unless no other user can write it.
+            check_private_root(remote, config['vm_root'].rstrip('/'))
             held = admission(remote, config['vm_root'])
             session = held.__enter__()
             phase('prepare-vm', prepare)
@@ -483,6 +521,10 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
                 # left with accumulated state. The reset is recorded with the
                 # attempt, and only once every fixture answered.
                 nonce = reset_fixtures(remote, remote_root, project, config['host'], path, session)
+                for name in RUNNER_FIXTURES:
+                    remote.download(f'{remote_root}/.fixtures/{name}', path / 'fixtures' / name)
+                logged(['git', 'bundle', 'create', str(path / 'source.bundle'), 'HEAD'], path, cwd=ROOT,
+                       name='bundle.log')
                 # Every input of this attempt lives in a directory of this
                 # epoch, which no other admission writes, and the runner gets
                 # the digest of every file in it: an upload of another
@@ -505,15 +547,22 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
                 (path / 'compose.campaign.json').write_text(json.dumps(override), encoding='utf-8')
                 if any(item.is_dir() for item in linux.iterdir()):
                     raise ValueError('the Linux distribution must be a flat directory')
+                fixtures = {f'fixtures/{name}': path / 'fixtures' / name for name in RUNNER_FIXTURES}
                 expected = expected_inputs({'baseline/plenora-storage': baseline,
                                             'linux-input.tar.gz': archive,
+                                            'source.bundle': path / 'source.bundle', **fixtures,
                                             'compose.campaign.json': path / 'compose.campaign.json',
                                             **{f'{distribution}/{item.name}': item for item in linux.iterdir()}})
                 write_json(path / 'expected-inputs.json', expected)
                 remote_inputs = remote_root + '/' + inputs
                 session.check(remote)
-                remote.run(f'mkdir -p {q(remote_root + "/.fixtures/inputs")} && mkdir {q(remote_inputs)} {q(remote_inputs + "/baseline")}')
+                remote.run(f'mkdir -p {q(remote_root + "/.fixtures/inputs")} && mkdir {q(remote_inputs)} '
+                           f'{q(remote_inputs + "/baseline")} {q(remote_inputs + "/fixtures")} '
+                           f'{q(remote_inputs + "/fixtures/extended")}')
                 remote.upload(baseline, remote_inputs + '/baseline/plenora-storage')
+                remote.upload(path / 'source.bundle', remote_inputs + '/source.bundle')
+                for name, local in fixtures.items():
+                    remote.upload(local, remote_inputs + '/' + name)
                 remote.upload(archive, remote_inputs + '/linux-input.tar.gz')
                 remote.upload(path / 'compose.campaign.json', remote_inputs + '/compose.campaign.json')
                 remote.run(f'cd {q(remote_inputs)} && tar -xzf linux-input.tar.gz && '
@@ -521,19 +570,25 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
                 compose = (f'cd {q(remote_root)} && docker compose -p {q(project)} -f docker-compose.yml '
                            f'-f compose.extended.yml -f {q(inputs + "/compose.campaign.json")}')
                 container = project + '-campaign-' + path.name
-                command = ['python3', 'scripts/run_vm_campaign.py', f'{inputs}/{distribution}',
-                           '--baseline-binary', '/baseline/plenora-storage', '--output', '.fixtures/campaign',
-                           '--inputs', inputs, '--expected-inputs', json.dumps(expected, sort_keys=True),
+                mounted = '/workspace/' + inputs
+                # The runner runs from its own verified checkout in the
+                # container's filesystem, writes every evidence there and
+                # measures fresh: a VM attempt never resumes earlier phases.
+                command = ['python3', 'scripts/run_vm_campaign.py', f'{mounted}/{distribution}',
+                           '--baseline-binary', '/baseline/plenora-storage', '--output', RUNNER_OUTPUT,
+                           '--fixture-state', '/workspace/.fixtures/campaign',
+                           '--inputs', mounted, '--expected-inputs', json.dumps(expected, sort_keys=True),
                            '--fixture-nonce', nonce, '--campaign-dir', '/campaign',
                            '--epoch', session.epoch,
                            '--backend-data', '/fixture-disks/minio', '--backend-data', '/fixture-disks/sftp', '--backend-data', '/fixture-disks/ftp']
-                for name in vm_retries:
-                    command.extend(['--retry-phase', name])
-                if reason:
-                    command.extend(['--retry-reason', reason])
-                setup = ('git config --global --add safe.directory /workspace; '
-                         'cp .fixtures/ca.crt /usr/local/share/ca-certificates/plenora-storage-fixture.crt; '
-                         'update-ca-certificates; ' + shlex.join(command))
+                setup = '\n'.join([
+                    *runner_bootstrap(RUNNER_WORK, mounted, expected['source.bundle'], revision,
+                                      {name: expected[f'fixtures/{name}'] for name in RUNNER_FIXTURES}),
+                    f'cp -- {RUNNER_WORK}/source/.fixtures/ca.crt '
+                    '/usr/local/share/ca-certificates/plenora-storage-fixture.crt',
+                    'update-ca-certificates',
+                    f'cd {RUNNER_WORK}/source',
+                    'exec ' + shlex.join(command)])
                 session.check(remote)
                 # The label lets an admission see this container before the
                 # runner inside it has taken the campaign lock.
@@ -548,23 +603,22 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
                     time.sleep(30)
                 else:
                     raise TimeoutError('VM campaign deadline exceeded')
-                remote.run('docker logs ' + q(container) + ' >' + q(remote_root + '/.fixtures/runner-' + path.name + '.log') + ' 2>&1')
-                remote.download(remote_root + '/.fixtures/runner-' + path.name + '.log', path / 'runner.log')
-                ledger_exists = remote.run('if test -f ' + q(remote_root + '/.fixtures/campaign/campaign.json') + '; then echo yes; else echo no; fi')
-                if ledger_exists != 'yes':
-                    raise ValueError('VM runner stopped before creating its ledger; inspect runner.log')
-                remote.download(remote_root + '/.fixtures/campaign/campaign.json', path / 'vm-campaign.json')
+                # Logs and evidence come straight from the container, through
+                # this connection: no file on the VM is their source.
+                remote.stream('docker logs ' + q(container) + ' 2>&1', path / 'runner.log')
+                try:
+                    remote.stream('docker cp ' + q(container + ':' + RUNNER_OUTPUT) + ' -', path / 'runner-output.tar')
+                except RuntimeError:
+                    raise ValueError('the VM runner stopped before creating its evidence; inspect runner.log') from None
+                runner = extract_runner_output(path / 'runner-output.tar', path)
                 session.check(remote)
                 if status['ExitCode']:
-                    raise ValueError('VM campaign failed; retry only the recorded failed phases')
-                remote.run(f'cd {q(remote_root)} && tar -czf .fixtures/selected.tar.gz -C .fixtures/campaign selected')
-                remote.download(remote_root + '/.fixtures/selected.tar.gz', path / 'selected.tar.gz')
-                with tarfile.open(path / 'selected.tar.gz') as stream:
-                    stream.extractall(path, filter='data')
+                    raise ValueError('VM campaign failed; inspect runner.log and the exported runner ledger, then '
+                                     'run a new qualify-vm attempt')
                 # Last checks before the attempt can pass: the evidence is of
                 # this campaign's binaries, and the admission still held the
-                # VM after the download.
-                check_selected(path, identity, linux, expected, path / 'vm-campaign.json', session.epoch, nonce)
+                # VM after the export.
+                check_selected(runner, identity, linux, expected, runner / 'campaign.json', session.epoch, nonce)
                 session.check(remote)
 
             vm_result = phase('qualify-vm', vm)
@@ -586,9 +640,9 @@ def run(config_path, output, retries, reason, vm_retries, connect_host=None):
                 if parse_version(version).requires((2, 1, 0)):
                     gates.append('transfers-spooled')
                 for name in gates:
-                    shutil.copytree(vm_result / 'selected/gates' / name, evidence / 'gates' / name)
+                    shutil.copytree(vm_result / 'output/selected/gates' / name, evidence / 'gates' / name)
                 for source, target in [(windows_result / 'dist' / version / TARGETS['windows'], TARGETS['windows']),
-                                       (vm_result / 'selected/linux-qualification', TARGETS['linux'])]:
+                                       (vm_result / 'output/selected/linux-qualification', TARGETS['linux'])]:
                     for report in source.glob('*.json'):
                         shutil.copyfile(report, release / target / report.name)
                 logged([sys.executable, str(ROOT / 'scripts/release_publication.py'), 'bundle', '--directory', str(release),
@@ -621,9 +675,8 @@ if __name__ == '__main__':
     parser.add_argument('--config', required=True, type=Path)
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--retry-phase', action='append', default=[])
-    parser.add_argument('--vm-retry-phase', action='append', default=[])
     parser.add_argument('--retry-reason')
     parser.add_argument('--connect-host', help='New TCP address of the same known SSH host, only after Windows qualification passed')
     args = parser.parse_args()
     sys.exit(entrypoint(lambda: run(args.config, args.output, args.retry_phase, args.retry_reason,
-                                    args.vm_retry_phase, args.connect_host)))
+                                    args.connect_host)))

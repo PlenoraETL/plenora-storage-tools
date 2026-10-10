@@ -291,21 +291,6 @@ class RetryTests(unittest.TestCase):
                                     retry=True, reason='compare again')
             self.assertEqual(result.name, '2')
 
-    def test_vm_retries_need_a_new_vm_attempt_and_an_executed_phase(self):
-        release_campaign.validate_vm_retries([], [], '3.0.0')
-        release_campaign.validate_vm_retries(['soak'], ['qualify-vm'], '3.0.0')
-        with self.assertRaises(ValueError):
-            release_campaign.validate_vm_retries(['soak'], [], '3.0.0')
-        with self.assertRaises(ValueError):
-            release_campaign.validate_vm_retries(['spooled-large'], ['qualify-vm'], '2.0.1')
-        with self.assertRaises(ValueError):
-            release_campaign.validate_vm_retries(['performance-baseline'], ['qualify-vm'], '3.0.0')
-        with tempfile.TemporaryDirectory() as temporary:
-            campaign = Campaign(Path(temporary), {'subject': 'same'})
-            campaign.phase('qualify-vm', lambda path: (path / 'report.json').write_text('passed'))
-            with self.assertRaises(ValueError):
-                campaign.validate_retries(['qualify-vm'], release_campaign.LOCAL_PHASES)
-
     def test_phases_follow_the_version(self):
         self.assertIn('performance-ab', run_vm_campaign.PHASES)
         self.assertNotIn('performance-baseline', run_vm_campaign.PHASES)

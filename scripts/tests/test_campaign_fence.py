@@ -568,7 +568,8 @@ class InputTests(unittest.TestCase):
             fence()
         with patch.object(run_vm_campaign, 'measure', measure):
             run_vm_campaign.run(self.inputs / 'dist/3.0.0/x', self.baseline, Path(self.temporary.name) / 'out', [],
-                                None, [], 'n0nce', campaign_dir, EPOCH, self.inputs, self.expected)
+                                None, [], 'n0nce', campaign_dir, EPOCH, self.inputs, self.expected,
+                                Path(self.temporary.name) / 'fixture-state')
         self.assertTrue(seen['folder'].is_relative_to(seen['private']))
         self.assertTrue(seen['baseline'].is_relative_to(seen['private']))
         self.assertFalse(seen['private'].is_relative_to(self.inputs))
@@ -594,6 +595,154 @@ class InputTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 run_vm_campaign.select_evidence(campaign, output / 'third',
                                                 {'gates/x.json': (folder, folder / 'unrecorded.json')})
+
+
+@unittest.skipUnless(LINUX, 'runs bash')
+class PrivateRootTests(unittest.TestCase):
+    """The VM root is used only when no other user can write it, or anything above it."""
+
+    def setUp(self):
+        # Under the home directory: the system temporary directory is
+        # writable by everyone, and so would refuse every root below it.
+        self.base = Path(tempfile.mkdtemp(dir=Path.home()))
+
+    def tearDown(self):
+        self.base.chmod(0o700)
+        shutil.rmtree(self.base)
+
+    def check(self, root):
+        return subprocess.run(campaign_fence.private_root_command(str(root)), shell=True, capture_output=True,
+                              text=True)
+
+    def test_a_new_root_is_created_private(self):
+        result = self.check(self.base / 'root')
+        self.assertEqual((result.returncode, result.stdout.strip()), (0, 'private'))
+        self.assertEqual((self.base / 'root').stat().st_mode & 0o777, 0o700)
+
+    def test_a_root_others_could_write_or_reach_by_a_link_is_refused(self):
+        root = self.base / 'root'
+        root.mkdir(mode=0o700)
+        root.chmod(0o755)
+        self.assertEqual(self.check(root).returncode, 1)
+        root.chmod(0o700)
+        self.base.chmod(0o777)
+        self.assertEqual(self.check(root).returncode, 1)
+        self.base.chmod(0o700)
+        (self.base / 'link').symlink_to(root)
+        self.assertEqual(self.check(self.base / 'link').returncode, 1)
+        # Only the canonical path is accepted, so the one checked is the one used.
+        self.assertEqual(self.check(f'{self.base}/./root').returncode, 1)
+        self.assertEqual(self.check(root).returncode, 0)
+
+    @unittest.skipUnless(shutil.which('setfacl'), 'needs setfacl')
+    def test_a_root_with_an_access_control_list_is_refused(self):
+        root = self.base / 'root'
+        root.mkdir(mode=0o700)
+        if subprocess.run(['setfacl', '-m', 'u:nobody:r', str(root)]).returncode:
+            self.skipTest('the filesystem has no access control lists')
+        self.assertEqual(self.check(root).returncode, 1)
+
+
+class PrivateRootControllerTests(unittest.TestCase):
+    def test_only_a_confirmed_private_root_is_used(self):
+        class Remote:
+            def __init__(self, answer):
+                self.answer = answer
+
+            def run(self, command):
+                if isinstance(self.answer, Exception):
+                    raise self.answer
+                return self.answer
+        campaign_fence.check_private_root(Remote('private'), '/srv/q')
+        for answer in (RuntimeError('dedicated VM command failed'), ''):
+            with self.subTest(answer=answer), self.assertRaises(ValueError):
+                campaign_fence.check_private_root(Remote(answer), '/srv/q')
+
+
+@unittest.skipUnless(LINUX and shutil.which('git') and shutil.which('sha256sum'), 'runs bash, git and sha256sum')
+class RunnerBootstrapTests(unittest.TestCase):
+    """The runner starts only from its own verified checkout and fixture files."""
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        root = Path(self.temporary.name)
+        repository = root / 'repository'
+        (repository / 'scripts').mkdir(parents=True)
+        (repository / 'scripts/runner.py').write_text('verified source\n')
+        (repository / '.gitignore').write_text('/.fixtures/\n')
+        git = ['git', '-C', str(repository), '-c', 'user.name=t', '-c', 'user.email=t@t.invalid']
+        subprocess.run(['git', 'init', '-q', str(repository)], check=True)
+        subprocess.run([*git, 'add', '.'], check=True)
+        subprocess.run([*git, 'commit', '-q', '-m', 'source'], check=True)
+        self.revision = subprocess.check_output([*git, 'rev-parse', 'HEAD'], text=True).strip()
+        self.inputs = root / 'inputs'
+        (self.inputs / 'fixtures').mkdir(parents=True)
+        subprocess.run([*git, 'bundle', 'create', '-q', str(self.inputs / 'source.bundle'), 'HEAD'], check=True)
+        (self.inputs / 'fixtures/ca.crt').write_text('certificate\n')
+        self.digests = {'bundle': digest(self.inputs / 'source.bundle'),
+                        'ca.crt': digest(self.inputs / 'fixtures/ca.crt')}
+        self.work = root / 'work'
+
+    def tearDown(self):
+        self.temporary.cleanup()
+
+    def start(self, *, bundle=None, revision=None, fixture=None):
+        lines = release_campaign.runner_bootstrap(str(self.work), str(self.inputs), bundle or self.digests['bundle'],
+                                                  revision or self.revision,
+                                                  {'ca.crt': fixture or self.digests['ca.crt']})
+        script = '\n'.join([*lines, 'cd "$work/source"', 'cat scripts/runner.py .fixtures/ca.crt'])
+        return subprocess.run(['bash', '-c', script], capture_output=True, text=True)
+
+    def test_the_runner_starts_from_its_verified_copy(self):
+        result = self.start()
+        self.assertEqual((result.returncode, result.stdout), (0, 'verified source\ncertificate\n'))
+
+    def test_any_difference_stops_the_container_before_the_runner(self):
+        for options in ({'bundle': '0' * 64}, {'revision': '0' * 40}, {'fixture': '0' * 64}):
+            with self.subTest(options=options):
+                shutil.rmtree(self.work, ignore_errors=True)
+                result = self.start(**options)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertNotIn('verified source', result.stdout)
+
+    def test_a_copy_already_present_is_never_reused(self):
+        self.work.mkdir()
+        self.assertNotEqual(self.start().returncode, 0)
+
+
+class RunnerOutputTests(unittest.TestCase):
+    """The controller reads the runner's evidence only from the exported archive."""
+
+    def archive(self, folder, members):
+        import io
+        import tarfile
+        path = folder / 'runner-output.tar'
+        with tarfile.open(path, 'w') as stream:
+            for name, data in members.items():
+                info = tarfile.TarInfo(name)
+                info.size = len(data)
+                stream.addfile(info, io.BytesIO(data))
+        return path
+
+    def test_an_export_without_ledger_or_escaping_the_attempt_is_refused(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            good = self.archive(folder, {'output/campaign.json': b'{}', 'output/selected/report.json': b'{}'})
+            self.assertEqual(release_campaign.extract_runner_output(good, folder / 'a'), folder / 'a/output')
+            with self.assertRaises(ValueError):
+                release_campaign.extract_runner_output(self.archive(folder, {'output/selected/report.json': b'{}'}),
+                                                       folder / 'b')
+            with self.assertRaises(Exception):
+                release_campaign.extract_runner_output(self.archive(folder, {'../escape': b'x'}), folder / 'c')
+            self.assertFalse((folder / 'escape').exists())
+
+    @unittest.skipIf(sys.platform == 'win32', 'the private root is the Linux container one')
+    def test_the_runner_refuses_a_checkout_or_output_outside_its_container(self):
+        private = run_vm_campaign.PRIVATE_ROOT
+        run_vm_campaign.require_private(private / 'plenora-runner/source', private / 'plenora-runner/output')
+        for root, output in ((ROOT, private / 'out'), (private / 'source', ROOT / '.fixtures/campaign')):
+            with self.subTest(root=root, output=output), self.assertRaises(ValueError):
+                run_vm_campaign.require_private(root, output)
 
 
 class SelectedEvidenceTests(unittest.TestCase):

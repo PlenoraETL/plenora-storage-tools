@@ -172,6 +172,48 @@ def admission_command(vm_root, lease=LEASE_SECONDS + LEASE_MARGIN):
     return f'exec bash -c {shlex.quote(script)} admission {shlex.quote(vm_root)}'
 
 
+def private_root_command(vm_root):
+    """The VM side of the privacy check of `vm_root`, run before the admission.
+
+    Creates the root with mode 700 if it does not exist. Refuses (exit 1)
+    unless the configured path is canonical, without links; the root belongs
+    to this user with mode 700; and every directory from the root up to `/`
+    belongs to root or to this user, is not writable by group or others and
+    has no access control list. Prints `private` when it holds.
+    """
+    script = '\n'.join([
+        'set -euo pipefail',
+        'root=$1',
+        'uid=$(id -u)',
+        'fail() { echo "$1" >&2; exit 1; }',
+        'if ! test -e "$root"; then mkdir -p -- "$root"; chmod 700 -- "$root"; fi',
+        '[ "$(realpath -e -- "$root")" = "$root" ] || fail "the VM root path is not canonical or contains a link"',
+        '[ "$(stat -c "%u %a" -- "$root")" = "$uid 700" ] || fail "the VM root must belong to this user with mode 700"',
+        'path=$root',
+        'while :; do',
+        '  read -r owner mode <<<"$(stat -c "%u %a" -- "$path")"',
+        '  { [ "$owner" = 0 ] || [ "$owner" = "$uid" ]; } || fail "a directory of the VM root path belongs to another user"',
+        '  (( (8#$mode & 8#022) == 0 )) || fail "a directory of the VM root path is writable by other users"',
+        '  case "$(ls -ld -- "$path")" in ??????????+*) fail "a directory of the VM root path has an access control list";; esac',
+        '  [ "$path" = / ] && break',
+        '  path=$(dirname -- "$path")',
+        'done',
+        'echo private',
+    ])
+    return f'bash -c {shlex.quote(script)} private {shlex.quote(vm_root)}'
+
+
+def check_private_root(remote, vm_root):
+    """Refuse a VM root that another user could write; see `private_root_command`."""
+    try:
+        answer = remote.run(private_root_command(vm_root))
+    except RuntimeError:
+        answer = None
+    if answer != 'private':
+        raise ValueError('the VM root, or a directory above it, can be written by another user or contains a '
+                         'link; nothing was touched')
+
+
 class Session:
     """The controller's admission: its channel, epoch, VM directory and lease."""
 

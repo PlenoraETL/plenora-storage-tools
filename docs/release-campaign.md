@@ -20,6 +20,18 @@ canonici di Actions: il runner non li ricompila. L'accesso SSH verifica le
 host key già approvate; la password viene richiesta interattivamente e non
 viene salvata. In alternativa specificare una chiave con `ssh_key`.
 
+La radice VM (`vm_root`) deve essere privata dell'utente SSH. Prima di ogni
+ammissione il coordinatore verifica:
+
+- che la radice appartenga a quell'utente con modo `700` (se non esiste la
+  crea così);
+- che il percorso configurato sia canonico, senza link;
+- che ogni directory da lì fino a `/` appartenga a root o all'utente, non sia
+  scrivibile da gruppo o da altri e non abbia una ACL.
+
+Altrimenti si ferma senza toccare niente, quindi la radice non va messa sotto
+`/tmp` o in directory condivise.
+
 ## Configurazione e avvio
 
 Salvare la configurazione sotto `target/`, escluso da Git. Esempio di struttura:
@@ -198,20 +210,36 @@ runner verifica che nella directory ci siano esattamente quei file con quei
 digest, e che il binario di baseline montato abbia il suo, prima di iniziare e
 a ogni controllo dell'epoca, quindi prima e dopo ogni fase.
 
-Il runner non misura i file dell'host. All'avvio copia distribuzione e baseline
-in una directory privata del container (`/tmp` del container, che nessun mount
-raggiunge), verifica ogni copia contro il digest atteso e da lì in poi usa solo
-le copie: binari, wheel, qualifica Linux e SDK installato. Le copie vengono
+Il runner non esegue né misura file dell'host. Prima di avviarlo, il comando del
+container, che il controller passa sulla riga di comando e non su un file,
+esegue questi passi:
+
+- copia il bundle Git del sorgente nel filesystem del container (`/tmp`, che
+  nessun mount raggiunge);
+- verifica la copia contro il digest del controller e ne fa il checkout alla
+  revisione della campagna, controllando che sia pulito;
+- copia nel checkout i file delle fixture generati sulla VM che il runner legge
+  (CA, certificato FTPS, fingerprint SFTP), ciascuno verificato contro il
+  digest che il controller ha calcolato dopo il reset.
+
+Il runner, quindi, gira solo dal proprio checkout e rifiuta di partire se il suo
+sorgente o la sua uscita non stanno nel filesystem del container. All'avvio
+copia lì anche distribuzione e baseline, verifica ogni copia contro il digest
+atteso e da lì in poi usa solo le copie: binari, wheel, qualifica Linux e SDK
+installato. Le copie vengono
 riverificate a ogni controllo dell'epoca. Una sostituzione sull'host seguita dal
 ripristino non tocca i byte misurati; una sostituzione già avvenuta al momento
 della copia ferma il runner.
 
-Ogni file selezionato deve avere il digest che il ledger ha registrato quando la
-sua fase è passata. Il report selezionato elenca tutti i file sotto `selected/`
-con il loro digest, compresi i report della qualifica Linux, e porta l'epoca e
-il nonce del reset del tentativo; il ledger registra il digest del report. Il
-controller, dopo il download, ricalcola i digest di ogni file sotto `selected/`
-e richiede:
+Ledger, evidenze e report del runner stanno nel filesystem del container, mai in
+una directory dell'host. Ogni file selezionato deve avere il digest che il
+ledger, tenuto in memoria dal runner, ha registrato quando la sua fase è
+passata. Il report selezionato elenca tutti i file sotto `selected/` con il
+loro digest, compresi i report della qualifica Linux, e porta l'epoca e il
+nonce del reset del tentativo; il ledger registra il digest del report. Finito
+il runner, il controller riceve log ed evidenze direttamente dal container,
+sulla connessione SSH (`docker logs` e `docker cp … -`), senza file intermedi
+sulla VM. Poi ricalcola i digest di ogni file sotto `selected/` e richiede:
 
 - lo stesso insieme di file del report, con gli stessi digest;
 - un report con il digest registrato nel ledger scaricato, con l'epoca e il
@@ -225,57 +253,60 @@ le distribuzioni da sigillare e la copia Windows qualificata.
 
 #### Modello di minaccia
 
-Lo strumento si difende anche da chi può **scrivere sulla VM** i file della
-campagna: la radice VM, cioè il checkout, `.fixtures` e `.campaign`, senza
-privilegi su Docker e senza root. Restano fuori dal modello:
+Lo strumento si difende anche da chi può **scrivere sulla VM**, senza privilegi
+su Docker e senza root. Su due livelli:
 
-- chi ha privilegi su Docker (il gruppo `docker` equivale a root) o è root sulla
-  VM o nel container del runner: può cambiare il filesystem privato del
-  container, i volumi delle fixture e i processi;
-- chi controlla l'host del controller.
+1. **La radice VM è privata.** Il controller verifica prima di ogni ammissione
+   che nessun altro utente possa scrivere la radice o una directory sopra di
+   lei; altrimenti non parte. Checkout, preparazioni delle fixture, input,
+   stato delle fixture e stato dell'ammissione stanno tutti lì.
+2. **Il runner non si fida nemmeno della radice.** Sorgente, input e file
+   delle fixture che legge sono copie nel filesystem del container, verificate
+   contro i digest del controller. Le evidenze escono dal container
+   direttamente verso il controller.
+
+Restano fuori dal modello:
+
+- chi ha privilegi su Docker (il gruppo `docker` equivale a root) o è root
+  sulla VM o nel container del runner: può cambiare il filesystem del
+  container, l'immagine, i volumi delle fixture e i processi, e quindi anche
+  l'utente SSH, che usa Docker;
+- chi controlla l'host del controller;
+- chi cambia i permessi della radice o di una directory sopra di lei dopo la
+  verifica, cosa che può fare solo il proprietario o root.
 
 La connessione è autenticata dalla host key verificata.
 
 **Coperto contro chi scrive sulla VM:**
 
-- i byte misurati: binario candidato, baseline e wheel sono copie private
+- **la configurazione insicura:** una radice che altri potrebbero scrivere fa
+  rifiutare la campagna prima di toccare qualsiasi cosa;
+- **il codice del runner:** gira solo da un checkout privato del bundle
+  verificato;
+- **i file delle fixture letti dal runner** (CA, certificato FTPS, fingerprint
+  SFTP): copie private verificate;
+- **i byte misurati:** binario candidato, baseline e wheel sono copie private
   verificate, e anche la qualifica Linux e l'SDK usano solo quelle copie;
-- un input sostituito prima della copia: il runner si ferma;
-- un report storico valido messo al posto di quello del tentativo: è rifiutato
-  per digest nel ledger, epoca e nonce;
-- un file di evidenza aggiunto, tolto o cambiato dopo la selezione: è rifiutato;
-- un file selezionato diverso da quello inventariato quando la sua fase è
-  passata: il runner lo rifiuta prima di scrivere il report;
-- una distribuzione sigillata diversa da quella verificata.
+- **le evidenze:** ledger, report e file selezionati non passano mai da una
+  directory dell'host. Il controller richiede l'insieme esatto dei file con i
+  loro digest, il report registrato nel ledger, l'epoca e il nonce del
+  tentativo;
+- **le fasi riprese:** non esistono più per la VM. Ogni tentativo `qualify-vm`
+  misura tutte le fasi con un ledger nuovo nel container, quindi nessuna
+  evidenza di un tentativo precedente entra in quello corrente;
+- **una distribuzione sigillata diversa da quella verificata.**
 
-**Non coperto contro chi scrive sulla VM**, dichiarato:
+**Il protocollo di ammissione** (`.campaign`) è coordinamento fra i processi
+della campagna, non una difesa. Contro chi scrive regge soltanto perché sta
+nella radice privata. Se qualcuno potesse scriverla, potrebbe rompere
+l'esclusione o il lease, e due campagne potrebbero misurare insieme sulle
+stesse fixture. La verifica dei permessi è il solo argine, e avviene
+all'ammissione.
 
-- **Il codice del runner.** Il runner e gli script che lancia girano dal
-  checkout sull'host (`/workspace`). Il runner verifica all'avvio che il
-  checkout sia pulito e alla revisione attesa, ma uno script cambiato dopo quel
-  controllo, o un file interno di Git, gira con i privilegi del runner e può
-  produrre evidenze false ma coerenti.
-- **Le evidenze in transito.** Le evidenze passano per la directory dell'host
-  `.fixtures/campaign`. Chi scrive può sostituirle fra la scrittura di un report
-  e l'inventario della fase, oppure, dopo la fine del runner, insieme a report e
-  ledger, in modo coerente con l'epoca e il nonce correnti, che sulla VM sono
-  leggibili. I controlli del controller rilevano le sostituzioni incoerenti, non
-  una contraffazione coerente.
-- **Le fasi riprese da un tentativo precedente.** Il loro inventario viene dal
-  ledger sull'host.
-- **Il protocollo di ammissione.** `.campaign` coordina i processi della
-  campagna e non è una difesa: chi scrive può rompere l'esclusione o il lease, e
-  due campagne possono misurare insieme sulle stesse fixture.
-- **I file di configurazione delle fixture nel checkout**, cioè certificati,
-  chiavi e script di preparazione.
-
-**Condizione di rientro**, per estendere la garanzia al risultato:
-
-- eseguire il runner da una copia privata del sorgente, verificata contro un
-  digest passato dal controller;
-- far uscire le evidenze dal filesystem privato del container con `docker cp`,
-  con l'inventario tenuto in memoria dal runner, invece che dalla directory
-  dell'host.
+Le preparazioni delle fixture girano sull'host dal checkout nella radice
+privata, con gli script e la configurazione Compose di quel checkout: non
+sono verificate per digest al momento dell'uso. Le protegge la sola privatezza
+della radice.
 
 #### Processi locali e lease
 
@@ -454,23 +485,24 @@ verifica del nonce copre una preparazione successiva della stessa campagna.
 
 ## Ripresa, tentativi e spazio
 
-Ripetere lo stesso comando riprende le fasi riuscite dopo averne verificato
+Ripetere lo stesso comando riprende le fasi riuscite del coordinatore dopo averne verificato
 tutti i digest. Cambiare sorgenti, configurazione o artefatti richiede una nuova
 campagna. Un lock del sistema operativo impedisce due coordinatori contemporanei
 sulla stessa directory e viene rilasciato anche quando il processo termina.
 
 Una fase fallita o interrotta richiede una scelta esplicita, con motivazione.
 Un retry di una fase già superata, o di una fase sconosciuta, viene rifiutato
-con un errore prima di eseguire qualsiasi fase, sia in `--retry-phase` sia in
-`--vm-retry-phase`: le evidenze superate non si rimisurano, perché ripetere
-una misura riuscita finché il risultato conviene non è una qualifica. Per
-misurare di nuovo si crea una campagna nuova. `--vm-retry-phase` richiede
-anche `--retry-phase qualify-vm`, perché senza un nuovo tentativo VM il runner
-non lo vedrebbe; viene rifiutata una fase che il runner non esegue per la
-versione qualificata, come le fasi `spooled-*` prima della 2.1.0.
+con un errore prima di eseguire qualsiasi fase: le evidenze superate non si
+rimisurano, perché ripetere una misura riuscita finché il risultato conviene
+non è una qualifica. Per misurare di nuovo si crea una campagna nuova.
+
+Le fasi del runner VM non si riprendono una per una: ogni tentativo
+`qualify-vm` le misura tutte, con un ledger nuovo nel filesystem del container,
+perché un ledger lasciato sull'host da un tentativo precedente non sarebbe una
+fonte affidabile. Per ripetere la parte VM si chiede un nuovo tentativo:
 
 ```powershell
-python scripts/release_campaign.py --config target/campaign.json --output target/campaign-2.0.1 --retry-phase qualify-vm --vm-retry-phase transfers-large --retry-reason "Spazio del laboratorio ripristinato"
+python scripts/release_campaign.py --config target/campaign.json --output target/campaign-2.0.1 --retry-phase qualify-vm --retry-reason "Spazio del laboratorio ripristinato"
 ```
 
 I tentativi precedenti restano presenti. Il retry crea una nuova directory,
