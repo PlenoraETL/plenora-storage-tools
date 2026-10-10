@@ -98,19 +98,22 @@ class CampaignLost(RuntimeError):
 # accepts a directory that belongs to root or to this user, `owned` a
 # directory or regular file that belongs to this user; neither may be a link,
 # be writable by group or others or carry an access control list. Every
-# command they run is checked: a failure is a refusal, never a pass.
+# command they run is checked, and every output must match a whole-line
+# pattern: a failure or an unexpected answer is a refusal, never a pass.
+# Access control lists come from `getfacl`, never from a listing: the path
+# must have exactly the three base entries. Without `getfacl` (package
+# `acl`) nothing is accepted.
 OWNERSHIP_LINES = [
     'fail() { echo "$1" >&2; exit 1; }',
+    'command -v getfacl >/dev/null || fail "getfacl is missing: install the acl package on the VM"',
     'owner() { local value; value=$(stat -c %u -- "$1") || fail "cannot inspect $1"; '
     '[[ "$value" =~ ^[0-9]+$ ]] || fail "cannot inspect $1"; printf %s "$value"; }',
-    # The eleventh character of `ls -ld` is `+` when the path has an access
-    # control list; a listing that fails or is not a mode string is refused.
-    'unshared() { local mode listing; mode=$(stat -c %a -- "$1") || fail "cannot inspect $1"; '
+    'base_acl=$\'^user::[-r][-w][-x]\\ngroup::[-r][-w][-x]\\nother::[-r][-w][-x]$\'',
+    'unshared() { local mode acl; mode=$(stat -c %a -- "$1") || fail "cannot inspect $1"; '
     '[[ "$mode" =~ ^[0-7]{3,4}$ ]] || fail "cannot inspect $1"; '
     '(( (8#$mode & 8#022) == 0 )) || fail "$1 is writable by other users"; '
-    'listing=$(ls -ld -- "$1") || fail "cannot list $1"; '
-    '[[ "$listing" =~ ^[-dl][-rwxsStT]{9}([^-rwxsStT]|$) ]] || fail "cannot list $1"; '
-    '[ "${listing:10:1}" != + ] || fail "$1 has an access control list"; }',
+    'acl=$(getfacl --absolute-names --omit-header -- "$1") || fail "cannot read the access control list of $1"; '
+    '[[ "$acl" =~ $base_acl ]] || fail "$1 has an access control list beyond its mode"; }',
     'trusted() { local value; [ ! -L "$1" ] && [ -d "$1" ] || fail "$1 is a link or not a directory"; '
     'value=$(owner "$1"); { [ "$value" = 0 ] || [ "$value" = "$(id -u)" ]; } || fail "$1 belongs to another user"; '
     'unshared "$1"; }',
@@ -644,7 +647,8 @@ def held(directory, epoch):
             try:
                 current = (directory / 'epoch').read_bytes()
             except OSError as error:
-                raise RuntimeError('the campaign epoch cannot be read; nothing more is recorded') from error
+                raise RuntimeError('the campaign epoch cannot be read (' + type(error).__name__ + '); nothing '
+                                   'more is recorded') from None
             if current != (epoch + '\n').encode('ascii'):
                 raise CampaignFenced('another controller was admitted on this VM; this run is void and its '
                                      'result is not recorded')

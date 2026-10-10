@@ -103,6 +103,16 @@ class Remote:
         no file and raises RuntimeError.
         """
         partial = path.with_name(path.name + '.partial')
+
+        def discard():
+            # The error names what failed by its type only: a transport
+            # message may carry an endpoint. If even the partial file cannot
+            # be removed, the error says so instead of hiding the first one.
+            try:
+                partial.unlink(missing_ok=True)
+            except OSError as error:
+                return '; the partial file could not be removed (' + type(error).__name__ + ')'
+            return ''
         # A leftover of a controller stopped half way is truncated by the
         # open below and then renamed or removed, never kept.
         try:
@@ -114,11 +124,9 @@ class Remote:
             if not code:
                 partial.replace(path)
         except Exception as error:  # every failure of the transfer is the same failure
-            partial.unlink(missing_ok=True)
-            raise RuntimeError('dedicated VM transfer interrupted') from error
+            raise RuntimeError('dedicated VM transfer interrupted (' + type(error).__name__ + ')' + discard()) from None
         if code:
-            partial.unlink(missing_ok=True)
-            raise RuntimeError('dedicated VM command failed')
+            raise RuntimeError('dedicated VM command failed' + discard())
 
     def download(self, remote, path):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -270,8 +278,16 @@ def run_preparation(remote, remote_root, project, host, label, folder, *, reset,
                f'(nohup bash .fixtures/{label}-{nonce}-run.sh >/dev/null 2>&1 </dev/null & echo started)')
     limit = time.monotonic() + deadline
     while True:
-        result = remote.run(f'cd {quoted} && if test -f {signal}.exit; then cat {signal}.exit; else echo running; fi')
-        if result != 'running':
+        # The exit signal is compared byte for byte with what the wrapper
+        # writes (the code and one newline); the output of a remote command
+        # is stripped, so the file is framed by a marker on both sides.
+        answer = remote.run(f'cd {quoted} && if test -f {signal}.exit; then printf x && cat {signal}.exit && printf x; '
+                            'else echo running; fi')
+        if answer != 'running':
+            framed = re.fullmatch(r'x(0|[1-9][0-9]{0,2})\nx', answer)
+            if not framed:
+                raise ValueError('the fixture preparation left a malformed exit signal')
+            result = framed.group(1)
             break
         if time.monotonic() >= limit:
             raise TimeoutError('fixture preparation timed out')

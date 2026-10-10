@@ -14,8 +14,9 @@ Servono Git, GitHub CLI autenticato, Python 3.11 e:
 python -m pip install -r scripts/requirements-campaign.txt
 ```
 
-La VM deve avere Docker Compose, Git, OpenSSL, un'immagine runner costruita dal
-Dockerfile del progetto e una cache Cargo popolata. I gate ricevono i binari
+La VM deve avere Docker Compose, Git, OpenSSL, il pacchetto `acl` (`getfacl`),
+un'immagine runner costruita dal Dockerfile del progetto e una cache Cargo
+popolata. I gate ricevono i binari
 canonici di Actions: il runner non li ricompila. L'accesso SSH verifica le
 host key già approvate; la password viene richiesta interattivamente e non
 viene salvata. In alternativa specificare una chiave con `ssh_key`.
@@ -33,8 +34,11 @@ attraverso un link, deve:
 - appartenere a root o all'utente;
 - non essere un link;
 - non essere scrivibile da gruppo o da altri;
-- non avere una ACL. La rileva il `+` nel modo di `ls -ld`; un `ls` o uno `stat`
-  che falliscono, o che non danno un risultato riconoscibile, sono un rifiuto.
+- non avere una ACL oltre al modo: `getfacl` deve riportare esattamente le tre
+  voci base `user::`, `group::` e `other::`. Le ACL non si deducono mai da un
+  listing. Senza `getfacl` (pacchetto `acl`) non si accetta niente. Un
+  `getfacl` o uno `stat` che falliscono, o che non danno esattamente il formato
+  atteso su tutta la riga, sono un rifiuto.
 
 Un livello che manca viene creato con modo `700` sotto `umask 077`, quindi non è
 mai aperto ad altri, nemmeno per un istante; se nel frattempo compare, la

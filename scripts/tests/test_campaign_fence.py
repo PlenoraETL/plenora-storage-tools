@@ -25,6 +25,24 @@ import run_vm_campaign
 ROOT = Path(__file__).resolve().parents[2]
 EPOCH = '7-' + '0' * 32
 LINUX = sys.platform != 'win32' and bool(shutil.which('bash')) and bool(shutil.which('flock'))
+# The VM checks read access control lists with getfacl (package acl). The CI
+# runner has it; a development machine without it gets a stand-in that
+# reports the three base entries from the mode, so the other checks still
+# run there. CI must use the real one (RealAclToolTests).
+REAL_GETFACL = shutil.which('getfacl')
+BASE_ACL_STUB = '''#!/usr/bin/env python3
+import os, stat, sys
+mode = os.lstat(sys.argv[-1]).st_mode
+bits = lambda shift: ''.join(c if mode >> shift & m else '-' for c, m in (('r', 4), ('w', 2), ('x', 1)))
+print('user::' + bits(6)); print('group::' + bits(3)); print('other::' + bits(0)); print()
+'''
+if sys.platform != 'win32' and not REAL_GETFACL:
+    import atexit
+    _ACL_STUB = Path(tempfile.mkdtemp(prefix='acl-stand-in-'))
+    atexit.register(shutil.rmtree, _ACL_STUB, True)
+    (_ACL_STUB / 'getfacl').write_text(BASE_ACL_STUB)
+    (_ACL_STUB / 'getfacl').chmod(0o755)
+    os.environ['PATH'] = f'{_ACL_STUB}:{os.environ["PATH"]}'
 
 
 class FakeChannel:
@@ -109,7 +127,8 @@ class FakeRemote:
         if '(nohup bash .fixtures/' in command:
             label_nonce = command.split('(nohup bash .fixtures/', 1)[1].split('-run.sh', 1)[0]
             signal = f'{self.root}/.fixtures/signals/{label_nonce}'
-            self.files[signal + '.exit'] = self.code
+            # As the wrapper writes it: the code and one newline.
+            self.files[signal + '.exit'] = self.code + '\n'
             self.files[signal + '.log'] = 'log'
             if self.code != str(campaign_fence.LOCK_HELD):
                 self.files[f'{self.root}/.fixtures/diagnostics/{label_nonce}.tar.gz'] = 'archive'
@@ -117,8 +136,8 @@ class FakeRemote:
             return 'started'
         path = command.split('if test -f ', 1)[1].split(';', 1)[0]
         present = f'{self.root}/{path}' in self.files
-        if 'then cat ' in command:
-            return self.files[f'{self.root}/{path}'] if present else 'running'
+        if 'then printf x && cat ' in command:
+            return ('x' + self.files[f'{self.root}/{path}'] + 'x').strip() if present else 'running'
         return 'yes' if present else 'no'
 
 
@@ -134,7 +153,7 @@ class PreparationTests(unittest.TestCase):
             folder = Path(temporary)
             remote = FakeRemote(self.ROOT)
             # A successful signal left by an earlier execution is never read.
-            remote.files[f'{self.ROOT}/.fixtures/signals/fixture-reset-{"0" * 32}.exit'] = '0'
+            remote.files[f'{self.ROOT}/.fixtures/signals/fixture-reset-{"0" * 32}.exit'] = '0\n'
             nonce = self.reset(remote, folder)
             record = json.loads((folder / 'fixture-reset.json').read_text())
             self.assertEqual((record['nonce'], record['epoch'], record['recreated']), (nonce, EPOCH, True))
@@ -146,7 +165,9 @@ class PreparationTests(unittest.TestCase):
         cases = ((str(campaign_fence.LOCK_HELD), 'PASS', campaign_fence.CampaignBusy),
                  (str(release_campaign.RUNNER_ACTIVE), 'PASS', campaign_fence.CampaignBusy),
                  (str(campaign_fence.FENCED), 'PASS', campaign_fence.CampaignFenced),
-                 ('66', 'PASS', ValueError), ('0', 'FAIL', ValueError))
+                 ('66', 'PASS', ValueError), ('0', 'FAIL', ValueError),
+                 # Not exactly what the wrapper writes: never read as a code.
+                 (' 0', 'PASS', ValueError), ('0\n', 'PASS', ValueError), ('0\r', 'PASS', ValueError))
         for code, check, error in cases:
             with self.subTest(code=code, check=check), tempfile.TemporaryDirectory() as temporary:
                 folder = Path(temporary)
@@ -704,17 +725,59 @@ class PrivateRootTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     release_campaign.configuration(path)
 
-    def test_a_listing_that_fails_or_is_not_a_mode_string_is_a_refusal(self):
-        bin_folder = self.top / 'bin'
-        bin_folder.mkdir()
-        for body in ('exit 2', 'echo unexpected; exit 0'):
-            with self.subTest(body=body):
-                (bin_folder / 'ls').write_text('#!/bin/sh\n' + body + '\n')
-                (bin_folder / 'ls').chmod(0o755)
-                command = (f'PATH={bin_folder}:$PATH ' +
-                           campaign_fence.private_root_command(str(self.base / 'root'), str(self.top)))
-                result = subprocess.run(command, shell=True, capture_output=True, text=True)
+    def tool(self, name, body):
+        folder = self.top / 'bin'
+        folder.mkdir(exist_ok=True)
+        (folder / name).write_text('#!/bin/sh\n' + body + '\n')
+        (folder / name).chmod(0o755)
+        return folder
+
+    def check_with(self, path_prefix, root=None):
+        command = (f'PATH={path_prefix} ' +
+                   campaign_fence.private_root_command(str(root or self.base / 'root'), str(self.top)))
+        return subprocess.run(command, shell=True, capture_output=True, text=True)
+
+    def test_access_control_lists_come_only_from_getfacl_and_must_be_the_base_entries(self):
+        extended = "printf 'user::rwx\\nuser:nobody:r--\\ngroup::---\\nmask::r--\\nother::---\\n\\n'"
+        for name, body in (('extended entry', extended),
+                           ('default entry', "printf 'user::rwx\\ngroup::---\\nother::---\\n"
+                                             "default:user::rwx\\n\\n'"),
+                           ('unexpected output', 'echo unexpected'),
+                           ('base entries but a failure', "printf 'user::rwx\ngroup::---\nother::---\n'; exit 1"),
+                           ('no output', 'exit 0'),
+                           ('failure', 'exit 1')):
+            with self.subTest(getfacl=name):
+                folder = self.tool('getfacl', body)
+                result = self.check_with(f'{folder}:$PATH')
                 self.assertEqual((result.returncode, result.stdout.strip()), (1, ''))
+                self.assertFalse((self.base / 'root').exists())
+
+    def test_no_listing_decides_about_access_control_lists(self):
+        # Listings that a parser of `ls -ld` could misread: none is consulted.
+        # With an extended entry reported by getfacl every one is refused,
+        # with the base entries every one is accepted.
+        for listing in ('drwx------ + 2 u u 4096 x', 'drwx------? 2 u u 4096 x', 'drwx------',
+                        'drwx------. 2 u u 4096 x'):
+            with self.subTest(listing=listing):
+                self.tool('ls', f"echo '{listing}'")
+                folder = self.tool('getfacl', "printf 'user::rwx\\nuser:nobody:r--\\ngroup::---\\n"
+                                              "mask::r--\\nother::---\\n\\n'")
+                self.assertEqual(self.check_with(f'{folder}:$PATH').returncode, 1)
+                (folder / 'getfacl').unlink()
+                accepted = self.check_with(f'{folder}:$PATH')
+                self.assertEqual((accepted.returncode, accepted.stdout.strip()), (0, 'private'))
+                (self.base / 'root').rmdir()
+
+    def test_without_getfacl_nothing_is_accepted(self):
+        # Only the tools the check needs, without getfacl.
+        tools = self.top / 'tools'
+        tools.mkdir()
+        for name in ('bash', 'stat', 'id', 'mkdir'):
+            (tools / name).symlink_to(shutil.which(name))
+        result = self.check_with(str(tools))
+        self.assertEqual((result.returncode, result.stdout.strip()), (1, ''))
+        self.assertIn('acl package', result.stderr)
+        self.assertFalse((self.base / 'root').exists())
 
     def test_a_root_of_another_user_or_open_to_others_is_refused_unchanged(self):
         root = self.base / 'root'
@@ -760,6 +823,13 @@ class OwnedStateTests(unittest.TestCase):
             for path in refused:
                 with self.subTest(path=path.name):
                     self.assertEqual(owned(folder / 'state', path).returncode, 1)
+
+
+class RealAclToolTests(unittest.TestCase):
+    @unittest.skipUnless(os.environ.get('CI') and sys.platform != 'win32', 'the CI Linux runner')
+    def test_ci_checks_access_control_lists_with_the_real_getfacl(self):
+        self.assertIsNotNone(REAL_GETFACL)
+        self.assertEqual(shutil.which('getfacl'), REAL_GETFACL)
 
 
 class PrivateRootControllerTests(unittest.TestCase):
@@ -874,6 +944,31 @@ class StreamTests(unittest.TestCase):
                     with self.assertRaises(RuntimeError):
                         self.remote(output, error).stream('docker logs c', path)
                     self.assertEqual(list(Path(temporary).iterdir()), [])
+
+    def test_errors_name_the_failure_by_type_only(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'runner.log'
+            secret = OSError('connection to storage-vm.example.invalid:22 reset')
+            with self.assertRaises(RuntimeError) as failure:
+                self.remote(None, secret).stream('docker logs c', path)
+            self.assertNotIn('example.invalid', str(failure.exception))
+            self.assertIsNone(failure.exception.__cause__)
+            self.assertTrue(failure.exception.__suppress_context__)
+
+    def test_a_partial_file_that_cannot_be_removed_is_reported_with_the_first_error(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'runner.log'
+            with patch.object(Path, 'replace', side_effect=OSError('rename failed')), \
+                    patch.object(Path, 'unlink', side_effect=PermissionError('busy')):
+                with self.assertRaises(RuntimeError) as failure:
+                    self.remote(self.Output([b'fresh'], 0)).stream('docker logs c', path)
+            message = str(failure.exception)
+            self.assertIn('OSError', message)
+            self.assertIn('could not be removed (PermissionError)', message)
+            with patch.object(Path, 'unlink', side_effect=PermissionError('busy')):
+                with self.assertRaises(RuntimeError) as failure:
+                    self.remote(self.Output([b'partial'], 1)).stream('docker logs c', path)
+            self.assertIn('command failed; the partial file could not be removed', str(failure.exception))
 
     def test_no_partial_file_survives_a_stopped_or_failed_transfer(self):
         with tempfile.TemporaryDirectory() as temporary:
