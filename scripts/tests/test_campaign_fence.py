@@ -602,17 +602,25 @@ class PrivateRootTests(unittest.TestCase):
     """The VM root is used only when no other user can write it, or anything above it."""
 
     def setUp(self):
-        # Under the home directory: the system temporary directory is
-        # writable by everyone, and so would refuse every root below it.
-        self.base = Path(tempfile.mkdtemp(dir=Path.home()))
+        # The walk stops at a directory the test controls: the directories
+        # above it belong to the machine running the tests.
+        self.top = Path(tempfile.mkdtemp())
+        self.base = self.top / 'base'
+        self.base.mkdir(mode=0o700)
 
     def tearDown(self):
         self.base.chmod(0o700)
-        shutil.rmtree(self.base)
+        shutil.rmtree(self.top)
 
     def check(self, root):
-        return subprocess.run(campaign_fence.private_root_command(str(root)), shell=True, capture_output=True,
-                              text=True)
+        return subprocess.run(campaign_fence.private_root_command(str(root), str(self.top)), shell=True,
+                              capture_output=True, text=True)
+
+    def test_every_campaign_checks_up_to_the_filesystem_root(self):
+        self.assertTrue(campaign_fence.private_root_command('/srv/q').endswith(' /srv/q /'))
+        outside = subprocess.run(campaign_fence.private_root_command(str(self.base), str(self.base / 'elsewhere')),
+                                 shell=True, capture_output=True, text=True)
+        self.assertEqual(outside.returncode, 1)
 
     def test_a_new_root_is_created_private(self):
         result = self.check(self.base / 'root')
