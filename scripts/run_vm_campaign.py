@@ -21,6 +21,15 @@ ROOT = Path(__file__).resolve().parents[1]
 # The container's own filesystem: no host directory is mounted there, so
 # only Docker or root in the container can change what the runner keeps in it.
 PRIVATE_ROOT = Path('/tmp')
+# Modes of the private copies, set explicitly and never left to the umask.
+# Private here means out of reach of the host, and writable only by the
+# runner; the qualification also runs the binaries as an unprivileged user
+# (qualify_local_faults.py, user 65534) to prove permission faults, so every
+# directory down to them lets others pass, without listing it, and the
+# binaries let others run them.
+PASSABLE = 0o711
+EXECUTABLE = 0o755
+READABLE = 0o644
 TARGET = 'x86_64-unknown-linux-gnu'
 PERFORMANCE_ORDER = SCHEME
 # A multiple of four, so ABBA gives every provider the same number of first
@@ -103,9 +112,11 @@ def private_inputs(folder, baseline, inputs, expected, root=PRIVATE_ROOT):
     folder, inputs = Path(folder).resolve(), Path(inputs).resolve()
     prefix = folder.relative_to(inputs).as_posix() + '/'
     private = Path(tempfile.mkdtemp(prefix='plenora-campaign-', dir=root))
+    private.chmod(PASSABLE)
     candidate, baseline_copy = private / 'candidate', private / 'baseline' / 'plenora-storage'
-    candidate.mkdir()
-    baseline_copy.parent.mkdir()
+    for directory in (candidate, baseline_copy.parent):
+        directory.mkdir()
+        directory.chmod(PASSABLE)
     copies = {}
     for name in sorted(expected):
         if not name.startswith(prefix):
@@ -118,9 +129,23 @@ def private_inputs(folder, baseline, inputs, expected, root=PRIVATE_ROOT):
     shutil.copyfile(baseline, baseline_copy)
     copies['baseline/plenora-storage'] = baseline_copy
     check_private(copies, expected)
-    for binary in (candidate / 'plenora-storage', baseline_copy):
-        binary.chmod(0o755)
+    binaries = {candidate / 'plenora-storage', baseline_copy}
+    for path in copies.values():
+        path.chmod(EXECUTABLE if path in binaries else READABLE)
     return private, candidate, baseline_copy, copies
+
+
+def qualification_copy(private, folder, version):
+    """A copy of the candidate distribution for the Linux qualification, in
+    the private directory, with the same explicit modes as the copies."""
+    copy = Path(private) / 'qualify' / version / TARGET
+    for directory in (copy.parent.parent, copy.parent):
+        directory.mkdir(exist_ok=True)
+        directory.chmod(PASSABLE)
+    # copytree keeps the modes of the private copies.
+    shutil.copytree(folder, copy)
+    copy.chmod(PASSABLE)
+    return copy
 
 
 def check_private(copies, expected):
@@ -267,8 +292,7 @@ def measure(folder, baseline, private, output, fixture_state, retries, reason, b
         def qualify(path):
             # Qualified in the private directory; only its reports become
             # evidence of the phase.
-            copy = private / 'qualify' / subject['version'] / TARGET
-            shutil.copytree(folder, copy)
+            copy = qualification_copy(private, folder, subject['version'])
             command(path, 'qualify_target.py', copy)
             reports = path / 'dist' / subject['version'] / TARGET
             reports.mkdir(parents=True)
