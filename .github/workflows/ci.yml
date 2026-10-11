@@ -51,6 +51,9 @@ jobs:
       - run: python3 -m unittest discover -s scripts/tests -v
         env:
           PLENORA_REQUIRE_REAL_ACL: '1'
+          # The runner qualifies the binaries also as user 65534: the test
+          # that runs the private copies as that user may not be skipped.
+          PLENORA_REQUIRE_UNPRIVILEGED_RUN: '1'
       - run: python3 scripts/render_sbom.py target/storage-sbom.cdx.json
       - run: python3 scripts/render_sbom.py target/storage-sbom.cdx.json --check
       - run: python3 scripts/render_sbom.py target/qualification-sbom.cdx.json --qualification
