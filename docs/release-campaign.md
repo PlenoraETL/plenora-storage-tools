@@ -277,6 +277,15 @@ riverificate a ogni controllo dell'epoca. Una sostituzione sull'host seguita dal
 ripristino non tocca i byte misurati; una sostituzione già avvenuta al momento
 della copia ferma il runner.
 
+I modi delle copie sono espliciti e non dipendono dall'umask. Il runner è
+l'unico che può scriverle: le directory hanno modo `711`, i binari `755`, gli
+altri file `644`. La qualifica Linux esegue il binario anche come utente non
+privilegiato (65534, in `qualify_local_faults.py`) per provare gli errori di
+permesso, quindi ogni directory fino ai binari deve lasciar passare chiunque,
+senza permettere di elencarla. «Privata» qui significa fuori dalla portata
+dell'host e scrivibile solo dal runner, non chiusa agli altri utenti del
+container.
+
 Ledger, evidenze e report del runner stanno nel filesystem del container, mai in
 una directory dell'host. Ogni file selezionato deve avere il digest che il
 ledger, tenuto in memoria dal runner, ha registrato quando la sua fase è

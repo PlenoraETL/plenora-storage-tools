@@ -1251,6 +1251,75 @@ class RunnerOutputTests(unittest.TestCase):
                 run_vm_campaign.require_private(root, output)
 
 
+@unittest.skipIf(sys.platform == 'win32', 'POSIX modes and users')
+class UnprivilegedExecutionTests(unittest.TestCase):
+    """The private copies can be run by the unprivileged user that the Linux
+    qualification uses (qualify_local_faults.py runs the binary as 65534):
+    the 3.0.0 campaign on 8d45d3c stopped there, on a private directory with
+    mode 700."""
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        # Like the /tmp of the container: anyone may pass.
+        self.root = Path(self.temporary.name)
+        self.root.chmod(0o711)
+        inputs = self.root / 'inputs'
+        self.folder = inputs / 'dist/3.0.0/x'
+        self.folder.mkdir(parents=True)
+        (inputs / 'baseline').mkdir()
+        executable = shutil.which('true')
+        for path in (self.folder / 'plenora-storage', inputs / 'baseline/plenora-storage'):
+            shutil.copyfile(executable, path)
+        (self.folder / 'release-manifest.json').write_text('{}')
+        self.inputs = inputs
+        self.expected = release_campaign.expected_inputs(
+            {path.relative_to(inputs).as_posix(): path for path in inputs.rglob('*') if path.is_file()})
+
+    def tearDown(self):
+        self.temporary.cleanup()
+
+    def copies(self):
+        """The private copies and the qualification copy, made under the
+        most restrictive umask: their modes must not depend on it."""
+        private = self.root / 'private'
+        private.mkdir(mode=0o711)
+        private.chmod(0o711)
+        previous = os.umask(0o077)
+        try:
+            directory, candidate, baseline, _ = run_vm_campaign.private_inputs(
+                self.folder, self.inputs / 'baseline/plenora-storage', self.inputs, self.expected, root=private)
+            qualified = run_vm_campaign.qualification_copy(directory, candidate, '3.0.0')
+        finally:
+            os.umask(previous)
+        return [candidate / 'plenora-storage', baseline, qualified / 'plenora-storage']
+
+    def test_every_private_binary_is_reachable_and_executable_by_others_and_writable_by_none(self):
+        for binary in self.copies():
+            with self.subTest(binary=binary.relative_to(self.root).as_posix()):
+                self.assertEqual(binary.stat().st_mode & 0o777, 0o755)
+                for directory in binary.relative_to(self.root).parents:
+                    mode = (self.root / directory).stat().st_mode
+                    self.assertTrue(mode & 0o001, f'{directory} does not let others pass')
+                    self.assertFalse(mode & 0o022, f'{directory} is writable by others')
+
+    def test_the_unprivileged_qualification_user_runs_every_private_binary(self):
+        if os.geteuid() == 0:
+            def run(binary):
+                return subprocess.run([str(binary)], user=65534, group=65534, extra_groups=[]).returncode
+        elif (shutil.which('sudo') and shutil.which('setpriv')
+              and subprocess.run(['sudo', '-n', 'true'], capture_output=True).returncode == 0):
+            def run(binary):
+                return subprocess.run(['sudo', '-n', 'setpriv', '--reuid=65534', '--regid=65534', '--clear-groups',
+                                       str(binary)]).returncode
+        elif os.environ.get('PLENORA_REQUIRE_UNPRIVILEGED_RUN') == '1':
+            self.fail('running as user 65534 needs root or passwordless sudo here')
+        else:
+            self.skipTest('running as user 65534 needs root or passwordless sudo')
+        for binary in self.copies():
+            with self.subTest(binary=binary.relative_to(self.root).as_posix()):
+                self.assertEqual(run(binary), 0)
+
+
 class SelectedEvidenceTests(unittest.TestCase):
     """The controller seals only the inventoried evidence of this attempt, of its own binaries."""
 
