@@ -541,6 +541,50 @@ preparazione e l'avvio del runner il lock di ammissione resta tenuto dal
 controller, quindi nessun'altra campagna può preparare nel frattempo; la
 verifica del nonce copre una preparazione successiva della stessa campagna.
 
+## Campagna 3.0.1
+
+Il candidato è 3.0.1 e la baseline prestazionale è la CLI Linux della
+distribuzione 3.0.0 verificata. Nella configurazione locale
+`target/campaign-3.0.1.json`, usare la struttura descritta sopra e impostare
+`baseline_binary` a `dist/3.0.0/x86_64-unknown-linux-gnu/plenora-storage`
+(oppure al percorso effettivo dello stesso binario verificato). Impostare
+`candidate_run` e `ci_run` agli ID dei workflow riusciti sul commit finale
+3.0.1; host, utente, radice privata e risorse Docker sono quelli del laboratorio.
+Non usare gli ID di esempio come evidenze.
+
+Non esiste un pin di versione della baseline nella policy: il coordinatore
+registra il digest di `baseline_binary`, mentre versione e revisione del
+candidato derivano dal workspace e sono confrontate con i manifest Actions.
+`scripts/performance-policy.json` mantiene soglie e motivazioni esistenti;
+non si aggiornano le baseline storiche. Il runner misura nuovamente entrambi
+i binari nella fase `performance-ab` di 32 round ABBA e richiede il soak
+completo di 7200 secondi, incluse entrambe le modalità di trasferimento.
+Le ricevute 3.0.0 non qualificano gli artefatti 3.0.1.
+
+Dopo aver reso disponibile il commit finale su un checkout pulito e ottenuto
+la CI riuscita sullo stesso commit, avviare il candidato:
+
+```powershell
+gh workflow run release-candidate.yml --ref release/3.0.1 --repo PlenoraETL/plenora-storage-tools
+```
+
+Dopo aver inserito gli ID effettivi nella configurazione:
+
+```powershell
+python -m pip install -r scripts/requirements-campaign.txt
+python scripts/release_campaign.py --config target/campaign-3.0.1.json --output target/campaign-3.0.1
+```
+
+Solo dopo la qualifica e l'autorizzazione alla pubblicazione, usare il percorso
+del bundle restituito dal coordinatore (qui il primo tentativo di seal):
+
+```powershell
+python scripts/publish_qualified.py --bundle target/campaign-3.0.1/seal/1/qualification-input.tar.gz --output target/publication-3.0.1 --repository PlenoraETL/plenora-storage-tools --notes docs/release-notes-3.0.1.md
+```
+
+Il comando crea tag e bozza e avvia le verifiche degli asset scaricati prima
+della pubblicazione. La sola preparazione dei file di release non lo esegue.
+
 ## Ripresa, tentativi e spazio
 
 Ripetere lo stesso comando riprende le fasi riuscite del coordinatore dopo averne verificato

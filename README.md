@@ -8,6 +8,9 @@ La [release 2.1.0](https://github.com/PlenoraETL/plenora-storage-tools/releases/
 è pubblicata; il [resoconto di qualifica](docs/release-2.1.0.md) riporta prove e limiti.
 La 3.0.0 è in preparazione e non è pubblicata: [note](docs/release-notes-3.0.0.md)
 e [migrazione](docs/migration-3.0.md) descrivono le incompatibilità.
+La patch 3.0.1 è in preparazione e non è pubblicata: le
+[note](docs/release-notes-3.0.1.md) descrivono l'aggiornamento rustls e la nuova
+qualifica richiesta, senza cambi incompatibili rispetto alla 3.0.0.
 
 La [2.1](docs/roadmap-2.1.0.md) aggiunge trasferimenti grandi su cinque provider
 tramite [preparazione privata su disco](docs/large-transfers.md), disponibile

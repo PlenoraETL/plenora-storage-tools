@@ -13,6 +13,9 @@ with `python -m pip install <wheel-file>`. The
 is published; its [qualification report](../../docs/release-2.1.0.md) identifies
 the tested artifacts and their limits. Version 3.0.0 is in preparation and not
 published; see the [migration guide](../../docs/migration-3.0.md).
+Version 3.0.1 is a patch in preparation, not published; its
+[release notes](../../docs/release-notes-3.0.1.md) describe the rustls update
+and required qualification, with no incompatible changes from 3.0.0.
 The supported targets and fixture-only compatibility scope are listed in the
 [compatibility matrix](../../docs/compatibility-1.0.md).
 
