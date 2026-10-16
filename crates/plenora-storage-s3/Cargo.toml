@@ -17,7 +17,7 @@ bytes.workspace = true
 futures-util.workspace = true
 http-body.workspace = true
 object_store.workspace = true
-plenora-storage-core = { path = "../plenora-storage-core", version = "3.0.0" }
+plenora-storage-core = { path = "../plenora-storage-core", version = "3.0.1" }
 reqwest.workspace = true
 rustls.workspace = true
 quick-xml.workspace = true

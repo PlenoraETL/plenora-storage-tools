@@ -2304,7 +2304,7 @@ checksum = "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
 
 [[package]]
 name = "plenora-smb2"
-version = "3.0.0"
+version = "3.0.1"
 dependencies = [
  "aes",
  "aes-gcm",
@@ -2333,7 +2333,7 @@ dependencies = [
 
 [[package]]
 name = "plenora-storage-cli"
-version = "3.0.0"
+version = "3.0.1"
 dependencies = [
  "clap",
  "futures-util",
@@ -2348,7 +2348,7 @@ dependencies = [
 
 [[package]]
 name = "plenora-storage-core"
-version = "3.0.0"
+version = "3.0.1"
 dependencies = [
  "async-trait",
  "getrandom 0.4.3",
@@ -2364,7 +2364,7 @@ dependencies = [
 
 [[package]]
 name = "plenora-storage-engine"
-version = "3.0.0"
+version = "3.0.1"
 dependencies = [
  "plenora-storage-core",
  "plenora-storage-ftp",
@@ -2377,7 +2377,7 @@ dependencies = [
 
 [[package]]
 name = "plenora-storage-ftp"
-version = "3.0.0"
+version = "3.0.1"
 dependencies = [
  "async-trait",
  "hex",
@@ -2395,7 +2395,7 @@ dependencies = [
 
 [[package]]
 name = "plenora-storage-providers"
-version = "3.0.0"
+version = "3.0.1"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -2425,7 +2425,7 @@ dependencies = [
 
 [[package]]
 name = "plenora-storage-py"
-version = "3.0.0"
+version = "3.0.1"
 dependencies = [
  "plenora-storage-core",
  "plenora-storage-engine",
@@ -2437,7 +2437,7 @@ dependencies = [
 
 [[package]]
 name = "plenora-storage-s3"
-version = "3.0.0"
+version = "3.0.1"
 dependencies = [
  "async-trait",
  "bytes",
@@ -2458,7 +2458,7 @@ dependencies = [
 
 [[package]]
 name = "plenora-storage-sftp"
-version = "3.0.0"
+version = "3.0.1"
 dependencies = [
  "async-trait",
  "aws-lc-rs",
