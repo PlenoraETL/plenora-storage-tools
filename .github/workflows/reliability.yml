@@ -140,7 +140,12 @@ jobs:
           python3 - <<'PY'
           import json, os, re
           from pathlib import Path
-          report = json.loads((Path(os.environ['RUNNER_TEMP']) / 'candidate-run.json').read_text())
+          def _unico(coppie):
+              chiavi = [chiave for chiave, _valore in coppie]
+              if len(chiavi) != len(set(chiavi)):
+                  raise SystemExit('control document contains duplicate JSON members')
+              return dict(coppie)
+          report = json.loads((Path(os.environ['RUNNER_TEMP']) / 'candidate-run.json').read_text(), object_pairs_hook=_unico)
           assert report['status'] == 'completed' and report['conclusion'] == 'success'
           assert report['workflowName'] == 'release-candidate'
           assert re.fullmatch('[0-9a-f]{40}', report['headSha'])
@@ -171,8 +176,13 @@ jobs:
           python3 - <<'PY'
           import hashlib, json, os, shutil, subprocess, tarfile
           from pathlib import Path
+          def _unico(coppie):
+              chiavi = [chiave for chiave, _valore in coppie]
+              if len(chiavi) != len(set(chiavi)):
+                  raise SystemExit('control document contains duplicate JSON members')
+              return dict(coppie)
           root = Path('.fixtures/performance-input')
-          release = json.loads((root / 'baseline-release.json').read_text())
+          release = json.loads((root / 'baseline-release.json').read_text(), object_pairs_hook=_unico)
           assert not release['isDraft'] and not release['isPrerelease']
           assert release['tagName'] == os.environ['BASELINE_TAG']
           archive, = (root / 'baseline').glob('*.tar.gz')
@@ -183,7 +193,7 @@ jobs:
           assert hashlib.sha256(baseline).hexdigest() == os.environ['BASELINE_SHA256']
           (root / 'baseline/plenora-storage').write_bytes(baseline)
           manifest_path, = (root / 'candidate').rglob('release-manifest.json')
-          manifest = json.loads(manifest_path.read_text())
+          manifest = json.loads(manifest_path.read_text(), object_pairs_hook=_unico)
           revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
           assert manifest['source_revision'] == revision and manifest['source_committed']
           assert manifest['target'] == 'x86_64-unknown-linux-gnu'
