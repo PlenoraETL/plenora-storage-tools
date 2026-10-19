@@ -682,6 +682,63 @@ fn capability_attributes_match_the_component_owned_schema() {
 }
 
 #[test]
+fn every_surface_matches_the_adopted_catalog_and_effects() {
+    let catalog: Value = serde_json::from_slice(
+        &fs::read(contracts_root().join("upstream/storage-tools-v1.json")).unwrap(),
+    )
+    .unwrap();
+    for surface in [
+        Surface::Rust,
+        Surface::Cli,
+        Surface::PythonSdk,
+        Surface::Runtime,
+    ] {
+        let document = CapabilityDocument::new(
+            surface,
+            vec![ProviderCapabilities {
+                provider: "test".to_owned(),
+                config_contract: "plenora-storage-test-connection-v1".to_owned(),
+                operations: ["test", "list", "stat", "get", "put", "copy", "delete"]
+                    .map(str::to_owned)
+                    .to_vec(),
+                attributes: std::collections::BTreeMap::new(),
+            }],
+        );
+        assert_eq!(document.interfaces.len(), 1);
+        assert_eq!(document.interfaces[0].kind, surface);
+        assert_eq!(
+            document.operations.len(),
+            catalog["operations"].as_array().unwrap().len()
+        );
+        for operation in document.operations {
+            assert_eq!(operation.surfaces, [surface]);
+            let actual = serde_json::to_value(operation).unwrap();
+            let expected = catalog["operations"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|item| item["id"] == actual["id"])
+                .unwrap();
+            for field in ["id", "version", "side_effect", "controls"] {
+                assert_eq!(actual[field], expected[field]);
+            }
+            for field in ["input", "output"] {
+                assert_eq!(actual[field]["contract"], expected[field]["contract"]);
+                assert_eq!(
+                    actual[field]["content_types"],
+                    expected[field]["content_types"]
+                );
+            }
+            assert!(
+                actual["attributes"]
+                    .get("plenora.surface_side_effects")
+                    .is_none()
+            );
+        }
+    }
+}
+
+#[test]
 fn rust_binding_and_runtime_descriptors_cover_the_same_operations() {
     let binding: Value = serde_json::from_slice(
         &fs::read(contracts_root().join("bindings").join("rust-v1.json"))

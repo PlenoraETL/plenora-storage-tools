@@ -31,6 +31,8 @@
     "contracts/upstream/cli-envelope-v2.schema.json": "e2210f179e24190ea85d1c82b5cacc2429ea7ba3505bbc47395e638236db19ea",
     "contracts/upstream/error-v1.schema.json": "164a0c580080d93ee1a020e7e33b651fe46950a4133e9bd8c044daa64cb9b914",
     "contracts/upstream/proposed/runtime-probe-v1.schema.json": "d80b1a340e736794abc88a1abdf531ed08a136fc0fbb91dd2e39d7328a3e05be",
+    "contracts/upstream/public-catalog-v2.schema.json": "54a824f5bcceb58475b34f8a1e4017de252db017f7e742835aac0af5b06fd480",
+    "contracts/upstream/ratified/runtime-probe-v1.schema.json": "d80b1a340e736794abc88a1abdf531ed08a136fc0fbb91dd2e39d7328a3e05be",
     "contracts/upstream/runtime-vector-v1.schema.json": "b5e38f0bee134240bbecffcb9f79e9051d27dcdfe90c0af467ef571528521ef8"
   },
   "edition": "2024",
@@ -296,6 +298,6 @@
   "schema_version": 1,
   "upstream_contracts": {
     "repository": "https://github.com/PlenoraETL/plenora-contracts.git",
-    "revision": "1e902dfaab5819c1d9ce785878d5b26dbeae48b3"
+    "revision": "3aec9f724f5a0ad21366f293895b4d0dbcd0aad1"
   }
 }

@@ -7,6 +7,8 @@ JSON documents satisfy the immutable schemas.
 from pathlib import Path
 from typing import Any, Iterable
 
+from json_values import same_value
+
 
 def capability_errors(document: dict[str, Any]) -> list[str]:
     errors = []
@@ -19,6 +21,37 @@ def capability_errors(document: dict[str, Any]) -> list[str]:
         identities.add(identity)
         if not set(operation["surfaces"]).issubset(interfaces):
             errors.append("CAP-007: operation surface absent from interfaces")
+        errors.extend(surface_side_effect_errors(operation))
+    return errors
+
+
+EFFECT_ORDER = {"none": 0, "local": 1, "remote": 2}
+SURFACE_EFFECTS_KEY = "plenora.surface_side_effects"
+
+
+def surface_side_effect_errors(operation: dict[str, Any]) -> list[str]:
+    """SB-001: the effect a surface adds is an object of listed surfaces to
+    `local` or `remote`, each stricter than the operation's `side_effect`."""
+    attributes = operation.get("attributes")
+    if not isinstance(attributes, dict):
+        return []
+    errors = []
+    for key in attributes:
+        if key.startswith("plenora.") and key != SURFACE_EFFECTS_KEY:
+            errors.append("CAP-013: attribute key reserved for shared contracts")
+    if SURFACE_EFFECTS_KEY not in attributes:
+        return errors
+    effects = attributes[SURFACE_EFFECTS_KEY]
+    if not isinstance(effects, dict) or not effects:
+        return errors + ["SB-001: surface side effects are not a non-empty object"]
+    floor = EFFECT_ORDER.get(operation["side_effect"], 0)
+    for surface, effect in effects.items():
+        if surface not in operation["surfaces"]:
+            errors.append("SB-001: surface side effect for a surface the operation does not list")
+        if effect not in ("local", "remote"):
+            errors.append("SB-001: surface side effect is not local or remote")
+        elif EFFECT_ORDER[effect] <= floor:
+            errors.append("SB-001: surface side effect is not stricter than the operation's")
     return errors
 
 
@@ -28,9 +61,10 @@ def adoption_errors(document: dict[str, Any]) -> list[str]:
     for artifact in document["artifacts"]:
         previous = artifacts.get(artifact["name"])
         identity = {key: value for key, value in artifact.items() if key != "verification"}
-        if previous is not None and identity != {
+        # VALUE: two declarations of one artifact in one manifest.
+        if previous is not None and not same_value(identity, {
             key: value for key, value in previous.items() if key != "verification"
-        }:
+        }):
             errors.append("ambiguous artifact name in adoption manifest")
         artifacts[artifact["name"]] = artifact
     contracts = {}

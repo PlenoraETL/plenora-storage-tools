@@ -1,4 +1,4 @@
-//! Runtime Binding 1.0 admission: reserved key grammars, rejection
+//! Runtime Binding 2.0 admission: reserved key grammars, rejection
 //! categories, deadline control and result identity, applied before any
 //! resolver or provider runs.
 
@@ -61,12 +61,11 @@ pub fn runtime_control(
     Ok(control)
 }
 
-/// Runtime Binding 1.0 §4 and RT-021: the deadline is an absolute RFC 3339
+/// Runtime Binding 2.0 §4 and RT-021: the deadline is an absolute RFC 3339
 /// UTC timestamp. Every RFC 3339 spelling of UTC is accepted (`Z` or `z`,
 /// `+00:00`, `T` or `t`, fractions of a second); a non-zero offset and `-00:00`
 /// (an unknown local offset) are `protocol` rejections, never reinterpreted.
-/// Whether a receiver accepts the UTC spellings other than `Z` is left open by
-/// 1.0; accepting them is the common choice pending ratification.
+/// RT-021 explicitly accepts these UTC spellings.
 fn parse_deadline(value: &str) -> StorageResult<OffsetDateTime> {
     let invalid = || route_error("runtime deadline must be an RFC 3339 UTC timestamp");
     if !value.is_ascii() {
@@ -95,7 +94,7 @@ fn parse_deadline(value: &str) -> StorageResult<OffsetDateTime> {
 pub fn validate_runtime_route(
     route: RuntimeRoute<'_>,
 ) -> StorageResult<&'static RuntimeOperationDescriptor> {
-    // Rule R1 of the common runtime matrix (pending ratification in
+    // Rule R1 of the common runtime matrix (ratified in
     // `plenora-contracts`): a well-formed value that no advertised operation
     // carries is `unsupported`; an absent, malformed or non-canonical one is
     // `protocol`. Versions reach this point already canonical.

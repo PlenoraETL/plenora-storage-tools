@@ -159,22 +159,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
              'verification': ['Runtime binding packaged in plenora-storage-core',
                               'cargo test --test runtime_binding from the extracted core archive']},
         ],
-        'contracts': [
-            {'id': contract, 'status': 'conforming', 'verification': checks}
-            for contract, checks in [
-                ('plenora-public-surfaces-v1', ['core contract fixtures and Rust/runtime operation binding equivalence tests']),
-                ('plenora-capabilities-v2', ['CLI capabilities schema validation and per-surface discovery tests']),
-                ('plenora-error-v1', ['CLI error schema validation and runtime error-axis tests']),
-                ('plenora-public-security-v1', ['provider preflight, credential reference, SSRF and artifact boundary tests']),
-                ('plenora-cli-v2', ['CLI protocol tests, version and capabilities on the packaged binary']),
-                ('plenora-runtime-binding-v1', ['runtime_binding integration suite executed from extracted core archive',
-                                                'runtime_vectors: the twelve RUNTIME-VECTORS-1.0 storage fixtures pinned by SHA-256 at the adopted revision']),
-                ('plenora-python-sdk-v1', ['Installed SDK identity, typing, lifecycle, parity, discovery and redaction tests',
-                                         'crates/plenora-storage-py/python/tests/test_sdk.py',
-                                         'Common python-sdk-v1 binding map entrypoints resolved from the installed wheel']),
-            ]
-        ],
-        'deviations': [],
+        **json.loads((ROOT / 'contracts/adoption-policy.json').read_text(encoding='utf-8')),
     }
     assert not adoption_errors(adoption), adoption_errors(adoption)
     adoption_path = output / 'adoption-manifest-v4.json'

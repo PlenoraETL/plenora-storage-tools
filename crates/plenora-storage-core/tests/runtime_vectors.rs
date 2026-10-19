@@ -31,7 +31,7 @@ use sha2::{Digest, Sha256};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 
 /// Adopted contracts revision; must equal `contracts/upstream/source.json`.
-const ADOPTED_REVISION: &str = "1e902dfaab5819c1d9ce785878d5b26dbeae48b3";
+const ADOPTED_REVISION: &str = "3aec9f724f5a0ad21366f293895b4d0dbcd0aad1";
 
 /// SHA-256 of each storage fixture in `vectors/runtime-v1` at the adopted
 /// revision, computed from the upstream Git blobs.
@@ -95,7 +95,7 @@ const PINNED_FILES: [(&str, &str); 3] = [
     ),
     (
         "RUNTIME-VECTORS-1.0.md",
-        "d7f9c42b2b6d50ee844425b77cbce59db8bc6a945726b67635d62884aacabd34",
+        "56dbaf80987632369375c7f04d534e609b98d96a3ffa18acb52eb6ff7cabd5ad",
     ),
     (
         "python-sdk-v1.json",
@@ -234,7 +234,7 @@ impl Calls {
 struct ScriptedS3 {
     calls: Arc<Calls>,
     failing: bool,
-    /// Error a put returns instead of the fixture outcomes, for proposed vectors.
+    /// Error a put returns instead of the fixture outcomes, for ratified vectors.
     put_error: Option<StorageError>,
 }
 
@@ -531,6 +531,59 @@ async fn invoke(engine: &Engine, host: &Host, request: RuntimeInvocation) -> Run
         .invoke(request, CancellationToken::new())
         .await
         .expect("result identity")
+}
+
+#[tokio::test]
+async fn bounded_runtime_returns_complete_errors_and_preserves_effects() {
+    for (name, effect) in [
+        ("storage-stat-request.json", RemoteEffect::None),
+        ("storage-put-request.json", RemoteEffect::Committed),
+        ("storage-get-request.json", RemoteEffect::Unknown),
+    ] {
+        let (engine, host) = fixture();
+        let request = invocation(&vector(name));
+        let result = RuntimeBinding::new(&engine, &host, &host)
+            .with_result_payload_limit(0)
+            .invoke(request, CancellationToken::new())
+            .await
+            .unwrap();
+        assert_eq!(result.content_type, ERROR_CONTENT_TYPE);
+        let error: StorageError = serde_json::from_value(result.payload.clone()).unwrap();
+        assert_eq!(error.category, ErrorCategory::ResourceLimit);
+        assert_eq!(error.remote_effect, effect);
+        assert_valid(&validators(), "error-v1", &result.payload);
+        assert!(!host.calls.take().is_empty());
+        assert_eq!(result.metadata.operation_version.as_deref(), Some("1"));
+    }
+}
+
+#[tokio::test]
+async fn unknown_commit_keeps_the_cause_instead_of_becoming_internal() {
+    for category in [
+        ErrorCategory::Io,
+        ErrorCategory::Timeout,
+        ErrorCategory::Internal,
+    ] {
+        let error = StorageError::new(
+            category,
+            ErrorPhase::Commit,
+            RemoteEffect::Unknown,
+            RetryDisposition::RequiresRecovery,
+            "SCRIPTED_COMMIT_FAILURE",
+            "commit failed",
+        );
+        let (engine, host) = scripted_with(false, Some(error));
+        let result = invoke(
+            &engine,
+            &host,
+            invocation(&vector("storage-put-request.json")),
+        )
+        .await;
+        let error: StorageError = serde_json::from_value(result.payload).unwrap();
+        assert_eq!(error.category, category);
+        assert_eq!(error.remote_effect, RemoteEffect::Unknown);
+        assert_eq!(error.retry, RetryDisposition::RequiresRecovery);
+    }
 }
 
 /// RT-012: the result is a new message whose causation is the request and
@@ -969,18 +1022,11 @@ async fn routing_mutations_of_every_request_vector_fail_closed() {
     assert_eq!(probes, REQUEST_VECTORS.len() * (5 + 4 + 7 + 4 + 6 + 4));
 }
 
-// --- Proposed, not yet normative -------------------------------------------
-//
-// The rejection probes (`vectors/runtime-probes-v1`) and the storage cleanup
-// error vectors of `plenora-contracts` pull request 21, copied byte for byte
-// from its commit into `contracts/upstream/proposed` and pinned by SHA-256.
-// They ratify the common runtime matrix (RT-016 to RT-023, ERR-014, ERR-015)
-// but are not part of the adopted revision yet; when they reach `main` they
-// move to the adopted copies.
+// Normative admission and cleanup fixtures from the adopted revision.
 
-const PROPOSED_REVISION: &str = "4890d27c120b3819bbadf6560ba9e730dfcb57aa";
+const RATIFIED_REVISION: &str = "3aec9f724f5a0ad21366f293895b4d0dbcd0aad1";
 
-const PROPOSED_FILES: [(&str, &str); 24] = [
+const RATIFIED_FILES: [(&str, &str); 24] = [
     (
         "runtime-probe-v1.schema.json",
         "5188813894c59c67c5c9b1aab551c6c783e13b021e5a4896c033d1636e705c47",
@@ -1079,33 +1125,33 @@ const PROPOSED_FILES: [(&str, &str); 24] = [
     ),
 ];
 
-fn proposed(name: &str) -> PathBuf {
-    upstream("proposed").join(name)
+fn ratified(name: &str) -> PathBuf {
+    upstream("ratified").join(name)
 }
 
-fn proposed_json(name: &str) -> Value {
-    serde_json::from_slice(&fs::read(proposed(name)).expect("proposed file")).expect("JSON")
+fn ratified_json(name: &str) -> Value {
+    serde_json::from_slice(&fs::read(ratified(name)).expect("ratified file")).expect("JSON")
 }
 
 #[test]
-fn proposed_files_are_the_pinned_copies_of_pull_request_21() {
-    let source = proposed_json("source.json");
-    assert_eq!(source["revision"], PROPOSED_REVISION);
-    assert_eq!(source["status"], "proposed, not yet normative");
+fn ratified_files_are_the_pinned_copies_of_adopted_revision() {
+    let source = ratified_json("source.json");
+    assert_eq!(source["revision"], RATIFIED_REVISION);
+    assert_eq!(source["status"], "normative");
     let mut present = Vec::new();
     for directory in ["runtime-probes-v1", "runtime-v1"] {
-        for entry in fs::read_dir(proposed(directory)).expect("proposed directory") {
+        for entry in fs::read_dir(ratified(directory)).expect("ratified directory") {
             let name = entry.expect("entry").file_name().into_string().unwrap();
             present.push(format!("{directory}/{name}"));
         }
     }
     present.push("runtime-probe-v1.schema.json".to_owned());
     present.sort_unstable();
-    let mut pinned = PROPOSED_FILES.map(|(name, _)| name.to_owned()).to_vec();
+    let mut pinned = RATIFIED_FILES.map(|(name, _)| name.to_owned()).to_vec();
     pinned.sort_unstable();
-    assert_eq!(present, pinned, "every proposed file must be pinned");
-    for (name, digest) in PROPOSED_FILES {
-        assert_eq!(sha256_file(&proposed(name)), digest, "{name}");
+    assert_eq!(present, pinned, "every ratified file must be pinned");
+    for (name, digest) in RATIFIED_FILES {
+        assert_eq!(sha256_file(&ratified(name)), digest, "{name}");
     }
 }
 
@@ -1151,20 +1197,20 @@ fn transposed_expectation(probe: &Value, storage: &Value) -> Value {
 }
 
 #[tokio::test]
-async fn proposed_rejection_probes_produce_their_expected_results() {
+async fn ratified_rejection_probes_produce_their_expected_results() {
     let probe_schema = jsonschema::draft202012::options()
-        .build(&proposed_json("runtime-probe-v1.schema.json"))
+        .build(&ratified_json("runtime-probe-v1.schema.json"))
         .expect("probe schema compiles");
     let storage_get = vector("storage-get-request.json");
     let (engine, host) = fixture();
-    let mut probes = fs::read_dir(proposed("runtime-probes-v1"))
+    let mut probes = fs::read_dir(ratified("runtime-probes-v1"))
         .expect("probes")
         .map(|entry| entry.expect("probe").file_name().into_string().unwrap())
         .collect::<Vec<_>>();
     probes.sort_unstable();
     assert_eq!(probes.len(), 21);
     for name in probes {
-        let probe = proposed_json(&format!("runtime-probes-v1/{name}"));
+        let probe = ratified_json(&format!("runtime-probes-v1/{name}"));
         assert!(probe_schema.is_valid(&probe), "{name}");
         let base_name = probe["base"].as_str().unwrap();
         let (base, expected_metadata) = if base_name.starts_with("storage-") {
@@ -1211,16 +1257,16 @@ async fn proposed_rejection_probes_produce_their_expected_results() {
     }
 }
 
-/// ERR-015 (proposed): a proven publication followed by a failed cleanup is
+/// ERR-015: a proven publication followed by a failed cleanup is
 /// `committed` in `cleanup`, `never` with a local residue and
 /// `requires_recovery` with a remote one. The binding preserves both.
 #[tokio::test]
-async fn proposed_cleanup_vectors_are_preserved_by_the_binding() {
+async fn ratified_cleanup_vectors_are_preserved_by_the_binding() {
     for name in [
         "runtime-v1/storage-put-cleanup-local-error.json",
         "runtime-v1/storage-put-cleanup-remote-error.json",
     ] {
-        let expected = proposed_json(name);
+        let expected = ratified_json(name);
         let mut error: StorageError = serde_json::from_value(expected["payload"].clone())
             .unwrap_or_else(|error| panic!("{name}: {error}"));
         error.execution_id = None;
