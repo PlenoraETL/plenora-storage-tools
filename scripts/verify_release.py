@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import strict_json
 from pathlib import Path
 import sys
 from versioning import parse_version
@@ -43,7 +44,7 @@ def main():
     results = []
     for path in manifests:
         folder = path.parent
-        manifest = json.loads(path.read_text())
+        manifest = strict_json.loads(path.read_text())
         validate_identity(folder, manifest)
         sources.add(manifest['source_sha256'])
         sums = {}
@@ -64,22 +65,22 @@ def main():
             archive = f"plenora-storage-{manifest['version']}-{manifest['target']}{extension}"
             assert archive in sums, 'missing platform CLI archive'
             verify_archive(folder / archive, folder / binary)
-            source_report = json.loads((folder / 'source-consumer.json').read_text())
+            source_report = strict_json.loads((folder / 'source-consumer.json').read_text())
             assert source_report['status'] == 'PASS'
             assert source_report['source_revision'] == manifest['source_revision']
             assert sums[source_report['archive']] == source_report['archive_sha256']
             assert sums['source-consumer.log'] == source_report['log_sha256']
         if parse_version(manifest['version']).requires((0, 2, 1)):
-            sbom = json.loads((folder / 'storage-sbom.cdx.json').read_text())
+            sbom = strict_json.loads((folder / 'storage-sbom.cdx.json').read_text())
             assert sbom['bomFormat'] == 'CycloneDX' and sbom['specVersion'] == '1.6'
             for component in sbom['components']:
                 if component['type'] == 'file':
                     assert component['hashes'] == [{'alg': 'SHA-256', 'content': sums[component['name']]}]
-            python_report = json.loads((folder / 'python-tests.json').read_text())
+            python_report = strict_json.loads((folder / 'python-tests.json').read_text())
             assert python_report['status'] == 'PASS'
             assert sums[python_report['wheel']] == python_report['wheel_sha256']
             assert sums['python-tests.log'] == python_report['tests_log_sha256']
-        adoption = json.loads((folder / 'adoption-manifest-v4.json').read_text())
+        adoption = strict_json.loads((folder / 'adoption-manifest-v4.json').read_text())
         assert adoption['schema_version'] == 4 and not adoption_errors(adoption)
         for artifact in adoption['artifacts']:
             name = artifact['name']
@@ -89,24 +90,24 @@ def main():
             assert artifact['digest'] == 'sha256:' + sums[name], name
         qualification_path = folder / 'qualification.json'
         if qualification_path.exists():
-            qualification = json.loads(qualification_path.read_text())
+            qualification = strict_json.loads(qualification_path.read_text())
             binary = 'plenora-storage.exe' if 'windows' in manifest['target'] else 'plenora-storage'
             assert qualification['binary_sha256'] == sums[binary], 'qualification binary differs'
         for name in ['extended-qualification.json', 'extended-regressions.json', 'cli-regressions.json',
                      'commit-faults.json', 'spooled-qualification.json', 'spooled-regressions.json']:
             report_path = folder / name
             if report_path.exists():
-                report = json.loads(report_path.read_text())
+                report = strict_json.loads(report_path.read_text())
                 binary = 'plenora-storage.exe' if 'windows' in manifest['target'] else 'plenora-storage'
                 assert report['binary_sha256'] == sums[binary], f'{name}: binary differs'
         local_faults_path = folder / 'local-faults.json'
         if local_faults_path.exists():
             binary = 'plenora-storage.exe' if 'windows' in manifest['target'] else 'plenora-storage'
-            validate_local_faults(json.loads(local_faults_path.read_text()), sums[binary])
+            validate_local_faults(strict_json.loads(local_faults_path.read_text()), sums[binary])
         spooled_faults_path = folder / 'spooled-local-faults.json'
         if spooled_faults_path.exists():
             binary = 'plenora-storage.exe' if 'windows' in manifest['target'] else 'plenora-storage'
-            validate_local_faults(json.loads(spooled_faults_path.read_text()), sums[binary], spool_uploads=True)
+            validate_local_faults(strict_json.loads(spooled_faults_path.read_text()), sums[binary], spool_uploads=True)
         results.append({'target': manifest['target'], 'artifacts': len(manifest['artifacts']),
                         'qualification_present': qualification_path.exists(), 'status': 'PASS'})
     assert len(sources) == 1, 'source snapshots differ across targets'

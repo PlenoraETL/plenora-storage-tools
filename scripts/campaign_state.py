@@ -2,6 +2,7 @@
 from contextlib import contextmanager
 import hashlib
 import json
+import strict_json
 import os
 from pathlib import Path
 import re
@@ -61,7 +62,7 @@ class Campaign:
         self.folder.mkdir(parents=True, exist_ok=True)
         self.path = self.folder / 'campaign.json'
         if self.path.exists():
-            self.state = json.loads(self.path.read_text(encoding='utf-8'))
+            self.state = strict_json.loads(self.path.read_text(encoding='utf-8'))
             if self.state['identity'] != identity:
                 raise ValueError('campaign source, subjects or policy changed; use a new campaign')
         else:

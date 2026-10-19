@@ -8,6 +8,7 @@ import argparse
 import ast
 import io
 import json
+import strict_json
 from pathlib import Path
 import re
 import tokenize
@@ -115,7 +116,7 @@ def main():
         args.output.write_text(encoded, encoding='utf-8', newline='\n')
     print(json.dumps({'areas': report['areas'], 'owned_total': report['owned_total']}, indent=2))
     if args.check:
-        failures = check_budget(report, json.loads(BUDGET.read_text(encoding='utf-8')))
+        failures = check_budget(report, strict_json.loads(BUDGET.read_text(encoding='utf-8')))
         if failures:
             raise SystemExit('\n'.join(failures))
         print('PASS product code size budgets')

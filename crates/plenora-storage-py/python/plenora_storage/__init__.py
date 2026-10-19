@@ -132,9 +132,27 @@ def _path(value: str | os.PathLike[str]) -> str:
         raise _invalid("SDK_PATH_INVALID", "file path must resolve to a string") from None
 
 
+def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise StorageError({"code": "SDK_JSON_DUPLICATE_MEMBER", "category": "internal",
+                                "phase": "prepare", "remote_effect": "unknown",
+                                "retry": {"kind": "requires_recovery"},
+                                "message": "JSON document contains duplicate members"})
+        result[key] = value
+    return result
+
+
+def _decode(document: str) -> Any:
+    return json.loads(document, object_pairs_hook=_unique_object)
+
+
 def _translate(error: ValueError) -> StorageError:
     try:
-        return StorageError(json.loads(str(error)))
+        return StorageError(_decode(str(error)))
+    except StorageError as duplicate:
+        return duplicate
     except (ValueError, TypeError, KeyError):
         return StorageError({"code": "SDK_INTERNAL", "category": "internal",
                              "phase": "prepare", "remote_effect": "unknown",
@@ -194,7 +212,7 @@ class Engine:
 
     def capabilities(self) -> dict[str, Any]:
         """Python capability catalog for the providers in this wheel."""
-        return json.loads(self._native.capabilities())
+        return _decode(self._native.capabilities())
 
     def _invoke(self, operation: str, connection: Connection, request: dict[str, Any], *,
                 cancellation: CancellationToken | None = None,
@@ -210,7 +228,7 @@ class Engine:
                                          cancellation or CancellationToken(), timeout_ms)
         except ValueError as error:
             raise _translate(error) from None
-        return json.loads(result)
+        return _decode(result)
 
     def test(self, connection: Connection, **controls: Any) -> dict[str, Any]:
         return self._invoke("test", connection, {}, **controls)

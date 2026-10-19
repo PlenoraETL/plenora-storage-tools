@@ -1,6 +1,7 @@
 """Compile isolated provider selections and verify the resulting CLI catalog."""
 import argparse
 import json
+import strict_json
 from pathlib import Path
 import subprocess
 import tempfile
@@ -25,7 +26,7 @@ def main():
         command.remove('--all-targets')
         result = subprocess.run(command + ['--quiet', '--', '--format', 'json', 'capabilities'],
                                 cwd=ROOT, check=True, capture_output=True, text=True)
-        catalog = json.loads(result.stdout)['result']
+        catalog = strict_json.loads(result.stdout)['result']
         actual = {provider['provider'] for operation in catalog['operations']
                   for provider in operation['attributes']['providers']}
         expected = set(providers if feature == 'full' else [] if feature == 'none' else [feature])
@@ -43,7 +44,7 @@ def main():
                     '--connection', str(connection), '--key', 'valid', '--output', str(output),
                     '--overwrite', 'false'], cwd=ROOT, capture_output=True, text=True)
                 assert rejected.returncode != 0
-                error = json.loads(rejected.stdout)['error']
+                error = strict_json.loads(rejected.stdout)['error']
                 assert error['category'] == 'unsupported' and error['remote_effect'] == 'none', error
                 assert not output.exists() and not list(folder.glob('*.part'))
         print(f'PASS provider selection: {feature}', flush=True)

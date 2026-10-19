@@ -1,5 +1,6 @@
 """Audit the vendored SMB package under its original RustSec package identity."""
 import json
+import strict_json
 from pathlib import Path
 import subprocess
 import tomllib
@@ -21,7 +22,7 @@ def main():
     lockfile = output / 'smb-upstream.lock'
     lockfile.write_text(source)
     result = subprocess.run(['cargo', 'audit', '--file', str(lockfile), '--json'], capture_output=True, text=True, cwd=ROOT)
-    report = json.loads(result.stdout)
+    report = strict_json.loads(result.stdout)
     (output / 'smb-upstream-audit.json').write_text(json.dumps(report, indent=2) + '\n')
     assert result.returncode == 0 and report['vulnerabilities']['count'] == 0 and not report.get('warnings'), result.stdout + result.stderr
     print('Vendored smb2 upstream audit: PASS')

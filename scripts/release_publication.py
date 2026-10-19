@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import strict_json
 from pathlib import Path
 import shutil
 import subprocess
@@ -41,13 +42,13 @@ def check_tag(tag):
 
 def draft(tag):
     check_tag(tag)
-    metadata = json.loads(subprocess.check_output(['gh', 'release', 'view', tag, '--json', 'isDraft,tagName'], text=True))
+    metadata = strict_json.loads(subprocess.check_output(['gh', 'release', 'view', tag, '--json', 'isDraft,tagName'], text=True))
     require(metadata['isDraft'] is True and metadata['tagName'] == tag, 'publication requires an unpublished draft')
 
 
 def qualified_files(release):
     """Only manifest and receipt entries may enter a public evidence archive."""
-    receipt = json.loads((release / 'release-qualification.json').read_text())
+    receipt = strict_json.loads((release / 'release-qualification.json').read_text())
     require(receipt['status'] == 'qualified_for_publication' and receipt['schema_version'] == 2,
             'release receipt is not qualified')
     paths = {'release-qualification.json', 'SHA256SUMS'}
@@ -55,7 +56,7 @@ def qualified_files(release):
         target = platform['target']
         require(target in TARGETS, 'unsupported qualification target')
         folder = release / target
-        manifest = json.loads((folder / 'release-manifest.json').read_text())
+        manifest = strict_json.loads((folder / 'release-manifest.json').read_text())
         paths.update([f'{target}/release-manifest.json', f'{target}/SHA256SUMS'])
         for artifact in manifest['artifacts']:
             name = artifact['name']
@@ -80,13 +81,13 @@ def qualified_files(release):
 
 
 def check_files(directory):
-    index = json.loads((directory / 'publication-index.json').read_text())
+    index = strict_json.loads((directory / 'publication-index.json').read_text())
     require(index['version'] == workspace_version().native, 'publication version differs')
     for name, sha in index['files'].items():
         require(Path(name).name == name and '/' not in name and '\\' not in name, 'unsafe publication filename')
         require(digest(directory / name) == sha, 'publication artifact digest differs')
     require(bool(index['files']), 'empty publication inventory')
-    receipt = json.loads((directory / 'release-qualification.json').read_text())
+    receipt = strict_json.loads((directory / 'release-qualification.json').read_text())
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     require(receipt['version'] == index['version'] and receipt['source_revision'] == revision
             and receipt['status'] == 'qualified_for_publication' and receipt['schema_version'] == 2
@@ -122,7 +123,7 @@ def prepare(archive, output, tag):
             cli = folder / f'plenora-storage-{version}-{target}{extension}'
             wheels = list(folder.glob('plenora_storage-*.whl'))
             require(len(wheels) == 1, 'expected one qualified wheel per target')
-            manifest = json.loads((folder / 'release-manifest.json').read_text())
+            manifest = strict_json.loads((folder / 'release-manifest.json').read_text())
             built = {artifact['name']: artifact['sha256'] for artifact in manifest['artifacts']}
             for name, public in target_documents(version, target).items():
                 # qualify_release.py checked these digests; the copy must keep them.
@@ -164,13 +165,13 @@ def bundle_input(release, evidence, output):
 
 def smoke_cli(binary, version):
     """Use the same machine protocol required of installed CLI consumers."""
-    identity = json.loads(subprocess.check_output([str(binary), '--format', 'json', '--version'], text=True))
+    identity = strict_json.loads(subprocess.check_output([str(binary), '--format', 'json', '--version'], text=True))
     require(identity['status'] == 'ok' and identity['command'] == 'version'
             and identity['protocol_version'] == 2
             and identity['component_version'] == version
             and identity['result'] == {'component_version': version, 'cli_protocol_version': 2},
             'downloaded CLI version or protocol differs')
-    catalog = json.loads(subprocess.check_output([str(binary), '--format', 'json', 'capabilities'], text=True))
+    catalog = strict_json.loads(subprocess.check_output([str(binary), '--format', 'json', 'capabilities'], text=True))
     require(catalog['status'] == 'ok' and catalog['result']['component_version'] == version
             and len(catalog['result']['operations']) == 7, 'downloaded CLI discovery differs')
     return {'status': 'PASS', 'version': version, 'binary_sha256': digest(binary)}
@@ -192,7 +193,7 @@ def smoke(directory):
             with tarfile.open(archive) as stream:
                 binary.write_bytes(stream.extractfile(binary_name).read())
             binary.chmod(0o700)
-        receipt = json.loads((directory / 'release-qualification.json').read_text())
+        receipt = strict_json.loads((directory / 'release-qualification.json').read_text())
         record = next(p for p in receipt['platforms'] if p['target'] == target)
         require(digest(binary) == record['binary_sha256'], 'downloaded CLI differs from qualified binary')
         smoke_cli(binary, version)

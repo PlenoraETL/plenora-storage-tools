@@ -38,6 +38,7 @@ pub struct ProviderConnection {
     /// Versioned provider connection contract; must match the selected adapter.
     pub config_contract: String,
     /// Non-secret flat JSON object with scalar values; at most 32 properties.
+    #[serde(deserialize_with = "crate::unique_json::deserialize")]
     pub config: Value,
     /// Opaque protected credential reference resolved by the host; never inline secrets.
     pub credential_ref: String,
@@ -241,6 +242,7 @@ pub struct PutRequest {
     pub content_length: Option<u64>,
     #[serde(default)]
     /// Operation metadata validated against the corresponding public contract.
+    #[serde(deserialize_with = "crate::unique_json::deserialize")]
     pub metadata: BTreeMap<String, String>,
 }
 

@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import http.server
 import json
+import strict_json
 import os
 from pathlib import Path
 import subprocess
@@ -96,7 +97,7 @@ def main():
             assert not process.stderr and len(process.stdout.splitlines()) == 1, process
             assert SECRET not in process.stdout, 'credentials leaked'
             assert endpoint not in process.stdout and 'untrusted-backend-diagnostic' not in process.stdout, 'backend details leaked'
-            value = json.loads(process.stdout)
+            value = strict_json.loads(process.stdout)
             assert (process.returncode == 0) == success, value
             return value
 

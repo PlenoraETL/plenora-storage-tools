@@ -8,6 +8,7 @@ not proof that the binary contains no dependencies.
 import argparse
 import hashlib
 import json
+import strict_json
 import os
 from pathlib import Path, PurePosixPath
 import stat
@@ -84,7 +85,7 @@ def unpack(archive, destination):
 
 
 def scan_target(folder, output, syft, revision, *, development=False):
-    manifest = json.loads((folder / 'release-manifest.json').read_text())
+    manifest = strict_json.loads((folder / 'release-manifest.json').read_text())
     if manifest['source_revision'] != revision or not manifest['source_committed']:
         raise ValueError('scan requires the exact committed distribution source')
     target = manifest['target']
@@ -124,7 +125,7 @@ def scan_target(folder, output, syft, revision, *, development=False):
                             '-o', 'syft-json=' + str(raw_path),
                             '-o', 'cyclonedx-json@1.6=' + str(cdx_path)],
                            cwd=ROOT, env=environment, check=True)
-            raw = json.loads(raw_path.read_text(encoding='utf-8'))
+            raw = strict_json.loads(raw_path.read_text(encoding='utf-8'))
             if raw.get('descriptor', {}).get('version') != SYFT_VERSION:
                 raise ValueError('scanner version differs from pinned policy')
             detected = native_inventory(raw, native)
@@ -158,8 +159,8 @@ def validate(evidence, prefix, revision, subjects):
         expected = subjects['cli_archive_sha256' if row['role'] == 'cli' else 'wheel_sha256']
         if row['artifact_sha256'] != expected or not row['native_files']:
             raise ValueError('native scan describes different distribution bytes')
-        raw = json.loads(evidence.read(prefix + '/' + row['raw'], row['raw_sha256']))
-        cdx = json.loads(evidence.read(prefix + '/' + row['cyclonedx'], row['cyclonedx_sha256']))
+        raw = strict_json.loads(evidence.read(prefix + '/' + row['raw'], row['raw_sha256']))
+        cdx = strict_json.loads(evidence.read(prefix + '/' + row['cyclonedx'], row['cyclonedx_sha256']))
         if (raw.get('descriptor', {}).get('name') != 'syft'
                 or raw['descriptor'].get('version') != SYFT_VERSION
                 or not isinstance(raw.get('artifacts'), list)
@@ -198,7 +199,7 @@ def main():
         raise ValueError('no release manifests to scan')
     targets = set()
     for path in manifests:
-        manifest = json.loads(path.read_text())
+        manifest = strict_json.loads(path.read_text())
         target = manifest['target']
         if target in targets:
             raise ValueError('duplicate release target')

@@ -6,6 +6,7 @@ campaign, not coverage-guided fuzzing of the FTP/XML protocol parsers.
 import argparse
 import hashlib
 import json
+import strict_json
 import os
 from pathlib import Path
 import random
@@ -45,7 +46,7 @@ def main():
             corpus = ['known', '../escape', '/absolute', 'a/../b', '.', '..', 'a//b', 'a\\b',
                       'a\r\nb', '%2e%2e', '\u202e', '日本語', '', 'x' * 4096]
             for index in range(args.cases):
-                document = json.loads(json.dumps(original))
+                document = strict_json.loads(json.dumps(original))
                 mode = index % 3
                 text = rng.choice(corpus)
                 if rng.randrange(2):
@@ -69,7 +70,7 @@ def main():
                 assert not result.stderr, 'public CLI emitted unexpected stderr'
                 assert SECRET.encode() not in result.stdout, 'credential exposed in diagnostic'
                 assert len(result.stdout.splitlines()) == 1, 'expected one protocol envelope'
-                envelope = json.loads(result.stdout)
+                envelope = strict_json.loads(result.stdout)
                 assert envelope['status'] in {'ok', 'error'}
                 if envelope['status'] == 'error':
                     assert result.returncode > 0, 'error did not use a failure exit code'

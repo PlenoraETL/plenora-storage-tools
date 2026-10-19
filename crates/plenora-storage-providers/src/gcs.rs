@@ -2,6 +2,10 @@
 mod operations;
 mod publication;
 
+#[cfg(test)]
+#[path = "gcs_json_tests.rs"]
+mod json_tests;
+
 use crate::{
     common::{
         Backend, ProviderFactory, Reader, failure, invalid, limit_error, page, parse, select,
@@ -210,6 +214,18 @@ async fn json<T: DeserializeOwned>(mut response: Response) -> StorageResult<T> {
             return Err(limit_error());
         }
         data.extend_from_slice(&chunk);
+    }
+    if let Err(error) = plenora_storage_core::validate_json(&data)
+        && error.code == "JSON_DUPLICATE_MEMBER"
+    {
+        return Err(plenora_storage_core::StorageError::new(
+            ErrorCategory::Protocol,
+            ErrorPhase::Read,
+            plenora_storage_core::RemoteEffect::None,
+            plenora_storage_core::RetryDisposition::Never,
+            error.code,
+            error.message,
+        ));
     }
     serde_json::from_slice(&data)
         .map_err(|_| failure(ErrorCategory::Protocol, ErrorPhase::Read, false))

@@ -167,6 +167,7 @@ pub struct RuntimeInvocation {
     /// Operation metadata validated against the corresponding public contract.
     pub metadata: RuntimeRequestMetadata,
     /// Operation JSON envelope; file contents are carried only by artifact streams.
+    #[serde(deserialize_with = "crate::unique_json::deserialize")]
     pub payload: Value,
 }
 
@@ -237,6 +238,7 @@ pub struct RuntimeResultEnvelope {
     /// Operation metadata validated against the corresponding public contract.
     pub metadata: RuntimeResultMetadata,
     /// Operation JSON envelope; file contents are carried only by artifact streams.
+    #[serde(deserialize_with = "crate::unique_json::deserialize")]
     pub payload: Value,
 }
 

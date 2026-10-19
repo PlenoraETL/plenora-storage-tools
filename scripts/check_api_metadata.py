@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import strict_json
 from pathlib import Path
 import tomllib
 
@@ -20,12 +21,12 @@ def snapshot():
         }
     contracts = {}
     for path in sorted((ROOT / 'contracts').rglob('*.schema.json')):
-        content = json.dumps(json.loads(path.read_text()), sort_keys=True, separators=(',', ':')).encode()
+        content = json.dumps(strict_json.loads(path.read_text()), sort_keys=True, separators=(',', ':')).encode()
         contracts[path.relative_to(ROOT).as_posix()] = hashlib.sha256(content).hexdigest()
     return {'schema_version': 1, 'rust_version': workspace['package']['rust-version'],
             'edition': workspace['package']['edition'], 'packages': packages, 'contracts': contracts,
             'python_requires': tomllib.loads((ROOT / 'crates/plenora-storage-py/pyproject.toml').read_text())['project']['requires-python'],
-            'upstream_contracts': json.loads((ROOT / 'contracts/upstream/source.json').read_text())}
+            'upstream_contracts': strict_json.loads((ROOT / 'contracts/upstream/source.json').read_text())}
 
 
 def main():
@@ -38,7 +39,7 @@ def main():
         args.candidate.write_text(json.dumps(actual, indent=2, sort_keys=True) + '\n')
         print('CANDIDATE API requirements and contracts')
     else:
-        expected = json.loads((ROOT / 'api/metadata.json').read_text())
+        expected = strict_json.loads((ROOT / 'api/metadata.json').read_text())
         if actual != expected:
             raise SystemExit('API requirements or contracts differ from api/metadata.json')
         print('PASS API requirements and contracts')

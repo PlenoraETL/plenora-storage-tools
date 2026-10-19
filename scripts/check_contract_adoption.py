@@ -6,6 +6,7 @@ The optional upstream checkout is read only; CI needs only vendored files.
 import argparse
 import hashlib
 import json
+import strict_json
 from pathlib import Path
 import sys
 
@@ -23,8 +24,8 @@ def require(condition, message):
 
 
 def check(upstream=None):
-    source = json.loads((UPSTREAM / 'source.json').read_text())
-    lock = json.loads((UPSTREAM / 'vendor-lock.json').read_text())
+    source = strict_json.loads((UPSTREAM / 'source.json').read_text())
+    lock = strict_json.loads((UPSTREAM / 'vendor-lock.json').read_text())
     require(source['revision'] == lock['revision'], 'ADOPTION: pin mismatch')
     present = {path.relative_to(UPSTREAM).as_posix() for path in UPSTREAM.rglob('*')
                if path.is_file() and '__pycache__' not in path.parts
@@ -41,14 +42,14 @@ def check(upstream=None):
             original = (upstream / entry['source']).resolve()
             require(original.is_relative_to(upstream.resolve()), 'ADOPTION: invalid source path')
             require(original.read_bytes() == path.read_bytes(), 'ADOPTION: upstream bytes differ')
-    policy = json.loads((ROOT / 'contracts/adoption-policy.json').read_text())
+    policy = strict_json.loads((ROOT / 'contracts/adoption-policy.json').read_text())
     # Structural/semantic probe, not an artifact qualification or release receipt.
     manifest = dict(schema_version=4, component='plenora-storage-tools',
                     contracts_source=source, profile='plenora-storage-tools-profile-v1',
                     artifacts=[dict(name='policy-probe', surface='runtime', version='0',
                                     digest='sha256:' + '0' * 64,
                                     verification=['Policy probe only'])], **policy)
-    schema = json.loads((UPSTREAM / 'adoption-manifest-v4.schema.json').read_text())
+    schema = strict_json.loads((UPSTREAM / 'adoption-manifest-v4.schema.json').read_text())
     require(not list(jsonschema.Draft202012Validator(schema).iter_errors(manifest)),
             'ADOPTION: manifest schema rejected')
     require(not adoption_errors(manifest), 'ADOPTION: manifest semantics rejected')
@@ -57,7 +58,7 @@ def check(upstream=None):
             'ADOPTION: missing version 2 contract')
     require(any(item['rule'] == 'RT-024' for item in policy['deviations']),
             'ADOPTION: missing materialization deviation')
-    catalog = json.loads((UPSTREAM / 'storage-tools-v1.json').read_text())
+    catalog = strict_json.loads((UPSTREAM / 'storage-tools-v1.json').read_text())
     require(catalog['profile'] == manifest['profile'], 'ADOPTION: profile mismatch')
     require(len(catalog['operations']) == 7, 'ADOPTION: catalog inventory mismatch')
     print('PASS adoption policy, catalog and vendor hashes')

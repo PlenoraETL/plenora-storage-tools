@@ -1,6 +1,7 @@
 """Enforce exact dependency pins: Cargo manifests with reviewed public-boundary
 exceptions, Python requirement files and the SDK build backend."""
 import json
+import strict_json
 from pathlib import Path
 import re
 import tomllib
@@ -81,7 +82,7 @@ def check_python_pins(name, requirements):
 
 
 def main():
-    policy = json.loads((ROOT / 'scripts/dependency-policy.json').read_text())
+    policy = strict_json.loads((ROOT / 'scripts/dependency-policy.json').read_text())
     exceptions = set(policy['compatible_workspace_requirements'])
     manifest_text = (ROOT / 'Cargo.toml').read_text(encoding='utf-8')
     workspace = tomllib.loads(manifest_text)

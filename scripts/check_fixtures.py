@@ -21,6 +21,7 @@ import ftplib
 import hashlib
 import hmac
 import json
+import strict_json
 import os
 from pathlib import Path
 import ssl
@@ -169,7 +170,7 @@ def containers():
     for line in output.splitlines():
         line = line.strip()
         if line:
-            value = json.loads(line)
+            value = strict_json.loads(line)
             rows.extend(value if isinstance(value, list) else [value])
     return {row['Service']: row for row in rows}
 

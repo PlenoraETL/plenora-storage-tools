@@ -99,6 +99,7 @@ def snapshot(module):
 
 
 def main():
+    import strict_json
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--candidate', type=Path, help='Write a candidate without changing the baseline')
     args = parser.parse_args()
@@ -109,7 +110,7 @@ def main():
         args.candidate.write_text(json.dumps(actual, indent=2, sort_keys=True) + '\n', encoding='utf-8')
         print('CANDIDATE installed Python API')
     else:
-        expected = json.loads((ROOT / 'api/python.json').read_text())
+        expected = strict_json.loads((ROOT / 'api/python.json').read_text())
         if actual != expected:
             raise SystemExit('Installed Python API differs from api/python.json; generate a candidate and review the change')
         print('PASS installed Python API')
