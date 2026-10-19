@@ -6059,6 +6059,7 @@ pub fn plenora_storage_core::directory_may_contain(directory_key: &str, prefix: 
 pub fn plenora_storage_core::is_secret_field_name(name: &str) -> bool
 pub fn plenora_storage_core::key_matches_prefix(key: &str, prefix: &str) -> bool
 pub async fn plenora_storage_core::resolve_network_target(host: &str, port: u16, allow_private_network: bool) -> plenora_storage_core::StorageResult<alloc::vec::Vec<core::net::socket_addr::SocketAddr>>
+pub fn plenora_storage_core::validate_json(bytes: &[u8]) -> plenora_storage_core::StorageResult<()>
 pub fn plenora_storage_core::validate_object_key(key: &str) -> plenora_storage_core::StorageResult<()>
 pub fn plenora_storage_core::validate_object_prefix(prefix: &str) -> plenora_storage_core::StorageResult<()>
 pub fn plenora_storage_core::validate_operation_schema_version(schema_version: u32) -> plenora_storage_core::StorageResult<()>
