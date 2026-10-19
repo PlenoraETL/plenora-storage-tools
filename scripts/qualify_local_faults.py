@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import strict_json
 import os
 from pathlib import Path
 import subprocess
@@ -96,7 +97,7 @@ def main():
                                          user=65534, group=65534, extra_groups=[], cwd=root, env=environment)
                 if process.returncode == 0 or process.stderr or len(process.stdout.splitlines()) != 1:
                     raise ValueError(f'{name}: expected one redacted error envelope')
-                document = json.loads(process.stdout)
+                document = strict_json.loads(process.stdout)
                 error = document['error']
                 expected = (category, phase, effect, {'kind': 'never'})
                 actual = (error['category'], error['phase'], error['remote_effect'], error['retry'])

@@ -13,6 +13,9 @@ mod network;
 mod provider;
 mod runtime;
 mod runtime_admission;
+mod unique_json;
+
+pub use unique_json::validate_json;
 
 pub use capability::{
     CAPABILITY_ATTRIBUTES_CONTRACT, CAPABILITY_NAME, CAPABILITY_SCHEMA_VERSION, COMPONENT_ID,

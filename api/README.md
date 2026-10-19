@@ -76,3 +76,12 @@ I gate vengono eseguiti in [CI](../.github/workflows/ci.yml) e prima del
 [packaging della release](../.github/workflows/release-candidate.yml).
 Le regressioni negative compilano piccole API modificate per dimostrare che
 metodi rimossi, tipi cambiati, enum estesi e auto-trait persi vengono rilevati.
+
+## Adozione contracts 3aec9f7
+
+Aggiunta compatibile: `RuntimeBinding::with_result_payload_limit(self, bytes)`.
+Il costruttore esistente conserva comportamento e firma. La singola firma e
+aggiunta alle baseline dei due target; il candidato rustdoc Windows verifica
+che non vi siano altre differenze. La baseline Linux richiede la verifica
+nella CI Linux: l'aggiornamento della firma non equivale a un test Linux.
+Il pin e i nuovi schemi vendorizzati aggiornano anche `metadata.json`.

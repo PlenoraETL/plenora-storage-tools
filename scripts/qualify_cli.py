@@ -1,6 +1,7 @@
 """Exercise all seven operations against the isolated Docker fixtures."""
 import hashlib
 import json
+import strict_json
 import os
 from pathlib import Path
 import subprocess
@@ -21,7 +22,7 @@ def invoke(connection, flags, command, *args, expected=0):
     assert not result.stderr, result.stderr
     assert not any(secret in result.stdout for secret in SECRETS), 'secret in public output'
     assert len(result.stdout.splitlines()) == 1, result.stdout
-    envelope = json.loads(result.stdout)
+    envelope = strict_json.loads(result.stdout)
     if expected is None:
         return result.returncode, envelope
     assert result.returncode == expected, envelope
@@ -40,7 +41,7 @@ def main():
         empty = work / 'empty.bin'
         empty.write_bytes(b'')
         for provider in ['s3', 'sftp', 'ftp']:
-            configuration = json.loads((ROOT / 'docker' / f'{"minio" if provider == "s3" else provider}-connection.json').read_text())
+            configuration = strict_json.loads((ROOT / 'docker' / f'{"minio" if provider == "s3" else provider}-connection.json').read_text())
             flags = ['--allow-insecure-ftp'] if provider == 'ftp' else []
             if provider == 's3':
                 if os.environ.get('PLENORA_QUALIFY_ALLOW_HTTP') == '1':

@@ -2,6 +2,7 @@
 import argparse
 from datetime import datetime, timezone
 import json
+import strict_json
 from pathlib import Path
 import subprocess
 import sys
@@ -40,7 +41,7 @@ def publish(bundle, output, repository, notes, retry_workflow=False):
                 'repository': repository, 'notes_sha256': digest(notes)}
     with exclusive(output):
         state_path = output / 'publication.json'
-        state = json.loads(state_path.read_text()) if state_path.exists() else {'identity': identity}
+        state = strict_json.loads(state_path.read_text()) if state_path.exists() else {'identity': identity}
         if state['identity'] != identity:
             raise ValueError('publication inputs changed')
         validate_input(bundle, version, output / 'preflight.log')
@@ -54,7 +55,7 @@ def publish(bundle, output, repository, notes, retry_workflow=False):
             return command('gh', *args, '--repo', repository)
 
         def release():
-            rows = json.loads(gh('release', 'list', '--limit', '100', '--json', 'tagName,isDraft,isPrerelease'))
+            rows = strict_json.loads(gh('release', 'list', '--limit', '100', '--json', 'tagName,isDraft,isPrerelease'))
             return next((row for row in rows if row['tagName'] == tag), None)
 
         refs = {row.split()[1]: row.split()[0] for row in command('git', 'ls-remote', 'origin',
@@ -76,7 +77,7 @@ def publish(bundle, output, repository, notes, retry_workflow=False):
             current = release()
         if current['isDraft']:
             save('checking-draft')
-            metadata = json.loads(gh('release', 'view', tag, '--json', 'assets'))
+            metadata = strict_json.loads(gh('release', 'view', tag, '--json', 'assets'))
             assets = [asset for asset in metadata['assets'] if asset['name'] == 'qualification-input.tar.gz']
             if assets:
                 with tempfile.TemporaryDirectory(prefix='storage-draft-check-') as temporary:
@@ -89,7 +90,7 @@ def publish(bundle, output, repository, notes, retry_workflow=False):
                 gh('release', 'upload', tag, str(bundle))
             identifier = state.get('workflow_run')
             if identifier:
-                prior = json.loads(gh('run', 'view', identifier, '--json', 'status,conclusion,headSha,displayTitle'))
+                prior = strict_json.loads(gh('run', 'view', identifier, '--json', 'status,conclusion,headSha,displayTitle'))
                 if prior['status'] == 'completed' and prior['conclusion'] != 'success':
                     if not retry_workflow:
                         raise ValueError('publication workflow failed; inspect before explicitly retrying')
@@ -103,7 +104,7 @@ def publish(bundle, output, repository, notes, retry_workflow=False):
                     gh('workflow', 'run', 'release.yml', '--ref', 'main', '-f', 'tag=' + tag)
                 deadline = time.monotonic() + 120
                 while time.monotonic() < deadline:
-                    runs = json.loads(gh('run', 'list', '--workflow', 'release.yml', '--event', 'workflow_dispatch',
+                    runs = strict_json.loads(gh('run', 'list', '--workflow', 'release.yml', '--event', 'workflow_dispatch',
                                          '--limit', '30', '--json', 'databaseId,headSha,displayTitle,createdAt'))
                     started = datetime.fromisoformat(state['dispatch_started']).timestamp()
                     matches = [row for row in runs if row['headSha'] == revision and row['displayTitle'] == 'Publish ' + tag
@@ -119,7 +120,7 @@ def publish(bundle, output, repository, notes, retry_workflow=False):
                     raise ValueError('dispatch outcome is unknown; inspect Actions before changing the checkpoint')
             deadline = time.monotonic() + 2 * 3600
             while time.monotonic() < deadline:
-                report = json.loads(gh('run', 'view', identifier, '--json', 'headSha,status,conclusion,displayTitle'))
+                report = strict_json.loads(gh('run', 'view', identifier, '--json', 'headSha,status,conclusion,displayTitle'))
                 if report['headSha'] != revision or report['displayTitle'] != 'Publish ' + tag:
                     raise ValueError('publication workflow identifies a different release')
                 if report['status'] == 'completed':
@@ -130,13 +131,13 @@ def publish(bundle, output, repository, notes, retry_workflow=False):
                 time.sleep(30)
             else:
                 raise TimeoutError('publication workflow did not finish')
-        current = json.loads(gh('release', 'view', tag, '--json', 'isDraft,isPrerelease,url,tagName'))
+        current = strict_json.loads(gh('release', 'view', tag, '--json', 'isDraft,isPrerelease,url,tagName'))
         if current['isDraft'] or current['isPrerelease'] or current['tagName'] != tag:
             raise ValueError('stable publication is not complete')
         downloaded = output / ('download-' + str(time.time_ns()))
         gh('release', 'download', tag, '--dir', str(downloaded))
         check_files(downloaded)
-        receipt = json.loads((downloaded / 'release-qualification.json').read_text())
+        receipt = strict_json.loads((downloaded / 'release-qualification.json').read_text())
         if receipt['source_revision'] != revision or receipt['status'] != 'qualified_for_publication':
             raise ValueError('published qualification differs')
         save('published-and-download-verified', release_url=current['url'],

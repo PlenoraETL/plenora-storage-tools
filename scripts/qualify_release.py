@@ -1,6 +1,7 @@
 """Seal a local release only after both platform and dependency gates passed."""
 import argparse
 import json
+import strict_json
 from pathlib import Path
 import re
 import shutil
@@ -34,7 +35,7 @@ def main():
     status = subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True)
     assert not status.strip(), 'qualification requires the final clean commit'
     audit_path = args.evidence / 'audit.json'
-    audit = json.loads(audit_path.read_text(encoding='utf-8'))
+    audit = strict_json.loads(audit_path.read_text(encoding='utf-8'))
     assert audit['vulnerabilities']['count'] == 0 and not audit.get('warnings'), 'dependency audit failed'
     deny_path = args.evidence / 'deny.log'
     assert 'advisories ok, bans ok, licenses ok, sources ok' in deny_path.read_text(encoding='utf-8'), 'dependency policy failed'
@@ -45,23 +46,23 @@ def main():
     subjects = {}
     for target in targets:
         folder = output / target
-        manifest = json.loads((folder / 'release-manifest.json').read_text())
+        manifest = strict_json.loads((folder / 'release-manifest.json').read_text())
         assert manifest['source_committed'] and manifest['source_revision'] == revision
         assert manifest['source_sha256'] == source_digest(), 'source snapshot changed'
         if parse_version(manifest['version']).requires((1, 0, 0)):
-            verify_qualification_sbom(json.loads((folder / 'qualification-sbom.cdx.json').read_text()))
+            verify_qualification_sbom(strict_json.loads((folder / 'qualification-sbom.cdx.json').read_text()))
             # These two files are produced after the inventoried build assets.
             inventoried = [folder / item['name'] for item in manifest['artifacts']
                           if item['name'] not in {'storage-sbom.cdx.json', 'adoption-manifest-v4.json'}]
-            verify_sbom(json.loads((folder / 'storage-sbom.cdx.json').read_text()), inventoried)
+            verify_sbom(strict_json.loads((folder / 'storage-sbom.cdx.json').read_text()), inventoried)
         qualification_path = folder / 'qualification.json'
-        qualification = json.loads(qualification_path.read_text())
+        qualification = strict_json.loads(qualification_path.read_text())
         assert {r['provider'] for r in qualification['results']} == {'s3', 'sftp', 'ftp'}
         assert all(r['status'] == 'PASS' and r['operations'] == 7 for r in qualification['results'])
         binary = folder / ('plenora-storage.exe' if 'windows' in target else 'plenora-storage')
         assert qualification['binary_sha256'] == digest(binary)
         regression_path = folder / 'cli-regressions.json'
-        regressions = json.loads(regression_path.read_text())
+        regressions = strict_json.loads(regression_path.read_text())
         assert regressions['binary_sha256'] == digest(binary)
         assert set(regressions['results']) == {'cli_pagination', 'cli_download_publication', 'connection_file_bound', 'ftp_parent_deadline'}
         assert all(r['status'] == 'PASS' for r in regressions['results'].values())
@@ -75,7 +76,7 @@ def main():
         if 'linux' in target:
             assert not any(int(ignored) for _, _, ignored in counts), 'Linux provider fixtures were skipped'
             faults_path = folder / 'commit-faults.json'
-            faults = json.loads(faults_path.read_text())
+            faults = strict_json.loads(faults_path.read_text())
             assert faults['binary_sha256'] == digest(binary)
             assert {(r['mode'], r['interruption']) for r in faults['results']} == {
                 (mode, control) for mode in ['before_commit', 'after_commit'] for control in ['deadline', 'sigterm']}
@@ -85,11 +86,11 @@ def main():
         if parse_version(manifest['version']).requires((1, 0, 0)):
             evidence.append(folder / 'qualification-sbom.cdx.json')
             fixture_path = folder / 'webdav-fixture.json'
-            validate_webdav_fixture(json.loads(fixture_path.read_text()), revision)
+            validate_webdav_fixture(strict_json.loads(fixture_path.read_text()), revision)
             evidence.append(fixture_path)
         if parse_version(manifest['version']).requires((0, 2, 1)):
             python_path = folder / 'python-qualification.json'
-            python_report = json.loads(python_path.read_text())
+            python_report = strict_json.loads(python_path.read_text())
             assert python_report.get('spool_uploads', False) is False, 'default SDK qualification strategy differs'
             assert python_report['version'] == manifest['version']
             assert python_report['wheel_sha256'] == digest(folder / python_report['wheel'])
@@ -104,18 +105,18 @@ def main():
             evidence.extend([python_path, folder / 'python-tests.json', folder / 'python-tests.log', folder / 'storage-sbom.cdx.json'])
         if parse_version(manifest['version']).requires((0, 2, 0)):
             upstream_audit_path = args.evidence / 'smb-upstream-audit.json'
-            upstream_audit = json.loads(upstream_audit_path.read_text())
+            upstream_audit = strict_json.loads(upstream_audit_path.read_text())
             assert upstream_audit['vulnerabilities']['count'] == 0 and not upstream_audit.get('warnings')
             shutil.copyfile(upstream_audit_path, archive_evidence / upstream_audit_path.name)
             evidence.append(upstream_audit_path)
             extended_path = folder / 'extended-qualification.json'
-            extended = json.loads(extended_path.read_text())
+            extended = strict_json.loads(extended_path.read_text())
             assert extended.get('spool_uploads', False) is False, 'default CLI qualification strategy differs'
             assert extended['binary_sha256'] == digest(binary)
             assert {r['provider'] for r in extended['results']} == {'local', 'ftps', 'azure', 'gcs', 'smb', 'webdav'}
             assert all(r['status'] == 'PASS' and r['operations'] == 7 for r in extended['results'])
             faults_extended_path = folder / 'extended-regressions.json'
-            extended_faults = json.loads(faults_extended_path.read_text())
+            extended_faults = strict_json.loads(faults_extended_path.read_text())
             assert extended_faults.get('spool_uploads', False) is False, 'default fault qualification strategy differs'
             assert extended_faults['binary_sha256'] == digest(binary)
             expected = EXPECTED_TESTS if parse_version(manifest['version']).requires((1, 0, 0)) else LEGACY_TESTS
@@ -130,11 +131,11 @@ def main():
             evidence.append(faults_path)
             if parse_version(manifest['version']).requires((1, 0, 0)):
                 local_faults_path = folder / 'local-faults.json'
-                validate_local_faults(json.loads(local_faults_path.read_text()), digest(binary))
+                validate_local_faults(strict_json.loads(local_faults_path.read_text()), digest(binary))
                 evidence.append(local_faults_path)
                 if parse_version(manifest['version']).requires((2, 1, 0)):
                     prepared_faults = folder / 'spooled-local-faults.json'
-                    validate_local_faults(json.loads(prepared_faults.read_text()), digest(binary), spool_uploads=True)
+                    validate_local_faults(strict_json.loads(prepared_faults.read_text()), digest(binary), spool_uploads=True)
                     evidence.append(prepared_faults)
         for source in [suite_path, audit_path, deny_path]:
             shutil.copyfile(source, archive_evidence / source.name)

@@ -5,6 +5,7 @@ This uses only the public fixture credentials, never production connections.
 """
 import argparse
 import json
+import strict_json
 import os
 from pathlib import Path
 from versioning import parse_version
@@ -19,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def qualify(folder, host=None, ca=None, pin=None):
     folder = folder.resolve()
-    manifest = json.loads((folder / 'release-manifest.json').read_text(encoding='utf-8'))
+    manifest = strict_json.loads((folder / 'release-manifest.json').read_text(encoding='utf-8'))
     windows = sys.platform == 'win32'
     spooled = parse_version(manifest['version']).requires((2, 1, 0))
     target = 'x86_64-pc-windows-msvc' if windows else 'x86_64-unknown-linux-gnu'

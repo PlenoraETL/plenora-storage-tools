@@ -1,6 +1,7 @@
 """Qualify exact Linux distributions with resumable, separately recorded attempts."""
 import argparse
 import json
+import strict_json
 import os
 from pathlib import Path
 import shutil
@@ -48,7 +49,7 @@ def phases_for(version):
 
 
 def identity(folder, baseline):
-    manifest = json.loads((folder / 'release-manifest.json').read_text())
+    manifest = strict_json.loads((folder / 'release-manifest.json').read_text())
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     if (manifest['target'] != TARGET or manifest['source_revision'] != revision or not manifest['source_committed']
             or subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()):
@@ -71,7 +72,7 @@ def check_fixture_state(output, nonce):
     the reset of this attempt.
     """
     try:
-        state = json.loads((output / 'fixture-state.json').read_text(encoding='utf-8'))
+        state = strict_json.loads((output / 'fixture-state.json').read_text(encoding='utf-8'))
     except (OSError, ValueError):
         state = None
     if state != {'nonce': nonce, 'kind': 'reset'}:
@@ -371,7 +372,7 @@ if __name__ == '__main__':
     parser.add_argument('--fixture-state', required=True, type=Path,
                         help='VM directory with the fixture state and its preparation lock')
     parser.add_argument('--inputs', required=True, type=Path, help='input directory of this attempt')
-    parser.add_argument('--expected-inputs', required=True, type=json.loads,
+    parser.add_argument('--expected-inputs', required=True, type=strict_json.loads,
                         help='JSON object: digest of every file of the input directory, by relative path')
     args = parser.parse_args()
     require_private(ROOT, args.output)

@@ -4654,6 +4654,7 @@ impl<'a> plenora_storage_core::RuntimeBinding<'a>
 pub async fn plenora_storage_core::RuntimeBinding<'a>::invoke(&self, invocation: plenora_storage_core::RuntimeInvocation, cancellation: plenora_storage_core::CancellationToken) -> plenora_storage_core::StorageResult<plenora_storage_core::RuntimeResultEnvelope>
 pub async fn plenora_storage_core::RuntimeBinding<'a>::invoke_json(&self, invocation: serde_json::value::Value, cancellation: plenora_storage_core::CancellationToken) -> plenora_storage_core::StorageResult<plenora_storage_core::RuntimeResultEnvelope>
 pub const fn plenora_storage_core::RuntimeBinding<'a>::new(engine: &'a plenora_storage_core::Engine, artifacts: &'a dyn plenora_storage_core::ArtifactResolver, secrets: &'a dyn plenora_storage_core::SecretResolver) -> Self
+pub const fn plenora_storage_core::RuntimeBinding<'a>::with_result_payload_limit(self, bytes: usize) -> Self
 impl<'a> core::marker::Freeze for plenora_storage_core::RuntimeBinding<'a>
 impl<'a> core::marker::Send for plenora_storage_core::RuntimeBinding<'a>
 impl<'a> core::marker::Sync for plenora_storage_core::RuntimeBinding<'a>
@@ -6058,6 +6059,7 @@ pub fn plenora_storage_core::directory_may_contain(directory_key: &str, prefix: 
 pub fn plenora_storage_core::is_secret_field_name(name: &str) -> bool
 pub fn plenora_storage_core::key_matches_prefix(key: &str, prefix: &str) -> bool
 pub async fn plenora_storage_core::resolve_network_target(host: &str, port: u16, allow_private_network: bool) -> plenora_storage_core::StorageResult<alloc::vec::Vec<core::net::socket_addr::SocketAddr>>
+pub fn plenora_storage_core::validate_json(bytes: &[u8]) -> plenora_storage_core::StorageResult<()>
 pub fn plenora_storage_core::validate_object_key(key: &str) -> plenora_storage_core::StorageResult<()>
 pub fn plenora_storage_core::validate_object_prefix(prefix: &str) -> plenora_storage_core::StorageResult<()>
 pub fn plenora_storage_core::validate_operation_schema_version(schema_version: u32) -> plenora_storage_core::StorageResult<()>

@@ -7,6 +7,7 @@ OS packages and build tools are outside this inventory.
 import argparse
 import hashlib
 import json
+import strict_json
 from pathlib import Path
 import re
 import tomllib
@@ -166,7 +167,7 @@ def main():
     parser.add_argument('--qualification', action='store_true')
     args = parser.parse_args()
     if args.check:
-        (verify_qualification if args.qualification else verify)(json.loads(args.output.read_text()))
+        (verify_qualification if args.qualification else verify)(strict_json.loads(args.output.read_text()))
     else:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         document = render_qualification() if args.qualification else render()

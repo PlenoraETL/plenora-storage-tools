@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import strict_json
 import os
 from pathlib import Path
 import subprocess
@@ -72,7 +73,7 @@ with open('/data/.qualification-pressure', 'xb') as f:
 v = os.statvfs('/data')
 print(json.dumps({'total_bytes': v.f_blocks * v.f_frsize, 'free_before': before, 'free_under_pressure': v.f_bavail * v.f_frsize}))
 '''
-        report['disk'] = json.loads(docker('exec', name, 'python', '-c', pressure))
+        report['disk'] = strict_json.loads(docker('exec', name, 'python', '-c', pressure))
         time.sleep(3)  # Allow the server's cached filesystem statistics to expire.
         # Capture the precise backend code independently of public redaction.
         status, body = request(endpoint, 'PUT', '/plenora-test/probe', headers={'x-amz-copy-source': '/plenora-test/source'})
@@ -93,7 +94,7 @@ print(json.dumps({'total_bytes': v.f_blocks * v.f_frsize, 'free_before': before,
                 require(not result.stderr and len(result.stdout.splitlines()) == 1, 'invalid public CLI response')
                 require(not any(value in result.stdout for value in [endpoint.encode(), b'plenora-dev-secret', sentinel, payload[:1024]]),
                         'public CLI response leaked fixture data')
-                return result.returncode, json.loads(result.stdout)
+                return result.returncode, strict_json.loads(result.stdout)
 
             code, response = copy()
             axes = {key: response.get('error', {}).get(key) for key in ('code', 'category', 'phase', 'remote_effect', 'retry')}

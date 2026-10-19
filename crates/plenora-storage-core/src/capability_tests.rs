@@ -35,3 +35,14 @@ fn catalog_omits_operations_without_a_registered_provider() {
     let document = CapabilityDocument::new(Surface::Rust, Vec::new());
     assert!(document.operations.is_empty());
 }
+
+#[test]
+fn runtime_contract_version_is_separate_from_wire_version() {
+    let document = CapabilityDocument::new(Surface::Runtime, Vec::new());
+    assert_eq!(
+        document.interfaces[0].contract,
+        "plenora-runtime-binding-v2"
+    );
+    assert_eq!(document.interfaces[0].version, 2);
+    assert_eq!(crate::RUNTIME_BINDING_VERSION, 1);
+}

@@ -33,3 +33,15 @@ ancora aperte sono in `STORAGE-OPERATIONS-1.0-PROPOSAL.md`.
 Il bordo runtime è intenzionalmente transport-neutral: il crate esporta i DTO,
 i selector e la validazione fail-closed, ma l'adapter concreto e la risoluzione
 degli artifact appartengono all'applicazione consumer.
+
+## Pin e adozione corrente
+
+`upstream/source.json` fissa `3aec9f724f5a0ad21366f293895b4d0dbcd0aad1`.
+`upstream/vendor-lock.json` elenca origine e SHA-256 delle copie adottate;
+`upstream/proposed` e storico, `upstream/ratified` contiene le sonde normative.
+`adoption-policy.json` alimenta il manifest v4 prodotto dal packaging, incluse
+le deviazioni RT-024 ed ERR-016. Catalogo e profilo storage restano v1;
+si adottano Public Catalogs 2.0 e Runtime Binding 2.0 (wire v1).
+Vedere [adozione](../docs/contract-adoption.md) e
+[limiti](../docs/contract-limits.md). Verifica offline:
+`python scripts/check_contract_adoption.py`.

@@ -26,6 +26,9 @@ fn credential_resolution_child() {
             "CREDENTIAL_UNAVAILABLE",
         ),
         "json" | "shape" => ("env:PLENORA_CREDENTIAL_TEST_VALUE", "CREDENTIAL_INVALID"),
+        "duplicate" | "nested_duplicate" => {
+            ("env:PLENORA_CREDENTIAL_TEST_VALUE", "JSON_DUPLICATE_MEMBER")
+        }
         "valid" => ("env:PLENORA_CREDENTIAL_TEST_VALUE", ""),
         _ => panic!("unknown credential test case"),
     };
@@ -70,6 +73,14 @@ fn environment_credentials_are_validated_in_isolated_processes() {
         ("missing", None),
         ("json", Some("private-secret")),
         ("shape", Some(r#"{"password":["private-secret"]}"#)),
+        (
+            "duplicate",
+            Some(r#"{"password":"private-secret","password":"other"}"#),
+        ),
+        (
+            "nested_duplicate",
+            Some(r#"{"password":[{"private-secret":1,"private-secret":2}]}"#),
+        ),
         ("valid", Some(r#"{"password":"private-secret"}"#)),
     ] {
         let mut child = Command::new(std::env::current_exe().unwrap());

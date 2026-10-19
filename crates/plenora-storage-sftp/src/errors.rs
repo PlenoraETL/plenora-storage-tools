@@ -51,6 +51,9 @@ pub fn map_sftp_error(error: SftpError, phase: ErrorPhase, mutating: bool) -> St
             "SFTP_TIMEOUT",
             "SFTP operation timed out",
         ),
+        // STOR-LIMIT-002 / ERR-016: generic failures may hide lost confirmation.
+        // All surfaces inherit execution/unknown; hazard: cause-based routing.
+        // Re-entry: classify transport causes; see docs/contract-limits.md.
         _ if mutating => (
             ErrorCategory::Execution,
             RemoteEffect::Unknown,
@@ -164,7 +167,7 @@ pub fn flush_error(error: SftpError) -> StorageError {
 /// The destination is published, but its metadata could not be read back.
 /// Publication is proved and nothing remains to reconcile, while repeating
 /// the request would publish again: `committed`, never retried (case 9e of the
-/// common runtime matrix, pending ratification in `plenora-contracts`).
+/// common runtime matrix, ERR-015 in the adopted `plenora-contracts`).
 pub fn committed_verification_error() -> StorageError {
     StorageError::new(
         ErrorCategory::Execution,

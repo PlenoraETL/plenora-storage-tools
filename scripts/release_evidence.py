@@ -7,6 +7,7 @@ never trust a summary's PASS alone or substitute another build of the same SHA.
 from collections import Counter
 import hashlib
 import json
+import strict_json
 import re
 from pathlib import Path
 
@@ -48,7 +49,7 @@ class Evidence:
         return raw
 
     def json(self, name):
-        return json.loads(self.read(name))
+        return strict_json.loads(self.read(name))
 
 
 def clean_source(report, revision, revision_key='source_revision', dirty_key='dirty'):
@@ -136,7 +137,7 @@ already checked by verify_release.py. No caller-supplied waiver is accepted.
         for target in TARGETS:
             validate_native_inventory(evidence, 'native-components/' + target, revision, subjects[target])
     check_test_layout(ROOT)
-    policy = json.loads((ROOT / 'scripts/coverage-policy.json').read_text())
+    policy = strict_json.loads((ROOT / 'scripts/coverage-policy.json').read_text())
     for target in TARGETS:
         prefix = f'api/{target}'
         report = evidence.json(prefix + '/report.json')
@@ -217,7 +218,7 @@ already checked by verify_release.py. No caller-supplied waiver is accepted.
     coverage = evidence.json('coverage/coverage-summary.json')
     clean_source(coverage, revision)
     raw = evidence.read('coverage/rust-coverage.json', coverage['raw_report_sha256'])
-    actual = apply_thresholds(summarize(json.loads(raw)), policy['rust_lines'])
+    actual = apply_thresholds(summarize(strict_json.loads(raw)), policy['rust_lines'])
     require(actual['threshold_status'] == coverage['threshold_status'] == 'PASS'
             and all(coverage[key] == actual[key] for key in ('crates', 'thresholds', 'product_excluding_smb_fork', 'excluded_test_files')),
             'Rust coverage failed or differs from raw counters')
@@ -240,7 +241,7 @@ already checked by verify_release.py. No caller-supplied waiver is accepted.
     evidence.read('performance/baseline.json', performance['baseline_sha256'])
     evidence.read('performance/candidate.json', performance['candidate_sha256'])
     clean_source(candidate, revision)
-    performance_policy = json.loads((ROOT / 'scripts/performance-policy.json').read_text())
+    performance_policy = strict_json.loads((ROOT / 'scripts/performance-policy.json').read_text())
     require_paired_performance(version_core, baseline, candidate)
     actual = compare(baseline, candidate, linux['binary_sha256'], performance_policy)
     require(actual['status'] == 'PASS' and all(performance[key] == value for key, value in actual.items()),

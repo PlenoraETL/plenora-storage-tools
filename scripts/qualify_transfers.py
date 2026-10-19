@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
+import strict_json
 import os
 from pathlib import Path
 import random
@@ -82,10 +83,10 @@ def invoke(binary, connection, env, operation, arguments, max_bytes, timeout, rs
             os.killpg(process.pid, signal.SIGKILL)
             process.communicate()
             raise RuntimeError(f'{operation}: process exceeded cooperative deadline; remote outcome requires inspection') from None
-        measure = json.loads(measurement.read_text())
+        measure = strict_json.loads(measurement.read_text())
     if stderr or len(stdout.splitlines()) != 1:
         raise AssertionError(f'{operation}: invalid CLI envelope')
-    response = json.loads(stdout)
+    response = strict_json.loads(stdout)
     if response['status'] != expected or (expected == 'ok' and process.returncode != 0):
         error = response.get('error', {})
         axes = {name: error.get(name) for name in ('code', 'category', 'phase', 'remote_effect', 'retry')}

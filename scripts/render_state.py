@@ -1,6 +1,7 @@
 """Generate the current product inventory from manifests and executable discovery."""
 import argparse
 import json
+import strict_json
 from pathlib import Path
 import subprocess
 import tomllib
@@ -14,7 +15,7 @@ def render():
     result = subprocess.run(['cargo', 'run', '--quiet', '--locked', '--offline', '-p',
                              'plenora-storage-cli', '--features', 'full', '--', '--format', 'json',
                              'capabilities'], cwd=ROOT, check=True, capture_output=True, text=True)
-    catalog = json.loads(result.stdout)['result']
+    catalog = strict_json.loads(result.stdout)['result']
     assert catalog['component_version'] == version
     providers = {}
     for operation in catalog['operations']:
@@ -38,7 +39,7 @@ def render():
               '## Operazioni', '', '| Operazione | Input | Output |', '| --- | --- | --- |']
     for op in catalog['operations']:
         lines.append(f'| `{op["id"]}` | `{op["input"]["contract"]}` | `{op["output"]["contract"]}` |')
-    source = json.loads((ROOT / 'contracts/upstream/source.json').read_text())
+    source = strict_json.loads((ROOT / 'contracts/upstream/source.json').read_text())
     lines += ['', '## Contratti bloccati', '', '```json', json.dumps(source, indent=2, sort_keys=True), '```', '',
               '## Superfici e limiti', '',
               '- Rust: core neutrale e factory applicativa `plenora_storage_engine::build_engine`.',

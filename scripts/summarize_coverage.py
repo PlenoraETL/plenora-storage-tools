@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import strict_json
 from pathlib import Path
 import subprocess
 from check_test_layout import test_files
@@ -77,12 +78,12 @@ if __name__ == '__main__':
     args.output.write_text(json.dumps(report) + '\n')
     try:
         raw = args.input.read_bytes()
-        report = summarize(json.loads(raw))
+        report = summarize(strict_json.loads(raw))
         report['raw_report_sha256'] = hashlib.sha256(raw).hexdigest()
         report['source_revision'] = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
         report['dirty'] = bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip())
         if args.policy:
-            apply_thresholds(report, json.loads(args.policy.read_text())['rust_lines'])
+            apply_thresholds(report, strict_json.loads(args.policy.read_text())['rust_lines'])
     except BaseException as error:
         report.update(threshold_status='FAIL', failure_type=type(error).__name__)
         raise

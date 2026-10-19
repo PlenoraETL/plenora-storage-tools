@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import strict_json
 import os
 from pathlib import Path
 import shutil
@@ -52,7 +53,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--allow-dirty', action='store_true', help='Build a local candidate from an uncommitted checkout')
     args = parser.parse_args()
-    metadata = json.loads(run('cargo', 'metadata', '--locked', '--offline', '--format-version', '1', '--no-deps', capture_output=True, text=True).stdout)
+    metadata = strict_json.loads(run('cargo', 'metadata', '--locked', '--offline', '--format-version', '1', '--no-deps', capture_output=True, text=True).stdout)
     version = metadata['packages'][0]['version']
     # Python is distributed as a tested wheel, not a Cargo consumer dependency.
     metadata['packages'] = [p for p in metadata['packages'] if p['name'] != 'plenora-storage-py']
@@ -81,7 +82,7 @@ def main():
     for command in ('--version', 'capabilities'):
         response = run(str(binary), '--format', 'json', command, capture_output=True, text=True)
         assert not response.stderr and len(response.stdout.splitlines()) == 1
-        value = json.loads(response.stdout)
+        value = strict_json.loads(response.stdout)
         assert value['status'] == 'ok' and value['component_version'] == version
         (output / (command.lstrip('-') + '.json')).write_text(response.stdout, encoding='utf-8')
 
@@ -138,7 +139,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     sbom_path = output / 'storage-sbom.cdx.json'
     sbom_path.write_text(json.dumps(render_sbom(files), indent=2) + '\n', encoding='utf-8')
     files.append(sbom_path)
-    source = json.loads((ROOT / 'contracts/upstream/source.json').read_text())
+    source = strict_json.loads((ROOT / 'contracts/upstream/source.json').read_text())
     adoption = {
         'schema_version': 4, 'component': 'plenora-storage-tools',
         'contracts_source': source, 'profile': 'plenora-storage-tools-profile-v1',
@@ -159,22 +160,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
              'verification': ['Runtime binding packaged in plenora-storage-core',
                               'cargo test --test runtime_binding from the extracted core archive']},
         ],
-        'contracts': [
-            {'id': contract, 'status': 'conforming', 'verification': checks}
-            for contract, checks in [
-                ('plenora-public-surfaces-v1', ['core contract fixtures and Rust/runtime operation binding equivalence tests']),
-                ('plenora-capabilities-v2', ['CLI capabilities schema validation and per-surface discovery tests']),
-                ('plenora-error-v1', ['CLI error schema validation and runtime error-axis tests']),
-                ('plenora-public-security-v1', ['provider preflight, credential reference, SSRF and artifact boundary tests']),
-                ('plenora-cli-v2', ['CLI protocol tests, version and capabilities on the packaged binary']),
-                ('plenora-runtime-binding-v1', ['runtime_binding integration suite executed from extracted core archive',
-                                                'runtime_vectors: the twelve RUNTIME-VECTORS-1.0 storage fixtures pinned by SHA-256 at the adopted revision']),
-                ('plenora-python-sdk-v1', ['Installed SDK identity, typing, lifecycle, parity, discovery and redaction tests',
-                                         'crates/plenora-storage-py/python/tests/test_sdk.py',
-                                         'Common python-sdk-v1 binding map entrypoints resolved from the installed wheel']),
-            ]
-        ],
-        'deviations': [],
+        **strict_json.loads((ROOT / 'contracts/adoption-policy.json').read_text(encoding='utf-8')),
     }
     assert not adoption_errors(adoption), adoption_errors(adoption)
     adoption_path = output / 'adoption-manifest-v4.json'

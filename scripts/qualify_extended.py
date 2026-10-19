@@ -3,6 +3,7 @@ import concurrent.futures
 import argparse
 import hashlib
 import json
+import strict_json
 import os
 from pathlib import Path
 import subprocess
@@ -70,7 +71,7 @@ def main():
                 assert not result.stderr, (provider, operation, result.stderr)
                 assert len(result.stdout.splitlines()) == 1, result.stdout
                 assert not any(secret in result.stdout for secret in ['plenora-fixture-secret', AZURE_KEY, 'fixture-token']), 'credential leaked'
-                document = json.loads(result.stdout)
+                document = strict_json.loads(result.stdout)
                 if success:
                     assert result.returncode == 0 and document['status'] == 'ok', (provider, operation, document)
                     return document['result']
@@ -82,7 +83,7 @@ def main():
                 if provider == 'ftps':
                     invalid_tls = dict(config)
                     invalid_tls.pop('tls_ca_pem')
-                    document = json.loads(connection.read_text())
+                    document = strict_json.loads(connection.read_text())
                     document['config'] = invalid_tls
                     connection.write_text(json.dumps(document))
                     invoke('test', success=False)
@@ -124,7 +125,7 @@ def main():
                                    '--overwrite', 'false', '--publication-policy', policy]
                         process = subprocess.run(command, env=provider_env, capture_output=True, text=True, timeout=90)
                         assert not process.stderr, process.stderr
-                        return process.returncode, json.loads(process.stdout)
+                        return process.returncode, strict_json.loads(process.stdout)
                     with concurrent.futures.ThreadPoolExecutor(2) as pool:
                         outcomes = list(pool.map(race, [source, empty]))
                     assert sorted(code for code, _ in outcomes) == [0, 5], (provider, 'race', outcomes)

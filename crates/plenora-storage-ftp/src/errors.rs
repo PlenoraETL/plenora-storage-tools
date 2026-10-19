@@ -177,6 +177,9 @@ pub fn map_ftp_error(error: FtpError, phase: ErrorPhase, mutating: bool) -> Stor
                 "FTP server does not support the operation",
             )
         }
+        // STOR-LIMIT-002 / ERR-016: generic failures may hide lost confirmation.
+        // All surfaces inherit execution/unknown; hazard: cause-based routing.
+        // Re-entry: classify transport causes; see docs/contract-limits.md.
         _ if mutating => (
             ErrorCategory::Execution,
             RemoteEffect::Unknown,
@@ -266,7 +269,7 @@ pub fn list_name_error() -> StorageError {
 /// The destination is published, but its metadata could not be read back.
 /// Publication is proved and nothing remains to reconcile, while repeating
 /// the request would publish again: `committed`, never retried (case 9e of the
-/// common runtime matrix, pending ratification in `plenora-contracts`).
+/// common runtime matrix, ERR-015 in the adopted `plenora-contracts`).
 pub fn committed_verification_error() -> StorageError {
     StorageError::new(
         ErrorCategory::Execution,

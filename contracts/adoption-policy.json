@@ -1,0 +1,108 @@
+{
+  "contracts": [
+    {
+      "id": "plenora-public-surfaces-v1",
+      "status": "conforming",
+      "verification": [
+        "core contract and runtime binding tests"
+      ]
+    },
+    {
+      "id": "plenora-public-catalog-v2",
+      "status": "conforming",
+      "verification": [
+        "scripts/check_contract_adoption.py; storage-tools-v1 catalog retained; CAT-001..003"
+      ]
+    },
+    {
+      "id": "plenora-surface-bindings-v1",
+      "status": "conforming",
+      "verification": [
+        "Rust mapping, CLI protocol, installed SDK, runtime vectors; SB-001"
+      ]
+    },
+    {
+      "id": "plenora-capabilities-v2",
+      "status": "conforming",
+      "verification": [
+        "core discovery and CLI protocol schema tests"
+      ]
+    },
+    {
+      "id": "plenora-error-v1",
+      "status": "conforming",
+      "verification": [
+        "runtime error axes, provider error tests; ERR-015 and ERR-016"
+      ]
+    },
+    {
+      "id": "plenora-public-security-v1",
+      "status": "conforming",
+      "verification": [
+        "provider preflight, credentials, network and artifact tests"
+      ]
+    },
+    {
+      "id": "plenora-cli-v2",
+      "status": "conforming",
+      "verification": [
+        "CLI protocol tests and packaged discovery"
+      ]
+    },
+    {
+      "id": "plenora-runtime-binding-v2",
+      "status": "conforming",
+      "verification": [
+        "core runtime_binding, runtime_vectors and result limit tests; RT-024 subject to STOR-LIMIT-001"
+      ]
+    },
+    {
+      "id": "plenora-python-sdk-v1",
+      "status": "conforming",
+      "verification": [
+        "installed wheel SDK tests and common binding map"
+      ]
+    },
+    {
+      "id": "plenora-interop-vectors-v1",
+      "status": "not_applicable"
+    }
+  ],
+  "deviations": [
+    {
+      "rule": "RT-024",
+      "surface": "runtime",
+      "observed_behavior": "STOR-LIMIT-001: optional bound counts serialized success payload after materialization. Allocation failure before this check is not a typed error. No default bound; host must configure its payload budget and reserve envelope/error space.",
+      "tracking": "docs/contract-limits.md#stor-limit-001",
+      "detectable_before_invocation": true
+    },
+    {
+      "rule": "ERR-016",
+      "surface": "rust",
+      "observed_behavior": "STOR-LIMIT-002: generic S3, SFTP and FTP/FTPS mutation failures can still map a lost confirmation to execution instead of io. Effect stays unknown and retry requires_recovery. The same provider mapping reaches CLI, Python and runtime.",
+      "tracking": "docs/contract-limits.md#stor-limit-002",
+      "detectable_before_invocation": false
+    },
+    {
+      "rule": "ERR-016",
+      "surface": "cli",
+      "observed_behavior": "STOR-LIMIT-002: generic S3, SFTP and FTP/FTPS mutation failures can still map a lost confirmation to execution instead of io. Effect stays unknown and retry requires_recovery. The same provider mapping reaches CLI, Python and runtime.",
+      "tracking": "docs/contract-limits.md#stor-limit-002",
+      "detectable_before_invocation": false
+    },
+    {
+      "rule": "ERR-016",
+      "surface": "python_sdk",
+      "observed_behavior": "STOR-LIMIT-002: generic S3, SFTP and FTP/FTPS mutation failures can still map a lost confirmation to execution instead of io. Effect stays unknown and retry requires_recovery. The same provider mapping reaches CLI, Python and runtime.",
+      "tracking": "docs/contract-limits.md#stor-limit-002",
+      "detectable_before_invocation": false
+    },
+    {
+      "rule": "ERR-016",
+      "surface": "runtime",
+      "observed_behavior": "STOR-LIMIT-002: generic S3, SFTP and FTP/FTPS mutation failures can still map a lost confirmation to execution instead of io. Effect stays unknown and retry requires_recovery. The same provider mapping reaches CLI, Python and runtime.",
+      "tracking": "docs/contract-limits.md#stor-limit-002",
+      "detectable_before_invocation": false
+    }
+  ]
+}

@@ -1,15 +1,16 @@
 """Render the reviewed, compiler/runtime-derived API inventory index."""
 import argparse
 import json
+import strict_json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def render():
-    metadata = json.loads((ROOT / 'api/metadata.json').read_text())
-    sdk = json.loads((ROOT / 'api/python.json').read_text())
-    cli = json.loads((ROOT / 'api/cli.json').read_text())
+    metadata = strict_json.loads((ROOT / 'api/metadata.json').read_text())
+    sdk = strict_json.loads((ROOT / 'api/python.json').read_text())
+    cli = strict_json.loads((ROOT / 'api/cli.json').read_text())
     lines = ['# Inventario delle API pubbliche', '',
              '<!-- Generato da scripts/render_api_inventory.py. Non modificare a mano. -->', '',
              'Baseline di sviluppo della serie 1.0: [regole e riproduzione](../api/README.md).',

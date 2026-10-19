@@ -253,6 +253,11 @@ async fn load_connection(path: &Path) -> StorageResult<ProviderConnection> {
             "connection file exceeds the 1 MiB limit",
         ));
     }
+    if let Err(error) = plenora_storage_core::validate_json(&data)
+        && error.code == "JSON_DUPLICATE_MEMBER"
+    {
+        return Err(error);
+    }
     serde_json::from_slice(&data).map_err(|_| {
         StorageError::invalid_configuration(
             "CONNECTION_DOCUMENT_INVALID",
@@ -260,3 +265,7 @@ async fn load_connection(path: &Path) -> StorageResult<ProviderConnection> {
         )
     })
 }
+
+#[cfg(test)]
+#[path = "commands_json_tests.rs"]
+mod json_tests;

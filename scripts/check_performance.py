@@ -3,6 +3,7 @@ import argparse
 from collections import defaultdict
 import hashlib
 import json
+import strict_json
 import math
 from pathlib import Path
 import sys
@@ -121,8 +122,8 @@ def main():
     args.output.write_text('{"status": "RUNNING"}\n')
     report = {'status': 'FAIL'}
     try:
-        baseline, candidate = (json.loads(path.read_bytes()) for path in (args.baseline, args.candidate))
-        policy = json.loads((ROOT / 'scripts/performance-policy.json').read_text())
+        baseline, candidate = (strict_json.loads(path.read_bytes()) for path in (args.baseline, args.candidate))
+        policy = strict_json.loads((ROOT / 'scripts/performance-policy.json').read_text())
         report = compare(baseline, candidate, candidate['binary_sha256'], policy)
         report['baseline_sha256'] = hashlib.sha256(args.baseline.read_bytes()).hexdigest()
         report['candidate_sha256'] = hashlib.sha256(args.candidate.read_bytes()).hexdigest()

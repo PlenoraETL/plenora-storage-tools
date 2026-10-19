@@ -8,6 +8,7 @@ import datetime
 import hashlib
 import http.server
 import json
+import strict_json
 import os
 import pathlib
 import socketserver
@@ -64,18 +65,18 @@ with http.server.ThreadingHTTPServer(('127.0.0.1', 0), S3) as server:
     config = connection('s3', {'endpoint': f'http://127.0.0.1:{server.server_port}', 'bucket': 'audit'})
     args = BASE + ['--allow-insecure-http', 'list', '--connection', config, '--max-items', '1']
     first = subprocess.run(args, env=ENV, capture_output=True, text=True, timeout=10)
-    first_json = json.loads(first.stdout)
+    first_json = strict_json.loads(first.stdout)
     assert first.returncode == 2 and first_json['error']['code'] == 'CLI_LIST_PAGINATION_REQUIRED', first_json
     complete = subprocess.run(args + ['--all'], env=ENV, capture_output=True, text=True, timeout=10)
-    value = json.loads(complete.stdout)
+    value = strict_json.loads(complete.stdout)
     assert complete.returncode == 0, value
     assert [item['key'] for item in value['result']['objects']] == ['a', 'b', 'c'], value
     assert value['result']['next_cursor'] is None and value['result']['truncated'] is False
     bounded = subprocess.run(args + ['--all', '--max-list-items', '2'], env=ENV, capture_output=True, text=True, timeout=10)
-    bound = json.loads(bounded.stdout)
+    bound = strict_json.loads(bounded.stdout)
     assert bounded.returncode == 4 and bound['error']['code'] == 'CLI_LIST_LIMIT_EXCEEDED', bound
     cursor = subprocess.run(args + ['--cursor', 'cursor://expired'], env=ENV, capture_output=True, text=True, timeout=10)
-    assert json.loads(cursor.stdout)['error']['code'] == 'CLI_CURSOR_SESSION_REQUIRED'
+    assert strict_json.loads(cursor.stdout)['error']['code'] == 'CLI_CURSOR_SESSION_REQUIRED'
     results['cli_pagination'] = {'status': 'PASS', 'pages': 3, 'bounded': True}
 
     destination = WORK / 'existing-output.txt'
@@ -83,7 +84,7 @@ with http.server.ThreadingHTTPServer(('127.0.0.1', 0), S3) as server:
                        '--key', 'object', '--output', str(destination)]
     destination.write_bytes(b'original')
     conflict = subprocess.run(get_args + ['--overwrite', 'false'], env=ENV, capture_output=True, text=True, timeout=10)
-    assert conflict.returncode == 5 and json.loads(conflict.stdout)['error']['code'] == 'OUTPUT_EXISTS', conflict.stdout
+    assert conflict.returncode == 5 and strict_json.loads(conflict.stdout)['error']['code'] == 'OUTPUT_EXISTS', conflict.stdout
     assert destination.read_bytes() == b'original'
     limited = subprocess.run(get_args + ['--overwrite', 'true', '--max-transfer-bytes', '1'], env=ENV, capture_output=True, text=True, timeout=10)
     assert limited.returncode == 4, limited.stdout
@@ -99,7 +100,7 @@ with http.server.ThreadingHTTPServer(('127.0.0.1', 0), S3) as server:
 large = WORK / 'oversized-connection.json'
 large.write_bytes(b' ' * 1_048_577)
 rejected = subprocess.run(BASE + ['test', '--connection', str(large)], env=ENV, capture_output=True, text=True, timeout=10)
-assert rejected.returncode == 4 and json.loads(rejected.stdout)['error']['code'] == 'CONNECTION_FILE_TOO_LARGE'
+assert rejected.returncode == 4 and strict_json.loads(rejected.stdout)['error']['code'] == 'CONNECTION_FILE_TOO_LARGE'
 results['connection_file_bound'] = {'status': 'PASS'}
 
 seen = threading.Event()
@@ -132,7 +133,7 @@ with socketserver.ThreadingTCPServer(('127.0.0.1', 0), FTP) as server:
         assert seen.wait(3), 'FTP parent probe was not reached'
         try:
             stdout, stderr = process.communicate(timeout=4)
-            value = json.loads(stdout)
+            value = strict_json.loads(stdout)
             assert process.returncode == 5 and value['error']['category'] == 'timeout', value
             assert value['error']['remote_effect'] == 'none', value
             results['ftp_parent_deadline'] = {'status': 'PASS', 'elapsed': round(time.monotonic() - started, 2)}

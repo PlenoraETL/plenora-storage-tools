@@ -8,6 +8,7 @@ import argparse
 from contextlib import contextmanager
 import getpass
 import json
+import strict_json
 import os
 from pathlib import Path, PurePosixPath
 import re
@@ -158,7 +159,7 @@ class Remote:
 
 
 def configuration(path):
-    config = json.loads(path.read_text())
+    config = strict_json.loads(path.read_text())
     allowed = {'repository', 'host', 'port', 'user', 'known_hosts', 'ssh_key', 'vm_root',
                'runner_image', 'registry_volume', 'candidate_run', 'ci_run', 'baseline_binary'}
     if set(config) - allowed:
@@ -339,7 +340,7 @@ def reset_fixtures(remote, remote_root, project, host, folder, session, **timing
     started = time.time()
     nonce = run_preparation(remote, remote_root, project, host, 'fixture-reset', folder, reset=True,
                             session=session, **timing)
-    check = json.loads((folder / 'fixture-check.json').read_text())
+    check = strict_json.loads((folder / 'fixture-check.json').read_text())
     if check.get('status') != 'PASS':
         raise ValueError('recreated fixtures do not all serve requests')
     write_json(folder / 'fixture-reset.json', {'recreated': True, 'nonce': nonce, 'epoch': session.epoch,
@@ -437,7 +438,7 @@ def extract_runner_output(archive, folder):
 def check_distribution(folder, reference):
     """Every artifact of `folder` has the digest in the manifest of `reference`,
     the distribution verified when it was assembled."""
-    manifest = json.loads((reference / 'release-manifest.json').read_text())
+    manifest = strict_json.loads((reference / 'release-manifest.json').read_text())
     if any(digest(folder / row['name']) != row['sha256'] for row in manifest['artifacts']):
         raise ValueError('a distribution differs from its verified manifest; nothing is sealed')
 
@@ -461,18 +462,18 @@ def check_selected(result, identity, linux, expected, ledger, epoch, nonce):
         raise ValueError('the VM evidence contains a link; nothing is sealed')
     found = {path.relative_to(selected).as_posix(): digest(path) for path in sorted(selected.rglob('*'))
              if path.is_file() and path != report_path}
-    recorded = json.loads(Path(ledger).read_text()).get('selected', {})
-    report = json.loads(report_path.read_text())
+    recorded = strict_json.loads(Path(ledger).read_text()).get('selected', {})
+    report = strict_json.loads(report_path.read_text())
     if (report.get('files') != found or recorded.get('report_sha256') != digest(report_path)
             or recorded.get('epoch') != epoch or report.get('epoch') != epoch
             or report.get('fixture_nonce') != nonce):
         raise ValueError('the VM evidence is not the inventoried evidence of this attempt; nothing is sealed')
     subject = report.get('identity', {})
-    manifest = json.loads((linux / 'release-manifest.json').read_text())
+    manifest = strict_json.loads((linux / 'release-manifest.json').read_text())
     artifacts = {row['name']: digest(linux / row['name']) for row in manifest['artifacts']}
     performance = result / 'selected/gates/performance'
-    baseline = json.loads((performance / 'baseline.json').read_text())
-    candidate = json.loads((performance / 'candidate.json').read_text())
+    baseline = strict_json.loads((performance / 'baseline.json').read_text())
+    candidate = strict_json.loads((performance / 'candidate.json').read_text())
     if (report.get('status') != 'PASS' or subject.get('source_revision') != identity['revision']
             or subject.get('baseline_binary_sha256') != identity['baseline_sha256']
             or subject.get('artifacts') != artifacts or report.get('inputs') != expected
@@ -507,7 +508,7 @@ def run(config_path, output, retries, reason, connect_host=None):
             return campaign.phase(name, action, retry=name in retries, reason=reason)
 
         def gh(*arguments):
-            return json.loads(subprocess.check_output(['gh', *arguments, '--repo', config['repository']], cwd=ROOT, text=True))
+            return strict_json.loads(subprocess.check_output(['gh', *arguments, '--repo', config['repository']], cwd=ROOT, text=True))
 
         def workflows(path):
             for key in ('candidate_run', 'ci_run'):
@@ -542,7 +543,7 @@ def run(config_path, output, retries, reason, connect_host=None):
             for system, target in TARGETS.items():
                 source = artifacts / ('storage-candidate-' + system)
                 folder = one(source, 'release-manifest.json').parent
-                manifest = json.loads((folder / 'release-manifest.json').read_text())
+                manifest = strict_json.loads((folder / 'release-manifest.json').read_text())
                 if manifest['source_revision'] != revision or manifest['version'] != version:
                     raise ValueError('artifact source or version differs')
                 shutil.copytree(folder, path / 'dist' / version / target)
@@ -710,7 +711,7 @@ def run(config_path, output, retries, reason, connect_host=None):
                 write_json(path / 'container.json', {'name': container})
                 deadline = time.monotonic() + 6 * 3600
                 while time.monotonic() < deadline:
-                    status = json.loads(remote.run('docker inspect --format ' + q('{{json .State}}') + ' ' + q(container)))
+                    status = strict_json.loads(remote.run('docker inspect --format ' + q('{{json .State}}') + ' ' + q(container)))
                     if not status['Running']:
                         break
                     time.sleep(30)

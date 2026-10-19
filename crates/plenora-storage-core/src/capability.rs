@@ -14,7 +14,7 @@ pub const CAPABILITY_ATTRIBUTES_CONTRACT: &str = "plenora-storage-capability-att
 
 const RUST_INTERFACE_CONTRACT: &str = "plenora-rust-public-v1";
 const CLI_INTERFACE_CONTRACT: &str = "plenora-cli-v2";
-const RUNTIME_INTERFACE_CONTRACT: &str = "plenora-runtime-binding-v1";
+const RUNTIME_INTERFACE_CONTRACT: &str = "plenora-runtime-binding-v2";
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 /// Discovery document for the operations and interfaces compiled into this build.
@@ -191,7 +191,7 @@ fn interface(surface: Surface) -> CapabilityInterface {
         Surface::Rust => (RUST_INTERFACE_CONTRACT, 1, "plenora-storage-core"),
         Surface::Cli => (CLI_INTERFACE_CONTRACT, 2, "plenora-storage"),
         Surface::PythonSdk => ("plenora-python-sdk-v1", 1, "plenora-storage"),
-        Surface::Runtime => (RUNTIME_INTERFACE_CONTRACT, 1, CAPABILITY_NAME),
+        Surface::Runtime => (RUNTIME_INTERFACE_CONTRACT, 2, CAPABILITY_NAME),
     };
     CapabilityInterface {
         kind: surface,

@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import strict_json
 from pathlib import Path
 import platform
 import re
@@ -77,9 +78,9 @@ def qualify(wheel, output, measure, typing=False):
               'tests_log_sha256': hashlib.sha256(log.read_bytes()).hexdigest()}
     if measure:
         path = output / 'coverage.json'
-        document = json.loads(path.read_text())
+        document = strict_json.loads(path.read_text())
         files = measured_coverage(document, wheel)
-        policy = json.loads((ROOT / 'scripts/coverage-policy.json').read_text())['python']
+        policy = strict_json.loads((ROOT / 'scripts/coverage-policy.json').read_text())['python']
         report['coverage'] = {'tool_version': document['meta']['version'], 'branch': True,
                               'files': files, 'policy': policy, 'report_sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
         enforce_coverage(files, policy)

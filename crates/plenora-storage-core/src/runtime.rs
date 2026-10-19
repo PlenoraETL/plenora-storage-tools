@@ -1,4 +1,4 @@
-//! Transport-neutral Runtime Binding 1.0 boundary. A final application can
+//! Transport-neutral Runtime Binding 2.0 boundary. A final application can
 //! wrap this type in its runtime `CapabilityHandler`; this module deliberately
 //! does not depend on `runtime-tools`.
 
@@ -20,7 +20,7 @@ use crate::{
     model::present_value, validate_operation_schema_version,
 };
 
-/// Supported transport-neutral runtime binding version.
+/// Wire version (RT-025); discovery announces contract version 2.
 pub const RUNTIME_BINDING_VERSION: u32 = 1;
 /// Media type for JSON operation envelopes.
 pub const JSON_CONTENT_TYPE: &str = "application/json";
@@ -167,6 +167,7 @@ pub struct RuntimeInvocation {
     /// Operation metadata validated against the corresponding public contract.
     pub metadata: RuntimeRequestMetadata,
     /// Operation JSON envelope; file contents are carried only by artifact streams.
+    #[serde(deserialize_with = "crate::unique_json::deserialize")]
     pub payload: Value,
 }
 
@@ -237,6 +238,7 @@ pub struct RuntimeResultEnvelope {
     /// Operation metadata validated against the corresponding public contract.
     pub metadata: RuntimeResultMetadata,
     /// Operation JSON envelope; file contents are carried only by artifact streams.
+    #[serde(deserialize_with = "crate::unique_json::deserialize")]
     pub payload: Value,
 }
 
@@ -248,7 +250,7 @@ pub struct RuntimeResultEnvelope {
 /// message identity (RT-012). Operation, operation version and correlation are
 /// copied byte for byte from the request only when canonical, and omitted
 /// otherwise: a rejection never reflects, normalizes or invents a routing
-/// value (rule R2 of the common runtime matrix, pending ratification in
+/// value (rule R2 of the common runtime matrix, ratified in
 /// `plenora-contracts`). A success always carries all three.
 pub struct RuntimeResultMetadata {
     #[serde(rename = "plenora.message.id")]
@@ -328,6 +330,7 @@ pub struct RuntimeBinding<'a> {
     engine: &'a Engine,
     artifacts: &'a dyn ArtifactResolver,
     secrets: &'a dyn SecretResolver,
+    result_payload_limit: Option<usize>,
 }
 
 impl<'a> RuntimeBinding<'a> {
@@ -342,7 +345,17 @@ impl<'a> RuntimeBinding<'a> {
             engine,
             artifacts,
             secrets,
+            result_payload_limit: None,
         }
+    }
+
+    /// Limit the serialized success payload in bytes, excluding envelope metadata.
+    /// An oversized result fails without truncation, after preserving any effects.
+    /// The host must reserve separate capacity for the terminal error envelope.
+    #[must_use]
+    pub const fn with_result_payload_limit(mut self, bytes: usize) -> Self {
+        self.result_payload_limit = Some(bytes);
+        self
     }
 
     /// Validate and dispatch a serialized invocation exactly as a transport
@@ -581,6 +594,9 @@ impl<'a> RuntimeBinding<'a> {
             }
             _ => return Err(route_error("runtime storage operation is unsupported")),
         };
+        if let Some(limit) = self.result_payload_limit {
+            result_limit::check(&result, descriptor, limit)?;
+        }
         Ok((descriptor, result))
     }
 
@@ -749,3 +765,6 @@ fn error_envelope(metadata: RuntimeResultMetadata, error: &StorageError) -> Runt
 #[cfg(test)]
 #[path = "runtime_tests.rs"]
 mod tests;
+
+#[path = "runtime_result_limit.rs"]
+mod result_limit;

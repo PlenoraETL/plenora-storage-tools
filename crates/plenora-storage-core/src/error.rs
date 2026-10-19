@@ -127,6 +127,7 @@ pub struct StorageError {
     pub execution_id: Option<ExecutionId>,
     #[serde(default)]
     /// Redacted structured diagnostics; callers constructing errors must sanitize values.
+    #[serde(deserialize_with = "crate::unique_json::deserialize")]
     pub details: BTreeMap<String, Value>,
 }
 

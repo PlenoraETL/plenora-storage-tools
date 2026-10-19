@@ -1,5 +1,6 @@
 """Validate separate private-file CLI and installed-SDK qualification evidence."""
 import json
+import strict_json
 
 from qualify_extended_faults import EXPECTED_TESTS
 
@@ -24,7 +25,7 @@ def validate_reports(folder, version, binary_sha256, wheel, wheel_sha256):
     paths = [folder / name for name in (
         'spooled-qualification.json', 'spooled-regressions.json',
         'spooled-python-qualification.json')]
-    cli, faults, sdk = [json.loads(path.read_text(encoding='utf-8')) for path in paths]
+    cli, faults, sdk = [strict_json.loads(path.read_text(encoding='utf-8')) for path in paths]
     for report in (cli, faults):
         if report.get('binary_sha256') != binary_sha256:
             raise ValueError('private-file evidence refers to another CLI')

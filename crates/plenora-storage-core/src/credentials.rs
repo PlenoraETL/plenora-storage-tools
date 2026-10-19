@@ -77,6 +77,11 @@ impl CredentialResolver for EnvironmentCredentialResolver {
                 "credential reference could not be resolved",
             )
         })?;
+        if let Err(error) = crate::validate_json(encoded.as_bytes())
+            && error.code == "JSON_DUPLICATE_MEMBER"
+        {
+            return Err(error);
+        }
         let fields = serde_json::from_str::<BTreeMap<String, String>>(&encoded).map_err(|_| {
             StorageError::invalid_configuration(
                 "CREDENTIAL_INVALID",

@@ -252,6 +252,11 @@ fn decode<T: DeserializeOwned>(input: &str) -> StorageResult<T> {
             "SDK document exceeds the 1 MiB limit",
         ));
     }
+    if let Err(error) = plenora_storage_core::validate_json(input.as_bytes())
+        && error.code == "JSON_DUPLICATE_MEMBER"
+    {
+        return Err(error);
+    }
     serde_json::from_str(input)
         .map_err(|_| invalid("SDK_INPUT_INVALID", "SDK document has an invalid shape"))
 }
@@ -276,3 +281,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "json_tests.rs"]
+mod json_tests;

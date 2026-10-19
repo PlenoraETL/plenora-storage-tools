@@ -8,6 +8,7 @@ import hashlib
 import http.client
 import http.server
 import json
+import strict_json
 import os
 from pathlib import Path
 import signal
@@ -77,7 +78,7 @@ def qualify(mode, interruption, work):
     payload = bytes(range(256)) * 32768 + b'commit-fault'
     source = work / 'payload.bin'
     source.write_bytes(payload)
-    config = json.loads((ROOT / 'docker/minio-connection.json').read_text())
+    config = strict_json.loads((ROOT / 'docker/minio-connection.json').read_text())
     config['config']['endpoint'] = os.environ['PLENORA_MINIO_ENDPOINT']
     direct = work / 'direct.json'
     direct.write_text(json.dumps(config))
@@ -110,7 +111,7 @@ def qualify(mode, interruption, work):
                 process.send_signal(signal.SIGTERM)
             stdout, stderr = process.communicate(timeout=12)
             assert not stderr and len(stdout.splitlines()) == 1, (stdout, stderr)
-            envelope = json.loads(stdout)
+            envelope = strict_json.loads(stdout)
             error = envelope['error']
             assert process.returncode == (5 if interruption == 'deadline' else 130), envelope
             assert error['category'] == ('timeout' if interruption == 'deadline' else 'cancelled'), error
