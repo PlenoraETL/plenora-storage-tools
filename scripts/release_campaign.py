@@ -121,10 +121,9 @@ class Remote:
         they are; nothing is written on the VM.
 
         `path` appears only when the command succeeded and its whole output
-        arrived. A command that failed, or an output cut short (the channel
-        then ends without an exit status, reported as -1), raises
-        RemoteFailure; a transfer that broke raises RuntimeError. Neither
-        leaves a file.
+        arrived. A command that failed raises RemoteFailure; an output cut
+        short (including a channel ending without exit status, reported as
+        -1) raises RuntimeError. Neither leaves a file.
         """
         partial = path.with_name(path.name + '.partial')
 
@@ -149,6 +148,8 @@ class Remote:
                 partial.replace(path)
         except Exception as error:  # every failure of the transfer is the same failure
             raise RuntimeError('dedicated VM transfer interrupted (' + type(error).__name__ + ')' + discard()) from None
+        if code == -1:
+            raise RuntimeError('dedicated VM transfer incomplete (no exit status)' + discard())
         if code:
             raise RemoteFailure('dedicated VM command failed' + discard(), errors)
 

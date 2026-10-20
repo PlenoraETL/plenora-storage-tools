@@ -633,9 +633,15 @@ class InputTests(unittest.TestCase):
                                                 {'gates/x.json': (folder, folder / 'unrecorded.json')})
 
 
-@unittest.skipUnless(LINUX, 'runs bash')
 class PrivateRootTests(unittest.TestCase):
     """The VM root is used only when no other user can write it, or anything above it."""
+
+    @classmethod
+    def setUpClass(cls):
+        if not LINUX:
+            if REQUIRE_REAL_ACL:
+                raise AssertionError('bash and flock are required for the real ACL gate')
+            raise unittest.SkipTest('runs bash and flock')
 
     def setUp(self):
         # The walk stops at a directory the test controls: the directories
@@ -841,7 +847,105 @@ class OwnedStateTests(unittest.TestCase):
                     self.assertEqual(owned(folder / 'state', path).returncode, 1)
 
 
+@unittest.skipUnless(LINUX, 'runs bash and POSIX filesystem checks')
+class UnsharedTreeTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.folder = Path(self.temporary.name)
+        self.root = self.folder / 'tree'
+        self.root.mkdir(mode=0o700)
+
+    def check(self, prune=None, env=None):
+        return subprocess.run(campaign_fence.tree_unshared_command(str(self.root), prune),
+                              shell=True, capture_output=True, text=True, env=env)
+
+    def test_links_are_checked_with_their_targets_and_descendants(self):
+        target = self.folder / 'target'
+        target.mkdir(mode=0o700)
+        file = target / 'file\n'
+        file.write_text('synthetic')
+        file.chmod(0o600)
+        (self.root / 'link').symlink_to(target)
+        self.assertEqual(self.check().stdout.strip(), 'unshared')
+        file.chmod(0o620)
+        refused = self.check()
+        self.assertEqual(refused.returncode, 1)
+        self.assertEqual(refused.stderr.splitlines(), ['campaign-refusal: writable-by-others'])
+        file.chmod(0o600)
+        self.assertEqual(self.check().returncode, 0)
+        (target / 'loop').symlink_to(target)
+        self.assertNotEqual(self.check().returncode, 0)
+        (target / 'loop').unlink()
+        (target / 'missing').symlink_to(target / 'absent')
+        self.assertNotEqual(self.check().returncode, 0)
+
+    def test_special_files_are_refused_even_when_not_writable_by_others(self):
+        fifo = self.root / 'fifo'
+        os.mkfifo(fifo, 0o600)
+        self.assertEqual(self.check().stderr.splitlines(), ['campaign-refusal: not-a-file'])
+        fifo.unlink()
+        fifo.write_text('regular')
+        fifo.chmod(0o600)
+        self.assertEqual(self.check().stdout.strip(), 'unshared')
+
+    def test_foreign_owners_are_refused(self):
+        target = self.root / 'file'
+        target.write_text('synthetic')
+        target.chmod(0o600)
+        self.assertEqual(self.check().returncode, 0)
+        if os.geteuid() == 0:
+            os.chown(target, 65534, -1)
+        else:
+            target.unlink()
+            target.symlink_to('/usr')
+        result = self.check()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('campaign-refusal: foreign-owner', result.stderr.splitlines())
+
+    def test_acl_on_a_link_target_is_refused(self):
+        if not shutil.which('setfacl'):
+            if REQUIRE_REAL_ACL:
+                self.fail('setfacl is required')
+            self.skipTest('setfacl is missing')
+        target = self.folder / 'target'
+        target.write_text('synthetic')
+        target.chmod(0o600)
+        (self.root / 'link').symlink_to(target)
+        self.assertEqual(self.check().returncode, 0)
+        subprocess.run(['setfacl', '-m', 'u:65534:r', str(target)], check=True)
+        self.assertEqual(self.check().stderr.splitlines(), ['campaign-refusal: acl'])
+        subprocess.run(['setfacl', '-b', str(target)], check=True)
+        self.assertEqual(self.check().returncode, 0)
+
+    def test_a_link_to_another_filesystem_is_refused_and_pruning_is_explicit(self):
+        if Path('/proc').stat().st_dev == self.root.stat().st_dev:
+            self.fail('the cross-filesystem test requires procfs')
+        link = self.root / 'mount'
+        link.symlink_to('/proc')
+        self.assertEqual(self.check().stderr.splitlines(), ['campaign-refusal: cannot-inspect'])
+        self.assertEqual(self.check(str(link)).stdout.strip(), 'unshared')
+
+    def test_failed_discovery_cannot_print_success(self):
+        tools = self.folder / 'bin'
+        tools.mkdir()
+        (tools / 'find').write_text('#!/bin/sh\nprintf "incomplete\\0"\nexit 1\n')
+        (tools / 'find').chmod(0o700)
+        result = self.check(env=dict(os.environ, PATH=f'{tools}:{os.environ["PATH"]}'))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn('unshared', result.stdout)
+
+
 class RealAclToolTests(unittest.TestCase):
+    def test_missing_flock_is_a_failure_when_real_acl_is_required(self):
+        for required in (False, True):
+            with self.subTest(required=required), patch.dict(
+                    globals(), LINUX=False, REQUIRE_REAL_ACL=required):
+                result = unittest.TestResult()
+                unittest.TestSuite([PrivateRootTests('test_every_campaign_checks_up_to_the_filesystem_root')]).run(result)
+                self.assertEqual(len(result.errors), int(required))
+                self.assertEqual(len(result.skipped), int(not required))
+
     @unittest.skipUnless(REQUIRE_REAL_ACL, 'only where PLENORA_REQUIRE_REAL_ACL is set (the CI Linux job)')
     def test_the_checks_use_getfacl_from_the_system_acl_package(self):
         self.assertIsNotNone(REAL_GETFACL)
@@ -962,8 +1066,10 @@ class LocalSftp:
     """An SFTP server on the local filesystem that, like a real one, creates
     files with the default mode filtered by the process umask."""
 
-    def __init__(self, chmod=True):
+    def __init__(self, chmod=True, late_chmod=False):
         self.honours_chmod = chmod
+        self.late_chmod = late_chmod
+        self.first_write_modes = []
 
     def __enter__(self):
         return self
@@ -974,8 +1080,13 @@ class LocalSftp:
     def open(self, path, mode):
         stream = open(path, mode)
         honours = self.honours_chmod
+        late = self.late_chmod
+        modes = self.first_write_modes
 
         class File:
+            written = False
+            pending_mode = None
+
             def __enter__(self):
                 return self
 
@@ -983,11 +1094,19 @@ class LocalSftp:
                 stream.close()
 
             def chmod(self, value):
-                if honours:
+                if late:
+                    self.pending_mode = value
+                elif honours:
                     os.chmod(path, value)
 
             def write(self, data):
-                return stream.write(data)
+                if not self.written:
+                    modes.append(os.fstat(stream.fileno()).st_mode & 0o777)
+                    self.written = True
+                result = stream.write(data)
+                if self.pending_mode is not None:
+                    os.chmod(path, self.pending_mode)
+                return result
         return File()
 
     def stat(self, path):
@@ -1013,9 +1132,11 @@ class PrivateCreationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary, GroupUmask():
             folder = Path(temporary)
             (folder / 'local.bin').write_bytes(b'binary' * 1000)
-            remote = self.remote(LocalSftp())
+            sftp = LocalSftp()
+            remote = self.remote(sftp)
             remote.upload(folder / 'local.bin', str(folder / 'uploaded.bin'))
             remote.write(str(folder / 'script.sh'), 'echo prepared\n')
+            self.assertEqual(sftp.first_write_modes, [0o600, 0o600])
             for name in ('uploaded.bin', 'script.sh'):
                 self.assertEqual((folder / name).stat().st_mode & 0o777, 0o600)
             self.assertEqual((folder / 'uploaded.bin').read_bytes(), b'binary' * 1000)
@@ -1031,6 +1152,19 @@ class PrivateCreationTests(unittest.TestCase):
                 remote.upload(folder / 'local.bin', str(folder / 'uploaded.bin'))
             with self.assertRaises(RuntimeError):
                 remote.write(str(folder / 'script.sh'), 'echo prepared\n')
+
+    def test_final_modes_do_not_hide_a_chmod_after_the_first_bytes(self):
+        with tempfile.TemporaryDirectory() as temporary, GroupUmask():
+            folder = Path(temporary)
+            source = folder / 'source'
+            source.write_bytes(b'synthetic')
+            sftp = LocalSftp(late_chmod=True)
+            remote = self.remote(sftp)
+            remote.upload(source, str(folder / 'uploaded'))
+            remote.write(str(folder / 'written'), 'synthetic')
+            self.assertEqual(sftp.first_write_modes, [0o664, 0o664])
+            for name in ('uploaded', 'written'):
+                self.assertEqual((folder / name).stat().st_mode & 0o777, 0o600)
 
     @unittest.skipUnless(LINUX and shutil.which('git'), 'runs bash and git')
     def test_the_checkout_is_not_writable_by_the_group_under_a_group_umask(self):
@@ -1082,11 +1216,25 @@ class PrivateCreationTests(unittest.TestCase):
             with tarfile.open(inputs / 'linux-input.tar.gz', 'w:gz') as stream:
                 stream.add(folder / 'staged' / 'dist', arcname='dist')
             (inputs / 'linux-input.tar.gz').chmod(0o600)
-            subprocess.run(release_campaign.extract_inputs_command(str(inputs), distribution), shell=True, check=True)
+            # GNU tar preserves modes by default as root. Reproduce that
+            # default even on the unprivileged CI worker, keeping umask 077
+            # identical in both runs: only --no-same-permissions differs.
+            environment = dict(os.environ, TAR_OPTIONS='--same-permissions')
+            subprocess.run(release_campaign.extract_inputs_command(str(inputs), distribution), shell=True,
+                           check=True, env=environment)
             result = subprocess.run(campaign_fence.tree_unshared_command(str(inputs)), shell=True,
                                     capture_output=True, text=True)
             self.assertEqual((result.returncode, result.stdout.strip()), (0, 'unshared'))
             self.assertEqual((inputs / distribution / 'plenora-storage').stat().st_mode & 0o777, 0o700)
+            shutil.rmtree(inputs / 'dist')
+            unsafe = release_campaign.extract_inputs_command(str(inputs), distribution).replace(
+                '--no-same-permissions', '')
+            subprocess.run(unsafe, shell=True, check=True, env=environment)
+            refused = subprocess.run(campaign_fence.tree_unshared_command(str(inputs)), shell=True,
+                                     capture_output=True, text=True)
+            self.assertEqual(refused.returncode, 1)
+            self.assertEqual(refused.stderr.splitlines(), ['campaign-refusal: writable-by-others'])
+
 
 
 class StreamTests(unittest.TestCase):
@@ -1144,6 +1292,30 @@ class StreamTests(unittest.TestCase):
             self.assertNotIn('example.invalid', str(failure.exception))
             self.assertIsNone(failure.exception.__cause__)
             self.assertTrue(failure.exception.__suppress_context__)
+
+    def test_no_exit_status_is_an_incomplete_export_not_a_failed_copy(self):
+        for code in (-1, 1):
+            for removal_fails in (False, True):
+                with self.subTest(code=code, removal_fails=removal_fails), tempfile.TemporaryDirectory() as temporary:
+                    folder = Path(temporary)
+                    original = Path.unlink
+
+                    def unlink(path, *args, **kwargs):
+                        if removal_fails:
+                            raise PermissionError('private endpoint')
+                        return original(path, *args, **kwargs)
+
+                    with patch.object(Path, 'unlink', unlink), self.assertRaises(
+                            RuntimeError if code == -1 else ValueError) as raised:
+                        release_campaign.export_runner_output(self.remote(self.Output([b'private bytes'], code)),
+                                                              'c', folder)
+                    message = str(raised.exception)
+                    self.assertEqual('no exit status' in message, code == -1)
+                    self.assertEqual('stopped before creating' in message, code == 1)
+                    self.assertEqual('could not be removed (PermissionError)' in message, removal_fails)
+                    self.assertNotIn('private', message)
+                    self.assertFalse((folder / 'runner-output.tar').exists())
+                    self.assertEqual((folder / 'runner-output.tar.partial').exists(), removal_fails)
 
     def test_a_partial_file_that_cannot_be_removed_is_reported_with_the_first_error(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -1772,12 +1944,25 @@ class PreparationProtocolTests(ProtocolCase):
         return run_vm_campaign.check_fixture_state(self.checkout / '.fixtures/campaign', nonce)
 
     def test_everything_a_preparation_creates_is_unshared_under_a_group_umask(self):
+        for name in ('prepare-fixtures.sh', 'prepare-extended-fixtures.sh', 'prepare-sftp-keys.sh'):
+            shutil.copyfile(ROOT / 'scripts' / name, self.checkout / 'scripts' / name)
+        # Only Docker is substituted; host-side fixture preparation runs for real.
+        (self.root / 'bin/docker').write_text(
+            '#!/bin/sh\ncase "$*" in *ssh-keygen*) echo "256 SHA256:fixture host";; '
+            '*authorized_keys*) cat >/dev/null;; esac\n')
         controller, epoch = self.admitted()
         with GroupUmask():
             self.assertEqual(self.execute('a' * 32, epoch), (0, '0'))
         result = subprocess.run(campaign_fence.tree_unshared_command(str(self.checkout / '.fixtures')), shell=True,
                                 capture_output=True, text=True)
         self.assertEqual((result.returncode, result.stdout.strip()), (0, 'unshared'))
+        # Real generated material, not the wrapper's stub marker.
+        key = self.checkout / '.fixtures/sftp-client'
+        self.assertTrue(key.read_bytes().startswith(b'-----BEGIN OPENSSH PRIVATE KEY-----'))
+        key.chmod(0o660)
+        refused = subprocess.run(campaign_fence.tree_unshared_command(str(self.checkout / '.fixtures')), shell=True,
+                                 capture_output=True, text=True)
+        self.assertEqual(refused.stderr.splitlines(), ['campaign-refusal: writable-by-others'])
         self.end(controller)
 
     def test_a_failed_preparation_invalidates_the_previous_reset(self):

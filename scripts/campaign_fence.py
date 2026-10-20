@@ -184,19 +184,26 @@ def owned_command(paths):
 
 
 def tree_unshared_command(root, prune=None):
-    """VM command that prints `unshared` only if no file or directory under
-    `root` (links aside, whose own mode means nothing) is writable by group
-    or others; `prune` is a subtree left to its own checks."""
+    """Check files, directories and link targets, including owner and ACL.
+
+    Follow links on the root filesystem only; refuse dangling links, loops,
+    special files and mount boundaries. `prune` has its own checks.
+    """
     script = '\n'.join([
         'set -euo pipefail',
-        'fail() { echo "campaign-refusal: $1" >&2; exit 1; }',
+        *OWNERSHIP_LINES,
         'root=$1; prune=${2:-}',
-        'if [ -n "$prune" ]; then',
-        '  found=$(find "$root" -xdev -path "$prune" -prune -o ! -type l -perm /022 -print -quit) || fail cannot-inspect',
-        'else',
-        '  found=$(find "$root" -xdev ! -type l -perm /022 -print -quit) || fail cannot-inspect',
-        'fi',
-        '[ -z "$found" ] || fail writable-by-others',
+        'device=$(stat -Lc %d -- "$root") || fail cannot-inspect',
+        '[[ "$device" =~ ^[0-9]+$ ]] || fail cannot-inspect',
+        'walk() { if [ -n "$prune" ]; then',
+        '  find -L "$root" -xdev -path "$prune" -prune -o -print0',
+        'else find -L "$root" -xdev -print0; fi; }',
+        'walk | while IFS= read -r -d "" path; do',
+        '  target=$(realpath -e -- "$path" && printf .) || fail cannot-inspect',
+        "  target=${target%$'\\n.'}",
+        '  [ "$(stat -c %d -- "$target")" = "$device" ] || fail cannot-inspect',
+        '  owned "$target"',
+        'done',
         'echo unshared',
     ])
     return ('bash -c ' + shlex.quote(script) + ' campaign-tree ' + shlex.quote(root)
