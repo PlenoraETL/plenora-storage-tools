@@ -114,10 +114,11 @@ mod fake_s3 {
             let mut connections = self.connections.lock().expect("connections");
             connections.abort_all();
             while let Some(result) = connections.try_join_next() {
-                if let Err(error) = result {
-                    if error.is_panic() && !std::thread::panicking() {
-                        std::panic::resume_unwind(error.into_panic());
-                    }
+                if let Err(error) = result
+                    && error.is_panic()
+                    && !std::thread::panicking()
+                {
+                    std::panic::resume_unwind(error.into_panic());
                 }
             }
         }
@@ -185,7 +186,7 @@ mod fake_s3 {
             loop {
                 let next_request = std::future::poll_fn(|cx| {
                     let mut buffer = tokio::io::ReadBuf::new(&mut byte);
-                    std::task::Poll::Ready(peek_has_bytes(socket.poll_peek(cx, &mut buffer)))
+                    std::task::Poll::Ready(peek_has_bytes(&socket.poll_peek(cx, &mut buffer)))
                 })
                 .await;
                 if next_request
@@ -203,19 +204,19 @@ mod fake_s3 {
         }
     }
 
-    fn peek_has_bytes(result: std::task::Poll<std::io::Result<usize>>) -> bool {
-        matches!(result, std::task::Poll::Ready(Ok(count)) if count > 0)
+    fn peek_has_bytes(result: &std::task::Poll<std::io::Result<usize>>) -> bool {
+        matches!(result, std::task::Poll::Ready(Ok(count)) if *count > 0)
     }
 
     #[test]
     fn only_available_bytes_acknowledge_an_answer() {
         use std::task::Poll;
-        assert!(peek_has_bytes(Poll::Ready(Ok(1))));
-        assert!(!peek_has_bytes(Poll::Ready(Ok(0))));
-        assert!(!peek_has_bytes(Poll::Ready(Err(
+        assert!(peek_has_bytes(&Poll::Ready(Ok(1))));
+        assert!(!peek_has_bytes(&Poll::Ready(Ok(0))));
+        assert!(!peek_has_bytes(&Poll::Ready(Err(
             std::io::ErrorKind::ConnectionReset.into()
         ))));
-        assert!(!peek_has_bytes(Poll::Pending));
+        assert!(!peek_has_bytes(&Poll::Pending));
     }
 
     #[tokio::test]

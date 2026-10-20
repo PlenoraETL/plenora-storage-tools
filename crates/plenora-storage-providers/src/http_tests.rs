@@ -107,10 +107,11 @@ impl Drop for Server {
         let mut connections = self.connections.lock().expect("connections");
         connections.abort_all();
         while let Some(result) = connections.try_join_next() {
-            if let Err(error) = result {
-                if error.is_panic() && !std::thread::panicking() {
-                    std::panic::resume_unwind(error.into_panic());
-                }
+            if let Err(error) = result
+                && error.is_panic()
+                && !std::thread::panicking()
+            {
+                std::panic::resume_unwind(error.into_panic());
             }
         }
     }
@@ -900,7 +901,7 @@ async fn a_missing_or_changed_content_range_fails_the_response_assertion() {
             );
         }
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            assert_range(&server, &answer)
+            assert_range(&server, &answer);
         }));
         assert_eq!(result.is_ok(), value == Some("bytes 2-5/10"));
     }
