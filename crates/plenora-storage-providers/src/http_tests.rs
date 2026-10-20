@@ -84,6 +84,7 @@ struct Server {
     /// Every request received, in order.
     log: Arc<Mutex<Vec<Recorded>>>,
     task: tokio::task::JoinHandle<()>,
+    connections: Arc<Mutex<tokio::task::JoinSet<()>>>,
 }
 
 impl Server {
@@ -101,6 +102,18 @@ impl Server {
 impl Drop for Server {
     fn drop(&mut self) {
         self.task.abort();
+        // Teardown runs in the test task: propagate completed connection
+        // panics here, including the real-time watchdog's assertion.
+        let mut connections = self.connections.lock().expect("connections");
+        connections.abort_all();
+        while let Some(result) = connections.try_join_next() {
+            if let Err(error) = result
+                && error.is_panic()
+                && !std::thread::panicking()
+            {
+                std::panic::resume_unwind(error.into_panic());
+            }
+        }
     }
 }
 
@@ -131,11 +144,15 @@ async fn server(script: Vec<Reply>) -> Server {
         shared.bytes.clone(),
         shared.log.clone(),
     );
+    let connections = Arc::new(Mutex::new(tokio::task::JoinSet::new()));
+    let serving = connections.clone();
     let task = tokio::spawn(async move {
-        let mut connections = tokio::task::JoinSet::new();
         loop {
             let (socket, _) = listener.accept().await.expect("accept");
-            connections.spawn(serve(socket, shared.clone()));
+            serving
+                .lock()
+                .expect("connections")
+                .spawn(serve(socket, shared.clone()));
         }
     });
     Server {
@@ -145,7 +162,25 @@ async fn server(script: Vec<Reply>) -> Server {
         bytes,
         log,
         task,
+        connections,
     }
+}
+
+#[tokio::test]
+#[should_panic(expected = "the client never read an answer")]
+async fn an_unobserved_answer_fails_the_test() {
+    let server = server(vec![]).await;
+    let task = server
+        .connections
+        .lock()
+        .expect("connections")
+        .spawn(async {
+            yield_until(|| false, "the client never read an answer").await;
+        });
+    while !task.is_finished() {
+        tokio::task::yield_now().await;
+    }
+    drop(server);
 }
 
 async fn serve(mut socket: TcpStream, shared: Shared) {
@@ -834,7 +869,42 @@ fn assert_range(server: &Server, answer: &Answer) {
     assert_eq!(request.method, "GET");
     assert_eq!(request.header("range"), Some("bytes=2-5"));
     assert_eq!(answer.0.as_u16(), 206);
+    assert_eq!(
+        answer
+            .1
+            .get(reqwest::header::CONTENT_RANGE)
+            .map(reqwest::header::HeaderValue::as_bytes),
+        Some(&b"bytes 2-5/10"[..])
+    );
     assert_eq!(&answer.2[..], b"2345");
+}
+
+#[tokio::test]
+async fn a_missing_or_changed_content_range_fails_the_response_assertion() {
+    let server = server(vec![]).await;
+    server.log.lock().expect("log").push(Recorded {
+        method: "GET".into(),
+        headers: vec![("range".into(), "bytes=2-5".into())],
+        body: vec![],
+    });
+    let mut answer = (
+        reqwest::StatusCode::PARTIAL_CONTENT,
+        reqwest::header::HeaderMap::new(),
+        bytes::Bytes::from_static(b"2345"),
+    );
+    for value in [None, Some("bytes 0-3/10"), Some("bytes 2-5/10")] {
+        answer.1.clear();
+        if let Some(value) = value {
+            answer.1.insert(
+                reqwest::header::CONTENT_RANGE,
+                value.parse().expect("header"),
+            );
+        }
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            assert_range(&server, &answer);
+        }));
+        assert_eq!(result.is_ok(), value == Some("bytes 2-5/10"));
+    }
 }
 
 /// A PROPFIND keeps its method, headers and XML body through the adapter, and

@@ -44,7 +44,7 @@ mod fake_s3 {
     use std::{
         net::SocketAddr,
         sync::{
-            Arc,
+            Arc, Mutex,
             atomic::{AtomicUsize, Ordering},
         },
         time::Duration,
@@ -103,11 +103,24 @@ mod fake_s3 {
         /// acknowledges; the tests count them.
         pub answers: Arc<AtomicUsize>,
         task: tokio::task::JoinHandle<()>,
+        connections: Arc<Mutex<tokio::task::JoinSet<()>>>,
     }
 
     impl Drop for Server {
         fn drop(&mut self) {
             self.task.abort();
+            // Teardown runs in the test task: propagate completed connection
+            // panics here, including the real-time watchdog's assertion.
+            let mut connections = self.connections.lock().expect("connections");
+            connections.abort_all();
+            while let Some(result) = connections.try_join_next() {
+                if let Err(error) = result
+                    && error.is_panic()
+                    && !std::thread::panicking()
+                {
+                    std::panic::resume_unwind(error.into_panic());
+                }
+            }
         }
     }
 
@@ -130,11 +143,15 @@ mod fake_s3 {
             received: received.clone(),
             answers: answers.clone(),
         };
+        let connections = Arc::new(Mutex::new(tokio::task::JoinSet::new()));
+        let serving = connections.clone();
         let task = tokio::spawn(async move {
-            let mut connections = tokio::task::JoinSet::new();
             loop {
                 let (socket, _) = listener.accept().await.expect("accept");
-                connections.spawn(serve(socket, script, observed.clone()));
+                serving
+                    .lock()
+                    .expect("connections")
+                    .spawn(serve(socket, script, observed.clone()));
             }
         });
         Server {
@@ -143,6 +160,7 @@ mod fake_s3 {
             received,
             answers,
             task,
+            connections,
         }
     }
 
@@ -168,7 +186,7 @@ mod fake_s3 {
             loop {
                 let next_request = std::future::poll_fn(|cx| {
                     let mut buffer = tokio::io::ReadBuf::new(&mut byte);
-                    std::task::Poll::Ready(socket.poll_peek(cx, &mut buffer).is_ready())
+                    std::task::Poll::Ready(peek_has_bytes(&socket.poll_peek(cx, &mut buffer)))
                 })
                 .await;
                 if next_request
@@ -184,6 +202,44 @@ mod fake_s3 {
                 tokio::task::yield_now().await;
             }
         }
+    }
+
+    fn peek_has_bytes(result: &std::task::Poll<std::io::Result<usize>>) -> bool {
+        matches!(result, std::task::Poll::Ready(Ok(count)) if *count > 0)
+    }
+
+    #[test]
+    fn only_available_bytes_acknowledge_an_answer() {
+        use std::task::Poll;
+        assert!(peek_has_bytes(&Poll::Ready(Ok(1))));
+        assert!(!peek_has_bytes(&Poll::Ready(Ok(0))));
+        assert!(!peek_has_bytes(&Poll::Ready(Err(
+            std::io::ErrorKind::ConnectionReset.into()
+        ))));
+        assert!(!peek_has_bytes(&Poll::Pending));
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "the client never observed an answer")]
+    async fn an_unobserved_answer_fails_the_test() {
+        let server = start(IDLE);
+        let socket = TcpStream::connect(server.address).await.expect("connect");
+        let observed = Observed {
+            requests: server.requests.clone(),
+            received: server.received.clone(),
+            answers: server.answers.clone(),
+        };
+        let task = server
+            .connections
+            .lock()
+            .expect("connections")
+            .spawn(async move {
+                observed.until_observed(&socket, 0, 0).await;
+            });
+        while !task.is_finished() {
+            tokio::task::yield_now().await;
+        }
+        drop(server);
     }
 
     async fn serve(mut socket: TcpStream, script: Script, observed: Observed) {
