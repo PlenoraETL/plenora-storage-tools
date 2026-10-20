@@ -7,6 +7,7 @@ scripts with bash and flock, and are skipped where those are missing
 import errno
 import json
 import os
+import shlex
 from pathlib import Path
 import shutil
 import subprocess
@@ -861,7 +862,7 @@ class UnsharedTreeTests(unittest.TestCase):
                               shell=True, capture_output=True, text=True, env=env)
 
     def test_links_are_checked_with_their_targets_and_descendants(self):
-        target = self.folder / 'target'
+        target = self.root / 'target'
         target.mkdir(mode=0o700)
         file = target / 'file\n'
         file.write_text('synthetic')
@@ -879,6 +880,40 @@ class UnsharedTreeTests(unittest.TestCase):
         (target / 'loop').unlink()
         (target / 'missing').symlink_to(target / 'absent')
         self.assertNotEqual(self.check().returncode, 0)
+
+    def test_external_writable_parent_cannot_replace_an_owned_private_target(self):
+        target = self.folder / 'external-secret'
+        target.mkdir()
+        target.chmod(0o777)
+        file = target / 'private-secret'
+        file.write_text('secret payload')
+        file.chmod(0o600)
+        self.assertEqual(file.stat().st_uid, os.geteuid())
+        self.assertEqual(file.stat().st_dev, self.root.stat().st_dev)
+        self.assertEqual(target.stat().st_mode & 0o1777, 0o777)
+        (self.root / 'link').symlink_to(file)
+        result = self.check()
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, '')
+        self.assertEqual(result.stderr, 'campaign-refusal: outside-tree\n')
+
+    def test_internal_relative_link_with_parent_component_is_accepted(self):
+        (self.root / 'nested').mkdir(mode=0o700)
+        file = self.root / 'private'
+        file.write_text('synthetic')
+        file.chmod(0o600)
+        (self.root / 'nested/link').symlink_to('../private')
+        result = self.check()
+        self.assertEqual((result.returncode, result.stdout, result.stderr), (0, 'unshared\n', ''))
+
+    def test_external_link_chain_returning_inside_is_refused(self):
+        file = self.root / 'private'
+        file.write_text('synthetic')
+        file.chmod(0o600)
+        outside = self.folder / 'outside'
+        outside.symlink_to(file)
+        (self.root / 'link').symlink_to(outside)
+        self.assertEqual(self.check().stderr, 'campaign-refusal: outside-tree\n')
 
     def test_special_files_are_refused_even_when_not_writable_by_others(self):
         fifo = self.root / 'fifo'
@@ -901,14 +936,15 @@ class UnsharedTreeTests(unittest.TestCase):
             target.symlink_to('/usr')
         result = self.check()
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('campaign-refusal: foreign-owner', result.stderr.splitlines())
+        reason = 'foreign-owner' if os.geteuid() == 0 else 'outside-tree'
+        self.assertIn('campaign-refusal: ' + reason, result.stderr.splitlines())
 
     def test_acl_on_a_link_target_is_refused(self):
         if not shutil.which('setfacl'):
             if REQUIRE_REAL_ACL:
                 self.fail('setfacl is required')
             self.skipTest('setfacl is missing')
-        target = self.folder / 'target'
+        target = self.root / 'target'
         target.write_text('synthetic')
         target.chmod(0o600)
         (self.root / 'link').symlink_to(target)
@@ -923,7 +959,7 @@ class UnsharedTreeTests(unittest.TestCase):
             self.fail('the cross-filesystem test requires procfs')
         link = self.root / 'mount'
         link.symlink_to('/proc')
-        self.assertEqual(self.check().stderr.splitlines(), ['campaign-refusal: cannot-inspect'])
+        self.assertEqual(self.check().stderr.splitlines(), ['campaign-refusal: outside-tree'])
         self.assertEqual(self.check(str(link)).stdout.strip(), 'unshared')
 
     def test_failed_discovery_cannot_print_success(self):
@@ -934,6 +970,46 @@ class UnsharedTreeTests(unittest.TestCase):
         result = self.check(env=dict(os.environ, PATH=f'{tools}:{os.environ["PATH"]}'))
         self.assertNotEqual(result.returncode, 0)
         self.assertNotIn('unshared', result.stdout)
+
+
+@unittest.skipUnless(shutil.which('bash'), 'runs the VM shell with simulated POSIX metadata')
+class SimulatedTreeConfinementTests(unittest.TestCase):
+    def test_owned_same_device_target_requires_internal_parent(self):
+        # Run the generated VM program even on Windows. The simulated external
+        # parent is 0777 without sticky, while both target files are owned 0600.
+        stub = r'''
+stat() {
+  case "$2" in
+    %d) echo 1;;
+    %u) echo 1000;;
+    %a) case "${@: -1}" in /external) echo 777;; */file) echo 600;; *) echo 700;; esac;;
+    *) return 1;;
+  esac
+}
+id() { echo 1000; }
+getfacl() { printf 'user::rw-\ngroup::---\nother::---\n'; }
+find() { printf '/campaign\0/campaign/link\0/campaign/file\0'; }
+readlink() { printf '%s\n' "$LINK_TARGET"; }
+realpath() {
+  case "${@: -1}" in
+    /campaign/link) printf '%s\n' "$LINK_TARGET";;
+    *) printf '%s\n' "${@: -1}";;
+  esac
+}
+[() {
+  if [[ "$1" = -L ]]; then [[ "$2" = /campaign/link ]];
+  elif [[ "$1" = -d || "$1" = -f ]]; then return 0;
+  else builtin [ "$@"; fi
+}
+'''
+        script = shlex.split(campaign_fence.tree_unshared_command('/campaign'))[2]
+        for target, expected in (('/external/file', (1, '', 'campaign-refusal: outside-tree\n')),
+                                 ('/campaign/file', (0, 'unshared\n', ''))):
+            with self.subTest(target=target):
+                result = subprocess.run([shutil.which('bash'), '-c', stub + script,
+                                         'campaign-tree', '/campaign'], capture_output=True, text=True,
+                                        env=dict(os.environ, LINK_TARGET=target))
+                self.assertEqual((result.returncode, result.stdout, result.stderr), expected)
 
 
 class RealAclToolTests(unittest.TestCase):
@@ -997,7 +1073,8 @@ class PrivateRootControllerTests(unittest.TestCase):
                     self.assertIsNone(failure.exception.__cause__)
         for code in campaign_fence.REFUSALS:
             self.assertIn(f'fail {code}', '\n'.join(campaign_fence.OWNERSHIP_LINES)
-                          + campaign_fence.private_root_command('/srv/q'))
+                          + campaign_fence.private_root_command('/srv/q')
+                          + campaign_fence.tree_unshared_command('/srv/q'))
 
 
 @unittest.skipUnless(LINUX and shutil.which('git') and shutil.which('sha256sum'), 'runs bash, git and sha256sum')

@@ -138,6 +138,7 @@ REFUSALS = {
     'appeared': 'a directory of the VM root path appeared while it was being created',
     'not-walked': 'the VM root path was not walked to its end',
     'root-mode': 'the VM root must belong to the campaign user with mode 700',
+    'outside-tree': 'a link leaves the campaign tree',
 }
 
 
@@ -186,21 +187,42 @@ def owned_command(paths):
 def tree_unshared_command(root, prune=None):
     """Check files, directories and link targets, including owner and ACL.
 
-    Follow links on the root filesystem only; refuse dangling links, loops,
+    Follow links inside the root tree only; refuse dangling links, loops,
     special files and mount boundaries. `prune` has its own checks.
     """
     script = '\n'.join([
         'set -euo pipefail',
         *OWNERSHIP_LINES,
         'root=$1; prune=${2:-}',
+        'boundary=$(realpath -e -- "$root" && printf .) || fail cannot-inspect',
+        "boundary=${boundary%$'\\n.'}",
+        'inside() { [[ "$1" = "$boundary" || "$1" = "$boundary/"* ]] || fail outside-tree; }',
+        # Confinement is deliberately stricter than checking the final inode:
+        # an external writable directory can replace even an owned 0600 file.
+        # Check each link's spelling before realpath hides an escape/re-entry;
+        # all links reached by the walk undergo this same check.
+        'confined_link() { local rest cursor part resolved;',
+        '  rest=$(readlink -- "$1" && printf .) || fail cannot-inspect;',
+        "  rest=${rest%$'\\n.'}; cursor=${1%/*};",
+        '  if [[ "$rest" = /* ]]; then inside "$rest"; rest=${rest#"$boundary"}; cursor=$boundary; fi;',
+        '  while [ -n "$rest" ]; do',
+        '    part=${rest%%/*}; if [[ "$rest" = */* ]]; then rest=${rest#*/}; else rest=; fi;',
+        '    case "$part" in ""|.) continue;; ..) cursor=${cursor%/*};; *) cursor="$cursor/$part";; esac;',
+        '    inside "$cursor";',
+        '    resolved=$(realpath -e -- "$cursor" && printf .) || fail cannot-inspect;',
+        "    resolved=${resolved%$'\\n.'}; inside \"$resolved\"; cursor=$resolved;",
+        '  done;',
+        '}',
         'device=$(stat -Lc %d -- "$root") || fail cannot-inspect',
         '[[ "$device" =~ ^[0-9]+$ ]] || fail cannot-inspect',
         'walk() { if [ -n "$prune" ]; then',
         '  find -L "$root" -xdev -path "$prune" -prune -o -print0',
         'else find -L "$root" -xdev -print0; fi; }',
         'walk | while IFS= read -r -d "" path; do',
+        '  if [ -L "$path" ]; then confined_link "$path"; fi',
         '  target=$(realpath -e -- "$path" && printf .) || fail cannot-inspect',
         "  target=${target%$'\\n.'}",
+        '  inside "$target"',
         '  [ "$(stat -c %d -- "$target")" = "$device" ] || fail cannot-inspect',
         '  owned "$target"',
         'done',
