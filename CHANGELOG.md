@@ -1,5 +1,21 @@
 # Changelog
 
+## 3.0.2 — unreleased
+
+Patch release; no incompatible changes and no change to the public
+operations.
+
+- Adopt plenora-contracts `3aec9f7` (Public Catalogs 2.0) with the storage
+  catalog and profile unchanged upstream at v1: refreshed copies and hashes,
+  provider annotations, API baseline, `check_contract_adoption.py` green
+  (#26).
+- Close the non-blocking campaign review items #17, #20 and #22: test and
+  diagnostics hardening from the reviews of #16, #19 and #21; no contract
+  change. Real POSIX/ACL checks remain with the Linux CI (#27).
+- webpki advisories: `rustls-webpki` 0.103.16 (RUSTSEC-2026-0382) and
+  `webpki-roots` 1.0.10 (RUSTSEC-2026-0381), fuzz lockfile included (#28).
+- Family dependency pin alignment: `thiserror` 2.0.21 (#29).
+
 ## 3.0.1 — 2026-10-16
 
 Patch release preparation; no incompatible changes. Compared with `v3.0.0`,
