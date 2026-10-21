@@ -31,7 +31,7 @@ futures-util.workspace = true
 http = { workspace = true, optional = true }
 http-body = { workspace = true, optional = true }
 object_store = { version = "=0.14.2", default-features = false, features = ["azure"], optional = true }
-plenora-storage-core = { path = "../plenora-storage-core", version = "3.0.1" }
+plenora-storage-core = { path = "../plenora-storage-core", version = "3.0.2" }
 quick-xml = { workspace = true, optional = true }
 reqwest = { workspace = true, features = ["rustls"], optional = true }
 rustls = { workspace = true, optional = true }
