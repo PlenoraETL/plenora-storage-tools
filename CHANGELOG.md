@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.0.2 — unreleased
+## 3.0.2 — 2026-10-23
 
 Patch release; no incompatible changes and no change to the public
 operations.
