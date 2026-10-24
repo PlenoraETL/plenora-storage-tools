@@ -15,7 +15,7 @@ plenora-storage-providers = { path = "../crates/plenora-storage-providers", defa
 plenora-storage-ftp = { path = "../crates/plenora-storage-ftp" }
 plenora-storage-s3 = { path = "../crates/plenora-storage-s3" }
 smb2 = { package = "plenora-smb2", path = "../crates/plenora-smb2", features = ["fuzzing"] }
-tokio = { version = "=1.53.1", features = ["rt"] }
+tokio = { version = "=1.53.3", features = ["rt"] }
 
 [[bin]]
 name = "s3_xml"
