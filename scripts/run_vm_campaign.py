@@ -35,7 +35,9 @@ TARGET = 'x86_64-unknown-linux-gnu'
 PERFORMANCE_ORDER = SCHEME
 # A multiple of four, so ABBA gives every provider the same number of first
 # runs as baseline and as candidate.
-PERFORMANCE_ROUNDS = 32
+PERFORMANCE_POLICY = strict_json.loads((ROOT / 'scripts/performance-policy.json').read_text())
+PERFORMANCE_ROUNDS = PERFORMANCE_POLICY['minimum_paired_measurement_rounds']
+PERFORMANCE_WARMUP_ROUNDS = PERFORMANCE_POLICY['paired_warmup_rounds']
 SPOOLED_PHASES = ('spooled-large', 'spooled-workers4', 'spooled-workers16')
 PHASES = ('qualify-linux', 'install-sdk', 'performance-ab', 'performance-compare', 'transfers-large',
           'transfers-workers4', 'transfers-workers16', *SPOOLED_PHASES, 'soak')
@@ -59,6 +61,8 @@ def identity(folder, baseline):
         raise ValueError('campaign distribution bytes differ from manifest')
     return {'source_revision': revision, 'version': manifest['version'], 'artifacts': subjects,
             'baseline_binary_sha256': digest(baseline), 'soak_seconds': SOAK_DURATION_SECONDS,
+            'performance_warmup_rounds': PERFORMANCE_WARMUP_ROUNDS,
+            'performance_policy': PERFORMANCE_POLICY,
             'performance_rounds': PERFORMANCE_ROUNDS, 'performance_order': PERFORMANCE_ORDER,
             'large_transfer_rounds': 2}
 
@@ -285,7 +289,7 @@ def measure(folder, baseline, private, output, fixture_state, retries, reason, b
                     raise ValueError('insufficient memory for the GCS fixture peak; no transfer started')
             # A paired run measures baseline and candidate alternately, slot by
             # slot, so a drift of the environment weighs the same on both.
-            pair = (['--baseline-binary', baseline, '--baseline-output', path / 'baseline.json',
+            pair = (['--warmup-rounds', PERFORMANCE_WARMUP_ROUNDS, '--baseline-binary', baseline, '--baseline-output', path / 'baseline.json',
                      '--output', path / 'candidate.json'] if paired else ['--output', path / 'report.json'])
             command(path, 'qualify_transfers.py', '--bytes', size, '--workers', workers, '--rounds', rounds,
                     *pair, *(['--spool-uploads'] if spool_uploads else []))
