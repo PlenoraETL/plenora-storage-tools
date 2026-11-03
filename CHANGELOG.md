@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.0.3 — unreleased
+
+Security patch release; no incompatible changes and no change to the public
+operations. Affects only the SFTP provider's SSH client and the async runtime.
+
+- `crypto-bigint` 0.7.10 (RUSTSEC-2026-0387, 2026-10-23): timing variability
+  in operations meant to be constant-time, reached through `russh` →
+  `p256`/`p384` → `ecdsa` → `elliptic-curve` (SFTP). **3.0.2 and earlier
+  ship `crypto-bigint` 0.7.5**; versions 0.7.6–0.7.8 are yanked upstream.
+  `ctutils` follows to 0.4.8; fuzz lockfile aligned (#34).
+- `tokio` 1.53.3 and `ctutils` (RUSTSEC-2026-0386, RUSTSEC-2026-0385) (#32).
+
 ## 3.0.2 — 2026-10-23
 
 Patch release; no incompatible changes and no change to the public
