@@ -174,7 +174,8 @@ def new_report(binary, args):
             'source_revision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
             'dirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()),
             'memory_measurement': 'Linux RUSAGE_CHILDREN per fresh wrapper; includes process startup',
-            'payload_bytes': args.bytes, 'workers': args.workers, 'rounds': args.rounds,
+            'payload_bytes': args.bytes, 'workers': args.workers, 'rounds': args.rounds + args.warmup_rounds,
+            'warmup_rounds': args.warmup_rounds,
             'spool_uploads': args.spool_uploads,
             'rss_limit_bytes': args.rss_limit_mib * 1024**2, 'status': 'RUNNING', 'results': []}
 
@@ -185,6 +186,8 @@ def main():
     parser.add_argument('--providers', default=','.join(PROVIDERS))
     parser.add_argument('--workers', type=int, default=1)
     parser.add_argument('--rounds', type=int, default=1)
+    parser.add_argument('--warmup-rounds', type=int, default=0,
+                        help='initial recorded rounds excluded from performance statistics; --rounds remains measured rounds')
     parser.add_argument('--spool-uploads', action='store_true')
     parser.add_argument('--timeout', type=float, default=600)
     parser.add_argument('--rss-limit-mib', type=int, default=256)
@@ -200,6 +203,8 @@ def main():
         parser.error('a paired run needs both --baseline-binary and --baseline-output')
     if args.baseline_binary is not None and args.rounds % 4:
         parser.error('a paired run needs a multiple of four rounds, so every provider runs first equally often')
+    if args.warmup_rounds < 0 or args.warmup_rounds % 4 or (args.warmup_rounds and args.baseline_binary is None):
+        parser.error('warmup needs a paired run and a nonnegative multiple of four rounds')
     binaries = {'candidate': Path(os.environ.get('PLENORA_CLI_BIN', ROOT / 'target/release/plenora-storage')).resolve()}
     outputs = {'candidate': args.output}
     if args.baseline_binary is not None:
@@ -208,7 +213,7 @@ def main():
     reports = {name: new_report(binary, args) for name, binary in binaries.items()}
     order = None
     if len(binaries) == 2:
-        order = paired_order(args.rounds, providers)
+        order = paired_order(args.rounds + args.warmup_rounds, providers)
         for name, report in reports.items():
             other = 'baseline' if name == 'candidate' else 'candidate'
             report['paired_measurement'] = {'role': name, 'order_scheme': PAIRED_ORDER,
@@ -232,7 +237,7 @@ def main():
                 report['payload_sha256'] = source_hash
             slots = iter(order or [])
             with ThreadPoolExecutor(max_workers=args.workers) as pool:
-                for iteration in range(args.rounds):
+                for iteration in range(args.rounds + args.warmup_rounds):
                     for provider in providers:
                         if order is None:
                             sequence = ['candidate']

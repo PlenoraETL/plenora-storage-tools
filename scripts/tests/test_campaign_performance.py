@@ -24,6 +24,8 @@ import run_vm_campaign
 
 ROOT = Path(__file__).resolve().parents[2]
 POLICY = json.loads((ROOT / 'scripts/performance-policy.json').read_text())
+CURRENT_POLICY = POLICY
+POLICY = dict(POLICY, schema_version=2)  # Historical no-warmup algorithm tests.
 ROUNDS, WORKERS = run_vm_campaign.PERFORMANCE_ROUNDS, 4
 BINARIES = {'baseline': 'a' * 64, 'candidate': 'b' * 64}
 ENVIRONMENT = {'machine': 'x86_64', 'kernel': 'test', 'cpu_count': 8, 'cpu_model': 'test', 'fixture_sha256': 'c' * 64}
@@ -218,6 +220,84 @@ class PairedOrderTests(unittest.TestCase):
                                                 rounds=1)
 
 
+class WarmupTests(unittest.TestCase):
+    def campaign(self, drift=0, regression=0):
+        warmup = CURRENT_POLICY['paired_warmup_rounds']
+        total = warmup + ROUNDS
+        baseline, candidate = measured(alternated(total), total, linear(0))
+        pair(baseline, candidate)
+        for report_ in (baseline, candidate):
+            report_['warmup_rounds'] = warmup
+            for row in report_['results']:
+                measured_round = row['round'] - warmup
+                # Severe startup cost, with no influence on median, p95 or RSS max.
+                elapsed = (2 if measured_round < 0 else
+                           .2 * (1 + drift * measured_round / (ROUNDS - 1)))
+                for m in row['measurements']:
+                    m['elapsed_seconds'] = elapsed * (1 + regression if report_ is candidate else 1)
+                    if measured_round < 0 and report_ is candidate:
+                        m['peak_rss_bytes'] *= 2
+        return baseline, candidate
+
+    def test_warmup_then_stable_measurement_passes_all_providers(self):
+        old, new = self.campaign()
+        result = compare(old, new, BINARIES['candidate'], CURRENT_POLICY)
+        self.assertEqual(result['status'], 'PASS')
+        self.assertEqual(result['sampling'], {'warmup_rounds': 16, 'measured_rounds': 32})
+        self.assertEqual(len(result['results']), 162)
+        self.assertTrue(all(r['first_half'] == .2 and r['second_half'] == .2 for r in result['stability']))
+        self.assertEqual(old['rounds'], 48)  # Comparator does not mutate evidence.
+
+    def test_drift_persisting_after_warmup_is_unreliable(self):
+        for drift in (.5, -.5):
+            with self.subTest(drift=drift):
+                old, new = self.campaign(drift=drift)
+                self.assertEqual(compare(old, new, BINARIES['candidate'], CURRENT_POLICY)['status'], UNRELIABLE)
+
+    def test_regression_after_warmup_fails(self):
+        old, new = self.campaign(regression=.3)
+        self.assertEqual(compare(old, new, BINARIES['candidate'], CURRENT_POLICY)['status'], 'FAIL')
+
+    def test_regression_only_in_warmup_passes(self):
+        # Una regressione confinata ai round di riscaldamento non entra nella
+        # misura: il gate resta PASS e le meta' della stabilita' coincidono.
+        old, new = self.campaign()
+        warmup = CURRENT_POLICY['paired_warmup_rounds']
+        for row in new['results']:
+            if row['round'] < warmup:
+                for m in row['measurements']:
+                    m['elapsed_seconds'] *= 1.5
+        result = compare(old, new, BINARIES['candidate'], CURRENT_POLICY)
+        self.assertEqual(result['status'], 'PASS')
+
+    def test_warmup_is_mandatory_fixed_and_complete(self):
+        for bad in (None, True, 0, 4, 20, 16.0):
+            old, new = self.campaign()
+            new['warmup_rounds'] = bad
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                compare(old, new, BINARIES['candidate'], CURRENT_POLICY)
+        for defect in ('missing', 'failed', 'nan', 'rss'):
+            old, new = self.campaign()
+            if defect == 'missing':
+                new['results'].pop(0)
+            elif defect == 'failed':
+                new['results'][0]['status'] = 'FAIL'
+            else:
+                new['results'][0]['measurements'][0][
+                    'elapsed_seconds' if defect == 'nan' else 'peak_rss_bytes'] = float('nan') if defect == 'nan' else 2**30
+            with self.subTest(defect=defect), self.assertRaises(ValueError):
+                compare(old, new, BINARIES['candidate'], CURRENT_POLICY)
+
+    def test_warmup_cannot_replace_measured_rounds(self):
+        old, new = self.campaign()
+        for report_ in (old, new):
+            report_['rounds'] = 32
+            report_['results'] = [r for r in report_['results'] if r['round'] < 32]
+        pair(old, new)
+        with self.assertRaises(ValueError):
+            compare(old, new, BINARIES['candidate'], CURRENT_POLICY)
+
+
 class ProducerTests(unittest.TestCase):
     """Runs the real qualify_transfers loop, concurrent workers included, with
     a recording roundtrip in place of the fixtures and binaries."""
@@ -238,7 +318,7 @@ class ProducerTests(unittest.TestCase):
             folder = Path(temporary)
             for role in ('baseline', 'candidate'):
                 (folder / role).write_bytes(role.encode())
-            argv = ['qualify_transfers.py', '--bytes', '1024', '--workers', str(WORKERS), '--rounds', str(rounds),
+            argv = ['qualify_transfers.py', '--bytes', '1024', '--workers', str(WORKERS), '--rounds', str(rounds), '--warmup-rounds', '4',
                     '--baseline-binary', str(folder / 'baseline'), '--baseline-output', str(folder / 'b.json'),
                     '--output', str(folder / 'c.json')]
             with patch.object(sys, 'argv', argv), patch.object(qualify_transfers.sys, 'platform', 'linux'), \
@@ -248,11 +328,13 @@ class ProducerTests(unittest.TestCase):
                 qualify_transfers.main()
             reports = {role: json.loads((folder / name).read_text())
                        for role, name in (('baseline', 'b.json'), ('candidate', 'c.json'))}
-        expected = paired_order(rounds, PROVIDERS)
+        expected = paired_order(rounds + 4, PROVIDERS)
         for role, own in reports.items():
+            self.assertEqual(own['warmup_rounds'], 4)
+            self.assertEqual(own['rounds'], rounds + 4)
             self.assertEqual(own['paired_measurement']['order'], expected)
             self.assertEqual(own['paired_measurement']['role'], role)
-            self.assertEqual(len(own['results']), rounds * len(PROVIDERS) * WORKERS)
+            self.assertEqual(len(own['results']), (rounds + 4) * len(PROVIDERS) * WORKERS)
         per_slot = 4 * WORKERS
         self.assertEqual(len(events), per_slot * len(expected))
         for index, slot in enumerate(expected):
@@ -261,6 +343,17 @@ class ProducerTests(unittest.TestCase):
             self.assertEqual([event[1] for event in window], [slot['first']] * 2 * WORKERS + [second] * 2 * WORKERS,
                              slot)
             self.assertTrue(all(event[2] == slot['provider'] for event in window))
+
+    def test_invalid_warmup_is_rejected_before_running(self):
+        for warmup, paired in ((-4, True), (3, True), (4, False)):
+            argv = ['qualify_transfers.py', '--rounds', '4', '--warmup-rounds', str(warmup)]
+            if paired:
+                argv += ['--baseline-binary', 'b', '--baseline-output', 'b.json']
+            with self.subTest(warmup=warmup, paired=paired), patch.object(sys, 'argv', argv), \
+                    patch.object(qualify_transfers.sys, 'platform', 'linux'), \
+                    patch.object(qualify_transfers, 'roundtrip') as run, self.assertRaises(SystemExit):
+                qualify_transfers.main()
+            run.assert_not_called()
 
     def test_a_paired_run_refuses_rounds_that_are_not_a_multiple_of_four(self):
         argv = ['qualify_transfers.py', '--rounds', '30', '--baseline-binary', 'b', '--baseline-output', 'b.json']

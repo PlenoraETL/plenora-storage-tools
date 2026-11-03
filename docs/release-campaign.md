@@ -123,7 +123,8 @@ nel perimetro delle fixture.
 ### Prestazioni: misura alternata
 
 La fase `performance-ab` misura baseline e candidato nella stessa esecuzione,
-32 round con 4 worker. Per ogni round e provider girano entrambi i binari, uno
+16 round iniziali di riscaldamento e poi 32 round di misura, con 4 worker.
+Per ogni round e provider girano entrambi i binari, uno
 dopo l'altro; chi parte per primo segue lo schema ABBA sull'indice di round di
 quel provider (baseline, candidato, candidato, baseline, poi di nuovo). Ogni
 provider, e quindi ogni sua operazione, parte per primo lo stesso numero di
@@ -131,6 +132,58 @@ volte con ciascun binario; per questo i round devono essere un multiplo di
 quattro, altrimenti la misura viene rifiutata. Lo scopo è ridurre l'effetto di
 una deriva lenta dell'ambiente, come un fixture che rallenta, che con due fasi
 consecutive ricadrebbe tutta sul secondo binario.
+
+Prima della modifica non veniva escluso alcun round: le due metà erano
+0–15 e 16–31. I campioni dei quattro worker sono aggregati per provider e
+operazione (anche le due delete per roundtrip); non si mediano prima i round.
+Il confronto usa mediana e p95 dei tempi e massimo RSS. La guardia usa la
+mediana dei tempi di ciascuna metà, separatamente per i due binari.
+
+**Riscaldamento (policy schema 3).** I 16 round iniziali eseguono tutte le
+operazioni di tutti i provider per entrambi i binari, con la stessa alternanza
+ABBA (quattro blocchi completi). Sono aggiuntivi: non riducono i 32 round
+misurati. `--rounds` indica la misura; `--warmup-rounds` il prefisso.
+I report conservano tutti i campioni e l'ordine dei 48 round, numerati 0–47,
+con `warmup_rounds: 16`; il confronto esclude solo il prefisso 0–15 da mediana,
+p95, massimo RSS e stabilità. Esiti, completezza, valori finiti e limiti RSS
+restano verificati anche durante il riscaldamento. La stabilità confronta
+quindi i round 16–31 con 32–47, senza cambiare formula o tolleranza.
+Numero di round e policy entrano nell'identità della campagna: un checkpoint
+precedente non può sostituire questa esecuzione.
+
+Motivazione sui report 3.0.3 disponibili in `target/evidenze`:
+
+| Tentativo | Confronti | Controlli instabili | Esito dopo esclusione di 16 round |
+| --- | --- | --- | --- |
+| 1 | 161 PASS, 1 FAIL | 2 | Non ricalcolabile |
+| 2 | Report non disponibile | Non verificabili | Non ricalcolabile |
+| 3 | 162 PASS | 19 | Non ricalcolabile |
+| 4 | 162 PASS | 6 | Non ricalcolabile |
+
+Nei tre report presenti tutti i controlli instabili hanno la prima metà più
+lenta: nel tentativo 4 `ftp get` baseline passa da 3,49045 a 3,23115 s
+(−7,43%); nel 3 le operazioni FTP baseline scendono del 25,62–29,41%,
+`azure copy` candidato del 31,21% e `ftps copy` baseline del 24,95%.
+Nel tentativo 1 il FAIL è `ftp get` p95: baseline 4,7155 s, candidato
+7,0122 s (+48,71%, limite 5,6586 s); non viene reinterpretato come PASS.
+I report contengono aggregati, non campioni per round: non dimostrano quando
+finisce il riscaldamento e non consentono di affermare che i quattro tentativi
+sarebbero passati. N=16 è prudenziale, pari a un'intera precedente metà,
+non una durata calibrata o già qualificata. Una nuova campagna VM deve
+verificare che basti; una deriva residua resta `UNRELIABLE`. Le soglie di
+regressione e stabilità sono invariate. Queste osservazioni sono coerenti con
+il riscaldamento di cache e fixture, ma non ne isolano la causa.
+
+Il gate misura il regime dopo riscaldamento: non rileva regressioni di tempo
+o picchi RSS limitati al prefisso (salvo il limite RSS assoluto), né certifica
+prestazioni a cache fredda, connessioni persistenti o sistemi cloud reali.
+Ogni operazione continua a usare il processo CLI previsto dal misuratore.
+I report storici senza riscaldamento restano leggibili con la precedente
+policy; la policy 3 richiede il prefisso nelle misure accoppiate. I confronti
+sequenziali storici conservano la loro semantica e non qualificano una release
+3.x, che richiede l'accoppiamento. Il job `product-quality` della CI esegue
+`python -m unittest discover -s scripts/tests -v`, inclusi i casi sintetici
+riscaldamento/stabilità, deriva persistente e regressione.
 
 Limiti dichiarati:
 
@@ -145,7 +198,7 @@ Limiti dichiarati:
 
 **Guardia di stabilità.** Per ogni provider e operazione il confronto calcola,
 separatamente per baseline e candidato, la mediana del tempo nella prima e
-nella seconda metà dei round. Se uno dei due binari cambia rispetto a sé stesso
+nella seconda metà dei soli round misurati. Se uno dei due binari cambia rispetto a sé stesso
 oltre metà del budget della mediana, 5% con un minimo di 10 ms
 (`stability_allowance` in `scripts/performance-policy.json`), la misura è
 **non affidabile**: lo stato è `UNRELIABLE`, mai `PASS`, anche se il

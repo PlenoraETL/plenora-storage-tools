@@ -48,6 +48,30 @@ def compare(baseline, candidate, binary, policy):
                     result[(row['provider'], measure['operation'], metric)].append(value)
         return result
 
+    # Validate even excluded samples: warmup is not an escape from correctness,
+    # finite timing or RSS limits. Keep the raw reports for pairing validation.
+    for report in (baseline, candidate):
+        samples(report)
+    warmup = 0
+    if paired and policy['schema_version'] >= 3:
+        warmup = policy['paired_warmup_rounds']
+        require(type(warmup) is int and warmup > 0 and warmup % 4 == 0,
+                'invalid warmup policy')
+        for report in (baseline, candidate):
+            require(type(report.get('warmup_rounds')) is int and report['warmup_rounds'] == warmup,
+                    'performance warmup differs from policy')
+            require(report['rounds'] - warmup >= policy['minimum_paired_measurement_rounds'],
+                    'performance measured rounds are incomplete')
+    else:
+        require(all(report.get('warmup_rounds', 0) == 0 for report in (baseline, candidate)),
+                'warmup requires the paired performance policy')
+
+    def measurement(report):
+        return dict(report, rounds=report['rounds'] - warmup,
+                    results=[dict(row, round=row['round'] - warmup) for row in report['results']
+                             if row['round'] >= warmup])
+
+    baseline, candidate = measurement(baseline), measurement(candidate)
     old, new = samples(baseline), samples(candidate)
     require(old.keys() == new.keys(), 'performance operation inventory differs')
     results = []
@@ -72,6 +96,7 @@ def compare(baseline, candidate, binary, policy):
     status = 'PASS' if all(r['status'] == 'PASS' for r in results) else 'FAIL'
     comparison = {'status': status, 'binary_sha256': binary, 'policy': policy, 'results': results}
     if paired:
+        comparison['sampling'] = {'warmup_rounds': warmup, 'measured_rounds': baseline['rounds']}
         stability = [row for report, role in ((baseline, 'baseline'), (candidate, 'candidate'))
                      for row in stability_checks(report, role, policy)]
         comparison['stability'] = stability

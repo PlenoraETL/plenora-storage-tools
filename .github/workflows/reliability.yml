@@ -81,9 +81,9 @@ jobs:
         run: |
           docker compose -f docker-compose.yml -f compose.extended.yml run --rm --no-deps storage-rust bash -c '
             set -euo pipefail
-            python3 scripts/qualify_transfers.py --bytes 1048576 --workers 4 --rounds 5 \
-              --output .fixtures/evidence/performance/baseline.json
-            python3 scripts/qualify_transfers.py --bytes 1048576 --workers 4 --rounds 5 \
+            python3 scripts/qualify_transfers.py --bytes 1048576 --workers 4 --rounds 32 --warmup-rounds 16 \
+              --baseline-binary target/release/plenora-storage \
+              --baseline-output .fixtures/evidence/performance/baseline.json \
               --output .fixtures/evidence/performance/candidate.json
             python3 scripts/check_performance.py .fixtures/evidence/performance/baseline.json \
               .fixtures/evidence/performance/candidate.json --output .fixtures/evidence/performance/report.json
@@ -224,7 +224,7 @@ jobs:
             > .fixtures/compose.performance.json
       - run: bash scripts/prepare-fixtures.sh
       - run: bash scripts/prepare-extended-fixtures.sh
-      - name: Compare thirty complete rounds of the exact baseline and candidate
+      - name: Compare paired baseline and candidate after recorded warmup
         run: |
           docker compose -f docker-compose.yml -f compose.extended.yml -f .fixtures/compose.performance.json \
             run --rm --no-deps storage-rust bash -c '
@@ -234,10 +234,12 @@ jobs:
               for subject in baseline candidate; do
                 python3 scripts/check_disk_space.py --bytes 1048576 --workers 4 \
                   --output ".fixtures/evidence/performance/disk-space-$subject.json"
-                PLENORA_CLI_BIN="/workspace/.fixtures/performance-input/$subject/plenora-storage" \
-                  python3 scripts/qualify_transfers.py --bytes 1048576 --workers 4 --rounds 30 \
-                  --output ".fixtures/evidence/performance/$subject.json"
               done
+              PLENORA_CLI_BIN="/workspace/.fixtures/performance-input/candidate/plenora-storage" \
+                python3 scripts/qualify_transfers.py --bytes 1048576 --workers 4 --rounds 32 --warmup-rounds 16 \
+                --baseline-binary /workspace/.fixtures/performance-input/baseline/plenora-storage \
+                --baseline-output .fixtures/evidence/performance/baseline.json \
+                --output .fixtures/evidence/performance/candidate.json
               python3 scripts/check_performance.py .fixtures/evidence/performance/baseline.json \
                 .fixtures/evidence/performance/candidate.json --output .fixtures/evidence/performance/report.json
             '
