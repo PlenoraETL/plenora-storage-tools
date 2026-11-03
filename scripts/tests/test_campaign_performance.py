@@ -258,6 +258,18 @@ class WarmupTests(unittest.TestCase):
         old, new = self.campaign(regression=.3)
         self.assertEqual(compare(old, new, BINARIES['candidate'], CURRENT_POLICY)['status'], 'FAIL')
 
+    def test_regression_only_in_warmup_passes(self):
+        # Una regressione confinata ai round di riscaldamento non entra nella
+        # misura: il gate resta PASS e le meta' della stabilita' coincidono.
+        old, new = self.campaign()
+        warmup = CURRENT_POLICY['paired_warmup_rounds']
+        for row in new['results']:
+            if row['round'] < warmup:
+                for m in row['measurements']:
+                    m['elapsed_seconds'] *= 1.5
+        result = compare(old, new, BINARIES['candidate'], CURRENT_POLICY)
+        self.assertEqual(result['status'], 'PASS')
+
     def test_warmup_is_mandatory_fixed_and_complete(self):
         for bad in (None, True, 0, 4, 20, 16.0):
             old, new = self.campaign()
