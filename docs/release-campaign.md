@@ -1,5 +1,23 @@
 # Campagna di qualifica riprendibile
 
+Dal 4 novembre 2026 si applicano i [livelli di qualifica](release.md#livelli-di-qualifica-decisione-del-maintainer-4-novembre-2026).
+Le istruzioni di campagna completa sotto restano il default `full`.
+Per `dependency-patch` la configurazione del coordinatore aggiunge
+`"profile": "dependency-patch", "previous_tag": "v3.0.2"` (tag precedente per
+la 3.0.3). Il preflight Git deve riuscire prima di accedere alla VM.
+Il runner esegue `qualify-linux`, `install-sdk`, tutti i trasferimenti normali
+e spooled; il coordinatore mantiene `qualify-windows`. Solo `performance-ab`,
+`performance-compare` e `soak` sono omessi, con motivazione registrata.
+Il parametro `baseline_binary` resta richiesto dal trasporto esistente e viene
+inventariato, ma nel profilo ridotto non viene misurato.
+Il profilo cambia l'identit? della campagna: usare una nuova directory, senza
+riassegnare checkpoint della campagna completa. Il bundle conserva
+`gates/profile.json` e `gates/install-sdk.json`, verificati nuovamente anche da
+`publish_qualified.py` e dal workflow release. I controlli Git richiedono la
+storia completa e il tag precedente; quelli Actions richiedono accesso di
+lettura al repository. Non ? sufficiente un riepilogo locale con `PASS`.
+
+
 Dalla 2.0.1 il coordinamento della VM è versionato, insieme ai gate, e non
 richiede script con commit o identificativi Actions incorporati. La durata
 del soak resta 7200 secondi. Account cloud reali rimangono fuori dal perimetro.

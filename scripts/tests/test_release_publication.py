@@ -50,7 +50,9 @@ class PublicationTests(unittest.TestCase):
                 (root / name).write_bytes(b'artifact')
             receipt = dict(version=version, source_revision='a' * 40, schema_version=2,
                            status='qualified_for_publication', platforms=platforms,
-                           additional_gates=[{'name': 'fixture', 'sha256': 'b' * 64}])
+                           additional_gates=[{'name': name, 'sha256': 'b' * 64} for name in
+                               ('performance/report.json', 'performance/baseline.json',
+                                'performance/candidate.json', 'soak/report.json')])
             receipt_path = root / 'release-qualification.json'
             receipt_path.write_text(json.dumps(receipt))
             names.append(receipt_path.name)
@@ -96,6 +98,12 @@ class PublicationTests(unittest.TestCase):
             (root / 'unrelated-private-file').write_text('must not be packaged')
             receipt = dict(status='qualified_for_publication', schema_version=2,
                            platforms=[{'target': publication.TARGETS[0], 'evidence': []}], additional_gates=[])
+            for name in ('performance/report.json', 'performance/baseline.json',
+                         'performance/candidate.json', 'soak/report.json'):
+                gate = root / 'evidence/gates' / name
+                gate.parent.mkdir(parents=True, exist_ok=True)
+                gate.write_text('{}')
+                receipt['additional_gates'].append({'name': name, 'sha256': publication.digest(gate)})
             (root / 'release-qualification.json').write_text(json.dumps(receipt))
             selected = publication.qualified_files(root)
             self.assertIn(f'{publication.TARGETS[0]}/fixture.bin', selected)

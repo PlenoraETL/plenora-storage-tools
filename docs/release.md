@@ -9,7 +9,8 @@ destinazione o residui temporanei. Il validatore finale richiede inoltre
 `transfers-spooled/{large,workers4,workers16}.json` e un soak che eserciti
 entrambe le modalità nelle stesse due ore. I workflow CI e candidato eseguono
 i nuovi test per target; la campagna VM e il workflow reliability eseguono
-i trasferimenti e il soak. I gate restano obbligatori per ogni candidato;
+i trasferimenti e il soak. Questi gate restano obbligatori nel profilo `full`; il profilo
+`dependency-patch` descritto sotto omette solo A/B e soak;
 il [resoconto 2.1.0](release-2.1.0.md) registra le prove dei suoi artefatti finali.
 
 Dalla 2.0.1 la [campagna VM versionata](release-campaign.md) coordina download,
@@ -51,6 +52,51 @@ La release corrente comprende Rust, CLI e SDK Python; la [matrice](provider-expa
 artefatti preparati diventano distribuibili quando `release-qualification.json`
 registra `qualified_for_publication` per i loro digest. Non pubblicare un
 artefatto prodotto da un checkout modificato o privo delle evidenze richieste.
+
+## Livelli di qualifica (decisione del maintainer, 4 novembre 2026)
+
+| Tipo di release | Profilo | CI Linux e Windows e release-candidate | Qualifica funzionale Windows e VM Linux, SDK e trasferimenti | A/B e confronto prestazionale | Soak |
+| --- | --- | --- | --- | --- | --- |
+| Patch stabile con sole dipendenze nei lockfile | `dependency-patch`, solo dopo verifica Git | Completi, riusciti sul commit candidato | Obbligatori, inclusi trasferimenti spooled | Omessi con motivazione | Omesso con motivazione |
+| Patch con codice o altre modifiche non ammesse | `full` (default) | Completi | Completi | Obbligatori | Obbligatorio |
+| Minor o major | `full` | Completi | Completi | Obbligatori | Obbligatorio |
+
+Il profilo ridotto non ? una deroga dichiarativa. `scripts/release_profile.py`
+confronta gli oggetti Git del tag precedente (per 3.0.3: `v3.0.2`) e del commit
+candidato, richiede ascendenza e la patch stabile immediatamente successiva.
+Ammette solo modifiche a `Cargo.lock`, `fuzz/Cargo.lock`, versione del prodotto
+nei manifest Cargo/pyproject e riferimenti di versione dei crate locali con
+`path`, `CHANGELOG.md`, `docs/STATO.md` e i tre documenti di procedura
+`release.md`, `release-campaign.md`, `release-evidence-bundle.md`, oltre alle
+note della versione candidata. L'inventario generato pu? cambiare solo nella
+versione: non si modifica a mano. Almeno un lockfile deve cambiare.
+Aggiunte, cancellazioni, rinomine e cambi di modalit? sono rifiutati (sono
+ammesse nuove note del candidato). Codice, workflow, contratti, policy e cambi
+di dipendenze nei manifest sono rifiutati. Non esiste esclusione per gli
+script di qualifica stessi: introdurre questa procedura richiede `full`.
+
+Il coordinatore accetta `profile: "dependency-patch"` e `previous_tag` nella
+configurazione. I workflow sono ricontrollati tramite API GitHub: repository,
+workflow, commit, tentativo, esito e tutti i job, senza skip, inclusi Linux e
+Windows. Il token deve poter leggere Actions. Restano tutti gli altri gate del
+candidato e della CI, inclusi API, fuzz, coverage, matrice SDK, SBOM native e
+pressione disco; restano i controlli dei digest e le prove dopo download.
+
+Nel bundle `qualification-input.tar.gz`, `evidence/gates/profile.json` lega
+profilo, diff verificato, workflow, fasi eseguite e omissioni alla revisione.
+`install-sdk.json` lega l'installazione alla wheel Linux. Il validatore finale
+ricontrolla il diff e i workflow, e verifica i report funzionali ordinari sui
+digest candidati. La ricevuta pubblica conserva `qualification_profile`.
+Senza profilo esplicito valgono tutti i gate `full`; una ricevuta completa
+presentata con un bundle ridotto ? rifiutata. I test negativi sono eseguiti dai
+job CI `product-quality` e `native-windows` con la suite Python degli script;
+`release.yml` riesegue gli stessi validatori prima di pubblicare.
+
+**Hazard accettato:** le regressioni di prestazioni indotte da una dipendenza
+non vengono misurate; il soak non viene eseguito e non ? dichiarato superato.
+**Rientro:** campagna completa alla prossima release con codice. Le ricevute
+storiche non vengono riscritte e le prove di un'altra revisione o di byte diversi
+non qualificano il candidato.
 
 ## Gate
 

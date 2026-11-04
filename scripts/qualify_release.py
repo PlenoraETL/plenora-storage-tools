@@ -160,6 +160,9 @@ def main():
                'status': 'qualified_for_publication', 'source_revision': revision,
                'source_sha256': source_digest(), 'advisory_database': audit['database'],
                'qualification_scope': qualification_scope(),
+               'qualification_profile': (strict_json.loads((bundle / 'profile.json').read_text())
+                                         if additional and (args.evidence / 'gates/profile.json').exists()
+                                         else {'profile': 'full'}),
                'platforms': records, 'additional_gates': additional}
     path = output / 'release-qualification.json'
     path.write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8')

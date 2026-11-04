@@ -13,7 +13,7 @@ import zipfile
 
 from package_source import extract
 from release_evidence import TARGETS, require
-from versioning import workspace_version
+from versioning import parse_version, workspace_version
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -51,6 +51,7 @@ def qualified_files(release):
     receipt = strict_json.loads((release / 'release-qualification.json').read_text())
     require(receipt['status'] == 'qualified_for_publication' and receipt['schema_version'] == 2,
             'release receipt is not qualified')
+    validate_profile_receipt(receipt)
     paths = {'release-qualification.json', 'SHA256SUMS'}
     for platform in receipt['platforms']:
         target = platform['target']
@@ -80,6 +81,22 @@ def qualified_files(release):
     return sorted(paths)
 
 
+def validate_profile_receipt(receipt):
+    profile = receipt.get('qualification_profile', {'profile': 'full'})
+    names = {entry['name'] for entry in receipt['additional_gates']}
+    if profile == {'profile': 'full'}:
+        if not parse_version(receipt.get('version', '1.0.0')).requires((1, 0, 0)):
+            require('profile.json' not in names, 'legacy release cannot carry a reduced profile')
+            return
+        require({'performance/report.json', 'performance/baseline.json', 'performance/candidate.json',
+                 'soak/report.json'} <= names and 'profile.json' not in names,
+                'full profile requires performance and soak evidence')
+    else:
+        from release_profile import validate
+        validate(profile, receipt['source_revision'])
+        require({'profile.json', 'install-sdk.json', 'install-sdk.log'} <= names, 'missing dependency-patch profile evidence')
+
+
 def check_files(directory):
     index = strict_json.loads((directory / 'publication-index.json').read_text())
     require(index['version'] == workspace_version().native, 'publication version differs')
@@ -94,6 +111,7 @@ def check_files(directory):
             and bool(receipt['additional_gates']), 'publication receipt is not current and qualified')
     require(len(receipt['platforms']) == len(TARGETS)
             and {p['target'] for p in receipt['platforms']} == set(TARGETS), 'publication targets are incomplete')
+    validate_profile_receipt(receipt)
     version = index['version']
     expected = {'release-qualification.json', f'plenora-storage-{version}-source.tar.gz',
                 f'plenora-storage-{version}-qualification.tar.gz'}
@@ -107,6 +125,15 @@ def check_files(directory):
     return index
 
 
+def check_input_profile(release, evidence):
+    receipt = strict_json.loads((release / 'release-qualification.json').read_text())
+    validate_profile_receipt(receipt)
+    path = evidence / 'gates/profile.json'
+    declared = strict_json.loads(path.read_text()) if path.exists() else {'profile': 'full'}
+    require(receipt.get('qualification_profile', {'profile': 'full'}) == declared,
+            'input receipt and evidence qualification profiles differ')
+
+
 def prepare(archive, output, tag):
     check_tag(tag)
     output.mkdir(parents=True, exist_ok=False)
@@ -114,6 +141,7 @@ def prepare(archive, output, tag):
         source = extract(archive, temporary, 'qualification')
         version = workspace_version().native
         release = source / 'dist' / version
+        check_input_profile(release, source / 'evidence')
         subprocess.run([sys.executable, str(ROOT / 'scripts/qualify_release.py'), str(release),
                         '--evidence', str(source / 'evidence')], cwd=ROOT, check=True)
         names = []

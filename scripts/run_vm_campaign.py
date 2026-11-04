@@ -43,8 +43,12 @@ PHASES = ('qualify-linux', 'install-sdk', 'performance-ab', 'performance-compare
           'transfers-workers4', 'transfers-workers16', *SPOOLED_PHASES, 'soak')
 
 
-def phases_for(version):
+def phases_for(version, profile='full'):
     """The phases this runner executes for `version`: spooled transfers exist from 2.1.0."""
+    if profile not in ('full', 'dependency-patch'):
+        raise ValueError('unknown qualification profile')
+    if profile == 'dependency-patch':
+        return tuple(name for name in PHASES if name not in ('performance-ab', 'performance-compare', 'soak'))
     spooled = parse_version(version).requires((2, 1, 0))
     return tuple(name for name in PHASES if spooled or name not in SPOOLED_PHASES)
 
@@ -222,7 +226,7 @@ def require_private(root, output):
 
 
 def run(folder, baseline, output, retries, reason, backend_data, fixture_nonce, campaign_dir, epoch, inputs,
-        expected, fixture_state):
+        expected, fixture_state, profile='full'):
     # Shared hold of the VM campaign lock for the whole run, then the epoch of
     # this runner's admission (campaign_fence): no controller is admitted while
     # this runner lives, and a runner started after another admission stops.
@@ -240,17 +244,19 @@ def run(folder, baseline, output, retries, reason, backend_data, fixture_nonce, 
                 host_fence()
                 check_private(copies, expected)
             measure(candidate, private_baseline, private, output, fixture_state, retries, reason, backend_data,
-                    fixture_nonce, fence, expected, epoch)
+                    fixture_nonce, fence, expected, epoch, profile)
         finally:
             shutil.rmtree(private)
 
 
 def measure(folder, baseline, private, output, fixture_state, retries, reason, backend_data, fixture_nonce, fence,
-            expected, epoch):
+            expected, epoch, profile='full'):
     if sys.platform != 'linux':
         raise ValueError('VM campaign requires Linux')
     folder, baseline, output = folder.resolve(), baseline.resolve(), output.resolve()
     subject = identity(folder, baseline)
+    if profile != 'full':
+        subject['profile'] = profile
     spooled = parse_version(subject['version']).requires((2, 1, 0))
     binary = folder / 'plenora-storage'
     wheels = list(folder.glob('*.whl'))
@@ -267,7 +273,7 @@ def measure(folder, baseline, private, output, fixture_state, retries, reason, b
     with exclusive(fixture_state), exclusive(output):
         check_fixture_state(fixture_state, fixture_nonce)
         campaign = Campaign(output, subject)
-        campaign.validate_retries(retries, phases_for(subject['version']))
+        campaign.validate_retries(retries, phases_for(subject['version'], profile))
 
         def phase(name, action):
             return fenced_phase(campaign, fence, name, action, retry=name in retries, reason=reason)
@@ -317,14 +323,18 @@ def measure(folder, baseline, private, output, fixture_state, retries, reason, b
 
         def sdk(path):
             installed_python(path)
-            write_json(path / 'wheel.json', {'sha256': digest(wheel)})
+            installed = {'sha256': digest(wheel)}
+            if profile == 'dependency-patch':
+                installed['log_sha256'] = digest(path / 'sdk-install.log')
+            write_json(path / 'wheel.json', installed)
 
-        phase('install-sdk', sdk)
-        paired = phase('performance-ab', lambda path: transfers(path, size=1024**2, workers=4,
-                                                                rounds=PERFORMANCE_ROUNDS, paired=True))
-        old, new = paired / 'baseline.json', paired / 'candidate.json'
-        comparison = phase('performance-compare', lambda path: command(path, 'check_performance.py',
-                           old, new, '--output', path / 'report.json'))
+        installed = phase('install-sdk', sdk)
+        if profile == 'full':
+            paired = phase('performance-ab', lambda path: transfers(path, size=1024**2, workers=4,
+                                                                    rounds=PERFORMANCE_ROUNDS, paired=True))
+            old, new = paired / 'baseline.json', paired / 'candidate.json'
+            comparison = phase('performance-compare', lambda path: command(path, 'check_performance.py',
+                               old, new, '--output', path / 'report.json'))
         large = phase('transfers-large', lambda path: transfers(path, size=GIB, workers=1, rounds=2))
         four = phase('transfers-workers4', lambda path: transfers(path, size=1024**2, workers=4, rounds=2))
         sixteen = phase('transfers-workers16', lambda path: transfers(path, size=1024**2, workers=16, rounds=1))
@@ -335,14 +345,21 @@ def measure(folder, baseline, private, output, fixture_state, retries, reason, b
                 result = phase('spooled-' + name, lambda path: transfers(
                     path, size=size, workers=workers, rounds=rounds, spool_uploads=True))
                 prepared[f'transfers-spooled/{name}.json'] = result / 'report.json'
-        soak = phase('soak', lambda path: command(path, 'stress_python.py', '--wheel', wheel, '--workers', 4,
-                     '--interval-seconds', 30, '--duration-seconds', SOAK_DURATION_SECONDS,
-                     *(['--both-upload-modes'] if spooled else []),
-                     '--output', path / 'report.json', python=installed_python(private)))
-        selected = {'performance/baseline.json': old,
-                    'performance/candidate.json': new, 'performance/report.json': comparison / 'report.json',
-                    'transfers/large.json': large / 'report.json', 'transfers/workers4.json': four / 'report.json',
-                    'transfers/workers16.json': sixteen / 'report.json', 'soak/report.json': soak / 'report.json', **prepared}
+        if profile == 'full':
+            soak = phase('soak', lambda path: command(path, 'stress_python.py', '--wheel', wheel, '--workers', 4,
+                         '--interval-seconds', 30, '--duration-seconds', SOAK_DURATION_SECONDS,
+                         *(['--both-upload-modes'] if spooled else []),
+                         '--output', path / 'report.json', python=installed_python(private)))
+        selected = {'transfers/large.json': large / 'report.json',
+                    'transfers/workers4.json': four / 'report.json',
+                    'transfers/workers16.json': sixteen / 'report.json', **prepared}
+        if profile == 'full':
+            selected.update({'performance/baseline.json': old, 'performance/candidate.json': new,
+                             'performance/report.json': comparison / 'report.json',
+                             'soak/report.json': soak / 'report.json'})
+        else:
+            selected['install-sdk.json'] = installed / 'wheel.json'
+            selected['install-sdk.log'] = installed / 'sdk-install.log'
         sources = {'gates/' + name: (source.parent, source) for name, source in selected.items()}
         qualified_target = qualified / 'dist' / subject['version'] / TARGET
         for source in sorted(qualified_target.glob('*.json')):
@@ -363,6 +380,7 @@ def measure(folder, baseline, private, output, fixture_state, retries, reason, b
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('distribution', type=Path)
+    parser.add_argument('--profile', choices=['full', 'dependency-patch'], default='full')
     parser.add_argument('--baseline-binary', required=True, type=Path)
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--backend-data', type=Path, action='append', default=[])
@@ -381,4 +399,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
     require_private(ROOT, args.output)
     run(args.distribution, args.baseline_binary, args.output, args.retry_phase, args.retry_reason, args.backend_data,
-        args.fixture_nonce, args.campaign_dir, args.epoch, args.inputs, args.expected_inputs, args.fixture_state)
+        args.fixture_nonce, args.campaign_dir, args.epoch, args.inputs, args.expected_inputs, args.fixture_state, args.profile)
