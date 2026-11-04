@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import subprocess
 import time
+from qualification_watchdog import kill_descendants, positive_seconds
 
 
 def digest(path):
@@ -136,9 +137,38 @@ class Campaign:
         return files
 
 
-def logged(command, folder, *, cwd=None, env=None, name='command.log'):
+def logged(command, folder, *, cwd=None, env=None, name='command.log', timeout=None):
     """Keep diagnostics local; the public failure contains no subprocess arguments."""
+    if timeout is not None:
+        positive_seconds(timeout)
+    started = time.monotonic()
+    state = {'status': 'RUNNING', 'timeout_seconds': timeout}
+    status_path = folder / (name + '.status.json')
+    write_json(status_path, state)
     with (folder / name).open('wb') as stream:
-        result = subprocess.run(command, cwd=cwd, env=env, stdout=stream, stderr=subprocess.STDOUT)
-    if result.returncode:
+        process = None
+        try:
+            process = subprocess.Popen(command, cwd=cwd, env=env, stdout=stream,
+                                       stderr=subprocess.STDOUT, start_new_session=os.name != 'nt')
+            state['pid'] = process.pid
+            write_json(status_path, state)
+            state['returncode'] = process.wait(timeout=timeout)
+            state['status'] = 'PASS' if process.returncode == 0 else 'FAIL'
+        except BaseException as error:
+            state.update(status='TIMEOUT' if isinstance(error, subprocess.TimeoutExpired) else 'FAIL',
+                         failure_type=type(error).__name__)
+            stream.write(b'\nFAIL campaign child watchdog or wait failure; remote effect unknown; inspect before retry\n')
+            stream.flush()
+            if process is not None:
+                kill_descendants(process.pid)
+                process.kill()
+                try:
+                    state['returncode'] = process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    state['reap_timeout'] = True
+            raise RuntimeError('campaign child watchdog or wait failed; inspect the protected attempt log') from None
+        finally:
+            state['elapsed_seconds'] = time.monotonic() - started
+            write_json(status_path, state)
+    if state['returncode']:
         raise RuntimeError('campaign command failed; inspect the protected attempt log')

@@ -38,6 +38,11 @@ PERFORMANCE_ORDER = SCHEME
 PERFORMANCE_POLICY = strict_json.loads((ROOT / 'scripts/performance-policy.json').read_text())
 PERFORMANCE_ROUNDS = PERFORMANCE_POLICY['minimum_paired_measurement_rounds']
 PERFORMANCE_WARMUP_ROUNDS = PERFORMANCE_POLICY['paired_warmup_rounds']
+PERFORMANCE_ROUND_TIMEOUT = 300
+PERFORMANCE_PHASE_TIMEOUT = 7500
+TRANSFER_ROUND_TIMEOUT = 10800
+TRANSFER_PHASE_TIMEOUT = 14400
+COMMAND_TIMEOUT = 14400
 SPOOLED_PHASES = ('spooled-large', 'spooled-workers4', 'spooled-workers16')
 PHASES = ('qualify-linux', 'install-sdk', 'performance-ab', 'performance-compare', 'transfers-large',
           'transfers-workers4', 'transfers-workers16', *SPOOLED_PHASES, 'soak')
@@ -64,6 +69,10 @@ def identity(folder, baseline):
             'performance_warmup_rounds': PERFORMANCE_WARMUP_ROUNDS,
             'performance_policy': PERFORMANCE_POLICY,
             'performance_rounds': PERFORMANCE_ROUNDS, 'performance_order': PERFORMANCE_ORDER,
+            'watchdogs': {'performance_round': PERFORMANCE_ROUND_TIMEOUT,
+                          'performance_phase': PERFORMANCE_PHASE_TIMEOUT,
+                          'transfer_round': TRANSFER_ROUND_TIMEOUT,
+                          'transfer_phase': TRANSFER_PHASE_TIMEOUT, 'command': COMMAND_TIMEOUT},
             'large_transfer_rounds': 2}
 
 
@@ -272,9 +281,9 @@ def measure(folder, baseline, private, output, fixture_state, retries, reason, b
         def phase(name, action):
             return fenced_phase(campaign, fence, name, action, retry=name in retries, reason=reason)
 
-        def command(path, script, *arguments, environment=env, python=sys.executable):
+        def command(path, script, *arguments, environment=env, python=sys.executable, timeout=COMMAND_TIMEOUT):
             logged([str(python), str(ROOT / 'scripts' / script), *map(str, arguments)],
-                   path, cwd=ROOT, env=environment)
+                   path, cwd=ROOT, env=environment, timeout=timeout)
 
         def transfers(path, *, size, workers, rounds, spool_uploads=False, paired=False):
             space = inspect(spaces, size, workers, spool_uploads=spool_uploads)
@@ -292,7 +301,10 @@ def measure(folder, baseline, private, output, fixture_state, retries, reason, b
             pair = (['--warmup-rounds', PERFORMANCE_WARMUP_ROUNDS, '--baseline-binary', baseline, '--baseline-output', path / 'baseline.json',
                      '--output', path / 'candidate.json'] if paired else ['--output', path / 'report.json'])
             command(path, 'qualify_transfers.py', '--bytes', size, '--workers', workers, '--rounds', rounds,
-                    *pair, *(['--spool-uploads'] if spool_uploads else []))
+                    '--round-timeout', PERFORMANCE_ROUND_TIMEOUT if paired else TRANSFER_ROUND_TIMEOUT,
+                    '--phase-timeout', PERFORMANCE_PHASE_TIMEOUT if paired else TRANSFER_PHASE_TIMEOUT,
+                    *pair, *(['--spool-uploads'] if spool_uploads else []),
+                    timeout=(PERFORMANCE_PHASE_TIMEOUT if paired else TRANSFER_PHASE_TIMEOUT) + 60)
 
         def qualify(path):
             # Qualified in the private directory; only its reports become
@@ -312,7 +324,7 @@ def measure(folder, baseline, private, output, fixture_state, retries, reason, b
             if not sdk_environment.exists():
                 venv.EnvBuilder(with_pip=True).create(sdk_environment)
                 logged([str(sdk_environment / 'bin/python'), '-m', 'pip', 'install', '--no-index', str(wheel)],
-                       log_folder, cwd=ROOT, name='sdk-install.log')
+                       log_folder, cwd=ROOT, name='sdk-install.log', timeout=COMMAND_TIMEOUT)
             return sdk_environment / 'bin/python'
 
         def sdk(path):

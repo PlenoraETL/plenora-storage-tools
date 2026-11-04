@@ -4,7 +4,8 @@ Linux fixture gate. Defaults to 1 GiB for streaming paths; buffered providers
 retain their documented 64 MiB limit. Each report identifies the tested binary.
 """
 import argparse
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import as_completed
+from qualification_watchdog import WorkerPool, Watchdog, diagnostic, entrypoint, positive_seconds
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
@@ -21,6 +22,7 @@ import uuid
 
 from fixture_connections import ATOMIC, BUFFERED, PROVIDERS, ROOT, fixture
 from performance_order import SCHEME as PAIRED_ORDER, paired_order
+from campaign_state import write_json
 
 
 class OperationFailure(AssertionError):
@@ -81,7 +83,7 @@ def invoke(binary, connection, env, operation, arguments, max_bytes, timeout, rs
             stdout, stderr = process.communicate(timeout=timeout + 15)
         except subprocess.TimeoutExpired:
             os.killpg(process.pid, signal.SIGKILL)
-            process.communicate()
+            process.communicate(timeout=5)
             raise RuntimeError(f'{operation}: process exceeded cooperative deadline; remote outcome requires inspection') from None
         measure = strict_json.loads(measurement.read_text())
     if stderr or len(stdout.splitlines()) != 1:
@@ -189,7 +191,9 @@ def main():
     parser.add_argument('--warmup-rounds', type=int, default=0,
                         help='initial recorded rounds excluded from performance statistics; --rounds remains measured rounds')
     parser.add_argument('--spool-uploads', action='store_true')
-    parser.add_argument('--timeout', type=float, default=600)
+    parser.add_argument('--timeout', type=positive_seconds, default=600)
+    parser.add_argument('--round-timeout', type=positive_seconds, default=10800)
+    parser.add_argument('--phase-timeout', type=positive_seconds, default=14400)
     parser.add_argument('--rss-limit-mib', type=int, default=256)
     parser.add_argument('--output', type=Path, default=ROOT / 'target/release-readiness/large-transfers.json')
     parser.add_argument('--baseline-binary', type=Path,
@@ -205,68 +209,71 @@ def main():
         parser.error('a paired run needs a multiple of four rounds, so every provider runs first equally often')
     if args.warmup_rounds < 0 or args.warmup_rounds % 4 or (args.warmup_rounds and args.baseline_binary is None):
         parser.error('warmup needs a paired run and a nonnegative multiple of four rounds')
-    binaries = {'candidate': Path(os.environ.get('PLENORA_CLI_BIN', ROOT / 'target/release/plenora-storage')).resolve()}
-    outputs = {'candidate': args.output}
-    if args.baseline_binary is not None:
-        binaries['baseline'] = args.baseline_binary.resolve()
-        outputs['baseline'] = args.baseline_output
-    reports = {name: new_report(binary, args) for name, binary in binaries.items()}
-    order = None
-    if len(binaries) == 2:
-        order = paired_order(args.rounds + args.warmup_rounds, providers)
-        for name, report in reports.items():
-            other = 'baseline' if name == 'candidate' else 'candidate'
-            report['paired_measurement'] = {'role': name, 'order_scheme': PAIRED_ORDER,
-                                            'partner_campaign_id': reports[other]['campaign_id'],
-                                            'order': order}
-    for path in outputs.values():
-        path.parent.mkdir(parents=True, exist_ok=True)
+    with Watchdog(args.phase_timeout) as watchdog:
+        binaries = {'candidate': Path(os.environ.get('PLENORA_CLI_BIN', ROOT / 'target/release/plenora-storage')).resolve()}
+        outputs = {'candidate': args.output}
+        if args.baseline_binary is not None:
+            binaries['baseline'] = args.baseline_binary.resolve()
+            outputs['baseline'] = args.baseline_output
+        reports = {name: new_report(binary, args) for name, binary in binaries.items()}
+        order = None
+        if len(binaries) == 2:
+            order = paired_order(args.rounds + args.warmup_rounds, providers)
+            for name, report in reports.items():
+                other = 'baseline' if name == 'candidate' else 'candidate'
+                report['paired_measurement'] = {'role': name, 'order_scheme': PAIRED_ORDER,
+                                                'partner_campaign_id': reports[other]['campaign_id'],
+                                                'order': order}
+        for path in outputs.values():
+            path.parent.mkdir(parents=True, exist_ok=True)
 
-    def save():
-        for name, report in reports.items():
-            outputs[name].write_text(json.dumps(report, indent=2) + '\n')
+        def save():
+            for name, report in reports.items():
+                write_json(outputs[name], report)
 
-    save()
-    try:
-        with tempfile.TemporaryDirectory(prefix='storage-transfer-gate-') as temporary:
-            root = Path(temporary)
-            (root / 'storage').mkdir()
-            source = root / 'payload'
-            source_hash = payload(source, args.bytes)
-            for report in reports.values():
-                report['payload_sha256'] = source_hash
-            slots = iter(order or [])
-            with ThreadPoolExecutor(max_workers=args.workers) as pool:
-                for iteration in range(args.rounds + args.warmup_rounds):
-                    for provider in providers:
-                        if order is None:
-                            sequence = ['candidate']
-                        else:
-                            first = next(slots)['first']
-                            sequence = [first, 'baseline' if first == 'candidate' else 'candidate']
-                        for name in sequence:
-                            # A new shared directory makes the mkdir race repeatable
-                            # across concurrent writers, even on reused fixtures.
-                            shared_parent = 'qualification/large-' + uuid.uuid4().hex
-                            tasks = [pool.submit(roundtrip, binaries[name], provider, source, source_hash, args.bytes,
-                                                 root, args.timeout, reports[name]['rss_limit_bytes'], 64 * 1024**2,
-                                                 shared_parent, args.spool_uploads)
-                                     for _ in range(args.workers)]
-                            for task in tasks:
-                                result = task.result()
-                                result['round'] = iteration
-                                reports[name]['results'].append(result)
-                                save()
-                            print(f'PASS {provider} ({name}): {args.workers} workers, round {iteration + 1}', flush=True)
-        for report in reports.values():
-            report['status'] = 'PASS'
-    except BaseException:
-        for report in reports.values():
-            report['status'] = 'FAIL'
-        raise
-    finally:
         save()
+        try:
+            with tempfile.TemporaryDirectory(prefix='storage-transfer-gate-') as temporary:
+                root = Path(temporary)
+                (root / 'storage').mkdir()
+                source = root / 'payload'
+                source_hash = payload(source, args.bytes)
+                for report in reports.values():
+                    report['payload_sha256'] = source_hash
+                slots = iter(order or [])
+                with WorkerPool(max_workers=args.workers) as pool:
+                    for iteration in range(args.rounds + args.warmup_rounds):
+                        watchdog.round(iteration + 1, args.round_timeout)
+                        for provider in providers:
+                            if order is None:
+                                sequence = ['candidate']
+                            else:
+                                first = next(slots)['first']
+                                sequence = [first, 'baseline' if first == 'candidate' else 'candidate']
+                            for name in sequence:
+                                # A new shared directory makes the mkdir race repeatable
+                                # across concurrent writers, even on reused fixtures.
+                                shared_parent = 'qualification/large-' + uuid.uuid4().hex
+                                tasks = [pool.submit(roundtrip, binaries[name], provider, source, source_hash, args.bytes,
+                                                     root, args.timeout, reports[name]['rss_limit_bytes'], 64 * 1024**2,
+                                                     shared_parent, args.spool_uploads)
+                                         for _ in range(args.workers)]
+                                for task in as_completed(tasks):
+                                    result = task.result()
+                                    result['round'] = iteration
+                                    reports[name]['results'].append(result)
+                                    save()
+                                print(f'PASS {provider} ({name}): {args.workers} workers, round {iteration + 1}', flush=True)
+            for report in reports.values():
+                report['status'] = 'PASS'
+        except BaseException as error:
+            diagnostic("main transfer exception", error)
+            for report in reports.values():
+                report['status'] = 'FAIL'
+            raise
+        finally:
+            save()
 
 
 if __name__ == '__main__':
-    main()
+    entrypoint(main)
