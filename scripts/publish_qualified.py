@@ -10,7 +10,7 @@ import tempfile
 import time
 
 from campaign_state import digest, exclusive, write_json
-from release_publication import check_files, extract
+from release_publication import check_files, check_input_profile, extract
 from versioning import ROOT, workspace_version
 
 
@@ -18,6 +18,7 @@ def validate_input(bundle, version, log):
     """Requalify before creating any public tag or GitHub draft."""
     with tempfile.TemporaryDirectory(prefix='storage-publication-preflight-') as temporary:
         source = extract(bundle, temporary, 'qualification')
+        check_input_profile(source / 'dist' / version, source / 'evidence')
         with log.open('wb') as stream:
             result = subprocess.run([sys.executable, str(ROOT / 'scripts/qualify_release.py'),
                                      str(source / 'dist' / version), '--evidence', str(source / 'evidence')],

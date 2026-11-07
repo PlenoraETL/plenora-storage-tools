@@ -1,5 +1,23 @@
 # Evidenze finali e pubblicazione GitHub
 
+Dal 4 novembre 2026 si applicano i [livelli di qualifica](release.md#livelli-di-qualifica-decisione-del-maintainer-4-novembre-2026).
+Le istruzioni di campagna completa sotto restano il default `full`.
+Per `dependency-patch` la configurazione del coordinatore aggiunge
+`"profile": "dependency-patch", "previous_tag": "v3.0.2"` (tag precedente per
+la 3.0.3). Il preflight Git deve riuscire prima di accedere alla VM.
+Il runner esegue `qualify-linux`, `install-sdk`, tutti i trasferimenti normali
+e spooled; il coordinatore mantiene `qualify-windows`. Solo `performance-ab`,
+`performance-compare` e `soak` sono omessi, con motivazione registrata.
+Il parametro `baseline_binary` resta richiesto dal trasporto esistente e viene
+inventariato, ma nel profilo ridotto non viene misurato.
+Il profilo cambia l'identit? della campagna: usare una nuova directory, senza
+riassegnare checkpoint della campagna completa. Il bundle conserva
+`gates/profile.json` e `gates/install-sdk.json`, verificati nuovamente anche da
+`publish_qualified.py` e dal workflow release. I controlli Git richiedono la
+storia completa e il tag precedente; quelli Actions richiedono accesso di
+lettura al repository. Non ? sufficiente un riepilogo locale con `PASS`.
+
+
 La ricevuta della serie 1.0 usa lo schema 2. Il gate finale controlla anche le
 prove elencate sotto: una qualifica incompleta non può produrre
 `qualified_for_publication`. Un tentativo fallito invalida la precedente ricevuta
@@ -24,7 +42,7 @@ passata a `qualify_release.py --evidence` aggiungere `gates/` con questa struttu
 
 I target sono `x86_64-unknown-linux-gnu` e `x86_64-pc-windows-msvc`; i nomi Python
 sono `3.10`, `3.11`, `3.12`, `3.13`, `3.14`. Dal 28 settembre 2026 la soglia
-provvisoria del soak è **due ore per tutte le versioni**, incluse alfa, beta,
+provvisoria del soak è **due ore per tutte le versioni nel profilo full**, incluse alfa, beta,
 RC e stabili, come definito in `scripts/soak_policy.py`. La durata sarà
 rivalutata prima del rilascio definitivo. Non sommare campagne parziali e non riassegnare
 un report a un'altra wheel, anche se deriva dallo stesso commit.

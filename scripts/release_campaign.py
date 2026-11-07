@@ -25,6 +25,7 @@ from campaign_fence import (FENCED, LABEL, LOCK_HELD, ROOT_PATH, CampaignBusy, C
                            admission, check_owned, check_private_root, check_tree_unshared, fence_lines,
                            supervised)
 from campaign_state import Campaign, digest, exclusive, logged, write_json
+from release_profile import verify_diff, declaration
 from versioning import parse_version, workspace_version
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -162,7 +163,7 @@ class Remote:
 def configuration(path):
     config = strict_json.loads(path.read_text())
     allowed = {'repository', 'host', 'port', 'user', 'known_hosts', 'ssh_key', 'vm_root',
-               'runner_image', 'registry_volume', 'candidate_run', 'ci_run', 'baseline_binary'}
+               'runner_image', 'registry_volume', 'candidate_run', 'ci_run', 'baseline_binary', 'profile', 'previous_tag'}
     if set(config) - allowed:
         raise ValueError('unknown campaign option; passwords must not be stored in configuration')
     for key in ('candidate_run', 'ci_run'):
@@ -472,6 +473,20 @@ def check_selected(result, identity, linux, expected, ledger, epoch, nonce):
     subject = report.get('identity', {})
     manifest = strict_json.loads((linux / 'release-manifest.json').read_text())
     artifacts = {row['name']: digest(linux / row['name']) for row in manifest['artifacts']}
+    if identity.get('profile', 'full') == 'dependency-patch':
+        from run_vm_campaign import phases_for
+        ledger_data = strict_json.loads(Path(ledger).read_text())
+        if (report.get('status') != 'PASS' or subject.get('profile') != 'dependency-patch'
+                or subject.get('source_revision') != identity['revision']
+                or subject.get('artifacts') != artifacts or report.get('inputs') != expected
+                or set(ledger_data['phases']) != set(phases_for(manifest['version'], 'dependency-patch'))
+                or any(rows[-1]['status'] != 'PASS' for rows in ledger_data['phases'].values())):
+            raise ValueError('incomplete dependency-patch functional campaign')
+        sdk = strict_json.loads((selected / 'gates/install-sdk.json').read_text())
+        if sdk != {'sha256': digest(next(linux.glob('*.whl'))),
+                   'log_sha256': digest(selected / 'gates/install-sdk.log')}:
+            raise ValueError('installed SDK differs')
+        return
     performance = result / 'selected/gates/performance'
     baseline = strict_json.loads((performance / 'baseline.json').read_text())
     candidate = strict_json.loads((performance / 'candidate.json').read_text())
@@ -491,10 +506,17 @@ def run(config_path, output, retries, reason, connect_host=None):
     if subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip():
         raise ValueError('release campaign requires clean committed source')
     version = workspace_version().native
+    profile = config.get('profile', 'full')
+    if profile not in ('full', 'dependency-patch'):
+        raise ValueError('unknown qualification profile')
+    if profile == 'dependency-patch':
+        verify_diff(revision, config.get('previous_tag', 'v3.0.2'))
     baseline = Path(config['baseline_binary']).resolve()
     output = output.resolve()
     identity = {'revision': revision, 'version': version, 'configuration_sha256': digest(config_path),
                 'baseline_sha256': digest(baseline)}
+    if profile != 'full':
+        identity['profile'] = profile
     remote_root = config['vm_root'].rstrip('/') + '/' + version + '-' + revision[:12]
     project = 'storage-q-' + revision[:12]
     q = shlex.quote
@@ -512,6 +534,9 @@ def run(config_path, output, retries, reason, connect_host=None):
             return strict_json.loads(subprocess.check_output(['gh', *arguments, '--repo', config['repository']], cwd=ROOT, text=True))
 
         def workflows(path):
+            if profile == 'dependency-patch':
+                write_json(path / 'profile.json', declaration(revision, config['ci_run'], config['candidate_run'],
+                                                            config.get('previous_tag', 'v3.0.2')))
             for key in ('candidate_run', 'ci_run'):
                 deadline = time.monotonic() + 4 * 3600
                 while time.monotonic() < deadline:
@@ -527,7 +552,7 @@ def run(config_path, output, retries, reason, connect_host=None):
                 else:
                     raise TimeoutError('workflow deadline exceeded')
 
-        phase('workflows', workflows)
+        workflow_result = phase('workflows', workflows)
 
         def download(path):
             logged(['gh', 'run', 'download', str(config['candidate_run']), '--repo', config['repository'],
@@ -691,6 +716,7 @@ def run(config_path, output, retries, reason, connect_host=None):
                 # measures fresh: a VM attempt never resumes earlier phases.
                 command = ['python3', 'scripts/run_vm_campaign.py', f'{mounted}/{distribution}',
                            '--baseline-binary', '/baseline/plenora-storage', '--output', RUNNER_OUTPUT,
+                           '--profile', profile,
                            '--fixture-state', '/workspace/.fixtures/campaign',
                            '--inputs', mounted, '--expected-inputs', json.dumps(expected, sort_keys=True),
                            '--fixture-nonce', nonce, '--campaign-dir', '/campaign',
@@ -747,7 +773,11 @@ def run(config_path, output, retries, reason, connect_host=None):
                                    assembled / 'dist' / version / TARGETS['windows'])
                 evidence = path / 'evidence'
                 shutil.copytree(assembled / 'evidence', evidence)
-                gates = ['performance', 'transfers', 'soak']
+                gates = ['transfers'] if profile == 'dependency-patch' else ['performance', 'transfers', 'soak']
+                if profile == 'dependency-patch':
+                    shutil.copyfile(workflow_result / 'profile.json', evidence / 'gates/profile.json')
+                    for name in ('install-sdk.json', 'install-sdk.log'):
+                        shutil.copyfile(vm_result / 'output/selected/gates' / name, evidence / 'gates' / name)
                 if parse_version(version).requires((2, 1, 0)):
                     gates.append('transfers-spooled')
                 for name in gates:
