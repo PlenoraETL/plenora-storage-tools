@@ -638,6 +638,97 @@ python scripts/publish_qualified.py --bundle target/campaign-3.0.1/seal/1/qualif
 Il comando crea tag e bozza e avvia le verifiche degli asset scaricati prima
 della pubblicazione. La sola preparazione dei file di release non lo esegue.
 
+## Arresti della misura e watchdog
+
+L'indagine sulle copie in `target/hang` della campagna 3.0.3 trova entrambi
+i report `RUNNING`, 1248 risultati baseline e 1251 candidato: nel round 35
+(indice 34) sono stati salvati tre worker GCS candidato, dopo i PASS Azure.
+`command.log` catturava gi? stdout **e stderr**; manca un traceback.
+`stack.txt` contiene soltanto quattro attese kernel `futex` e nessuno stack
+Python. Lo stato Z del thread principale riportato dall'osservazione VM non
+si spiega da solo con una normale eccezione Python: il main che attende
+`ThreadPoolExecutor.shutdown(wait=True)` resterebbe vivo. Non ? possibile
+ricostruire dai soli file quale istruzione abbia terminato quel thread,
+n? distinguere il lock dei worker dalla loro coda inattiva. Servirebbero
+stack Python/native o un core raccolti durante il blocco. Non si attribuisce
+quindi una causa nativa o una specifica eccezione senza prova.
+
+Sono invece riproducibili due difetti preesistenti a #36: il context manager
+`ThreadPoolExecutor` attendeva indefinitamente i worker prima di propagare
+un'eccezione al gestore che salva FAIL e al traceback; il padre usava
+`subprocess.run` senza timeout. Le future erano attese senza limite. Una
+normale eccezione del worker ? conservata nella future (anche `SystemExit`),
+non termina direttamente il main; non ci sono `os._exit`, `preexec_fn` o
+fork espliciti nel percorso precedente. La comunicazione tramite pipe aveva
+gi? un timeout per operazione, ma il secondo `communicate()` dopo SIGKILL
+non era limitato. #36 cambia il numero di round e la metadata, non questa
+gestione: ordine e ciclo usano entrambi `rounds + warmup_rounds`, senza un
+limite speciale a 32 o 35. Questi difetti spiegano l'attesa senza limite,
+non provano l'innesco dell'incidente specifico.
+
+Il misuratore ora usa worker daemon riutilizzati, shutdown esplicito con
+join complessivo massimo di 5 s e raccolta delle future completate: un worker
+che fallisce non rimane nascosto dietro un altro worker fermo. Le eccezioni
+`BaseException` dei worker e del main sono registrate con tipo e frame
+(file, funzione, riga), senza testo dell'eccezione, sorgenti o variabili che
+potrebbero contenere credenziali o dati dei callback. L'entrypoint termina
+esplicitamente il processo dopo il main, senza join impliciti dell'interprete;
+worker ancora vivi significano FAIL. Un watchdog daemon indipendente osserva
+round, fase e terminazione inattesa del main, emette un errore e termina con
+codice 124. Gli altri errori del misuratore escono con codice 1. La pulizia
+forzata Linux comprende i discendenti, anche i wrapper in sessioni separate.
+Il secondo `communicate` ha ora un limite di 5 s.
+
+| Ambito | Round completo | Fase / comando | Attesa esterna |
+| --- | --- | --- | --- |
+| `performance-ab`, 1 MiB, 4 worker, 16 + 32 round | 300 s | 7500 s | 7560 s |
+| Altri trasferimenti, inclusi spooled e 1 GiB | 10800 s | 14400 s | 14460 s |
+| Altri comandi del runner, inclusi qualifica, installazione e soak | ? | ? | 14400 s |
+
+Il round include tutti i provider ed entrambi i ruoli nella misura A/B.
+Nei 34 round completi di `target/hang`, sommando per ciascuno slot il massimo
+tra i quattro worker, si ricavano 45,5142?47,4252 s per round; il massimo
+roundtrip di un worker ? 22,2823 s. Sono stime dai campioni, **non** durate
+wall-clock del coordinatore: escludono scrittura report e altri overhead.
+300 s supera di oltre sei volte il massimo osservato; 7500 s supera di oltre
+tre volte la proiezione di 48 round (2276,41 s), lasciando spazio alla
+preparazione e ai salvataggi. Il limite globale resta indipendente dal
+riarmo del round, cos? una serie di round lenti non prolunga indefinitamente
+la fase. Per 1 GiB/spooled non esiste in queste evidenze una calibrazione:
+i limiti pi? ampi sono budget operativi prudenziali, non prestazioni misurate.
+Le quattro ore per gli altri comandi includono il soak obbligatorio di due
+ore. Le soglie del gate, i 16 + 32 round, ABBA, RSS e stabilit? non cambiano.
+
+Gli script diretti accettano `--round-timeout` e `--phase-timeout` (default
+10800 e 14400 s); il runner passa esplicitamente i budget della tabella e
+li include nell'identit? della campagna. Ogni comando registra anche
+`command.log.status.json` (o il nome specifico del log pi? `.status.json`):
+PID, budget, durata, returncode e stato PASS/FAIL/TIMEOUT. Il ledger della
+fase registra FAIL anche dopo timeout del figlio. Il timeout del padre ?
+indipendente dal GIL e protegge anche gli altri script di qualifica che
+usano executor (CLI, extended, WebDAV, stress Python). Non ? una modifica
+alle deadline o ai contratti dei provider del prodotto.
+
+Su watchdog, conservare log, stato del comando, ledger e report parziali.
+I report sono sostituiti atomicamente, ma possono restare `RUNNING` se il
+processo viene terminato: **non sono evidenze valide** e non si trasformano
+in PASS. Ispezionare fixture, risorse e oggetti remoti del tentativo: una
+terminazione forzata lascia effetto remoto sconosciuto, non prova rollback.
+Verificare che il runner precedente sia terminato, correggere la causa e
+richiedere un nuovo tentativo `qualify-vm` con `--retry-phase qualify-vm` e
+`--retry-reason` motivato, come descritto sotto. Non riprendere dal round 35,
+non unire campioni tra tentativi e non aumentare il timeout per ottenere
+un PASS; una revisione motivata dei budget cambia l'identit? e richiede una
+nuova campagna. Le evidenze precedenti restano immutabili.
+
+I test sintetici della suite `python -m unittest discover -s scripts/tests`,
+eseguita dai job Linux/Windows di `.github/workflows/ci.yml`, riproducono main
+che solleva con worker bloccato, `SystemExit` del worker, watchdog di round
+e fase, main completato con thread residuo, timeout e uscita brusca del figlio.
+Il test dei discendenti con sessione separata ? Linux-only: uno skip Windows
+non costituisce prova Linux. Non ? stata rieseguita una campagna VM reale
+come parte di questi test offline.
+
 ## Ripresa, tentativi e spazio
 
 Ripetere lo stesso comando riprende le fasi riuscite del coordinatore dopo averne verificato
