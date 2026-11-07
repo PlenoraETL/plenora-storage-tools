@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.0.3 — unreleased
+## 3.0.3 — 2026-11-07
 
 Security patch release; no incompatible changes and no change to the public
 operations. Affects only the SFTP provider's SSH client and the async runtime.
