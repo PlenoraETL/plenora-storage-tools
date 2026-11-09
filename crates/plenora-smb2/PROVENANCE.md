@@ -40,3 +40,9 @@ reply and the other former panics are typed errors (`Error::Internal`,
 and KDF helpers now return `Result`, and `MockTransport` is compiled only for
 tests or with the `testing` feature. These are API changes of the fork, part of
 the Plenora 3.0.0 major release.
+
+For the Plenora 3.0.4 candidate, the ccache parser tests construct their synthetic
+v3/v4 inputs at runtime instead of embedding saved credential-cache files. The
+public `testing` feature retains its embedded consumer rig, but preparation now
+generates a password consumed through a Compose secret; `test_password` exposes
+it to test consumers without changing the explicit authentication signatures.

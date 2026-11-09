@@ -212,8 +212,17 @@ already checked by verify_release.py. No caller-supplied waiver is accepted.
                 'fuzz counters differ or campaign failed')
         require(entry['elapsed_seconds'] >= fuzz['seconds_per_target'], 'fuzz campaign ended early')
         require(bool(entry['seeds']), 'fuzz seed inventory is empty')
-        for name, digest in entry['seeds'].items():
-            evidence.read(f'fuzz/{target}/corpus/{name}', digest)
+        # Initial seeds are deterministic and regenerated, not distributed as
+        # credential-bearing fuzz corpus in the public qualification bundle.
+        import tempfile
+        import shutil
+        from fuzz_parsers import boundary_seeds
+        with tempfile.TemporaryDirectory(prefix='storage-fuzz-seeds-') as temporary:
+            corpus = Path(temporary) / 'corpus'
+            shutil.copytree(ROOT / 'fuzz/seeds' / target, corpus)
+            boundary_seeds(target, corpus)
+            generated = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in corpus.iterdir()}
+        require(entry['seeds'] == generated, 'fuzz seeds differ from generated test inputs')
 
     coverage = evidence.json('coverage/coverage-summary.json')
     clean_source(coverage, revision)

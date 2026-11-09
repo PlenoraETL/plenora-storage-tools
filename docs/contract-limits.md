@@ -31,3 +31,26 @@ provider. Il binding preserva correttamente le categorie esplicite; questo
 non dimostra la classificazione dei fallback. Le annotazioni sono in
 `errors.rs` dei tre crate provider. Local, HTTP e SMB hanno mapping distinti:
 questa deviazione non li qualifica ne estende automaticamente il loro ambito.
+
+## STOR-LIMIT-003
+
+Regola: policy dei pacchetti e DECISIONE DEL TITOLARE del 06/11/2026 sulle
+guardie statiche: coprire per costruzione le forme dirette e dichiarare le
+varianti come limite, senza inseguirle.
+
+Ambito: scansione dei membri testuali ammessi in tutte le distribuzioni,
+compresi i contenitori annidati, tramite `scripts/check_packages.py`.
+Riconosce PEM privati e DER privato in base64 nudo; non garantisce il
+riconoscimento di chiavi ricodificate in hex, base64 con prefisso o mescolato
+ad altro testo, o altre codifiche. I test hex e base64 con prefisso documentano
+la mancata rilevazione come comportamento dichiarato, non come successo della
+guardia. Vedere la [policy dei pacchetti](package-policy.md).
+
+Hazard: il contenuto codificato di un file testuale ammesso puo contenere una
+chiave non rilevata. Un file di testo nuovo o modificato e comunque
+nell'inventario esatto e passa dalla revisione della PR; il limite riguarda
+solo il contenuto codificato dei file testuali ammessi.
+
+Rientro: nuova decisione esplicita del titolare che estenda il perimetro a
+codifiche nominate, con prove riproducibili e gate eseguibile per quelle forme.
+Non e richiesto inseguire varianti nell'attuale perimetro.

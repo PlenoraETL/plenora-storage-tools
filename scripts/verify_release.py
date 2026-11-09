@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 from versioning import parse_version
 from package_cli import verify_archive
+from check_packages import verify_distribution
 from qualify_local_faults import validate_report as validate_local_faults
 from release_scope import validate_scope
 
@@ -56,6 +57,7 @@ def main():
             sums[name] = actual
         assert set(sums) == {'release-manifest.json'} | {item['name'] for item in manifest['artifacts']}
         for item in manifest['artifacts']:
+            verify_distribution(folder / item['name'], member=manifest['target'] + '/' + item['name'])
             assert sums[item['name']] == item['sha256'], item['name']
             assert (folder / item['name']).stat().st_size == item['size'], item['name']
         if parse_version(manifest['version']).requires((1, 0, 0)):

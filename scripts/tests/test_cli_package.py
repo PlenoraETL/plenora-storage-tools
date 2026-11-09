@@ -1,4 +1,6 @@
 import sys
+import hashlib
+from unittest.mock import patch
 from pathlib import Path
 import tempfile
 import unittest
@@ -6,6 +8,7 @@ import zipfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from package_cli import build, verify_archive
+import check_packages
 
 
 class CLIPackageTests(unittest.TestCase):
@@ -17,7 +20,11 @@ class CLIPackageTests(unittest.TestCase):
                 with self.subTest(target=target):
                     binary = root / name
                     binary.write_bytes(b'candidate executable')
-                    archive = build(root, binary, '1.0.0-rc.1', target)
+                    policy = check_packages.registry()
+                    kind = 'cli-windows' if 'windows' in target else 'cli-linux'
+                    policy['member_rules'][kind][name] = {'sha256': hashlib.sha256(binary.read_bytes()).hexdigest()}
+                    with patch.object(check_packages, 'registry', return_value=policy):
+                        archive = build(root, binary, '1.0.0-rc.1', target)
                     binary.write_bytes(b'another executable')
                     with self.assertRaisesRegex(ValueError, 'differs'):
                         verify_archive(archive, binary)

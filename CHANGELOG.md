@@ -5,6 +5,11 @@
 Patch release preparation; source manifests remain at 3.0.3 until release
 preparation. See [candidate notes](docs/release-notes-3.0.4.md) for scope and evidence.
 
+- Stop distributing Kerberos test credential caches; tests generate synthetic
+  inputs at runtime. Through 3.0.3 these were non-secret test data. Consumer
+  Samba fixtures now generate their password when prepared. Exact versioned
+  package inventories and recursive content checks reject extra/missing files,
+  private keys and credential containers at build and release gates.
 - Align `serde_json` 1.0.151 → 1.0.154 in the workspace and all three lockfiles,
   preserving the public compatible requirement and existing features. Finite
   JSON numbers outside the f32 range no longer compare equal to f32 infinity

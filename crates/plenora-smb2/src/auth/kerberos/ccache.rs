@@ -325,10 +325,61 @@ fn read_credential(data: &[u8], pos: &mut usize) -> Result<CcacheCredential> {
 mod tests {
     use super::*;
 
+    // Synthetic wire data, generated for each test: no KDC or saved credentials.
+    fn synthetic_ccache(version: u16) -> Vec<u8> {
+        fn field(out: &mut Vec<u8>, value: &[u8]) {
+            out.extend_from_slice(&(value.len() as u32).to_be_bytes());
+            out.extend_from_slice(value);
+        }
+        fn principal(out: &mut Vec<u8>, realm: &str, components: &[&str]) {
+            out.extend_from_slice(&1u32.to_be_bytes());
+            out.extend_from_slice(&(components.len() as u32).to_be_bytes());
+            field(out, realm.as_bytes());
+            for component in components {
+                field(out, component.as_bytes());
+            }
+        }
+        let (realm, user, etype, key_len, count) = if version == 0x0504 {
+            ("TEST.LOCAL", "smbtest", 23u16, 16u8, 2u8)
+        } else {
+            ("EXAMPLE.COM", "user", 18u16, 32u8, 1u8)
+        };
+        let mut out = version.to_be_bytes().to_vec();
+        if version == 0x0504 {
+            out.extend_from_slice(&0u16.to_be_bytes()); // empty v4 header
+        }
+        principal(&mut out, realm, &[user]);
+        for index in 0..count {
+            principal(&mut out, realm, &[user]);
+            let service = if index == 0 {
+                ["krbtgt", realm]
+            } else {
+                ["cifs", "server.test.local"]
+            };
+            principal(&mut out, realm, &service);
+            out.extend_from_slice(&etype.to_be_bytes());
+            field(
+                &mut out,
+                &(index * key_len..(index + 1) * key_len).collect::<Vec<_>>(),
+            );
+            for timestamp in [1744100000u32, 1744100000, 1744200000, 1744300000] {
+                out.extend_from_slice(&timestamp.to_be_bytes());
+            }
+            out.push(0); // is_skey
+            for value in [0u32, 0, 0] {
+                // flags, address count, authdata count
+                out.extend_from_slice(&value.to_be_bytes());
+            }
+            field(&mut out, b"synthetic ticket, not valid for authentication");
+            field(&mut out, &[]); // second ticket
+        }
+        out
+    }
+
     #[test]
     fn parse_v4_ccache_from_fixture() {
-        let data = include_bytes!("fixtures/test.ccache");
-        let ccache = parse_ccache(data).expect("failed to parse v4 ccache");
+        let data = synthetic_ccache(0x0504);
+        let ccache = parse_ccache(&data).expect("failed to parse v4 ccache");
 
         assert_eq!(ccache.version, 0x0504);
         assert_eq!(ccache.default_principal.realm, "TEST.LOCAL");
@@ -338,8 +389,8 @@ mod tests {
 
     #[test]
     fn parse_v3_ccache_from_fixture() {
-        let data = include_bytes!("fixtures/test_v3.ccache");
-        let ccache = parse_ccache(data).expect("failed to parse v3 ccache");
+        let data = synthetic_ccache(0x0503);
+        let ccache = parse_ccache(&data).expect("failed to parse v3 ccache");
 
         assert_eq!(ccache.version, 0x0503);
         assert_eq!(ccache.default_principal.realm, "EXAMPLE.COM");
@@ -349,8 +400,8 @@ mod tests {
 
     #[test]
     fn tgt_credential_has_correct_fields() {
-        let data = include_bytes!("fixtures/test.ccache");
-        let ccache = parse_ccache(data).unwrap();
+        let data = synthetic_ccache(0x0504);
+        let ccache = parse_ccache(&data).unwrap();
 
         let tgt = &ccache.credentials[0];
         assert_eq!(tgt.client.realm, "TEST.LOCAL");
@@ -365,8 +416,8 @@ mod tests {
 
     #[test]
     fn service_ticket_has_correct_fields() {
-        let data = include_bytes!("fixtures/test.ccache");
-        let ccache = parse_ccache(data).unwrap();
+        let data = synthetic_ccache(0x0504);
+        let ccache = parse_ccache(&data).unwrap();
 
         let svc = &ccache.credentials[1];
         assert_eq!(svc.server.components, vec!["cifs", "server.test.local"]);
@@ -376,8 +427,8 @@ mod tests {
 
     #[test]
     fn find_tgt_by_realm() {
-        let data = include_bytes!("fixtures/test.ccache");
-        let ccache = parse_ccache(data).unwrap();
+        let data = synthetic_ccache(0x0504);
+        let ccache = parse_ccache(&data).unwrap();
 
         let tgt = ccache.find_tgt("TEST.LOCAL");
         assert!(tgt.is_some());
@@ -388,8 +439,8 @@ mod tests {
 
     #[test]
     fn find_service_ticket_by_spn() {
-        let data = include_bytes!("fixtures/test.ccache");
-        let ccache = parse_ccache(data).unwrap();
+        let data = synthetic_ccache(0x0504);
+        let ccache = parse_ccache(&data).unwrap();
 
         let svc = ccache.find_service_ticket("cifs", "server.test.local", "TEST.LOCAL");
         assert!(svc.is_some());
@@ -419,16 +470,16 @@ mod tests {
 
     #[test]
     fn find_tgt_case_insensitive() {
-        let data = include_bytes!("fixtures/test.ccache");
-        let ccache = parse_ccache(data).unwrap();
+        let data = synthetic_ccache(0x0504);
+        let ccache = parse_ccache(&data).unwrap();
 
         assert!(ccache.find_tgt("test.local").is_some());
     }
 
     #[test]
     fn v3_ccache_tgt_has_aes256_key() {
-        let data = include_bytes!("fixtures/test_v3.ccache");
-        let ccache = parse_ccache(data).unwrap();
+        let data = synthetic_ccache(0x0503);
+        let ccache = parse_ccache(&data).unwrap();
 
         let tgt = ccache.find_tgt("EXAMPLE.COM").unwrap();
         assert_eq!(tgt.key_etype, 18); // AES-256

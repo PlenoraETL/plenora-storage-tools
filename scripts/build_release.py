@@ -11,6 +11,7 @@ import tarfile
 import tempfile
 import sys
 
+from check_packages import check_cargo, verify_distribution
 from build_python import build as build_python
 from render_sbom import render as render_sbom
 from render_sbom import render_qualification
@@ -74,6 +75,7 @@ def main():
     command = ['cargo', 'package', '--workspace', '--exclude', 'plenora-storage-py', '--locked', '--offline', '--no-verify']
     if args.allow_dirty:
         command.append('--allow-dirty')
+    check_cargo()
     run(*command)
 
     binary_name = 'plenora-storage.exe' if os.name == 'nt' else 'plenora-storage'
@@ -89,6 +91,7 @@ def main():
     packages = []
     for package in metadata['packages']:
         archive = target_dir / 'package' / f"{package['name']}-{version}.crate"
+        verify_distribution(archive)
         shutil.copy2(archive, output / archive.name)
         packages.append(archive)
 
@@ -127,6 +130,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         archive.add(ROOT / 'contracts', arcname='contracts',
                     filter=lambda member: None if '__pycache__' in Path(member.name).parts else member)
 
+    verify_distribution(contracts)
     files = [binary, archive_path, contracts] + [output / p.name for p in packages]
     if not args.allow_dirty:
         files.extend(package_source(output, target_dir))

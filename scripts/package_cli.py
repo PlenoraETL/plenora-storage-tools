@@ -2,21 +2,13 @@
 import hashlib
 from pathlib import Path
 import stat
-import subprocess
 import tarfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-DOCUMENTS = [
-    'README.md', 'LICENSE',
-    'crates/plenora-storage-py/README.md',
-    'crates/plenora-storage-py/examples/local_roundtrip.py',
-    'crates/plenora-smb2/PROVENANCE.md', 'crates/plenora-smb2/LICENSE-MIT',
-    'crates/plenora-smb2/LICENSE-APACHE',
-]
-# Ship the complete committed documentation tree, including the release reports
-# linked by its index. Untracked working notes must never enter a distribution.
-DOCUMENTS += sorted(subprocess.check_output(['git', 'ls-files', '--', 'docs'], cwd=ROOT, text=True).splitlines())
+from check_packages import registry, verify_distribution
+
+DOCUMENTS = [n for n in registry()['cli-linux'] if n != 'plenora-storage']
 
 
 def verify_archive(archive, binary):
@@ -55,4 +47,5 @@ def build(output, binary, version, target):
             for source, name in files:
                 stream.add(source, arcname=name)
     verify_archive(archive, binary)
+    verify_distribution(archive)
     return archive

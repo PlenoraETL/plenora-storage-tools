@@ -12,6 +12,7 @@ import tempfile
 import zipfile
 
 from package_source import extract
+from check_packages import verify_distribution
 from release_evidence import TARGETS, require
 from versioning import workspace_version
 
@@ -143,6 +144,7 @@ def prepare(archive, output, tag):
         with tarfile.open(bundle, 'w:gz') as stream:
             for name in qualified_files(release):
                 stream.add(release / name, arcname=version + '/' + name, recursive=False)
+        verify_distribution(bundle)
         names.append(bundle.name)
         files = {name: digest(output / name) for name in sorted(names)}
         (output / 'publication-index.json').write_text(json.dumps(dict(version=version, files=files), indent=2) + '\n')
@@ -207,6 +209,8 @@ def smoke(directory):
 def upload(directory, tag):
     draft(tag)
     index = check_files(directory)
+    for name in index['files']:
+        verify_distribution(directory / name)
     paths = [directory / name for name in [*index['files'], 'publication-index.json', 'SHA256SUMS']]
     subprocess.run(['gh', 'release', 'upload', tag, *map(str, paths), '--clobber'], check=True)
 
@@ -214,6 +218,8 @@ def upload(directory, tag):
 def publish(directory, tag):
     draft(tag)
     index = check_files(directory)
+    for name in index['files']:
+        verify_distribution(directory / name)
     with tempfile.TemporaryDirectory(prefix='storage-release-roundtrip-') as temporary:
         folder = Path(temporary)
         subprocess.run(['gh', 'release', 'download', tag, '--dir', str(folder)], check=True)
