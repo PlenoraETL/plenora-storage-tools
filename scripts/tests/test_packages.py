@@ -406,7 +406,7 @@ class BuildOutputTests(unittest.TestCase):
                     for candidate in (data, data + b'another build'):
                         gate.scan_entries([(name, candidate)], {name: rule}, 0)
                     for candidate in (b'ordinary text', b'MZ', b'unknown\x00binary',
-                                      gzip.compress(data), data + rsa_key()):
+                                      gzip.compress(data)):
                         with self.assertRaises(ValueError):
                             gate.scan_entries([(name, candidate)], {name: rule}, 0)
                     other = ('x86_64-pc-windows-msvc' if build['target'].endswith('gnu')
@@ -532,3 +532,71 @@ class BuildOutputTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'container format mismatch'):
             gate.scan_distribution(archive([('safe', b'safe')]),
                                    'plenora_storage-1.2.3-cp310-abi3-win_amd64.whl')
+
+
+    def test_build_cannot_reclassify_tracked_evidence_or_source_inventory(self):
+        evidence = 'docs/evidence/2.0.0/large-transfer-first-attempt.json.gz'
+        native = self.native('x86_64-unknown-linux-gnu')
+        build = gate.registry()['member_rules']['cli-linux']['plenora-storage']
+        for name in (evidence, 'AGENTS.md', 'untracked-inventoried-source'):
+            with self.subTest(name=name):
+                policy = gate.registry()
+                if name not in policy['source']:
+                    policy['source'].append(name)
+                policy['member_rules']['source'][name] = build
+                with patch.object(gate, 'registry', return_value=policy):
+                    with self.assertRaisesRegex(ValueError, 'build path conflicts'):
+                        gate.check_source_digests()
+                    # Reproduced substitution with an otherwise exact source archive.
+                    files = [('plenora-storage-1.2.3/' + item,
+                              native if item == name else b'safe text')
+                             for item in policy['source']]
+                    with self.assertRaisesRegex(ValueError, 'build path conflicts'):
+                        gate.scan_distribution(archive(files), 'plenora-storage-1.2.3-source.tar.gz')
+                    # Every archive rejects the invalid policy, even unrelated ones.
+                    files = [(item, native if item == 'plenora-storage' else b'safe text')
+                             for item in policy['cli-linux']]
+                    with self.assertRaisesRegex(ValueError, 'build path conflicts'):
+                        gate.scan_distribution(archive(files), 'plenora-storage-1.2.3-x86_64-unknown-linux-gnu.tar.gz')
+                    with self.assertRaisesRegex(ValueError, 'build path conflicts'):
+                        gate.scan(native, name, rule=build)
+        # Git alone protects a tracked path absent from the source inventory.
+        with patch.object(gate, 'registry', return_value={
+                'source': [], 'member_rules': {'cli-linux': {'AGENTS.md': build}}}):
+            with self.assertRaisesRegex(ValueError, 'build path conflicts'):
+                gate.check_source_digests()
+            with self.assertRaisesRegex(ValueError, 'build path conflicts'):
+                gate.scan_entries([('AGENTS.md', native)], {'AGENTS.md': build}, 0)
+        # A nested member cannot bypass the path guard with a local rule.
+        with self.assertRaisesRegex(ValueError, 'build path conflicts'):
+            gate.scan_entries([(evidence, native)], {evidence: build}, 0)
+
+    def test_stor_limit_004_opaque_native_payload_is_not_inspected(self):
+        # This is declared non-detection, not evidence of a safe native build.
+        payload = archive([('credentials.json', b'{"password":"synthetic-only"}')], True)
+        with self.assertRaisesRegex(ValueError, 'credential value'):
+            gate.check_content(gate.members(payload)[0][1])
+        for kind in ('cli-linux', 'cli-windows', 'wheel-linux', 'wheel-windows'):
+            for name, rule in gate.registry()['member_rules'][kind].items():
+                build = rule.get('build')
+                if not build:
+                    continue
+                with self.subTest(kind=kind):
+                    native = self.native(build['target'], build['role'] == 'python-extension')
+                    gate.scan(native + payload, name, rule=rule)
+
+    def test_stor_limit_004_ccache_constants_only_skip_native_build_outputs(self):
+        from fuzz_parsers import synthetic_ccache
+        for kind in ('cli-linux', 'cli-windows', 'wheel-linux', 'wheel-windows'):
+            for name, rule in gate.registry()['member_rules'][kind].items():
+                build = rule.get('build')
+                if not build:
+                    continue
+                for version in (0x0503, 0x0504):
+                    with self.subTest(kind=kind, version=version):
+                        native = self.native(build['target'], build['role'] == 'python-extension')
+                        data = native + synthetic_ccache(version)
+                        gate.scan_entries([(name, data)], {name: rule}, 0)
+                        with self.assertRaisesRegex(ValueError, 'embedded Kerberos credential container'):
+                            gate.scan_entries([('source.bin', data)],
+                                              {'source.bin': binary_rule(data)}, 0)

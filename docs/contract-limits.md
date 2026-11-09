@@ -54,3 +54,27 @@ solo il contenuto codificato dei file testuali ammessi.
 Rientro: nuova decisione esplicita del titolare che estenda il perimetro a
 codifiche nominate, con prove riproducibili e gate eseguibile per quelle forme.
 Non e richiesto inseguire varianti nell'attuale perimetro.
+
+
+## STOR-LIMIT-004
+
+Regola: policy dei pacchetti, limite dichiarato sugli output di build opachi.
+
+Ambito: binari nativi ELF/PE ed estensioni ammessi tramite regole `build` in
+`scripts/check_packages.py`, in tutte le distribuzioni. La guardia verifica
+nome, ruolo, target, ABI e formato; non applica la scansione del contenuto
+agli output di build nativi. Tutti gli altri membri, inclusi sorgenti testuali
+e binari versionati, contenitori dichiarati e metadati delle wheel, restano
+scansionati. Un payload accodato o incorporato, per esempio uno ZIP dopo
+un'intestazione ELF/PE, non e ispezionato. Il test ELF/PE per CLI
+ed estensioni documenta la mancata rilevazione come comportamento dichiarato,
+non come successo della guardia. Vedere la [policy dei pacchetti](package-policy.md).
+
+Hazard: un binario prodotto da una build compromessa puo contenere payload
+non rilevati. Mitigazione: gli output di build sono prodotti dalla CI dai
+sorgenti, che sono sotto inventario esatto, digest e scansione. Una regola
+`build` non puo riclassificare un percorso tracciato da Git o appartenente
+all'inventario sorgente; il limite riguarda il contenuto del binario generato.
+
+Rientro: verifica di riproducibilita o attestazione della build, con prove
+riproducibili e gate eseguibile.

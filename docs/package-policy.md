@@ -48,7 +48,10 @@ Other members are classified by provenance, never exempted by extension:
   packaged bytes. This includes the 21 historical gzip evidence files; their
   bytes and historical claims remain unchanged.
 - Build outputs have a `build` rule with exact role and target, and ABI for
-  Python extensions. They cannot have a source digest. The inventory names
+  Python extensions. They cannot have a source digest. A build path must not
+  match any Git-tracked path (`git ls-files` including HEAD) or any source
+  inventory member. The guard rejects conflicting policies in
+  `check_source_digests` and on every archive, including nested members. The inventory names
   exactly one member for each role/target/ABI. CLI executables and extension
   libraries must be x86-64 ELF64 on Linux or PE32+ on Windows; DLL versus EXE
   and ELF executable versus shared library types are checked. Unknown targets,
@@ -83,6 +86,18 @@ or mixed with other text, or other encodings. This is declared as
 is still in the exact inventory and subject to PR review; the limit concerns
 only encoded content inside admitted text files. The hex and prefixed-base64
 tests document non-detection as declared behavior, not guard success.
+
+Opaque native build outputs (ELF/PE executables and extensions) have name,
+role, target, ABI and format checks, with no content scanning. All other
+members, including textual sources, tracked binaries, declared containers
+and wheel metadata, remain subject to scanning. Appended or embedded payloads, such as a ZIP after an ELF/PE header,
+are not recursively inspected or reliably detected. This is
+[STOR-LIMIT-004](contract-limits.md#stor-limit-004); its test documents
+non-detection as declared behavior. The hazard is a binary produced by a
+compromised build. CI produces build outputs from sources covered by exact
+inventories, digests and scanning; this is the mitigation, not proof of binary
+contents. Closing the limit requires build reproducibility verification or
+build attestation.
 
 Container magic is checked before accepting a binary digest: gzip, bzip2, xz,
 zstd (including skippable frames), lz4, ZIP, tar, 7z, RAR, ar and cpio. A container

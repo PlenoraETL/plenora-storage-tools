@@ -317,6 +317,8 @@ SUPPORTED = {'gzip', 'bzip2', 'xz', 'zip', 'tar'}
 
 
 def scan_entries(entries, expected, depth):
+    check_build_paths()
+    check_build_paths(expected)
     compare([n for n, _ in entries], expected)
     roles = set()
     for rule in expected.values():
@@ -335,6 +337,7 @@ def check_build(data, rule, name):
     build = rule['build']
     if 'sha256' in rule or 'source' in rule:
         raise ValueError('build output cannot have a source digest')
+    check_build_paths({name: rule})
     target = build.get('target')
     if target not in {'x86_64-pc-windows-msvc', 'x86_64-unknown-linux-gnu'}:
         raise ValueError('unknown build target')
@@ -361,6 +364,10 @@ def check_build(data, rule, name):
     if (role == 'python-extension' and build.get('abi') != 'cp310-abi3'
             or role == 'cli' and 'abi' in build):
         raise ValueError('unknown native ABI')
+    # STOR-LIMIT-004: native build outputs are checked only for format,
+    # not scanned for content (including appended/embedded payloads).
+    # CI builds from inventoried, digested/scanned sources mitigate a
+    # compromised build. Reproducibility or build attestation closes it.
     if target == 'x86_64-unknown-linux-gnu':
         # ELF64, little-endian, x86-64, current version, executable or DSO.
         if (build.get('format') != 'elf' or len(data) < 64
@@ -393,7 +400,36 @@ def source_bytes(name):
     return result.stdout
 
 
+def check_build_paths(rules=None):
+    """A build declaration cannot turn a source path into generated output."""
+    policy = registry()
+    tracked = subprocess.run(
+        ['git', 'ls-files', '--cached', '--with-tree=HEAD', '-z'], cwd=ROOT,
+        capture_output=True, check=True).stdout.decode('utf-8').split('\0')
+    protected = set(tracked) - {''}
+    protected.update(policy.get('source', []))
+    for group in policy.get('member_rules', {}).values():
+        protected.update(rule['source'] for rule in group.values() if 'source' in rule)
+
+    def check(group):
+        for name, rule in group.items():
+            if 'build' in rule:
+                pattern = re.escape(name)
+                for placeholder in ('{version}', '{python_version}', '{native}'):
+                    pattern = pattern.replace(re.escape(placeholder), '[^/]+')
+                if any(re.fullmatch(pattern, path) for path in protected):
+                    raise ValueError('build path conflicts with tracked or inventoried source')
+            container = rule.get('container', {})
+            check(container.get('members', {}))
+            if 'payload' in container:
+                check({name: container['payload']})
+
+    for group in ([rules] if rules is not None else policy.get('member_rules', {}).values()):
+        check(group)
+
+
 def check_source_digests():
+    check_build_paths()
     for rules in registry().get('member_rules', {}).values():
         for rule in rules.values():
             if 'build' in rule:
@@ -453,6 +489,8 @@ def scan(data, name='', depth=0, rule=None):
         return scan(expanded, 'payload', depth+1, declaration['payload'])
     if 'container' in rule:
         raise ValueError('declared container missing')
+    if 'build' in rule:
+        return  # Validated native build output: STOR-LIMIT-004.
     check_content(data)
 
 
