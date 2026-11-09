@@ -163,7 +163,7 @@ la licenza upstream MIT OR Apache-2.0 con i relativi testi
 
 `cargo fetch --locked`, poi `python scripts/build_release.py` producono binari,
 crate Rust, wheel Python testata, SBOM, contratti e SHA-256 in `dist/`. Installare
-prima `maturin==1.15.0`. Il flag `--allow-dirty` serve solo
+prima `maturin==1.16.0`. Il flag `--allow-dirty` serve solo
 per candidati locali da modifiche non committate. La verifica compila un
 consumer esterno e la CLI dagli archivi estratti. La procedura operativa e i
 limiti supportati sono in [docs/release.md](docs/release.md).

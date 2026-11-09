@@ -133,6 +133,24 @@ directory candidata: spostare gli asset alfa in `dist/1.0.0` non li promuove.
 su cui si basano alcuni controlli. Queste condizioni hanno regressioni negative
 nel job `product-quality` della CI.
 
+## Scelte TLS e crittografiche
+
+AWS-LC è una scelta intenzionale, non una dipendenza da eliminare per
+uniformare il grafo a ring. Il workspace abilita `russh/aws-lc-rs` per SSH/SFTP,
+`suppaftp/tokio-rustls-aws-lc-rs` per FTPS e
+`tokio-rustls/aws_lc_rs,tls12`. Anche `object_store` raggiunge AWS-LC nel grafo
+completo HTTP/S3. Su Windows `plenora-storage-sftp` dichiara direttamente
+`aws-lc-rs =1.18.1`, senza feature predefinite e con `prebuilt-nasm`, affinché
+la build SFTP isolata non dipenda dall'unificazione delle feature di un
+provider TLS. Il lock mantiene `aws-lc-sys 0.45.0`; `rustls 0.23.46` e
+`ring 0.17.14` possono coesistere nel grafo. Questa scelta non attesta FIPS,
+non cambia trust store, verifica dei certificati o pin delle host key e non
+qualifica server diversi dalle fixture dichiarate.
+
+Il controllo del candidato 3.0.4 conserva queste versioni. Per provenienza,
+raggiungibilità di defmt/bitflags e contenuto dei pacchetti, vedere le
+[note del candidato](release-notes-3.0.4.md).
+
 ## Ambito e limiti operativi
 
 - Rust richiede Tokio; toolchain minima dichiarata: 1.98 (1.92 fino alla 2.1). Non è dichiarata
@@ -268,7 +286,7 @@ quella documentata nelle [prove di affidabilità](reliability.md).
 `scripts/check_features.py` verifica ogni selezione di provider, inclusa la build
 senza provider. `scripts/check_docs.py` controlla lo stato generato e le versioni.
 `python -m unittest discover -s scripts/tests` verifica l'inventario SBOM.
-Il packaging richiede `maturin==1.15.0`, costruisce la wheel con `build_python.py`
+Il packaging richiede `maturin==1.16.0`, costruisce la wheel con `build_python.py`
 e ne esegue i test dopo installazione in un ambiente isolato. Wheel e log hanno
 digest nel manifest. La qualifica Python live è eseguita da `qualify_python.py`
 sulla wheel finale per ciascun target. Non riutilizzare report di una wheel diversa.

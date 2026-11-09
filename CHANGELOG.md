@@ -1,5 +1,18 @@
 # Changelog
 
+## 3.0.4 — unreleased
+
+Patch release preparation; source manifests remain at 3.0.3 until release
+preparation. See [candidate notes](docs/release-notes-3.0.4.md) for scope and evidence.
+
+- Align `serde_json` 1.0.151 → 1.0.154 in the workspace and all three lockfiles,
+  preserving the public compatible requirement and existing features. Finite
+  JSON numbers outside the f32 range no longer compare equal to f32 infinity
+  in Rust consumers of public `Value` payloads (for example `1e100`);
+  `runtime_payload_large_finite_number_is_not_f32_infinity` covers this correction.
+- Align the SDK build backend and quality/CI installation pins to
+  `maturin==1.16.0`.
+
 ## 3.0.3 — 2026-11-07
 
 Security patch release; no incompatible changes and no change to the public
