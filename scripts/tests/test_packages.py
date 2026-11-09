@@ -69,6 +69,9 @@ def binary_rule(data, container=None):
 
 
 class PackageGuardTests(unittest.TestCase):
+    def setUp(self):
+        (gate.ROOT / 'target').mkdir(parents=True, exist_ok=True)
+
     def test_safe_text_public_certificate_and_native_data(self):
         for data in (b'ordinary source', b'password field documentation',
                      b'MZ' + bytes(range(256)),
@@ -141,6 +144,11 @@ class PackageGuardTests(unittest.TestCase):
             gate.scan(output.getvalue())
 
     def test_credential_document_and_fixed_samba_password(self):
+        public_fixture = b'printf "testpass' + b'\\ntestpass\\n" | smbpasswd -a -s testuser'
+        gate.scan(public_fixture)
+        for extra in (rsa_key(), b'\n' + b'printf "other\\nother\\n" | smbpasswd -a -s user'):
+            with self.subTest(extra=extra[:5]), self.assertRaises(ValueError):
+                gate.scan(public_fixture + extra)
         with self.assertRaises(ValueError):
             gate.scan(json.dumps({'password': 'generated-only-in-test'}).encode())
         with self.assertRaises(ValueError):
@@ -157,12 +165,12 @@ class PackageGuardTests(unittest.TestCase):
             ('wheel-linux', 'plenora_storage-1.2.3-cp310-abi3-manylinux_2_34_x86_64.whl', ''),
         ]
         for kind, name, prefix in cases:
-            with self.subTest(kind=kind), patch.object(gate, 'registry', return_value={kind: ['one', 'two']}):
+            with self.subTest(kind=kind), patch.object(gate, 'registry', return_value={kind: ['one', 'two'], 'wheel-tags': gate.registry()['wheel-tags']}):
                 good = [(prefix+'one', b'one'), (prefix+'two', b'two')]
-                gate.scan(archive(good), name)
+                gate.scan(archive(good, kind in {'cli-windows', 'wheel-windows', 'wheel-linux'}), name)
                 for files in (good[:1], good+[(prefix+'extra', b'extra')]):
                     with self.assertRaises(ValueError):
-                        gate.scan(archive(files), name)
+                        gate.scan(archive(files, kind in {'cli-windows', 'wheel-windows', 'wheel-linux'}), name)
 
     def test_prerelease_qualification_uses_python_version(self):
         name = 'plenora-storage-1.2.3-rc.1-qualification.tar.gz'
@@ -251,12 +259,12 @@ class PackageGuardTests(unittest.TestCase):
             package.write_bytes(archive([('nested', data)], True))
             policy = root / 'policy.json'
             initial = {'cli-windows': ['nested'], 'source': [], 'cli-linux': [],
-                       'member_rules': {'cli-windows': {'nested': {'container': {
+                       'member_rules': {'cli-windows': {'nested': {'source': 'nested', 'container': {
                            'format': 'tar', 'members': {'p' * 155 + '/' + 'a' * 100: {}}}}}}}
             for repository in (False, True):
                 with self.subTest(repository=repository):
                     policy.write_text(json.dumps(initial))
-                    with patch.object(gate, 'REGISTRY', policy), patch.object(gate, 'ROOT', root):
+                    with patch.object(gate, 'REGISTRY', policy), patch.object(gate, 'ROOT', root), patch.object(gate, 'source_bytes', return_value=data):
                         record([] if repository else [package], repository=repository)
                         rule = gate.registry()['member_rules']['cli-windows']['nested']
                         self.assertEqual(rule['sha256'], hashlib.sha256(data).hexdigest())
@@ -306,13 +314,14 @@ class PackageGuardTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=gate.ROOT / 'target') as temporary:
             root = Path(temporary)
             policy = root / 'policy.json'
-            policy.write_text(json.dumps({'cli-windows': ['app']}))
+            policy.write_text(json.dumps({'cli-windows': ['app'], 'member_rules': {'cli-windows': {'app': {'source': 'tracked/app'}}}}))
             package = root / 'plenora-storage-1.2.3-x86_64-pc-windows-msvc.zip'
             data = b'opaque\x00binary'
             package.write_bytes(archive([('app', data)], True))
-            with patch.object(gate, 'REGISTRY', policy):
+            with patch.object(gate, 'REGISTRY', policy), patch.object(gate, 'source_bytes', return_value=data):
                 record([package])
                 first = policy.read_bytes()
+                self.assertNotIn(b'\r\n', first)
                 gate.verify_distribution(package)
                 record([package])
                 self.assertEqual(first, policy.read_bytes())
@@ -359,8 +368,167 @@ class PackageGuardTests(unittest.TestCase):
 
     def test_prerelease_wheel_with_binary_rule(self):
         payload = b'native\x00binary'
-        policy = {'wheel-windows': ['module', 'metadata-{version}'],
+        policy = {'wheel-tags': gate.registry()['wheel-tags'],
+                  'wheel-windows': ['module', 'metadata-{version}'],
                   'member_rules': {'wheel-windows': {'module': binary_rule(payload)}}}
         with patch.object(gate, 'registry', return_value=policy):
             gate.scan(archive([('module', payload), ('metadata-1.2.3rc1', b'metadata')], True),
                       'plenora_storage-1.2.3rc1-cp310-abi3-win_amd64.whl')
+
+
+class BuildOutputTests(unittest.TestCase):
+    @staticmethod
+    def native(target, library=False):
+        data = bytearray(256)
+        if target == 'x86_64-unknown-linux-gnu':
+            data[:7] = bytes([127, 69, 76, 70, 2, 1, 1])
+            data[16:18] = (3 if library else 2).to_bytes(2, 'little')
+            data[18:20] = (62).to_bytes(2, 'little')
+            data[20:24] = (1).to_bytes(4, 'little')
+            data[52:54] = (64).to_bytes(2, 'little')
+        else:
+            data[:2] = b'MZ'
+            data[60:64] = (128).to_bytes(4, 'little')
+            data[128:132] = bytes([80, 69, 0, 0])
+            data[132:134] = (0x8664).to_bytes(2, 'little')
+            data[150:152] = (0x2002 if library else 2).to_bytes(2, 'little')
+            data[152:154] = (0x20b).to_bytes(2, 'little')
+        return bytes(data)
+
+    def test_all_declared_native_roles_accept_different_build_bytes(self):
+        for kind, rules in gate.registry()['member_rules'].items():
+            for name, rule in rules.items():
+                if rule.get('build', {}).get('role') not in {'cli', 'python-extension'}:
+                    continue
+                with self.subTest(kind=kind, name=name):
+                    build = rule['build']
+                    data = self.native(build['target'], build['role'] == 'python-extension')
+                    for candidate in (data, data + b'another build'):
+                        gate.scan_entries([(name, candidate)], {name: rule}, 0)
+                    for candidate in (b'ordinary text', b'MZ', b'unknown\x00binary',
+                                      gzip.compress(data), data + rsa_key()):
+                        with self.assertRaises(ValueError):
+                            gate.scan_entries([(name, candidate)], {name: rule}, 0)
+                    other = ('x86_64-pc-windows-msvc' if build['target'].endswith('gnu')
+                             else 'x86_64-unknown-linux-gnu')
+                    with self.assertRaises(ValueError):
+                        gate.scan(self.native(other), rule=rule)
+                    with self.assertRaisesRegex(ValueError, 'digest'):
+                        gate.scan(data, rule=dict(rule, sha256=hashlib.sha256(data).hexdigest()))
+                    with self.assertRaisesRegex(ValueError, 'duplicate build role'):
+                        gate.scan_entries([(name, data), ('extra', data)],
+                                          {name: rule, 'extra': rule}, 0)
+
+    def test_all_wheel_tags_and_unknown_platforms(self):
+        for tag, kind in gate.registry()['wheel-tags'].items():
+            name = 'plenora_storage-1.2.3rc1-' + tag + '.whl'
+            actual_kind, prefix, expected = gate.distribution_policy(name)
+            self.assertEqual(actual_kind, kind)
+            files = []
+            for member, rule in expected.items():
+                build = rule.get('build')
+                data = self.native(build['target'], True) if build else b'safe text'
+                files.append((prefix + member, data))
+            gate.scan(archive(files, True), name)
+            for bad in (files[:-1], files + [('extra.so', self.native('x86_64-unknown-linux-gnu', True))]):
+                with self.assertRaisesRegex(ValueError, 'inventory mismatch'):
+                    gate.scan(archive(bad, True), name)
+        for tag in ('cp311-cp311-win_amd64', 'cp310-abi3-win_arm64',
+                    'cp310-abi3-manylinux_2_40_x86_64', 'cp310-abi3-linux_x86_64'):
+            with self.assertRaisesRegex(ValueError, 'unknown wheel'):
+                gate.distribution_policy('plenora_storage-1.2.3-' + tag + '.whl')
+        with self.assertRaisesRegex(ValueError, 'unknown distribution'):
+            gate.distribution_policy('plenora-storage-1.2.3-aarch64-unknown-linux-gnu.tar.gz')
+
+    def test_built_crates_recurse_without_digest_and_keep_inventory(self):
+        policy = gate.registry()
+        for name, rule in policy['member_rules']['qualification'].items():
+            if not rule.get('build', {}).get('role', '').startswith('cargo:'):
+                continue
+            concrete = name.replace('{version}', '1.2.3')
+            crate = rule['build']['role'].removeprefix('cargo:')
+            prefix = crate + '-1.2.3/'
+            files = [(prefix + item, b'safe text') for item in policy['crates'][crate]]
+            for payload in (b'first build', b'second build'):
+                files[0] = (files[0][0], payload)
+                gate.scan(archive(files), concrete, rule=rule)
+            for bad in (files[:-1], files + [(prefix + 'extra', b'safe')],
+                        [(files[0][0], rsa_key())] + files[1:]):
+                with self.assertRaises(ValueError):
+                    gate.scan(archive(bad), concrete, rule=rule)
+            with self.assertRaisesRegex(ValueError, 'undeclared container'):
+                gate.scan(archive(files), concrete, rule={})
+
+    def test_source_digests_match_git_and_reject_changed_policy(self):
+        gate.check_source_digests()
+        policy = gate.registry()
+        rule = next(iter(policy['member_rules']['source'].values()))
+        rule['sha256'] = '0' * 64
+        with patch.object(gate, 'registry', return_value=policy):
+            with self.assertRaisesRegex(ValueError, 'differs from git'):
+                gate.check_source_digests()
+        with self.assertRaisesRegex(ValueError, 'not tracked'):
+            gate.source_bytes('target/not-a-source-file')
+
+    def test_recorder_cannot_pin_builds_or_learn_source_provenance(self):
+        from record_package_digests import record_rule
+        rule = gate.registry()['member_rules']['cli-windows']['plenora-storage.exe']
+        before = json.dumps(rule, sort_keys=True)
+        record_rule(rule, self.native('x86_64-pc-windows-msvc'))
+        self.assertEqual(before, json.dumps(rule, sort_keys=True))
+        with self.assertRaisesRegex(ValueError, 'provenance'):
+            record_rule({}, b'unknown\x00binary')
+        with patch.object(gate, 'source_bytes', return_value=b'tracked bytes'):
+            with self.assertRaisesRegex(ValueError, 'differ from git'):
+                record_rule({'source': 'tracked', 'sha256': '0' * 64}, b'replacement')
+
+
+    def test_complete_qualification_build_containers_and_roles(self):
+        def distribution(name):
+            _, prefix, expected = gate.distribution_policy(name)
+            files = []
+            for member, rule in expected.items():
+                if 'source' in rule:
+                    payload = gate.source_bytes(rule['source'])
+                elif 'container' in rule:
+                    payload = distribution(member)
+                elif 'build' in rule:
+                    build = rule['build']
+                    payload = self.native(build['target'], build['role'] == 'python-extension')
+                else:
+                    payload = b'safe text'
+                files.append((prefix + member, payload))
+            return archive(files, name.endswith(('.whl', '.zip')))
+        name = 'plenora-storage-1.2.3-qualification.tar.gz'
+        data = distribution(name)
+        gate.scan_distribution(data, name)
+        entries = gate.members(data)
+        for bad in (entries[:-1], entries + [('1.2.3/unlisted.crate', archive([('key', rsa_key())]))]):
+            with self.assertRaisesRegex(ValueError, 'inventory mismatch'):
+                gate.scan_distribution(archive(bad), name)
+
+
+    def test_standalone_archive_cannot_bypass_parent_inventory(self):
+        import tempfile
+        (gate.ROOT / 'target').mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=gate.ROOT / 'target') as temporary:
+            path = Path(temporary) / 'plenora-storage-1.2.3-source.tar.gz'
+            path.write_bytes(archive([('plenora-storage-1.2.3/readme', b'safe')]))
+            with self.assertRaisesRegex(ValueError, 'undeclared standalone'):
+                gate.verify_distribution(path, member='unknown/' + path.name)
+
+    def test_generated_container_role_target_abi_and_format_are_binding(self):
+        policy = gate.registry()
+        name = 'x86_64-pc-windows-msvc/plenora_storage-1.2.3-cp310-abi3-win_amd64.whl'
+        rule = policy['member_rules']['qualification'][name.replace('1.2.3', '{python_version}')]
+        for field, value in (('role', 'source'), ('target', 'x86_64-unknown-linux-gnu'), ('abi', 'cp311-cp311')):
+            bad = dict(rule, build=dict(rule['build'], **{field: value}))
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                gate.check_build(b'', bad, name)
+        for name in ('plenora-storage-1.2.3-x86_64-pc-windows-msvc.tar.gz',
+                     'plenora-storage-1.2.3-x86_64-unknown-linux-gnu.zip'):
+            with self.assertRaisesRegex(ValueError, 'archive format'):
+                gate.distribution_policy(name)
+        with self.assertRaisesRegex(ValueError, 'container format mismatch'):
+            gate.scan_distribution(archive([('safe', b'safe')]),
+                                   'plenora_storage-1.2.3-cp310-abi3-win_amd64.whl')

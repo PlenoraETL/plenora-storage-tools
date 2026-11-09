@@ -4,6 +4,10 @@
 //! with factory methods that return connected [`SmbClient`] instances.
 //! Enable the `testing` feature flag to use this module.
 //!
+//! Authenticated consumer fixtures use `testuser` with password `testpass`.
+//! This fixed password is a public test value, not a secret, cryptographic
+//! material or a credential cache.
+//!
 //! # Three-layer testing model
 //!
 //! **Layer 1: Rust integration tests** -- Use [`TestServers`] to get
@@ -528,40 +532,8 @@ fn embedded_files() -> Vec<EmbeddedFile> {
 /// ```
 ///
 /// Use this for Layer 2 (E2E tests) or Layer 3 (manual QA) where you
-/// run `docker compose up` outside of Rust. Read the generated `smb-password`
-/// file for the `testuser` password; it is shared through a Compose secret.
+/// run `docker compose up` outside of Rust.
 pub fn write_compose_files(dir: &Path) -> Result<()> {
-    fs::create_dir_all(dir).map_err(Error::Io)?;
-    let password_path = dir.join("smb-password");
-    // Preserve the password when refreshing an already prepared test rig.
-    if !password_path.exists() {
-        use std::io::Write;
-        let mut bytes = [0u8; 32];
-        getrandom::fill(&mut bytes)
-            .map_err(|_| Error::Io(std::io::Error::other("test password generation failed")))?;
-        let alphabet = b"0123456789abcdef";
-        let password: String = bytes
-            .iter()
-            .flat_map(|byte| {
-                [
-                    char::from(alphabet[usize::from(byte >> 4)]),
-                    char::from(alphabet[usize::from(byte & 15)]),
-                ]
-            })
-            .collect();
-        let mut options = fs::OpenOptions::new();
-        options.write(true).create_new(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            options.mode(0o600);
-        }
-        options
-            .open(password_path)
-            .map_err(Error::Io)?
-            .write_all(password.as_bytes())
-            .map_err(Error::Io)?;
-    }
     let files = embedded_files();
     for file in &files {
         let path = dir.join(file.relative_path);
@@ -680,12 +652,6 @@ impl TestServers {
         self.require_service("smb-consumer-guest")?;
         let addr = format!("127.0.0.1:{}", guest_port());
         connect_guest(&addr).await
-    }
-
-    /// Password generated for the `testuser` account in this test rig.
-    /// Pass it to [`Self::auth_client`] or [`Self::both_client_auth`].
-    pub fn test_password(&self) -> Result<String> {
-        fs::read_to_string(self.compose_dir.join("smb-password")).map_err(Error::Io)
     }
 
     /// Auth-required server. Needs username and password.
@@ -1152,34 +1118,6 @@ mod tests {
 
         // Clean up.
         let _ = fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn generated_password_is_unique_and_preserved() {
-        let root = std::env::temp_dir().join(format!("smb2-password-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&root);
-        let first = root.join("first");
-        let second = root.join("second");
-        write_compose_files(&first).unwrap();
-        write_compose_files(&second).unwrap();
-        let password = fs::read_to_string(first.join("smb-password")).unwrap();
-        assert_eq!(password.len(), 64);
-        assert!(password.bytes().all(|b| b.is_ascii_hexdigit()));
-        assert_ne!(
-            password,
-            fs::read_to_string(second.join("smb-password")).unwrap()
-        );
-        write_compose_files(&first).unwrap();
-        assert_eq!(
-            password,
-            fs::read_to_string(first.join("smb-password")).unwrap()
-        );
-        assert!(COMPOSE_YML.contains("file: ./smb-password"));
-        for dockerfile in [AUTH_DOCKERFILE, BOTH_DOCKERFILE] {
-            assert!(dockerfile.contains("/run/secrets/smb_password"));
-            assert!(dockerfile.contains("smbpasswd -a -s testuser"));
-        }
-        let _ = fs::remove_dir_all(root);
     }
 
     #[test]

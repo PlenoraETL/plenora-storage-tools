@@ -1,13 +1,30 @@
-"""Record exact binary digests from reviewed artifacts; never run from a gate.
+"""Record digests of reviewed, tracked source members only; never build outputs.
 
-Container declarations and member inventories must already exist. This command
-changes policy and requires review; it does not certify the input artifacts.
+Inventories, provenance and container declarations must already exist.
+This is a deliberate policy edit, never a build or verification step.
 """
 import argparse
 import hashlib
 import json
 from pathlib import Path
 import check_packages as gate
+
+
+def record_rule(rule, data, name=''):
+    if 'build' in rule:
+        gate.scan(data, name, rule=rule)
+        return
+    container = gate.container_format(data)
+    if container and (container not in gate.SUPPORTED or 'container' not in rule):
+        raise ValueError('unsupported or undeclared source container')
+    if container or not gate.is_text(data) or 'sha256' in rule:
+        if 'source' not in rule:
+            raise ValueError('source provenance must be declared before recording')
+        committed = gate.source_bytes(rule['source'])
+        if data != committed:
+            raise ValueError('source bytes differ from git')
+        rule['sha256'] = hashlib.sha256(committed).hexdigest()
+        gate.scan(data, name, rule=rule)
 
 
 def record(paths, repository=False, member=None):
@@ -17,23 +34,15 @@ def record(paths, repository=False, member=None):
         templates = policy['crates'][kind[7:]] if kind.startswith('crates/') else policy[kind]
         if name not in templates:
             raise ValueError('member outside exact inventory')
-        data = Path(source).read_bytes()
-        if gate.container_format(data):
-            raise ValueError('use an archive inventory to record container members')
-        policy.setdefault('member_rules', {}).setdefault(kind, {}).setdefault(name, {})['sha256'] = hashlib.sha256(data).hexdigest()
+        rule = policy.get('member_rules', {}).get(kind, {}).get(name, {})
+        if 'build' in rule:
+            raise ValueError('cannot record a digest for a build output')
+        record_rule(rule, Path(source).read_bytes())
     if repository:
-        for kind in ('source', 'cli-linux', 'cli-windows'):
-            rules = policy.setdefault('member_rules', {}).setdefault(kind, {})
-            for name in policy[kind]:
-                source = gate.ROOT / name
-                if source.is_file():
-                    data = source.read_bytes()
-                    if gate.container_format(data) or not gate.is_text(data):
-                        rule = rules.setdefault(name, {})
-                        container = gate.container_format(data)
-                        if container and (container not in gate.SUPPORTED or 'container' not in rule):
-                            raise ValueError('unsupported or undeclared repository container')
-                        rule['sha256'] = hashlib.sha256(data).hexdigest()
+        for rules in policy.get('member_rules', {}).values():
+            for rule in rules.values():
+                if 'source' in rule:
+                    record_rule(rule, (gate.ROOT / rule['source']).read_bytes())
     for path in paths:
         kind, prefix, expected = gate.distribution_policy(path.name)
         entries = gate.members(path.read_bytes())
@@ -41,20 +50,12 @@ def record(paths, repository=False, member=None):
             raise ValueError('unexpected distribution root')
         entries = [(n[len(prefix):], data) for n, data in entries]
         gate.compare([n for n, _ in entries], expected)
-        rules = policy.setdefault('member_rules', {}).setdefault(kind, {})
-        # Resolve template names without deriving new inventory entries.
         templates = policy['crates'][kind[7:]] if kind.startswith('crates/') else policy[kind]
         mapping = dict(zip(expected, templates))
+        rules = policy.get('member_rules', {}).get(kind, {})
         for name, data in entries:
-            container = gate.container_format(data)
-            rule = rules.setdefault(mapping[name], {})
-            if container and (container not in gate.SUPPORTED or 'container' not in rule):
-                raise ValueError('unsupported or undeclared container during digest recording')
-            if 'container' in rule or not gate.is_text(data) or 'sha256' in rule:
-                rule['sha256'] = hashlib.sha256(data).hexdigest()
-            if not rule:
-                del rules[mapping[name]]
-    gate.REGISTRY.write_text(json.dumps(policy, indent=2) + '\n', encoding='utf-8')
+            record_rule(rules.get(mapping[name], {}), data, name)
+    gate.REGISTRY.write_text(json.dumps(policy, indent=2) + '\n', encoding='utf-8', newline='\n')
 
 
 if __name__ == '__main__':

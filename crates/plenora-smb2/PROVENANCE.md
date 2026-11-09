@@ -43,6 +43,6 @@ the Plenora 3.0.0 major release.
 
 For the Plenora 3.0.4 candidate, the ccache parser tests construct their synthetic
 v3/v4 inputs at runtime instead of embedding saved credential-cache files. The
-public `testing` feature retains its embedded consumer rig, but preparation now
-generates a password consumed through a Compose secret; `test_password` exposes
-it to test consumers without changing the explicit authentication signatures.
+public `testing` feature retains its embedded consumer rig and the existing
+fixed password. That password is a public test value, not a secret, cryptographic
+material or a credential cache; its behavior and authentication API are unchanged.

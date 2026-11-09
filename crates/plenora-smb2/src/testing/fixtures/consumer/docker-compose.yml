@@ -20,16 +20,12 @@ services:
   smb-consumer-auth:
     build:
       context: smb-consumer-auth
-    secrets:
-      - smb_password
     ports:
       - "${SMB_BIND_ADDR:-127.0.0.1}:${SMB_CONSUMER_AUTH_PORT:-10481}:445"
 
   smb-consumer-both:
     build:
       context: smb-consumer-both
-    secrets:
-      - smb_password
     ports:
       - "${SMB_BIND_ADDR:-127.0.0.1}:${SMB_CONSUMER_BOTH_PORT:-10482}:445"
 
@@ -106,7 +102,3 @@ services:
       context: smb-consumer-maxreadsize
     ports:
       - "${SMB_BIND_ADDR:-127.0.0.1}:${SMB_CONSUMER_MAXREADSIZE_PORT:-10494}:445"
-
-secrets:
-  smb_password:
-    file: ./smb-password

@@ -23,13 +23,11 @@ working-tree archive checks are local evidence only, not release qualification.
 The 37 consumer files are required by the public `plenora-smb2/testing` feature:
 `include_str!` embeds them and `write_compose_files` writes the rig. They remain
 in Cargo/source distributions to preserve this public feature. No binary keys
-were present. Two Dockerfiles previously installed a fixed test password. They
-now read a Compose secret at container start, never in an image layer.
-`write_compose_files` creates `smb-password` using OS randomness (32 bytes, hex),
-preserves it on repeated preparation and uses mode 0600 on Unix. Consumers pass
-`TestServers::test_password()` with username `testuser` to the existing explicit
-credential methods. Manual consumers read that generated file. Windows uses the
-parent directory's ACL. Docker integration still requires a live fixture run.
+were present. Authenticated consumer fixtures retain username `testuser` and
+fixed password `testpass`, preserving their existing public behavior. This
+password is a public test value, not a secret, cryptographic material or a
+credential cache; it is outside the exclusion above. Docker integration still
+requires a live fixture run.
 
 Kerberos fuzz cache seeds are also generated. Qualification regenerates initial
 seeds and compares their exact hashes with the campaign report. Raw fuzz corpus
@@ -43,13 +41,38 @@ level must have an exact inventory entry. `member_rules` supplements those
 entries; rules outside a distribution inventory are rejected.
 
 Text means valid UTF-8 with no Unicode control characters except TAB, CR and LF.
-Every other member requires its exact SHA-256 in `member_rules`. A recorded hash
-is checked even if replacement bytes are text. File extensions never grant an
-exception. This closes unknown binary key formats by construction, independently
-of the private-key recognizer. Text is still checked for private PEM, bare or
-multiline base64 private DER blocks, credential documents and fixed passwords;
-structural checks for DER and Kerberos material remain additional checks.
-Traditional six-INTEGER DSA is included in the base64 key recognition.
+Other members are classified by provenance, never exempted by extension:
+
+- Tracked source members have `source` and exact `sha256` rules. The package
+  gate compares the digest with the Git HEAD blob as well as inspecting the
+  packaged bytes. This includes the 21 historical gzip evidence files; their
+  bytes and historical claims remain unchanged.
+- Build outputs have a `build` rule with exact role and target, and ABI for
+  Python extensions. They cannot have a source digest. The inventory names
+  exactly one member for each role/target/ABI. CLI executables and extension
+  libraries must be x86-64 ELF64 on Linux or PE32+ on Windows; DLL versus EXE
+  and ELF executable versus shared library types are checked. Unknown targets,
+  ABIs, native roles and opaque binary members fail closed. All native bytes
+  still undergo the private-material scanner.
+- Generated Cargo, source, contracts, CLI and wheel archives nested in the
+  qualification bundle have explicit build roles and container declarations.
+  Their contents recurse into their exact distribution inventory. A plausible
+  filename alone never authorizes a nested archive.
+
+`wheel-tags` declares `cp310-abi3-win_amd64`,
+`cp310-abi3-manylinux_2_34_x86_64` (Bookworm release/coverage) and
+`cp310-abi3-manylinux_2_39_x86_64` (Ubuntu quality CI). Both Linux tags use the
+same exact member inventory. The release qualification inventory requires the
+Bookworm wheel, not both Linux CI variants. Undeclared tags are rejected rather
+than inferred from the build host. CLI distributions are exactly Windows MSVC
+ZIP and Linux GNU tar.gz. No standalone static library is distributed.
+
+A recorded source hash is checked even if replacement bytes are text. Text
+and native outputs are checked for private PEM, bare or multiline base64 private
+DER blocks, credential documents and fixed Samba passwords other than the exact
+public fixture value described above; structural checks for
+DER and Kerberos material remain additional checks. Traditional six-INTEGER DSA
+is included in the base64 key recognition.
 
 Under the owner's static-guard decision of 2026-11-06, the guard covers direct
 forms by construction and declares variants as limits rather than pursuing
@@ -63,8 +86,9 @@ tests document non-detection as declared behavior, not guard success.
 
 Container magic is checked before accepting a binary digest: gzip, bzip2, xz,
 zstd (including skippable frames), lz4, ZIP, tar, 7z, RAR, ar and cpio. A container
-requires both an exact digest and an explicit `container` declaration, even
-when all its bytes are printable text. zstd,
+requires an explicit `container` declaration and, for a source member, an exact
+digest even when all its bytes are printable text. Generated distribution
+containers instead require their declared build role. zstd,
 lz4, 7z, RAR, ar and cpio are unsupported and always rejected, even when declared.
 Supported compressed streams specify `format` and a `payload` rule; ZIP/tar
 specify an exact `members` mapping of names to rules. The same rules apply
@@ -75,34 +99,21 @@ selected by the explicitly supported distribution names; all their members
 are subject to the rules above. Standalone release/publication files are also
 selected from exact qualification/public-document inventories.
 
-The 21 historical gzip evidence files have explicit gzip declarations, text
-payload rules and exact hashes in each distribution that includes them. Their
-bytes and historical claims are unchanged. Native Windows CLI/wheel hashes
-currently identify the local debug artifacts, not optimized release artifacts.
-No Linux native digest or completed qualification-bundle digest is invented.
-Such artifacts fail closed until their actual bytes have been reviewed and
-recorded. Rebuilding a native artifact may change its digest.
+Digest recording is a separate policy edit for tracked source members only:
 
-Digest recording is a separate, deliberate policy edit, never part of a build,
-CI verification or publication. From the repository root, reproduce the current
-hashes with:
-
-```powershell
-python scripts/record_package_digests.py --member qualification x86_64-pc-windows-msvc/plenora-storage.exe target/debug/plenora-storage.exe
-python scripts/record_package_digests.py --repository target/fixture-packages/archives/plenora-storage-3.0.3-x86_64-pc-windows-msvc.zip target/fixture-packages/wheel/plenora_storage-3.0.3-cp310-abi3-win_amd64.whl
+```sh
+python scripts/record_package_digests.py --repository
 ```
 
-`--repository` records binary documentation from the exact source/CLI inventories;
-archive arguments record binary members from the corresponding exact inventory.
-The command refuses undeclared/unsupported containers and never adds member
-names or container declarations. Review the resulting `scripts/package_files.json`
-diff, then run the guard independently. To prepare another candidate, build its
-artifacts (the builder may initially reject their unrecorded digests), record
-those exact artifacts, review the policy change, then rerun verification/build.
-`--member KIND NAME FILE` records a single existing inventory entry (for example,
-the standalone CLI in qualification). Nested package policies must also be recorded from their individual artifacts.
-This is approval of specific bytes, not an assertion that a format detector can
-identify every obfuscated secret. Diagnostics never include inspected payloads.
+Declare the exact `source` path and any container structure before recording.
+The recorder compares input bytes with Git HEAD, refuses untracked/substituted
+inputs, and never learns member names or container declarations. Archive
+arguments validate generated members without recording their digests;
+`--member KIND NAME FILE` refuses build outputs. Rebuilding a CLI, wheel or
+nested Cargo archive requires no policy edit. Release manifests and receipts
+still bind the actual final artifacts to their SHA-256 checksums: this policy
+change does not weaken artifact identity checks or claim reproducible builds.
+Diagnostics never include inspected payloads.
 
 CI runs `python scripts/check_packages.py --build`; release builders check the
 actual archives, `verify_release.py` checks every artifact, and publication

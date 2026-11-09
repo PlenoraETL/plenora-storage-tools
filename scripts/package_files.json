@@ -1226,148 +1226,257 @@
         "container": {
           "format": "gzip",
           "distribution": true
+        },
+        "build": {
+          "role": "cargo:plenora-smb2",
+          "target": "x86_64-pc-windows-msvc"
         }
       },
       "x86_64-pc-windows-msvc/plenora-storage-cli-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
+        },
+        "build": {
+          "role": "cargo:plenora-storage-cli",
+          "target": "x86_64-pc-windows-msvc"
         }
       },
       "x86_64-pc-windows-msvc/plenora-storage-contracts-{version}.tar.gz": {
         "container": {
           "format": "gzip",
           "distribution": true
+        },
+        "build": {
+          "role": "contracts",
+          "target": "x86_64-pc-windows-msvc"
         }
       },
       "x86_64-pc-windows-msvc/plenora-storage-core-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
+        },
+        "build": {
+          "role": "cargo:plenora-storage-core",
+          "target": "x86_64-pc-windows-msvc"
         }
       },
       "x86_64-pc-windows-msvc/plenora-storage-engine-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
+        },
+        "build": {
+          "role": "cargo:plenora-storage-engine",
+          "target": "x86_64-pc-windows-msvc"
         }
       },
       "x86_64-pc-windows-msvc/plenora-storage-ftp-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
+        },
+        "build": {
+          "role": "cargo:plenora-storage-ftp",
+          "target": "x86_64-pc-windows-msvc"
         }
       },
       "x86_64-pc-windows-msvc/plenora-storage-providers-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
+        },
+        "build": {
+          "role": "cargo:plenora-storage-providers",
+          "target": "x86_64-pc-windows-msvc"
         }
       },
       "x86_64-pc-windows-msvc/plenora-storage-s3-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
+        },
+        "build": {
+          "role": "cargo:plenora-storage-s3",
+          "target": "x86_64-pc-windows-msvc"
         }
       },
       "x86_64-pc-windows-msvc/plenora-storage-sftp-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
+        },
+        "build": {
+          "role": "cargo:plenora-storage-sftp",
+          "target": "x86_64-pc-windows-msvc"
         }
       },
       "x86_64-pc-windows-msvc/plenora-storage-{version}-source.tar.gz": {
         "container": {
           "format": "gzip",
           "distribution": true
+        },
+        "build": {
+          "role": "source",
+          "target": "x86_64-pc-windows-msvc"
         }
       },
       "x86_64-pc-windows-msvc/plenora-storage-{version}-x86_64-pc-windows-msvc.zip": {
         "container": {
           "format": "zip",
           "distribution": true
+        },
+        "build": {
+          "role": "cli-archive",
+          "target": "x86_64-pc-windows-msvc"
         }
       },
       "x86_64-pc-windows-msvc/plenora_storage-{python_version}-cp310-abi3-win_amd64.whl": {
         "container": {
           "format": "zip",
           "distribution": true
+        },
+        "build": {
+          "role": "wheel",
+          "target": "x86_64-pc-windows-msvc",
+          "abi": "cp310-abi3"
         }
       },
       "x86_64-unknown-linux-gnu/plenora-smb2-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
+        },
+        "build": {
+          "role": "cargo:plenora-smb2",
+          "target": "x86_64-unknown-linux-gnu"
         }
       },
       "x86_64-unknown-linux-gnu/plenora-storage-cli-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
+        },
+        "build": {
+          "role": "cargo:plenora-storage-cli",
+          "target": "x86_64-unknown-linux-gnu"
         }
       },
       "x86_64-unknown-linux-gnu/plenora-storage-contracts-{version}.tar.gz": {
         "container": {
           "format": "gzip",
           "distribution": true
+        },
+        "build": {
+          "role": "contracts",
+          "target": "x86_64-unknown-linux-gnu"
         }
       },
       "x86_64-unknown-linux-gnu/plenora-storage-core-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
+        },
+        "build": {
+          "role": "cargo:plenora-storage-core",
+          "target": "x86_64-unknown-linux-gnu"
         }
       },
       "x86_64-unknown-linux-gnu/plenora-storage-engine-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
+        },
+        "build": {
+          "role": "cargo:plenora-storage-engine",
+          "target": "x86_64-unknown-linux-gnu"
         }
       },
       "x86_64-unknown-linux-gnu/plenora-storage-ftp-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
+        },
+        "build": {
+          "role": "cargo:plenora-storage-ftp",
+          "target": "x86_64-unknown-linux-gnu"
         }
       },
       "x86_64-unknown-linux-gnu/plenora-storage-providers-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
+        },
+        "build": {
+          "role": "cargo:plenora-storage-providers",
+          "target": "x86_64-unknown-linux-gnu"
         }
       },
       "x86_64-unknown-linux-gnu/plenora-storage-s3-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
+        },
+        "build": {
+          "role": "cargo:plenora-storage-s3",
+          "target": "x86_64-unknown-linux-gnu"
         }
       },
       "x86_64-unknown-linux-gnu/plenora-storage-sftp-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
+        },
+        "build": {
+          "role": "cargo:plenora-storage-sftp",
+          "target": "x86_64-unknown-linux-gnu"
         }
       },
       "x86_64-unknown-linux-gnu/plenora-storage-{version}-source.tar.gz": {
         "container": {
           "format": "gzip",
           "distribution": true
+        },
+        "build": {
+          "role": "source",
+          "target": "x86_64-unknown-linux-gnu"
         }
       },
       "x86_64-unknown-linux-gnu/plenora-storage-{version}-x86_64-unknown-linux-gnu.tar.gz": {
         "container": {
           "format": "gzip",
           "distribution": true
+        },
+        "build": {
+          "role": "cli-archive",
+          "target": "x86_64-unknown-linux-gnu"
         }
       },
       "x86_64-unknown-linux-gnu/plenora_storage-{python_version}-cp310-abi3-manylinux_2_34_x86_64.whl": {
         "container": {
           "format": "zip",
           "distribution": true
+        },
+        "build": {
+          "role": "wheel",
+          "target": "x86_64-unknown-linux-gnu",
+          "abi": "cp310-abi3"
         }
       },
       "x86_64-pc-windows-msvc/plenora-storage.exe": {
-        "sha256": "afac97eb5388d3c89bb9edc5a9622673c7d2e39bb048d77dc413a0ef4ad8b3ef"
+        "build": {
+          "role": "cli",
+          "target": "x86_64-pc-windows-msvc",
+          "format": "pe"
+        }
+      },
+      "x86_64-unknown-linux-gnu/plenora-storage": {
+        "build": {
+          "role": "cli",
+          "target": "x86_64-unknown-linux-gnu",
+          "format": "elf"
+        }
       }
     },
     "source": {
@@ -1376,147 +1485,168 @@
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "2a7bec7824c436693a0b8110f71c51b7598feb6416088dc10a056389f79d2ab4"
+        "sha256": "2a7bec7824c436693a0b8110f71c51b7598feb6416088dc10a056389f79d2ab4",
+        "source": "docs/evidence/2.0.0/large-transfer-first-attempt.json.gz"
       },
       "docs/evidence/2.0.0/large-transfer-recheck.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "34c747e956d487a970fb8a94c0332a33ba7d611aeed61a95427418666f416aaa"
+        "sha256": "34c747e956d487a970fb8a94c0332a33ba7d611aeed61a95427418666f416aaa",
+        "source": "docs/evidence/2.0.0/large-transfer-recheck.json.gz"
       },
       "docs/evidence/2.0.1/disk-pressure.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "5b6245a76267ad9d59bc3fd13d2d8cea817af1a0bbd80cd8d41549235738d1e2"
+        "sha256": "5b6245a76267ad9d59bc3fd13d2d8cea817af1a0bbd80cd8d41549235738d1e2",
+        "source": "docs/evidence/2.0.1/disk-pressure.json.gz"
       },
       "docs/evidence/2.0.1/release-qualification.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "9aa75a6e912866b95af71ceac676c81a01aa5cce12b31217ade41a5915050959"
+        "sha256": "9aa75a6e912866b95af71ceac676c81a01aa5cce12b31217ade41a5915050959",
+        "source": "docs/evidence/2.0.1/release-qualification.json.gz"
       },
       "docs/evidence/2.0.1/soak-completed.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "2f0da1a1fb0f42c6088fb14a264c761661b4e82f028041f59729363782beabe7"
+        "sha256": "2f0da1a1fb0f42c6088fb14a264c761661b4e82f028041f59729363782beabe7",
+        "source": "docs/evidence/2.0.1/soak-completed.json.gz"
       },
       "docs/evidence/2.0.1/soak-interrupted.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "97b4bca35ca969e384f4925c7ad2bc7ca9886e5ec4f1ba97ac63871083e3e1a2"
+        "sha256": "97b4bca35ca969e384f4925c7ad2bc7ca9886e5ec4f1ba97ac63871083e3e1a2",
+        "source": "docs/evidence/2.0.1/soak-interrupted.json.gz"
       },
       "docs/evidence/2.1.0/disk-pressure.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "6638c4357f21c2887ce49a25f6a04376d48b6a2e0993467e0d0dca955f858e21"
+        "sha256": "6638c4357f21c2887ce49a25f6a04376d48b6a2e0993467e0d0dca955f858e21",
+        "source": "docs/evidence/2.1.0/disk-pressure.json.gz"
       },
       "docs/evidence/2.1.0/host-load.jsonl.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "56b9c3a63940bd1945c9a5995326f1e4aa3b8d0936fa9297a22f3f876b1a3115"
+        "sha256": "56b9c3a63940bd1945c9a5995326f1e4aa3b8d0936fa9297a22f3f876b1a3115",
+        "source": "docs/evidence/2.1.0/host-load.jsonl.gz"
       },
       "docs/evidence/2.1.0/performance-baseline.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "deb16db1717a747b9eb7eeb38a2d2fbd461d4aa585e8d78f4e65ca3b8258555b"
+        "sha256": "deb16db1717a747b9eb7eeb38a2d2fbd461d4aa585e8d78f4e65ca3b8258555b",
+        "source": "docs/evidence/2.1.0/performance-baseline.json.gz"
       },
       "docs/evidence/2.1.0/performance-candidate.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "5b87f89e06b65b7639634142fcc781ea798cf26086ab4c283944afcb2fc1dc34"
+        "sha256": "5b87f89e06b65b7639634142fcc781ea798cf26086ab4c283944afcb2fc1dc34",
+        "source": "docs/evidence/2.1.0/performance-candidate.json.gz"
       },
       "docs/evidence/2.1.0/performance-comparison.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "82544b060838608e2fe7c93556f539441783e67064ca0403a711c66c1f2280c5"
+        "sha256": "82544b060838608e2fe7c93556f539441783e67064ca0403a711c66c1f2280c5",
+        "source": "docs/evidence/2.1.0/performance-comparison.json.gz"
       },
       "docs/evidence/2.1.0/performance-vm-baseline.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "a61b8be6ae5a36a2ea0037f5501186c415eae2d7882540e45ecaa762688f2ee2"
+        "sha256": "a61b8be6ae5a36a2ea0037f5501186c415eae2d7882540e45ecaa762688f2ee2",
+        "source": "docs/evidence/2.1.0/performance-vm-baseline.json.gz"
       },
       "docs/evidence/2.1.0/performance-vm-candidate.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "b412bd9f6fdce5a8530f80669421fd1e306ab78c3e837199f3e06665098e5b65"
+        "sha256": "b412bd9f6fdce5a8530f80669421fd1e306ab78c3e837199f3e06665098e5b65",
+        "source": "docs/evidence/2.1.0/performance-vm-candidate.json.gz"
       },
       "docs/evidence/2.1.0/performance-vm-failed.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "bad54cd17222a3563b873ffe7e3f06fdab1bc5d4742fadf2c9c0565008db72b4"
+        "sha256": "bad54cd17222a3563b873ffe7e3f06fdab1bc5d4742fadf2c9c0565008db72b4",
+        "source": "docs/evidence/2.1.0/performance-vm-failed.json.gz"
       },
       "docs/evidence/2.1.0/release-qualification.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "67846f200198a1308fc078203a3502888573ecf27e9621fb57cf43baea411648"
+        "sha256": "67846f200198a1308fc078203a3502888573ecf27e9621fb57cf43baea411648",
+        "source": "docs/evidence/2.1.0/release-qualification.json.gz"
       },
       "docs/evidence/2.1.0/soak-completed.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "9623f435021a8215c0d5c9dda260d151b885c1b9feca605adb5f4938363402a3"
+        "sha256": "9623f435021a8215c0d5c9dda260d151b885c1b9feca605adb5f4938363402a3",
+        "source": "docs/evidence/2.1.0/soak-completed.json.gz"
       },
       "docs/evidence/2.1.0/tail-diagnostic.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "61af6b8bb101c14d590d28f7064bf90bb9461f0ae19c54b642cb034771a77972"
+        "sha256": "61af6b8bb101c14d590d28f7064bf90bb9461f0ae19c54b642cb034771a77972",
+        "source": "docs/evidence/2.1.0/tail-diagnostic.json.gz"
       },
       "docs/evidence/2.1.0/transfers-large-default.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "f3f459e5fdecb36a0240e24e898346e5da5d422a8ce002688df7808daf510db3"
+        "sha256": "f3f459e5fdecb36a0240e24e898346e5da5d422a8ce002688df7808daf510db3",
+        "source": "docs/evidence/2.1.0/transfers-large-default.json.gz"
       },
       "docs/evidence/2.1.0/transfers-large-private-file.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "c6c4bba36d9ce7c17064a2f745f869ce175b23f1124845a9e8d7d2d7e1ba79d3"
+        "sha256": "c6c4bba36d9ce7c17064a2f745f869ce175b23f1124845a9e8d7d2d7e1ba79d3",
+        "source": "docs/evidence/2.1.0/transfers-large-private-file.json.gz"
       },
       "docs/evidence/performance-2026-09-27/baseline.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "9465c56a0a3d0b14a730de35bd9aac886c388dccb3aea29270aa538c72e12ab2"
+        "sha256": "9465c56a0a3d0b14a730de35bd9aac886c388dccb3aea29270aa538c72e12ab2",
+        "source": "docs/evidence/performance-2026-09-27/baseline.json.gz"
       },
       "docs/evidence/performance-2026-09-27/candidate.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "62e16f5a401c13d10f5bad7957dadab888c4d1d83b8f7c01d2a30a4d44f47cde"
+        "sha256": "62e16f5a401c13d10f5bad7957dadab888c4d1d83b8f7c01d2a30a4d44f47cde",
+        "source": "docs/evidence/performance-2026-09-27/candidate.json.gz"
       }
     },
     "cli-linux": {
@@ -1525,147 +1655,175 @@
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "2a7bec7824c436693a0b8110f71c51b7598feb6416088dc10a056389f79d2ab4"
+        "sha256": "2a7bec7824c436693a0b8110f71c51b7598feb6416088dc10a056389f79d2ab4",
+        "source": "docs/evidence/2.0.0/large-transfer-first-attempt.json.gz"
       },
       "docs/evidence/2.0.0/large-transfer-recheck.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "34c747e956d487a970fb8a94c0332a33ba7d611aeed61a95427418666f416aaa"
+        "sha256": "34c747e956d487a970fb8a94c0332a33ba7d611aeed61a95427418666f416aaa",
+        "source": "docs/evidence/2.0.0/large-transfer-recheck.json.gz"
       },
       "docs/evidence/2.0.1/disk-pressure.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "5b6245a76267ad9d59bc3fd13d2d8cea817af1a0bbd80cd8d41549235738d1e2"
+        "sha256": "5b6245a76267ad9d59bc3fd13d2d8cea817af1a0bbd80cd8d41549235738d1e2",
+        "source": "docs/evidence/2.0.1/disk-pressure.json.gz"
       },
       "docs/evidence/2.0.1/release-qualification.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "9aa75a6e912866b95af71ceac676c81a01aa5cce12b31217ade41a5915050959"
+        "sha256": "9aa75a6e912866b95af71ceac676c81a01aa5cce12b31217ade41a5915050959",
+        "source": "docs/evidence/2.0.1/release-qualification.json.gz"
       },
       "docs/evidence/2.0.1/soak-completed.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "2f0da1a1fb0f42c6088fb14a264c761661b4e82f028041f59729363782beabe7"
+        "sha256": "2f0da1a1fb0f42c6088fb14a264c761661b4e82f028041f59729363782beabe7",
+        "source": "docs/evidence/2.0.1/soak-completed.json.gz"
       },
       "docs/evidence/2.0.1/soak-interrupted.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "97b4bca35ca969e384f4925c7ad2bc7ca9886e5ec4f1ba97ac63871083e3e1a2"
+        "sha256": "97b4bca35ca969e384f4925c7ad2bc7ca9886e5ec4f1ba97ac63871083e3e1a2",
+        "source": "docs/evidence/2.0.1/soak-interrupted.json.gz"
       },
       "docs/evidence/2.1.0/disk-pressure.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "6638c4357f21c2887ce49a25f6a04376d48b6a2e0993467e0d0dca955f858e21"
+        "sha256": "6638c4357f21c2887ce49a25f6a04376d48b6a2e0993467e0d0dca955f858e21",
+        "source": "docs/evidence/2.1.0/disk-pressure.json.gz"
       },
       "docs/evidence/2.1.0/host-load.jsonl.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "56b9c3a63940bd1945c9a5995326f1e4aa3b8d0936fa9297a22f3f876b1a3115"
+        "sha256": "56b9c3a63940bd1945c9a5995326f1e4aa3b8d0936fa9297a22f3f876b1a3115",
+        "source": "docs/evidence/2.1.0/host-load.jsonl.gz"
       },
       "docs/evidence/2.1.0/performance-baseline.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "deb16db1717a747b9eb7eeb38a2d2fbd461d4aa585e8d78f4e65ca3b8258555b"
+        "sha256": "deb16db1717a747b9eb7eeb38a2d2fbd461d4aa585e8d78f4e65ca3b8258555b",
+        "source": "docs/evidence/2.1.0/performance-baseline.json.gz"
       },
       "docs/evidence/2.1.0/performance-candidate.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "5b87f89e06b65b7639634142fcc781ea798cf26086ab4c283944afcb2fc1dc34"
+        "sha256": "5b87f89e06b65b7639634142fcc781ea798cf26086ab4c283944afcb2fc1dc34",
+        "source": "docs/evidence/2.1.0/performance-candidate.json.gz"
       },
       "docs/evidence/2.1.0/performance-comparison.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "82544b060838608e2fe7c93556f539441783e67064ca0403a711c66c1f2280c5"
+        "sha256": "82544b060838608e2fe7c93556f539441783e67064ca0403a711c66c1f2280c5",
+        "source": "docs/evidence/2.1.0/performance-comparison.json.gz"
       },
       "docs/evidence/2.1.0/performance-vm-baseline.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "a61b8be6ae5a36a2ea0037f5501186c415eae2d7882540e45ecaa762688f2ee2"
+        "sha256": "a61b8be6ae5a36a2ea0037f5501186c415eae2d7882540e45ecaa762688f2ee2",
+        "source": "docs/evidence/2.1.0/performance-vm-baseline.json.gz"
       },
       "docs/evidence/2.1.0/performance-vm-candidate.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "b412bd9f6fdce5a8530f80669421fd1e306ab78c3e837199f3e06665098e5b65"
+        "sha256": "b412bd9f6fdce5a8530f80669421fd1e306ab78c3e837199f3e06665098e5b65",
+        "source": "docs/evidence/2.1.0/performance-vm-candidate.json.gz"
       },
       "docs/evidence/2.1.0/performance-vm-failed.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "bad54cd17222a3563b873ffe7e3f06fdab1bc5d4742fadf2c9c0565008db72b4"
+        "sha256": "bad54cd17222a3563b873ffe7e3f06fdab1bc5d4742fadf2c9c0565008db72b4",
+        "source": "docs/evidence/2.1.0/performance-vm-failed.json.gz"
       },
       "docs/evidence/2.1.0/release-qualification.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "67846f200198a1308fc078203a3502888573ecf27e9621fb57cf43baea411648"
+        "sha256": "67846f200198a1308fc078203a3502888573ecf27e9621fb57cf43baea411648",
+        "source": "docs/evidence/2.1.0/release-qualification.json.gz"
       },
       "docs/evidence/2.1.0/soak-completed.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "9623f435021a8215c0d5c9dda260d151b885c1b9feca605adb5f4938363402a3"
+        "sha256": "9623f435021a8215c0d5c9dda260d151b885c1b9feca605adb5f4938363402a3",
+        "source": "docs/evidence/2.1.0/soak-completed.json.gz"
       },
       "docs/evidence/2.1.0/tail-diagnostic.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "61af6b8bb101c14d590d28f7064bf90bb9461f0ae19c54b642cb034771a77972"
+        "sha256": "61af6b8bb101c14d590d28f7064bf90bb9461f0ae19c54b642cb034771a77972",
+        "source": "docs/evidence/2.1.0/tail-diagnostic.json.gz"
       },
       "docs/evidence/2.1.0/transfers-large-default.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "f3f459e5fdecb36a0240e24e898346e5da5d422a8ce002688df7808daf510db3"
+        "sha256": "f3f459e5fdecb36a0240e24e898346e5da5d422a8ce002688df7808daf510db3",
+        "source": "docs/evidence/2.1.0/transfers-large-default.json.gz"
       },
       "docs/evidence/2.1.0/transfers-large-private-file.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "c6c4bba36d9ce7c17064a2f745f869ce175b23f1124845a9e8d7d2d7e1ba79d3"
+        "sha256": "c6c4bba36d9ce7c17064a2f745f869ce175b23f1124845a9e8d7d2d7e1ba79d3",
+        "source": "docs/evidence/2.1.0/transfers-large-private-file.json.gz"
       },
       "docs/evidence/performance-2026-09-27/baseline.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "9465c56a0a3d0b14a730de35bd9aac886c388dccb3aea29270aa538c72e12ab2"
+        "sha256": "9465c56a0a3d0b14a730de35bd9aac886c388dccb3aea29270aa538c72e12ab2",
+        "source": "docs/evidence/performance-2026-09-27/baseline.json.gz"
       },
       "docs/evidence/performance-2026-09-27/candidate.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "62e16f5a401c13d10f5bad7957dadab888c4d1d83b8f7c01d2a30a4d44f47cde"
+        "sha256": "62e16f5a401c13d10f5bad7957dadab888c4d1d83b8f7c01d2a30a4d44f47cde",
+        "source": "docs/evidence/performance-2026-09-27/candidate.json.gz"
+      },
+      "plenora-storage": {
+        "build": {
+          "role": "cli",
+          "target": "x86_64-unknown-linux-gnu",
+          "format": "elf"
+        }
       }
     },
     "cli-windows": {
@@ -1674,155 +1832,195 @@
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "2a7bec7824c436693a0b8110f71c51b7598feb6416088dc10a056389f79d2ab4"
+        "sha256": "2a7bec7824c436693a0b8110f71c51b7598feb6416088dc10a056389f79d2ab4",
+        "source": "docs/evidence/2.0.0/large-transfer-first-attempt.json.gz"
       },
       "docs/evidence/2.0.0/large-transfer-recheck.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "34c747e956d487a970fb8a94c0332a33ba7d611aeed61a95427418666f416aaa"
+        "sha256": "34c747e956d487a970fb8a94c0332a33ba7d611aeed61a95427418666f416aaa",
+        "source": "docs/evidence/2.0.0/large-transfer-recheck.json.gz"
       },
       "docs/evidence/2.0.1/disk-pressure.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "5b6245a76267ad9d59bc3fd13d2d8cea817af1a0bbd80cd8d41549235738d1e2"
+        "sha256": "5b6245a76267ad9d59bc3fd13d2d8cea817af1a0bbd80cd8d41549235738d1e2",
+        "source": "docs/evidence/2.0.1/disk-pressure.json.gz"
       },
       "docs/evidence/2.0.1/release-qualification.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "9aa75a6e912866b95af71ceac676c81a01aa5cce12b31217ade41a5915050959"
+        "sha256": "9aa75a6e912866b95af71ceac676c81a01aa5cce12b31217ade41a5915050959",
+        "source": "docs/evidence/2.0.1/release-qualification.json.gz"
       },
       "docs/evidence/2.0.1/soak-completed.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "2f0da1a1fb0f42c6088fb14a264c761661b4e82f028041f59729363782beabe7"
+        "sha256": "2f0da1a1fb0f42c6088fb14a264c761661b4e82f028041f59729363782beabe7",
+        "source": "docs/evidence/2.0.1/soak-completed.json.gz"
       },
       "docs/evidence/2.0.1/soak-interrupted.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "97b4bca35ca969e384f4925c7ad2bc7ca9886e5ec4f1ba97ac63871083e3e1a2"
+        "sha256": "97b4bca35ca969e384f4925c7ad2bc7ca9886e5ec4f1ba97ac63871083e3e1a2",
+        "source": "docs/evidence/2.0.1/soak-interrupted.json.gz"
       },
       "docs/evidence/2.1.0/disk-pressure.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "6638c4357f21c2887ce49a25f6a04376d48b6a2e0993467e0d0dca955f858e21"
+        "sha256": "6638c4357f21c2887ce49a25f6a04376d48b6a2e0993467e0d0dca955f858e21",
+        "source": "docs/evidence/2.1.0/disk-pressure.json.gz"
       },
       "docs/evidence/2.1.0/host-load.jsonl.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "56b9c3a63940bd1945c9a5995326f1e4aa3b8d0936fa9297a22f3f876b1a3115"
+        "sha256": "56b9c3a63940bd1945c9a5995326f1e4aa3b8d0936fa9297a22f3f876b1a3115",
+        "source": "docs/evidence/2.1.0/host-load.jsonl.gz"
       },
       "docs/evidence/2.1.0/performance-baseline.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "deb16db1717a747b9eb7eeb38a2d2fbd461d4aa585e8d78f4e65ca3b8258555b"
+        "sha256": "deb16db1717a747b9eb7eeb38a2d2fbd461d4aa585e8d78f4e65ca3b8258555b",
+        "source": "docs/evidence/2.1.0/performance-baseline.json.gz"
       },
       "docs/evidence/2.1.0/performance-candidate.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "5b87f89e06b65b7639634142fcc781ea798cf26086ab4c283944afcb2fc1dc34"
+        "sha256": "5b87f89e06b65b7639634142fcc781ea798cf26086ab4c283944afcb2fc1dc34",
+        "source": "docs/evidence/2.1.0/performance-candidate.json.gz"
       },
       "docs/evidence/2.1.0/performance-comparison.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "82544b060838608e2fe7c93556f539441783e67064ca0403a711c66c1f2280c5"
+        "sha256": "82544b060838608e2fe7c93556f539441783e67064ca0403a711c66c1f2280c5",
+        "source": "docs/evidence/2.1.0/performance-comparison.json.gz"
       },
       "docs/evidence/2.1.0/performance-vm-baseline.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "a61b8be6ae5a36a2ea0037f5501186c415eae2d7882540e45ecaa762688f2ee2"
+        "sha256": "a61b8be6ae5a36a2ea0037f5501186c415eae2d7882540e45ecaa762688f2ee2",
+        "source": "docs/evidence/2.1.0/performance-vm-baseline.json.gz"
       },
       "docs/evidence/2.1.0/performance-vm-candidate.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "b412bd9f6fdce5a8530f80669421fd1e306ab78c3e837199f3e06665098e5b65"
+        "sha256": "b412bd9f6fdce5a8530f80669421fd1e306ab78c3e837199f3e06665098e5b65",
+        "source": "docs/evidence/2.1.0/performance-vm-candidate.json.gz"
       },
       "docs/evidence/2.1.0/performance-vm-failed.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "bad54cd17222a3563b873ffe7e3f06fdab1bc5d4742fadf2c9c0565008db72b4"
+        "sha256": "bad54cd17222a3563b873ffe7e3f06fdab1bc5d4742fadf2c9c0565008db72b4",
+        "source": "docs/evidence/2.1.0/performance-vm-failed.json.gz"
       },
       "docs/evidence/2.1.0/release-qualification.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "67846f200198a1308fc078203a3502888573ecf27e9621fb57cf43baea411648"
+        "sha256": "67846f200198a1308fc078203a3502888573ecf27e9621fb57cf43baea411648",
+        "source": "docs/evidence/2.1.0/release-qualification.json.gz"
       },
       "docs/evidence/2.1.0/soak-completed.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "9623f435021a8215c0d5c9dda260d151b885c1b9feca605adb5f4938363402a3"
+        "sha256": "9623f435021a8215c0d5c9dda260d151b885c1b9feca605adb5f4938363402a3",
+        "source": "docs/evidence/2.1.0/soak-completed.json.gz"
       },
       "docs/evidence/2.1.0/tail-diagnostic.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "61af6b8bb101c14d590d28f7064bf90bb9461f0ae19c54b642cb034771a77972"
+        "sha256": "61af6b8bb101c14d590d28f7064bf90bb9461f0ae19c54b642cb034771a77972",
+        "source": "docs/evidence/2.1.0/tail-diagnostic.json.gz"
       },
       "docs/evidence/2.1.0/transfers-large-default.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "f3f459e5fdecb36a0240e24e898346e5da5d422a8ce002688df7808daf510db3"
+        "sha256": "f3f459e5fdecb36a0240e24e898346e5da5d422a8ce002688df7808daf510db3",
+        "source": "docs/evidence/2.1.0/transfers-large-default.json.gz"
       },
       "docs/evidence/2.1.0/transfers-large-private-file.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "c6c4bba36d9ce7c17064a2f745f869ce175b23f1124845a9e8d7d2d7e1ba79d3"
+        "sha256": "c6c4bba36d9ce7c17064a2f745f869ce175b23f1124845a9e8d7d2d7e1ba79d3",
+        "source": "docs/evidence/2.1.0/transfers-large-private-file.json.gz"
       },
       "docs/evidence/performance-2026-09-27/baseline.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "9465c56a0a3d0b14a730de35bd9aac886c388dccb3aea29270aa538c72e12ab2"
+        "sha256": "9465c56a0a3d0b14a730de35bd9aac886c388dccb3aea29270aa538c72e12ab2",
+        "source": "docs/evidence/performance-2026-09-27/baseline.json.gz"
       },
       "docs/evidence/performance-2026-09-27/candidate.json.gz": {
         "container": {
           "format": "gzip",
           "payload": {}
         },
-        "sha256": "62e16f5a401c13d10f5bad7957dadab888c4d1d83b8f7c01d2a30a4d44f47cde"
+        "sha256": "62e16f5a401c13d10f5bad7957dadab888c4d1d83b8f7c01d2a30a4d44f47cde",
+        "source": "docs/evidence/performance-2026-09-27/candidate.json.gz"
       },
       "plenora-storage.exe": {
-        "sha256": "afac97eb5388d3c89bb9edc5a9622673c7d2e39bb048d77dc413a0ef4ad8b3ef"
+        "build": {
+          "role": "cli",
+          "target": "x86_64-pc-windows-msvc",
+          "format": "pe"
+        }
       }
     },
     "wheel-windows": {
       "plenora_storage/_native.pyd": {
-        "sha256": "efa535cb441fc8ff0f0561ad4209342da1a80b25bbae2ec92634f39d1b3d3860"
+        "build": {
+          "role": "python-extension",
+          "target": "x86_64-pc-windows-msvc",
+          "format": "pe",
+          "abi": "cp310-abi3"
+        }
+      }
+    },
+    "wheel-linux": {
+      "plenora_storage/_native.abi3.so": {
+        "build": {
+          "role": "python-extension",
+          "target": "x86_64-unknown-linux-gnu",
+          "format": "elf",
+          "abi": "cp310-abi3"
+        }
       }
     }
   },
@@ -1832,5 +2030,10 @@
     "plenora-storage-{version}-x86_64-pc-windows-msvc.adoption-manifest-v4.json",
     "plenora-storage-{version}-x86_64-unknown-linux-gnu.sbom.cdx.json",
     "plenora-storage-{version}-x86_64-unknown-linux-gnu.adoption-manifest-v4.json"
-  ]
+  ],
+  "wheel-tags": {
+    "cp310-abi3-win_amd64": "wheel-windows",
+    "cp310-abi3-manylinux_2_34_x86_64": "wheel-linux",
+    "cp310-abi3-manylinux_2_39_x86_64": "wheel-linux"
+  }
 }

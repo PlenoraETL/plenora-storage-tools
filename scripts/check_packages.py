@@ -164,8 +164,11 @@ def check_content(data):
             continue
         if private_der(decoded):
             raise ValueError('base64 private key material in distribution')
-    if re.search(rb'printf[ \t]+["\'][^"\']+\\n[^"\']+["\'][ \t]*\|[ \t]*smbpasswd', data):
-        raise ValueError('fixed Samba password in distribution')
+    for match in re.finditer(rb'printf[ \t]+["\'][^"\']+\\n[^"\']+["\'][ \t]*\|[ \t]*smbpasswd', data):
+        # The public testing feature promises this fixed fixture value.
+        # This exception does not bypass any private-material checks above.
+        if match[0] != b'printf "testpass\\ntestpass\\n" | smbpasswd':
+            raise ValueError('fixed Samba password in distribution')
 
 
 def members(data):
@@ -219,15 +222,18 @@ def distribution_policy(name):
         expected = policy['crates'][match[1]]
         prefix = name[:-6] + '/'
     elif name.endswith('.whl'):
-        match = re.fullmatch(r'plenora_storage-([^-]+)-cp310-abi3-(win_amd64|manylinux_2_34_x86_64)\.whl', name)
-        if not match:
+        match = re.fullmatch(r'plenora_storage-([^-]+)-(.+)\.whl', name)
+        tags = policy.get('wheel-tags', {})
+        if not match or match[2] not in tags:
             raise ValueError('unknown wheel target or ABI')
         version = match[1]
-        kind = 'wheel-windows' if match[2] == 'win_amd64' else 'wheel-linux'
+        kind = tags[match[2]]
     elif name.startswith('plenora-storage-') and name.endswith(('.tar.gz', '.zip')):
         match = re.fullmatch(r'plenora-storage-(\d+\.\d+\.\d+(?:-[a-z0-9.]+)?)-(source|qualification|x86_64-pc-windows-msvc|x86_64-unknown-linux-gnu)\.(?:tar.gz|zip)', name)
         if match:
             version, variant = match.groups()
+            if name.endswith('.zip') != (variant == 'x86_64-pc-windows-msvc'):
+                raise ValueError('unknown distribution archive format')
             kind = {'source': 'source', 'qualification': 'qualification',
                     'x86_64-pc-windows-msvc': 'cli-windows', 'x86_64-unknown-linux-gnu': 'cli-linux'}[variant]
             prefix = f'plenora-storage-{version}/' if variant == 'source' else f'{version}/' if variant == 'qualification' else ''
@@ -254,12 +260,13 @@ def distribution_policy(name):
 
 def verify_distribution(path, member=None):
     path = Path(path)
-    if path.name.endswith(('.crate', '.whl', '.tar.gz', '.zip')):
+    if member is None and path.name.endswith(('.crate', '.whl', '.tar.gz', '.zip')):
         return scan_distribution(path.read_bytes(), path.name)
     policy = registry()
     version = workspace_version().native
     kind = 'qualification' if member is not None else 'public-documents'
-    expected = {n.replace('{version}', version): n for n in policy[kind]}
+    expected = {n.replace('{version}', version).replace('{python_version}', parse_version(version).python): n
+                for n in policy[kind]}
     name = member if member is not None else path.name
     if name not in expected:
         raise ValueError('undeclared standalone distribution member')
@@ -311,8 +318,94 @@ SUPPORTED = {'gzip', 'bzip2', 'xz', 'zip', 'tar'}
 
 def scan_entries(entries, expected, depth):
     compare([n for n, _ in entries], expected)
+    roles = set()
+    for rule in expected.values():
+        if 'build' in rule:
+            build = rule['build']
+            identity = (build['target'], build['role'], build.get('abi'))
+            if identity in roles:
+                raise ValueError('duplicate build role in distribution')
+            roles.add(identity)
     for name, data in entries:
         scan(data, name, depth, expected[name])
+
+
+def check_build(data, rule, name):
+    """Validate declared build outputs without predicting their bytes."""
+    build = rule['build']
+    if 'sha256' in rule or 'source' in rule:
+        raise ValueError('build output cannot have a source digest')
+    target = build.get('target')
+    if target not in {'x86_64-pc-windows-msvc', 'x86_64-unknown-linux-gnu'}:
+        raise ValueError('unknown build target')
+    role = build.get('role', '')
+    if 'container' in rule:
+        if rule['container'].get('distribution') is not True:
+            raise ValueError('build container requires distribution inventory')
+        distribution, _, _ = distribution_policy(name)
+        expected_role = ('cargo:' + distribution[7:] if distribution.startswith('crates/')
+                         else 'wheel' if distribution.startswith('wheel-')
+                         else 'cli-archive' if distribution.startswith('cli-') else distribution)
+        if role != expected_role or role not in {'wheel', 'cli-archive', 'source', 'contracts'} and not role.startswith('cargo:'):
+            raise ValueError('build container role mismatch')
+        if (role == 'wheel' and build.get('abi') != 'cp310-abi3'
+                or role != 'wheel' and 'abi' in build):
+            raise ValueError('unknown build container ABI')
+        if (distribution.endswith('-windows') and target != 'x86_64-pc-windows-msvc'
+                or distribution.endswith('-linux') and target != 'x86_64-unknown-linux-gnu'
+                or '/' in name and name.split('/', 1)[0] != target):
+            raise ValueError('build container target mismatch')
+        return
+    if role not in {'cli', 'python-extension'}:
+        raise ValueError('unknown native build role')
+    if (role == 'python-extension' and build.get('abi') != 'cp310-abi3'
+            or role == 'cli' and 'abi' in build):
+        raise ValueError('unknown native ABI')
+    if target == 'x86_64-unknown-linux-gnu':
+        # ELF64, little-endian, x86-64, current version, executable or DSO.
+        if (build.get('format') != 'elf' or len(data) < 64
+                or data[:7] != bytes([127, 69, 76, 70, 2, 1, 1])
+                or int.from_bytes(data[18:20], 'little') != 62
+                or int.from_bytes(data[20:24], 'little') != 1
+                or int.from_bytes(data[52:54], 'little') != 64
+                or int.from_bytes(data[16:18], 'little') not in
+                   ({3} if role == 'python-extension' else {2, 3})):
+            raise ValueError('native ELF type or architecture mismatch')
+    else:
+        offset = int.from_bytes(data[60:64], 'little')
+        flags = int.from_bytes(data[offset+22:offset+24], 'little')
+        if (build.get('format') != 'pe' or len(data) < 64 or data[:2] != b'MZ'
+                or offset < 64 or offset + 26 > len(data)
+                or data[offset:offset+4] != bytes([80, 69, 0, 0])
+                or int.from_bytes(data[offset+4:offset+6], 'little') != 0x8664
+                or int.from_bytes(data[offset+24:offset+26], 'little') != 0x20b
+                or not flags & 2 or bool(flags & 0x2000) != (role == 'python-extension')):
+            raise ValueError('native PE type or architecture mismatch')
+
+
+def source_bytes(name):
+    """Read a tracked source blob, never an arbitrary build artifact."""
+    inventory([name])
+    result = subprocess.run(['git', 'show', 'HEAD:' + name], cwd=ROOT,
+                            capture_output=True)
+    if result.returncode:
+        raise ValueError('binary source is not tracked in HEAD')
+    return result.stdout
+
+
+def check_source_digests():
+    for rules in registry().get('member_rules', {}).values():
+        for rule in rules.values():
+            if 'build' in rule:
+                if 'sha256' in rule or 'source' in rule:
+                    raise ValueError('build output cannot have a source digest')
+            elif 'sha256' in rule or 'container' in rule:
+                if 'source' not in rule:
+                    raise ValueError('binary source provenance missing')
+                data = source_bytes(rule['source'])
+                if hashlib.sha256(data).hexdigest() != rule.get('sha256'):
+                    raise ValueError('source digest differs from git')
+                scan(data, rule=rule)
 
 
 def scan_distribution(data, name, depth=0):
@@ -320,7 +413,10 @@ def scan_distribution(data, name, depth=0):
         raise ValueError('archive nesting limit exceeded')
     if container_format(data) not in SUPPORTED:
         raise ValueError('unsupported distribution container')
-    _, prefix, expected = distribution_policy(name)
+    distribution, prefix, expected = distribution_policy(name)
+    expected_format = 'zip' if distribution in {'wheel-windows', 'wheel-linux', 'cli-windows'} else 'gzip'
+    if container_format(data) != expected_format:
+        raise ValueError('distribution container format mismatch')
     entries = members(data)
     if any(not n.startswith(prefix) for n, _ in entries):
         raise ValueError('unexpected distribution root')
@@ -340,7 +436,9 @@ def scan(data, name='', depth=0, rule=None):
         raise ValueError('unsupported container format')
     if kind and 'container' not in rule:
         raise ValueError('undeclared container')
-    if 'container' in rule or 'sha256' in rule or not is_text(data):
+    if 'build' in rule:
+        check_build(data, rule, name)
+    elif 'container' in rule or 'sha256' in rule or not is_text(data):
         if hashlib.sha256(data).hexdigest() != rule.get('sha256'):
             raise ValueError('binary digest missing or mismatched')
     if kind:
@@ -384,6 +482,7 @@ def cargo(*args):
 
 
 def check_cargo(build=False):
+    check_source_digests()
     metadata = strict_json.loads(cargo('metadata', '--locked', '--offline', '--no-deps', '--format-version', '1'))
     packages = metadata['packages']
     compare([p['name'] for p in packages], registry()['crates'])
