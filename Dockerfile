@@ -7,7 +7,7 @@ RUN git config --global --add safe.directory /workspace
 
 RUN apt-get update && apt-get install -y --no-install-recommends python3-dev python3-venv \
     && python3 -m venv /opt/storage-python-build \
-    && /opt/storage-python-build/bin/pip install --no-cache-dir maturin==1.15.0
+    && /opt/storage-python-build/bin/pip install --no-cache-dir maturin==1.16.0
 ENV PATH="/opt/storage-python-build/bin:${PATH}"
 
 COPY . .

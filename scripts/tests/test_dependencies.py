@@ -20,7 +20,7 @@ class DependencyPolicyTests(unittest.TestCase):
         self.assertEqual(check_manifest({'dependencies': {'x': '=1.2.3', 'owned': {'path': '../owned'}}}), [])
 
     def test_python_requirements_and_build_backend_are_exact(self):
-        self.assertEqual(check_python_pins('r', ['maturin==1.15.0', 'rpds-py==2026.9.1', 'typing_extensions==4.16.0']), [])
+        self.assertEqual(check_python_pins('r', ['maturin==1.16.0', 'rpds-py==2026.9.1', 'typing_extensions==4.16.0']), [])
         for requirement in ('maturin>=1.7,<2.0', 'jsonschema', 'x==1.0; python_version < "3.13"',
                             'x~=1.0', 'x==1.*', '-r other.txt', 'x == 1.0'):
             self.assertTrue(check_python_pins('r', [requirement]), requirement)

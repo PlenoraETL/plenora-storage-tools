@@ -10,6 +10,25 @@ const BAD: [&str; 3] = [
     r#"{"key":1,"k\u0065y":2}"#,
 ];
 
+/// Public runtime payloads retain finite JSON numbers even beyond the f32 range.
+#[test]
+fn runtime_payload_large_finite_number_is_not_f32_infinity() {
+    let document = r#"{"content_type":"application/json","metadata":{"plenora.message.id":"id","plenora.output.contract":"output"},"payload":{"number":1e100}}"#;
+    let result: RuntimeResultEnvelope = serde_json::from_str(document).unwrap();
+    assert_ne!(result.payload["number"], f32::INFINITY);
+    let encoded = serde_json::to_vec(&result).unwrap();
+    let decoded: RuntimeResultEnvelope = serde_json::from_slice(&encoded).unwrap();
+    assert_eq!(result.payload, decoded.payload);
+}
+
+/// Parser byte positions must not escape through the public validation error.
+#[test]
+fn invalid_utf8_remains_a_redacted_json_error() {
+    let error = validate_json(b"{\"private\":\"\xffsuffix\"}").unwrap_err();
+    assert_eq!(error.code, "JSON_INVALID");
+    assert_eq!(error.message, "JSON document is invalid");
+}
+
 #[test]
 fn recursive_preflight_is_redacted_and_checks_the_complete_document() {
     for document in BAD {

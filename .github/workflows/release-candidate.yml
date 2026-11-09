@@ -205,7 +205,7 @@ jobs:
       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - run: python scripts/run_logged.py target/release-evidence/x86_64-pc-windows-msvc-tests.log cargo test --workspace --all-targets --locked
       - run: cargo fetch --locked
-      - run: python -m pip install maturin==1.15.0
+      - run: python -m pip install maturin==1.16.0
       - run: python scripts/run_logged.py target/release-evidence/build-windows.log python scripts/build_release.py
       - name: Qualify released binary on localhost
         shell: pwsh
