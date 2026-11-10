@@ -65,15 +65,18 @@ Ambito: esclusivamente i membri nativi elencati nella tabella in codice
 indicata dalla stessa tabella (tag piattaforma/ABI incluso per le wheel).
 La policy non puo dichiarare ruoli `build` o aggiungere esenzioni. La guardia verifica
 nome, ruolo, target, ABI e formato; il classificatore non scansiona il membro
-nativo come membro singolo. Il contenitore applica comunque la scansione ai
-propri byte espansi, che includono anche i nativi. Tutti gli altri membri,
-inclusi sorgenti testuali
-e binari versionati, contenitori dichiarati e metadati delle wheel, restano
-scansionati. Il classificatore del singolo nativo non apre un payload accodato
-o incorporato, per esempio uno ZIP dopo un'intestazione ELF/PE; la scansione
-del contenitore puo comunque rilevare materiale privato nei byte del nativo.
-Il test ELF/PE per CLI ed estensioni documenta l'esenzione del classificatore
-come limite dichiarato, non come successo della guardia. Vedere la [policy dei pacchetti](package-policy.md).
+nativo come membro singolo. La scansione grezza del contenitore espanso copre
+ogni byte (intestazioni, metadati, padding, directory centrale e dati dei membri),
+tranne gli intervalli esatti dei dati dei nativi della tabella per quella
+distribuzione: nello ZIP i byte compressi o memorizzati della voce, nel tar i
+byte dati del membro, escluso il padding dei blocchi. Sono gli stessi intervalli
+calcolati dal controllo che vieta byte non contabilizzati. Le intestazioni dei
+nativi e i descrittori ZIP restano scansionati. Tutti gli altri membri, inclusi
+sorgenti testuali e binari versionati, contenitori dichiarati e metadati delle
+wheel, restano scansionati. Il classificatore del singolo nativo non apre un
+payload accodato o incorporato, per esempio uno ZIP dopo un'intestazione ELF/PE.
+I test ELF/PE per CLI ed estensioni documentano l'esenzione come limite
+dichiarato, non come successo della guardia. Vedere la [policy dei pacchetti](package-policy.md).
 
 Hazard: un binario prodotto da una build compromessa puo contenere payload
 non rilevati. Mitigazione: gli output di build sono prodotti dalla CI dai

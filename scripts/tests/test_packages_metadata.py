@@ -45,28 +45,33 @@ class HiddenMetadataRegressionTests(unittest.TestCase):
         for offset in (513, len(raw)):
             candidate = raw[:offset] + pem + raw[offset+len(pem):]
             for compress in (lambda b: b, gzip.compress, bz2.compress, lzma.compress):
-                with self.subTest(offset=offset, compress=compress), self.assertRaisesRegex(ValueError, 'private PEM'):
+                with self.subTest(offset=offset, compress=compress), self.assertRaisesRegex(ValueError, 'padding|terminator'):
                     gate.members(compress(candidate))
         out = io.BytesIO(archive([('a', b'a')], True))
         with zipfile.ZipFile(out, 'a') as stream:
             stream.comment = pem
-        with self.assertRaisesRegex(ValueError, 'private PEM'):
+        with self.assertRaisesRegex(ValueError, 'uncommented EOCD'):
             gate.members(out.getvalue())
 
     def test_deflated_zip_members_are_scanned_after_expansion(self):
         from test_packages import BuildOutputTests
         name = 'plenora_storage-1.2.3-cp310-abi3-win_amd64.whl'
         _, _, expected = gate.distribution_policy(name)
-        out = io.BytesIO()
-        with zipfile.ZipFile(out, 'w', compression=zipfile.ZIP_DEFLATED) as stream:
-            for member in expected:
-                data = b'safe'
-                if gate.native_member('cp310-abi3-win_amd64', member):
-                    data = BuildOutputTests.native('x86_64-pc-windows-msvc', True)
-                    data += b'-----BEGIN PRIVATE KEY-----\nYWJj\n'
-                stream.writestr(member, data)
-        with self.assertRaisesRegex(ValueError, 'private PEM'):
-            gate.scan_distribution(out.getvalue(), name)
+        for private_native in (True, False):
+            out = io.BytesIO()
+            with zipfile.ZipFile(out, 'w', compression=zipfile.ZIP_DEFLATED) as stream:
+                for member in expected:
+                    native = gate.native_member('cp310-abi3-win_amd64', member)
+                    data = BuildOutputTests.native('x86_64-pc-windows-msvc', True) if native else b'safe'
+                    if bool(native) == private_native:
+                        data += b'-----BEGIN PRIVATE KEY-----\nYWJj\n'
+                    stream.writestr(member, data)
+            if private_native:
+                # STOR-LIMIT-004: native payloads are deliberately opaque.
+                gate.scan_distribution(out.getvalue(), name)
+            else:
+                with self.assertRaisesRegex(ValueError, 'private PEM'):
+                    gate.scan_distribution(out.getvalue(), name)
 
 
     def test_closed_pax_keys_and_long_paths(self):

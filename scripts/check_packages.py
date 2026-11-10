@@ -339,6 +339,7 @@ def validate_zip(data, archive):
         raise ValueError('ZIP directory mismatch')
     cursor = start
     ranges = []
+    payload_ranges = {}
     for item in items:
         if data[cursor:cursor+4] != b'PK\x01\x02' or cursor + 46 > len(data)-22:
             raise ValueError('invalid ZIP central header')
@@ -361,6 +362,7 @@ def validate_zip(data, archive):
         stop = begin + packed
         if stop > start:
             raise ValueError('ZIP data overlaps directory')
+        payload_ranges[item.orig_filename] = (begin, stop)
         compressed = data[begin:stop]
         if method == 8:
             decoder = zlib.decompressobj(-15)
@@ -388,22 +390,32 @@ def validate_zip(data, archive):
         cursor = end
     if cursor != start:
         raise ValueError('unaccounted ZIP bytes')
+    return payload_ranges
 
 
 def members(data, name=''):
     """Read regular archive members without extraction; reject links/duplicates."""
-    # Inspect the whole expanded stream, including bytes hidden by parsers.
-    check_content(data)
+    # Only a resolved distribution identity can exempt code-table natives.
+    context, prefix = '', ''
+    if name:
+        distribution, prefix, _ = distribution_policy(name)
+        identity = normalize_path(name).rsplit('/', 1)[-1]
+        context = identity.split('-', 2)[2][:-4] if identity.endswith('.whl') else distribution
+
+    def is_native(member):
+        relative = relative_entries([(member, b'')], prefix)[0][0]
+        return native_member(context, relative)
+
+    excluded = []
     compression = container_format(data)
     if compression in {'gzip', 'bzip2', 'xz'}:
         data = expand(data, compression, name)
-        check_content(data)
     source = io.BytesIO(data)
     directories = []
     all_names = []
     if container_format(data) == 'zip':
         with zipfile.ZipFile(source) as archive:
-            validate_zip(data, archive)
+            payload_ranges = validate_zip(data, archive)
             result = []
             for item in archive.infolist():
                 all_names.append(item.orig_filename.removesuffix('/') if item.is_dir() else item.orig_filename)
@@ -420,7 +432,10 @@ def members(data, name=''):
                 if unix_type == stat.S_IFDIR or dos_directory:
                     raise ValueError('non-file archive member')
                 payload = archive.read(item)
-                check_content(payload)
+                if is_native(item.orig_filename):
+                    excluded.append(payload_ranges[item.orig_filename])
+                else:
+                    check_content(payload)
                 result.append((item.orig_filename, payload))
     else:
         source.seek(0)
@@ -441,9 +456,18 @@ def members(data, name=''):
                     continue
                 if item.type not in (tarfile.REGTYPE, tarfile.AREGTYPE):
                     raise ValueError('non-file archive member')
+                if is_native(item.name):
+                    excluded.append((item.offset_data, item.offset_data + item.size))
                 result.append((item.name, archive.extractfile(item).read()))
             if len(data) % 512 or len(data) < cursor + 1024 or any(data[cursor:]):
                 raise ValueError('invalid tar terminator or trailing bytes')
+    # Scan all accounted bytes except exact native payload ranges. Keep headers,
+    # descriptors, central directory and tar padding outside the exemption.
+    cursor = 0
+    for begin, end in sorted(excluded):
+        check_content(data[cursor:begin])
+        cursor = end
+    check_content(data[cursor:])
     inventory(all_names)
     parents = {normalize_path(str(parent)) for name, _ in result for parent in PurePosixPath(name).parents if str(parent) != '.'}
     if not inventory(directories) <= parents:
@@ -598,8 +622,8 @@ def check_native(data, native):
     target = 'x86_64-unknown-linux-gnu' if format == 'elf' else 'x86_64-pc-windows-msvc'
     role = 'python-extension' if library else 'cli'
     # STOR-LIMIT-004: native build outputs are checked only for format,
-    # not scanned individually. The enclosing container still scans all
-    # expanded bytes, including native bytes (STOR-LIMIT-004).
+    # not scanned individually. The enclosing container excludes only their
+    # exact data ranges from its expanded-stream scan (STOR-LIMIT-004).
     # CI builds from inventoried, digested/scanned sources mitigate a
     # compromised build. Reproducibility or build attestation closes it.
     if target == 'x86_64-unknown-linux-gnu':

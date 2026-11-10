@@ -95,12 +95,13 @@ is still in the exact inventory and subject to PR review; the limit concerns
 only encoded content inside admitted text files. The hex and prefixed-base64
 tests document non-detection as declared behavior, not guard success.
 
-Every supported container is also scanned as an entire raw byte stream after
-decompression, including headers, metadata, padding and trailing bytes, using
-the same content scanner as text members. ZIP wrapper bytes are scanned as well
-as every decompressed member. This scan also sees native member
-bytes inside a tar or ZIP; it does not recursively interpret native
-payloads or replace the declared native-content limit below.
+Every supported container is scanned as a raw byte stream after decompression,
+covering headers, metadata, padding, central directory and member data. Only
+exact data ranges of code-table natives in their specified distribution are
+excluded: compressed or stored entry bytes for ZIP, member data bytes for tar
+(without block padding). These ranges come from the same layout validation
+that rejects unaccounted bytes. Native headers and ZIP data descriptors remain
+scanned, as does every decompressed non-native member.
 
 Tar accepts only regular files, empty directories and local PAX headers with
 `path`, empty `linkpath`, `size`, `mtime`, `uid`, `gid`, `uname` or `gname`.

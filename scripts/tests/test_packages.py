@@ -717,6 +717,62 @@ class EntryPointRegressionTests(unittest.TestCase):
 
 
 class ContainerCoverageTests(unittest.TestCase):
+    def test_native_ccache_ranges(self):
+        from fuzz_parsers import synthetic_ccache
+        cache = synthetic_ccache(0x0504)[:48]
+        for context, native in gate.NATIVE_DISTRIBUTIONS.items():
+            if context.startswith('qualification') or context == '.crate':
+                continue
+            target = 'x86_64-unknown-linux-gnu' if native[2] == 'elf' else 'x86_64-pc-windows-msvc'
+            wheel = context.startswith('cp')
+            zipped = wheel or native[2] == 'pe'
+            name = ('plenora_storage-1.2.3-' + context + '.whl' if wheel else
+                    'plenora-storage-1.2.3-' + target + ('.zip' if zipped else '.tar.gz'))
+            _, _, expected = gate.distribution_policy(name)
+            files = [(n, BuildOutputTests.native(target, native[3]) + cache
+                      if n == native[1] else gate.source_bytes(rule['source']) if 'source' in rule else b'safe')
+                     for n, rule in expected.items()]
+            for method in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
+                with self.subTest(context=context, method=method):
+                    def pack(entries):
+                        if not zipped:
+                            return gzip.compress(gzip.decompress(archive(entries)), compresslevel=0)
+                        out = io.BytesIO()
+                        with zipfile.ZipFile(out, 'w', compression=method) as stream:
+                            for n, payload in entries:
+                                stream.writestr(n, payload)
+                        return out.getvalue()
+                    good = pack(files)
+                    gate.scan_distribution(good, name)
+                    bad = [(n, payload if n == native[1] else cache) for n, payload in files]
+                    with self.assertRaisesRegex(ValueError, 'Kerberos'):
+                        gate.scan_distribution(pack(bad), name)
+                    if not zipped:
+                        raw = bytearray(gzip.decompress(good))
+                        with tarfile.open(fileobj=io.BytesIO(raw)) as stream:
+                            item = stream.getmember(native[1])
+                        header = bytearray(raw[item.offset_data-512:item.offset_data])
+                        marker = cache
+                        header[400:400+len(marker)] = marker
+                        header[148:156] = b'        '
+                        header[148:156] = ('%06o\0 ' % sum(header)).encode()
+                        changed = raw[:]
+                        changed[item.offset_data-512:item.offset_data] = header
+                        with self.assertRaisesRegex(ValueError, 'Kerberos'):
+                            gate.scan_distribution(gzip.compress(changed), name)
+                        end = item.offset_data + item.size
+                        raw[end:end+len(marker)] = marker
+                        with self.assertRaisesRegex(ValueError, 'padding'):
+                            gate.scan_distribution(gzip.compress(raw), name)
+                    else:
+                        with patch.object(gate, 'check_content', wraps=gate.check_content) as scan:
+                            gate.scan_distribution(good, name)
+                        with zipfile.ZipFile(io.BytesIO(good)) as stream:
+                            begin, end = gate.validate_zip(good, stream)[native[1]]
+                        scanned = [call.args[0] for call in scan.call_args_list]
+                        self.assertIn(good[:begin], scanned)
+                        self.assertIn(good[end:], scanned)
+
     def test_complete_distributions_with_hidden_compressed_keys(self):
         crate = 'plenora-storage-core-3.0.3.crate'
         wheel = 'plenora_storage-3.0.3-cp310-abi3-win_amd64.whl'
