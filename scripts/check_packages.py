@@ -238,10 +238,17 @@ def members(data):
             result = []
             for item in archive.infolist():
                 all_names.append(item.orig_filename.removesuffix('/') if item.is_dir() else item.orig_filename)
+                unix_type = stat.S_IFMT(item.external_attr >> 16)
+                dos_directory = bool(item.external_attr & 0x10)
+                if unix_type not in (0, stat.S_IFREG, stat.S_IFDIR):
+                    raise ValueError('non-file archive member')
                 if item.is_dir():
+                    if (unix_type not in (0, stat.S_IFDIR) or not dos_directory
+                            or item.file_size != 0 or archive.read(item) != b''):
+                        raise ValueError('invalid archive directory')
                     directories.append(item.orig_filename.removesuffix('/'))
                     continue
-                if stat.S_IFMT(item.external_attr >> 16) not in (0, stat.S_IFREG):
+                if unix_type == stat.S_IFDIR or dos_directory:
                     raise ValueError('non-file archive member')
                 result.append((item.orig_filename, archive.read(item)))
     else:
@@ -251,9 +258,11 @@ def members(data):
             for item in archive:
                 all_names.append(item.name.removesuffix('/') if item.isdir() else item.name)
                 if item.isdir():
+                    if item.size != 0:
+                        raise ValueError('nonempty archive directory')
                     directories.append(item.name.removesuffix('/'))
                     continue
-                if not item.isfile():
+                if item.type not in (tarfile.REGTYPE, tarfile.AREGTYPE):
                     raise ValueError('non-file archive member')
                 result.append((item.name, archive.extractfile(item).read()))
     inventory(all_names)
@@ -335,7 +344,7 @@ def verify_distribution(path, member=None):
     if name not in expected:
         raise ValueError('undeclared standalone distribution member')
     rule = policy.get('member_rules', {}).get(kind, {}).get(expected[name], {})
-    scan(path.read_bytes(), name, rule=rule)
+    classify_member(path.read_bytes(), name, rule=rule, distribution=kind)
 
 
 def is_tar(data):
@@ -386,24 +395,35 @@ def scan_entries(entries, expected, depth, distribution=''):
     compare([n for n, _ in entries], expected)
     rules = {normalize_path(n): rule for n, rule in expected.items()}
     tracked = tracked_paths()
-    protected = inventory(registry().get('source', [])) | set(tracked)
     for name, data in entries:
-        rule = rules[normalize_path(name)]
-        source = repository_path(distribution, name)
-        native = native_member(distribution, name)
-        if native:
-            if normalize_path(name) in protected or source in protected:
-                raise ValueError('native path conflicts with tracked or inventoried source')
-            if rule:
-                raise ValueError('native member cannot have a policy rule')
-            check_native(data, native)
-        else:
-            if source in protected and ('source' in rule or not is_text(data)):
-                if normalize_path(rule.get('source', source)) != source:
-                    raise ValueError('source provenance differs from repository mapping')
-                if source in tracked and hashlib.sha256(data).hexdigest() != hashlib.sha256(source_bytes(tracked[source])).hexdigest():
-                    raise ValueError('binary source digest differs from git')
-            scan(data, name, depth, rule)
+        classify_member(data, name, depth, rules[normalize_path(name)], distribution, _tracked=tracked)
+
+
+def classify_member(data, name='', depth=0, rule=None, distribution='', *, _tracked=None):
+    """Single entry for native, source, metadata and container classification."""
+    if depth > 8:
+        raise ValueError('archive nesting limit exceeded')
+    check_build_paths({name or 'payload': rule or {}})
+    if rule is None and name.endswith(('.crate', '.whl', '.tar.gz', '.zip')):
+        return scan_distribution(data, name, depth)
+    rule = rule or {}
+    tracked = tracked_paths() if _tracked is None else _tracked
+    protected = inventory(registry().get('source', [])) | set(tracked)
+    source = repository_path(distribution, name) if name else None
+    native = native_member(distribution, name)
+    if native:
+        if normalize_path(name) in protected or source in protected:
+            raise ValueError('native path conflicts with tracked or inventoried source')
+        if rule:
+            raise ValueError('native member cannot have a policy rule')
+        check_native(data, native)
+    else:
+        if source in protected and ('source' in rule or not is_text(data)):
+            if normalize_path(rule.get('source', source)) != source:
+                raise ValueError('source provenance differs from repository mapping')
+            if source in tracked and hashlib.sha256(data).hexdigest() != hashlib.sha256(source_bytes(tracked[source])).hexdigest():
+                raise ValueError('binary source digest differs from git')
+        _scan_content(data, name, depth, rule)
 
 
 def check_native(data, native):
@@ -483,7 +503,7 @@ def check_source_digests():
                 data = source_bytes(rule['source'])
                 if hashlib.sha256(data).hexdigest() != rule.get('sha256'):
                     raise ValueError('source digest differs from git')
-                scan(data, rule=rule)
+                classify_member(data, rule=rule)
 
 
 def relative_entries(entries, prefix):
@@ -512,13 +532,9 @@ def scan_distribution(data, name, depth=0):
     scan_entries(relative_entries(entries, prefix), expected, depth+1, context)
 
 
-def scan(data, name='', depth=0, rule=None):
+def _scan_content(data, name='', depth=0, rule=None):
     if depth > 8:
         raise ValueError('archive nesting limit exceeded')
-    # A named top-level distribution has its own explicit inventory. Nested
-    # members always receive a rule, so a plausible filename grants nothing.
-    if rule is None and name.endswith(('.crate', '.whl', '.tar.gz', '.zip')):
-        return scan_distribution(data, name, depth)
     rule = rule or {}
     check_build_paths({name or 'payload': rule})
     kind = container_format(data)
@@ -539,10 +555,14 @@ def scan(data, name='', depth=0, rule=None):
         if kind in {'zip', 'tar'}:
             return scan_entries(members(data), declaration['members'], depth+1)
         expanded = {'gzip': gzip.decompress, 'bzip2': bz2.decompress, 'xz': lzma.decompress}[kind](data)
-        return scan(expanded, 'payload', depth+1, declaration['payload'])
+        return classify_member(expanded, 'payload', depth+1, declaration['payload'])
     if 'container' in rule:
         raise ValueError('declared container missing')
     check_content(data)
+
+
+# Compatibility name: all callers still enter the same classifier.
+scan = classify_member
 
 
 def check_archive(path, kind, version='', prefix='', platform=''):
@@ -585,7 +605,7 @@ def check_cargo(build=False):
             source = directory / ('Cargo.toml' if item == 'Cargo.toml.orig' else item)
             if not source.exists() and package.get('license_file'):
                 source = directory / package['license_file']
-            scan(source.read_bytes(), item, rule=registry().get('member_rules', {}).get('crates/' + name, {}).get(item, {}))
+            classify_member(source.read_bytes(), item, distribution='crates/' + name, rule=registry().get('member_rules', {}).get('crates/' + name, {}).get(item, {}))
         print(f'{name}: exact inventory and content PASS ({len(expected)} files)')
     if build:
         cargo('package', '--workspace', '--exclude', 'plenora-storage-py', '--no-verify', '--locked', '--offline', '--allow-dirty')

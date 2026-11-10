@@ -69,9 +69,6 @@ def binary_rule(data, container=None):
 
 
 class PackageGuardTests(unittest.TestCase):
-    def setUp(self):
-        (gate.ROOT / 'target').mkdir(parents=True, exist_ok=True)
-
     def test_safe_text_public_certificate_and_native_data(self):
         for data in (b'ordinary source', b'password field documentation',
                      b'MZ' + bytes(range(256)),
@@ -251,7 +248,7 @@ class PackageGuardTests(unittest.TestCase):
     def test_printable_container_digest_recording(self):
         import tempfile
         from record_package_digests import record
-        with tempfile.TemporaryDirectory(dir=gate.ROOT / 'target') as temporary:
+        with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             data = printable_tar()
             (root / 'nested').write_bytes(data)
@@ -264,7 +261,7 @@ class PackageGuardTests(unittest.TestCase):
             for repository in (False, True):
                 with self.subTest(repository=repository):
                     policy.write_text(json.dumps(initial))
-                    with patch.object(gate, 'REGISTRY', policy), patch.object(gate, 'ROOT', root), patch.object(gate, 'source_bytes', return_value=data):
+                    with patch.object(gate, 'REGISTRY', policy), patch.object(gate, 'ROOT', root), patch.object(gate, 'tracked_paths', return_value={}), patch.object(gate, 'source_bytes', return_value=data):
                         record([] if repository else [package], repository=repository)
                         rule = gate.registry()['member_rules']['cli-windows']['nested']
                         self.assertEqual(rule['sha256'], hashlib.sha256(data).hexdigest())
@@ -311,7 +308,7 @@ class PackageGuardTests(unittest.TestCase):
     def test_recording_is_reproducible_and_does_not_learn_members(self):
         import tempfile
         from record_package_digests import record
-        with tempfile.TemporaryDirectory(dir=gate.ROOT / 'target') as temporary:
+        with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             policy = root / 'policy.json'
             policy.write_text(json.dumps({'cli-windows': ['app'], 'member_rules': {'cli-windows': {'app': {'source': 'tracked/app'}}}}))
@@ -345,7 +342,7 @@ class PackageGuardTests(unittest.TestCase):
 
     def test_standalone_release_members_use_exact_rules(self):
         import tempfile
-        with tempfile.TemporaryDirectory(dir=gate.ROOT / 'target') as temporary:
+        with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / 'README.md'
             path.write_bytes(b'opaque\x00binary')
             policy = {'qualification': ['target/README.md'], 'public-documents': [],
@@ -425,7 +422,7 @@ class BuildOutputTests(unittest.TestCase):
                 files.append((prefix + member, data))
             gate.scan(archive(files, True), name)
             import tempfile
-            with tempfile.TemporaryDirectory(dir=gate.ROOT / 'target') as temporary:
+            with tempfile.TemporaryDirectory() as temporary:
                 path = Path(temporary) / name
                 path.write_bytes(archive(files, True))
                 gate.check_archive(path, kind)
@@ -511,8 +508,7 @@ class BuildOutputTests(unittest.TestCase):
 
     def test_standalone_archive_cannot_bypass_parent_inventory(self):
         import tempfile
-        (gate.ROOT / 'target').mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(dir=gate.ROOT / 'target') as temporary:
+        with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / 'plenora-storage-1.2.3-source.tar.gz'
             path.write_bytes(archive([('plenora-storage-1.2.3/readme', b'safe')]))
             with self.assertRaisesRegex(ValueError, 'undeclared standalone'):
@@ -598,3 +594,120 @@ class BuildOutputTests(unittest.TestCase):
                 if payload in payloads[1:]:
                     with self.assertRaisesRegex(ValueError, 'embedded Kerberos'):
                         gate.scan_entries([('source.bin', data)], {'source.bin': binary_rule(data)}, 0)
+
+class EntryPointRegressionTests(unittest.TestCase):
+    def test_same_native_bytes_through_all_release_paths(self):
+        import tempfile
+        import verify_release
+        from versioning import parse_version
+        version = '0.2.0'
+        for target, kind, binary, suffix in (
+                ('x86_64-unknown-linux-gnu', 'cli-linux', 'plenora-storage', '.tar.gz'),
+                ('x86_64-pc-windows-msvc', 'cli-windows', 'plenora-storage.exe', '.zip')):
+            data = BuildOutputTests.native(target)
+            name = f'plenora-storage-{version}-{target}{suffix}'
+            packed = archive([(binary, data)], suffix == '.zip')
+            member = target + '/' + binary
+            nested = target + '/' + name
+            rule = {'container': {'format': 'zip' if suffix == '.zip' else 'gzip', 'distribution': True}}
+            policy = {kind: [binary], 'qualification': [member, nested],
+                      'member_rules': {'qualification': {nested: rule}}}
+            with self.subTest(target=target), tempfile.TemporaryDirectory() as temporary, \
+                    patch.object(gate, 'registry', return_value=policy), \
+                    patch.object(gate, 'workspace_version', return_value=parse_version(version)):
+                root = Path(temporary) / version
+                folder = root / target
+                folder.mkdir(parents=True)
+                (folder / binary).write_bytes(data)
+                (folder / name).write_bytes(packed)
+                gate.scan_distribution(packed, name)
+                gate.verify_distribution(folder / name)
+                gate.verify_distribution(folder / binary, member=member)
+                gate.verify_distribution(folder / name, member=nested)
+                bundle = archive([(version + '/' + member, data), (version + '/' + nested, packed)])
+                gate.scan_distribution(bundle, f'plenora-storage-{version}-qualification.tar.gz')
+                outer = archive([(name, packed)], True)
+                gate.classify_member(outer, rule=binary_rule(outer, {'format': 'zip', 'members': {name: rule}}))
+                artifacts = [{'name': n, 'sha256': hashlib.sha256(d).hexdigest(), 'size': len(d)}
+                             for n, d in ((binary, data), (name, packed))]
+                manifest = {'version': version, 'target': target, 'source_sha256': 'synthetic', 'artifacts': artifacts}
+                (folder / 'release-manifest.json').write_text(json.dumps(manifest))
+                (folder / 'SHA256SUMS').write_text('\n'.join(
+                    hashlib.sha256((folder / n).read_bytes()).hexdigest() + '  ' + n
+                    for n in (binary, name, 'release-manifest.json')))
+                (folder / 'adoption-manifest-v4.json').write_text(json.dumps({'schema_version': 4, 'artifacts': []}))
+                with patch.object(sys, 'argv', ['verify_release.py', str(root)]), \
+                        patch.object(verify_release, 'adoption_errors', return_value=[]):
+                    verify_release.main()
+                (folder / binary).write_bytes(b'invalid native')
+                with self.assertRaisesRegex(ValueError, 'native'):
+                    gate.verify_distribution(folder / binary, member=member)
+
+    def test_zip_entry_types_in_complete_wheel_and_nested_zip(self):
+        import stat
+        name = 'plenora_storage-1.2.3-cp310-abi3-win_amd64.whl'
+        _, _, expected = gate.distribution_policy(name)
+        files = [(n, BuildOutputTests.native('x86_64-pc-windows-msvc', True)
+                  if gate.native_member('cp310-abi3-win_amd64', n) else b'safe') for n in expected]
+        payload = b'-----BEGIN PRIVATE KEY-----\nYWJj\n'
+        cases = [(stat.S_IFDIR, 0x10, '/', b'', True),
+                 (0, 0x10, '/', b'', True),
+                 (stat.S_IFDIR, 0x10, '/', payload, False),
+                 (stat.S_IFREG, 0x10, '/', b'', False),
+                 (stat.S_IFDIR, 0, '/', b'', False),
+                 (0, 0, '/', b'', False),
+                 (stat.S_IFDIR, 0x10, '', b'', False),
+                 (stat.S_IFREG, 0x10, '', payload, False)]
+        cases += [(kind, 0x10, '/', payload, False) for kind in
+                  (stat.S_IFLNK, stat.S_IFCHR, stat.S_IFBLK, stat.S_IFIFO, stat.S_IFSOCK)]
+        for kind, dos, slash, data, accepted in cases:
+            with self.subTest(kind=kind, dos=dos, slash=slash, payload=bool(data)):
+                out = io.BytesIO(archive(files, True))
+                with zipfile.ZipFile(out, 'a') as stream:
+                    info = zipfile.ZipInfo('plenora_storage' + slash)
+                    info.create_system = 3
+                    info.external_attr = ((kind | 0o755) << 16) | dos
+                    stream.writestr(info, data)
+                packed = out.getvalue()
+                outer = archive([(name, packed)], True)
+                for check in (lambda: gate.scan_distribution(packed, name),
+                              lambda: gate.classify_member(outer, rule=binary_rule(outer, {
+                                  'format': 'zip', 'members': {name: {'container': {
+                                      'format': 'zip', 'distribution': True}}}}))):
+                    if accepted:
+                        check()
+                        continue
+                    with self.assertRaises(ValueError):
+                        check()
+
+    def test_tar_types_in_crate_source_and_compressed_containers(self):
+        payload = b'-----BEGIN PRIVATE KEY-----\nYWJj\n'
+        for kind in (tarfile.DIRTYPE, tarfile.SYMTYPE, tarfile.LNKTYPE,
+                     tarfile.CHRTYPE, tarfile.BLKTYPE, tarfile.FIFOTYPE, tarfile.CONTTYPE):
+            for data in (b'', payload):
+                out = io.BytesIO()
+                with tarfile.open(fileobj=out, mode='w', format=tarfile.USTAR_FORMAT) as stream:
+                    info = tarfile.TarInfo('root/directory')
+                    info.type, info.size = kind, len(data)
+                    stream.addfile(info, io.BytesIO(data))
+                    info = tarfile.TarInfo('root/directory/file')
+                    info.size = 4
+                    stream.addfile(info, io.BytesIO(b'safe'))
+                raw = out.getvalue()
+                for fmt, packed, declaration in (
+                        ('tar', raw, {'format': 'tar', 'members': {'root/directory/file': {}}}),
+                        *[(fmt, compress(raw), {'format': fmt, 'payload': binary_rule(raw, {
+                            'format': 'tar', 'members': {'root/directory/file': {}}})})
+                          for fmt, compress in (('gzip', gzip.compress), ('bzip2', bz2.compress), ('xz', lzma.compress))]):
+                    with self.subTest(kind=kind, payload=bool(data), format=fmt):
+                        if kind == tarfile.DIRTYPE and not data:
+                            gate.classify_member(packed, rule=binary_rule(packed, declaration))
+                        else:
+                            with self.assertRaises(ValueError):
+                                gate.classify_member(packed, rule=binary_rule(packed, declaration))
+                for name in ('plenora-storage-core-1.2.3.crate', 'plenora-storage-1.2.3-source.tar.gz',
+                             'plenora_storage-1.2.3.tar.gz'):
+                    if kind != tarfile.DIRTYPE or data:
+                        with self.subTest(name=name, kind=kind), self.assertRaisesRegex(
+                                ValueError, 'sdist distribution|non-file archive|nonempty archive'):
+                            gate.scan_distribution(gzip.compress(raw), name)

@@ -16,7 +16,7 @@ def record_rule(rule, data, name='', distribution=''):
         gate.scan_entries([(name, data)], {name: rule}, 0, distribution)
         return
     if rule.get('container', {}).get('distribution') is True:
-        gate.scan(data, name, rule=rule)
+        gate.classify_member(data, name, rule=rule, distribution=distribution)
         return
     container = gate.container_format(data)
     if container and (container not in gate.SUPPORTED or 'container' not in rule):
@@ -28,7 +28,7 @@ def record_rule(rule, data, name='', distribution=''):
         if data != committed:
             raise ValueError('source bytes differ from git')
         rule['sha256'] = hashlib.sha256(committed).hexdigest()
-        gate.scan(data, name, rule=rule)
+        gate.classify_member(data, name, rule=rule, distribution=distribution)
 
 
 def record(paths, repository=False, member=None):
