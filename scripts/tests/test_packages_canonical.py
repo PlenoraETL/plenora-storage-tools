@@ -61,7 +61,7 @@ class ReleaseCheckoutTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=gate.ROOT / 'target') as temporary:
             base = Path(temporary)
             root = base / 'shallow'
-            subprocess.run(gate.git_command('clone', '--no-local', '--depth=1', '--quiet',
+            subprocess.run(env=gate.git_env(), args=gate.git_command('clone', '--no-local', '--depth=1', '--quiet',
                                            gate.ROOT.resolve().as_uri(), str(root)),
                            check=True, capture_output=True)
             empty = base / 'empty.gitconfig'
