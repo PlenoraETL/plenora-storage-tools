@@ -4,6 +4,7 @@ No inventory is learned or updated by this gate. Changes require review of
 scripts/package_files.json. Diagnostics never include inspected contents.
 """
 import argparse
+import os
 import tempfile
 from contextlib import contextmanager
 import base64
@@ -55,6 +56,25 @@ def git_input(key, read):
     if key not in cache:
         cache[key] = read()
     return cache[key]
+
+
+def git_env():
+    """Environment for the guard's own git calls.
+
+    Git 2.39 honours safe.directory for a local clone only from protected
+    (system/global) configuration, not from -c: the guard points
+    GIT_CONFIG_GLOBAL at a private file that trusts the checkout, its .git
+    and the guard's own temporary clones under target/, and nothing else.
+    """
+    target = ROOT / 'target'
+    target.mkdir(exist_ok=True)
+    trusted = [ROOT.resolve(), ROOT.resolve() / '.git']
+    for clone in sorted(target.glob('package-reference-*')):
+        trusted += [clone.resolve() / 'work', clone.resolve() / 'work' / '.git']
+    config = target / 'package-guard-gitconfig'
+    lines = ['[safe]'] + ['\tdirectory = ' + path.as_posix() for path in trusted]
+    config.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+    return {**os.environ, 'GIT_CONFIG_GLOBAL': str(config)}
 
 
 def git_command(*args, work=None):
@@ -206,7 +226,7 @@ def tracked_paths():
 
 
 def _tracked_paths():
-    names = subprocess.run(git_command('ls-files', '--cached', '--with-tree=' + release_revision(), '-z'),
+    names = subprocess.run(env=git_env(), args=git_command('ls-files', '--cached', '--with-tree=' + release_revision(), '-z'),
                            cwd=ROOT, capture_output=True, check=True).stdout.decode('utf-8').split('\0')
     names = [n for n in names if n]
     inventory(names)
@@ -738,7 +758,7 @@ def source_bytes(name):
 
 
 def _source_bytes(name):
-    result = subprocess.run(git_command('show', release_revision() + ':' + name), cwd=ROOT,
+    result = subprocess.run(env=git_env(), args=git_command('show', release_revision() + ':' + name), cwd=ROOT,
                             capture_output=True)
     if result.returncode:
         raise ValueError('binary source is not tracked in HEAD')
@@ -746,7 +766,7 @@ def _source_bytes(name):
 
 
 def check_git_version():
-    output = subprocess.check_output(git_command('--version'), cwd=ROOT).decode('ascii')
+    output = subprocess.check_output(env=git_env(), args=git_command('--version'), cwd=ROOT).decode('ascii')
     match = re.match(r'git version (\d+)\.(\d+)', output)
     if not match or tuple(map(int, match.groups())) < (2, 39):
         raise ValueError('package guard requires Git >= 2.39')
@@ -760,18 +780,18 @@ def release_checkout():
     with tempfile.TemporaryDirectory(dir=ROOT / 'target', prefix='package-reference-') as tmp:
         directory = Path(tmp)
         work = directory / 'work'
-        result = subprocess.run(git_command('clone', '--shared', '--no-checkout', '--no-reject-shallow',
+        result = subprocess.run(env=git_env(), args=git_command('clone', '--shared', '--no-checkout', '--no-reject-shallow',
                                             '--quiet', str(ROOT.resolve()), str(work), work=work),
                                 capture_output=True)
         if result.returncode:
             raise ValueError('cannot create isolated release checkout: ' +
                              result.stderr.decode('utf-8', errors='replace').strip())
         for key in ('core.autocrlf', 'core.eol'):
-            value = subprocess.run(git_command('config', '--get', key), cwd=ROOT, capture_output=True)
+            value = subprocess.run(env=git_env(), args=git_command('config', '--get', key), cwd=ROOT, capture_output=True)
             if value.returncode == 0:
-                subprocess.run(git_command('config', key, value.stdout.decode().strip(), work=work),
+                subprocess.run(env=git_env(), args=git_command('config', key, value.stdout.decode().strip(), work=work),
                                cwd=work, check=True, capture_output=True)
-        result = subprocess.run(git_command('checkout', '--quiet', '--detach', release_revision(), work=work),
+        result = subprocess.run(env=git_env(), args=git_command('checkout', '--quiet', '--detach', release_revision(), work=work),
                                 cwd=work, capture_output=True)
         if result.returncode:
             raise ValueError('cannot produce git checkout source bytes: ' +
