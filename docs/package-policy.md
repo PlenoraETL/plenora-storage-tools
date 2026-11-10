@@ -16,7 +16,7 @@ explicit inventory and gate change.
 The source bundle contains the buildable workspace sources selected from the
 crate inventories, root manifests/lock/toolchain, contracts, licenses and product
 documentation. It no longer distributes the entire development checkout (Docker
-rigs, development scripts and fuzz corpora). Git supplies committed bytes;
+rigs, development scripts and fuzz corpora). Git supplies committed bytes with the build platform checkout conversion;
 `package_source.py` checks the resulting archive before extracting it. Dirty
 working-tree archive checks are local evidence only, not release qualification.
 
@@ -44,8 +44,8 @@ Text means valid UTF-8 with no Unicode control characters except TAB, CR and LF.
 Other members are classified by provenance, never exempted by extension:
 
 - Tracked source members have `source` and exact `sha256` rules. The package
-  gate compares the digest with the Git HEAD blob as well as inspecting the
-  packaged bytes. This includes the 21 historical gzip evidence files; their
+  gate retains these recorded binary digests and also compares every source
+  member (text or binary) with Git checkout bytes at the release revision. This includes the 21 historical gzip evidence files; their
   bytes and historical claims remain unchanged.
 - Native exemptions come exclusively from `NATIVE_DISTRIBUTIONS` in
   `scripts/check_packages.py`: the exact distribution-relative member, target
@@ -55,7 +55,9 @@ Other members are classified by provenance, never exempted by extension:
   PE32+ on Windows; DLL versus EXE and ELF executable versus shared library
   types are checked. Crates admit no native output. Qualification bundles
   admit the two CLI executables at their exact target-relative paths.
-- Generated archives nested in qualification have container declarations.
+- Generated archives nested in qualification have container declarations and
+  must match the 24 exact `GENERATED_CONTAINERS` entries in code. A policy
+  declaration alone cannot exempt a source from Git identity.
   Their contents recurse into their exact distribution inventory; they are
   never opaque exemptions. A filename alone never authorizes a nested archive.
 
@@ -85,15 +87,68 @@ public fixture value described above; structural checks for
 DER and Kerberos material remain additional checks. Traditional six-INTEGER DSA
 is included in the base64 key recognition.
 
-Under the owner's static-guard decision of 2026-11-06, the guard covers direct
-forms by construction and declares variants as limits rather than pursuing
-them. Text scanning recognizes private PEM and bare base64 private DER; it
-does not guarantee recognition of a key recoded as hex, base64 with a prefix
-or mixed with other text, or other encodings. This is declared as
-[STOR-LIMIT-003](contract-limits.md#stor-limit-003). A new or changed text file
-is still in the exact inventory and subject to PR review; the limit concerns
-only encoded content inside admitted text files. The hex and prefixed-base64
-tests document non-detection as declared behavior, not guard success.
+The owner decision of 2026-11-10 requires **every source member**, textual or
+binary, to equal its tracked release source byte for byte. The reference comes
+from the pinned Git revision and an isolated shared clone under `target/`,
+checked out with the repository's `core.autocrlf` and `core.eol` settings.
+Git >= 2.39 is required and checked explicitly. Each guard Git command trusts
+only the absolute source path and, when needed, the isolated clone through
+command-scoped `safe.directory`. Shallow sources are accepted explicitly;
+clone/checkout failures retain Git's diagnostic. Working-tree bytes and dirty
+attributes cannot supply the reference. `.gitattributes` and the build platform's Git EOL settings
+apply; the guard never strips CR or otherwise normalizes package bytes. The
+source builder uses the same checkout conversion. Changes to inventory or a
+recorded digest cannot authorize an untracked or substituted source.
+
+The closed generated-text table is `GENERATED_MEMBERS` in
+`scripts/package_generated.py`, matched by distribution and exact member (only
+version placeholders expand). Every such exception must remain UTF-8 text,
+contain no container, and pass the private-material and credential scanner;
+it cannot carry a source/digest rule. Cargo metadata is reproduced offline by the pinned Cargo from an isolated Git
+checkout (`cargo package --workspace --no-verify --locked --offline`): normalized
+`Cargo.toml` and generated `Cargo.lock` must match byte for byte. The VCS JSON
+is serialized canonically from the release revision and expected `path_in_vcs`.
+Wheel `WHEEL` and `METADATA` are reconstructed in maturin's field order from
+`pyproject.toml`, the pinned maturin version/tag and the declared README body
+(LF serialization plus maturin's final newline). `RECORD` is reconstructed as
+LF CSV in archive member order, with SHA-256 and sizes, and its own empty
+hash/size. All these members must match the reconstructed bytes exactly;
+parser-equivalent spellings, ignored lines, BOMs and whitespace are rejected.
+These checks also apply inside qualification containers. Regression tests in
+`test_packages_canonical.py` run through the existing script-test discovery in
+CI `product-quality` and `native-windows`, including an untrusted shallow clone.
+The wheel SBOM, campaign evidence and publication documents remain scanned
+text exceptions, not content-derived provenance guarantees:
+
+| Distribution | Generated-text exceptions |
+| --- | --- |
+| Source tar.gz, contracts, CLI documents/licenses | None |
+| Each Cargo package | `Cargo.toml`, `Cargo.lock`, `.cargo_vcs_info.json`; `Cargo.toml.orig` must equal the tracked manifest |
+| Each supported wheel | Exact versioned dist-info `METADATA`, `RECORD`, `WHEEL`, `sboms/plenora-storage-py.cyclonedx.json`; the copied `licenses/LICENSE` must equal Git |
+| Qualification | 144 exact report, log, checksum and manifest paths enumerated in the code table; 24 declared nested distributions recurse and natives use the existing native table |
+| Standalone publication documents | The five exact versioned manifest/SBOM/qualification paths enumerated in the code table |
+| Python sdist | Unsupported and rejected; no exceptions |
+
+No aggregated license is currently distributed as a generated-text exception.
+A new generated member requires a code-table change as well as an inventory
+change. Qualification source members not in that table map to repository paths
+and must equal Git, including sources inside all nested packages.
+
+Text scanning recognizes private PEM and bare base64 private DER; it does not
+guarantee recognition of hex, prefixed/mixed base64 or other encodings. Under
+[STOR-LIMIT-003](contract-limits.md#stor-limit-003), the residual risk includes repository content subject to PR review **and**
+generated campaign evidence/publication documents and the wheel SBOM.
+For source members, encoded substitutions made only during packaging are
+rejected by byte identity.
+The 144 generated qualification entries and five publication documents remain
+within STOR-LIMIT-003: provenance is guaranteed by the receipt and the
+publication HEAD/receipt/tag binding, not by their content. A `deny.log` with
+the required success substring is not proof that its remaining text is safe.
+The generated wheel SBOM also retains the scanner's encoding limits; an exact
+RECORD hash binds its bytes but does not prove their content. This limit is
+not reduced to the repository alone.
+The hex and prefixed-base64 scanner tests document non-detection, while source
+substitution tests demonstrate rejection independently of encoding.
 
 Every supported container is scanned as a raw byte stream after decompression,
 covering headers, metadata, padding, central directory and member data. Only
@@ -145,7 +200,7 @@ python scripts/record_package_digests.py --repository
 ```
 
 Declare the exact `source` path and any container structure before recording.
-The recorder compares input bytes with Git HEAD, refuses untracked/substituted
+The recorder compares input bytes with Git HEAD checkout bytes, refuses untracked/substituted
 inputs, and never learns member names or container declarations. Archive
 arguments validate generated members without recording their digests;
 `--member KIND NAME FILE` refuses build outputs. Rebuilding a CLI, wheel or

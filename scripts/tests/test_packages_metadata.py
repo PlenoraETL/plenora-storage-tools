@@ -11,10 +11,10 @@ import zipfile
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_packages import archive, binary_rule, gate
+from test_packages import archive, binary_rule, gate, source_fixture, GitSnapshotTestCase, wheel_record
 
 
-class HiddenMetadataRegressionTests(unittest.TestCase):
+class HiddenMetadataRegressionTests(GitSnapshotTestCase):
     def test_complete_crate_rejects_hidden_tar_extensions(self):
         name = 'plenora-storage-core-1.2.3.crate'
         _, prefix, expected = gate.distribution_policy(name)
@@ -60,11 +60,14 @@ class HiddenMetadataRegressionTests(unittest.TestCase):
         for private_native in (True, False):
             out = io.BytesIO()
             with zipfile.ZipFile(out, 'w', compression=zipfile.ZIP_DEFLATED) as stream:
+                files = []
                 for member in expected:
                     native = gate.native_member('cp310-abi3-win_amd64', member)
-                    data = BuildOutputTests.native('x86_64-pc-windows-msvc', True) if native else b'safe'
+                    data = BuildOutputTests.native('x86_64-pc-windows-msvc', True) if native else source_fixture('cp310-abi3-win_amd64', member)
                     if bool(native) == private_native:
                         data += b'-----BEGIN PRIVATE KEY-----\nYWJj\n'
+                    files.append((member, data))
+                for member, data in wheel_record(files):
                     stream.writestr(member, data)
             if private_native:
                 # STOR-LIMIT-004: native payloads are deliberately opaque.
@@ -98,7 +101,7 @@ class HiddenMetadataRegressionTests(unittest.TestCase):
             gate.members(out.getvalue())
 
 
-class CanonicalRuleRegressionTests(unittest.TestCase):
+class CanonicalRuleRegressionTests(GitSnapshotTestCase):
     def test_same_rule_across_verification_paths(self):
         for spelling, canonical in [('README.md', 'readme.md'), ('readme.md', 'README.md'),
                                     ('ReAdMe.MD', 'readme.md'), ('R\u00c9SUM\u00c9.md', 're\u0301sume\u0301.md')]:
@@ -109,7 +112,7 @@ class CanonicalRuleRegressionTests(unittest.TestCase):
                       'public-documents': [spelling], 'crates': {crate: [spelling]},
                       'member_rules': {kind: {canonical: rule} for kind in
                                        ('source', 'qualification', 'public-documents', 'crates/' + crate)}}
-            with tempfile.TemporaryDirectory() as temporary, patch.object(gate, 'registry', return_value=policy), patch.object(gate, 'tracked_paths', return_value={}):
+            with tempfile.TemporaryDirectory() as temporary, patch.object(gate, 'registry', return_value=policy), patch.object(gate, 'tracked_paths', return_value={gate.normalize_path(spelling): spelling, gate.normalize_path('crates/plenora-example/' + spelling): 'crates/plenora-example/' + spelling}), patch.object(gate, 'checkout_source_bytes', return_value=good):
                 path = Path(temporary) / spelling
                 for data in (good, b'changed text'):
                     path.write_bytes(data)
@@ -153,7 +156,7 @@ class CanonicalRuleRegressionTests(unittest.TestCase):
                 self.assertEqual(gate.native_member(context.upper(), item[1].upper()), item)
 
 
-class BuilderRuleRegressionTests(unittest.TestCase):
+class BuilderRuleRegressionTests(GitSnapshotTestCase):
     def test_cargo_listing_uses_same_normalized_digest(self):
         import json
         with tempfile.TemporaryDirectory() as temporary:
@@ -165,7 +168,7 @@ class BuilderRuleRegressionTests(unittest.TestCase):
             def cargo(*args):
                 return json.dumps(metadata) if args[0] == 'metadata' else 'README.md'
             with patch.object(gate, 'registry', return_value=policy), patch.object(gate, 'cargo', side_effect=cargo), \
-                    patch.object(gate, 'check_source_digests'), patch.object(gate, 'tracked_paths', return_value={}):
+                    patch.object(gate, 'check_source_digests'), patch.object(gate, 'tracked_paths', return_value={'readme.md': 'README.md'}), patch.object(gate, 'checkout_source_bytes', return_value=b'original'):
                 path.write_bytes(b'original')
                 gate.check_cargo()
                 path.write_bytes(b'changed')

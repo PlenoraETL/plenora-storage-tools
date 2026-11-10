@@ -11,6 +11,7 @@ import tarfile
 import unittest
 import zipfile
 from unittest.mock import patch
+from functools import lru_cache
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import check_packages as gate
@@ -32,6 +33,7 @@ def rsa_key():
 
 
 def archive(files, zip_format=False):
+    files = wheel_record(files) if zip_format else files
     output = io.BytesIO()
     if zip_format:
         with zipfile.ZipFile(output, 'w') as stream:
@@ -68,7 +70,57 @@ def binary_rule(data, container=None):
     return rule
 
 
-class PackageGuardTests(unittest.TestCase):
+def wheel_record(files):
+    import csv
+    files = list(files)
+    records = [n for n, d in files if n.endswith('.dist-info/RECORD')]
+    if len(records) != 1:
+        return files
+    record = records[0]
+    out = io.StringIO(newline='')
+    csv.writer(out, lineterminator='\n').writerows([
+        [n, '' if n == record else 'sha256=' + base64.urlsafe_b64encode(
+            hashlib.sha256(d).digest()).rstrip(b'=').decode(), '' if n == record else str(len(d))]
+        for n, d in files])
+    return [(n, out.getvalue().encode() if n == record else d) for n, d in files]
+
+
+@lru_cache(maxsize=None)
+def cargo_fixture():
+    from package_generated import cargo_reference
+    return cargo_reference()
+
+
+@lru_cache(maxsize=None)
+def source_fixture(context, name):
+    if gate.generated_member(context, name):
+        if context.startswith('crates/'):
+            if name == '.cargo_vcs_info.json':
+                return json.dumps({'git': {'sha1': gate.release_revision()},
+                                   'path_in_vcs': context}, indent=2).encode()
+            return cargo_fixture()[context[7:]][name]
+        if context.startswith('cp'):
+            from package_generated import wheel_metadata
+            fields, body, version = wheel_metadata(context)
+            if name.endswith('/METADATA'):
+                return ('\n'.join(k + ': ' + v for k, v in fields) + '\n\n' + body).encode()
+            if name.endswith('/WHEEL'):
+                return ('Wheel-Version: 1.0\nGenerator: maturin (' + version + ')\n'
+                        'Root-Is-Purelib: false\nTag: ' + context + '\n').encode()
+            if name.endswith('/RECORD'):
+                return (name + ',,\n').encode()
+        return b'safe text'
+    source = gate.repository_path(context, name)
+    return gate.checkout_source_bytes(gate.path_lookup(gate.tracked_paths(), source))
+
+
+class GitSnapshotTestCase(unittest.TestCase):
+    def setUp(self):
+        token = gate._GIT_CACHE.set({})
+        self.addCleanup(gate._GIT_CACHE.reset, token)
+
+
+class PackageGuardTests(GitSnapshotTestCase):
     def test_safe_text_public_certificate_and_native_data(self):
         for data in (b'ordinary source', b'password field documentation',
                      b'MZ' + bytes(range(256)),
@@ -162,7 +214,7 @@ class PackageGuardTests(unittest.TestCase):
             ('wheel-linux', 'plenora_storage-1.2.3-cp310-abi3-manylinux_2_34_x86_64.whl', ''),
         ]
         for kind, name, prefix in cases:
-            with self.subTest(kind=kind), patch.object(gate, 'registry', return_value={kind: ['one', 'two'], 'wheel-tags': gate.registry()['wheel-tags']}):
+            with self.subTest(kind=kind), patch.object(gate, 'registry', return_value={kind: ['one', 'two'], 'wheel-tags': gate.registry()['wheel-tags']}), patch.object(gate, 'classify_member'):
                 good = [(prefix+'one', b'one'), (prefix+'two', b'two')]
                 gate.scan(archive(good, kind in {'cli-windows', 'wheel-windows', 'wheel-linux'}), name)
                 for files in (good[:1], good+[(prefix+'extra', b'extra')]):
@@ -171,7 +223,7 @@ class PackageGuardTests(unittest.TestCase):
 
     def test_prerelease_qualification_uses_python_version(self):
         name = 'plenora-storage-1.2.3-rc.1-qualification.tar.gz'
-        with patch.object(gate, 'registry', return_value={'qualification': ['artifact-{python_version}']}):
+        with patch.object(gate, 'registry', return_value={'qualification': ['artifact-{python_version}']}), patch.object(gate, 'classify_member'):
             gate.scan(archive([('1.2.3-rc.1/artifact-1.2.3rc1', b'safe')]), name)
 
     def test_undeclared_python_distribution_is_rejected(self):
@@ -264,7 +316,7 @@ class PackageGuardTests(unittest.TestCase):
             for repository in (False, True):
                 with self.subTest(repository=repository):
                     policy.write_text(json.dumps(initial))
-                    with patch.object(gate, 'REGISTRY', policy), patch.object(gate, 'ROOT', root), patch.object(gate, 'tracked_paths', return_value={}), patch.object(gate, 'source_bytes', return_value=data):
+                    with patch.object(gate, 'REGISTRY', policy), patch.object(gate, 'ROOT', root), patch.object(gate, 'tracked_paths', return_value={'nested': 'nested'}), patch.object(gate, 'checkout_source_bytes', return_value=data), patch.object(gate, 'source_bytes', return_value=data):
                         record([] if repository else [package], repository=repository)
                         rule = gate.registry()['member_rules']['cli-windows']['nested']
                         self.assertEqual(rule['sha256'], hashlib.sha256(data).hexdigest())
@@ -314,11 +366,11 @@ class PackageGuardTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             policy = root / 'policy.json'
-            policy.write_text(json.dumps({'cli-windows': ['app'], 'member_rules': {'cli-windows': {'app': {'source': 'tracked/app'}}}}))
+            policy.write_text(json.dumps({'cli-windows': ['app'], 'member_rules': {'cli-windows': {'app': {'source': 'app'}}}}))
             package = root / 'plenora-storage-1.2.3-x86_64-pc-windows-msvc.zip'
             data = b'opaque\x00binary'
             package.write_bytes(archive([('app', data)], True))
-            with patch.object(gate, 'REGISTRY', policy), patch.object(gate, 'source_bytes', return_value=data):
+            with patch.object(gate, 'REGISTRY', policy), patch.object(gate, 'source_bytes', return_value=data), patch.object(gate, 'tracked_paths', return_value={'app': 'app'}), patch.object(gate, 'checkout_source_bytes', return_value=data):
                 record([package])
                 first = policy.read_bytes()
                 self.assertNotIn(b'\r\n', first)
@@ -335,9 +387,9 @@ class PackageGuardTests(unittest.TestCase):
                 self.assertEqual(first, policy.read_bytes())
 
     def test_nested_distribution_name_never_grants_authority(self):
-        nested = archive([('plenora-example-1.0.0/readme', b'hello')])
+        nested = archive([('plenora-example-1.0.0/README.md', source_fixture('source', 'README.md'))])
         name = 'plenora-example-1.0.0.crate'
-        policy = {'crates': {'plenora-example': ['readme']}}
+        policy = {'crates': {'plenora-example': ['README.md']}}
         with patch.object(gate, 'registry', return_value=policy):
             with self.assertRaisesRegex(ValueError, 'undeclared'):
                 gate.scan(nested, name, rule=binary_rule(nested))
@@ -347,16 +399,16 @@ class PackageGuardTests(unittest.TestCase):
         import tempfile
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / 'README.md'
-            path.write_bytes(b'opaque\x00binary')
-            policy = {'qualification': ['target/README.md'], 'public-documents': [],
-                      'member_rules': {'qualification': {'target/README.md': binary_rule(path.read_bytes())}}}
+            path.write_bytes(source_fixture('source', 'README.md'))
+            policy = {'qualification': ['README.md'], 'public-documents': [],
+                      'member_rules': {'qualification': {'README.md': binary_rule(path.read_bytes())}}}
             with patch.object(gate, 'registry', return_value=policy):
-                gate.verify_distribution(path, member='target/README.md')
+                gate.verify_distribution(path, member='README.md')
                 with self.assertRaisesRegex(ValueError, 'undeclared'):
                     gate.verify_distribution(path)
                 path.write_bytes(b'changed')
                 with self.assertRaisesRegex(ValueError, 'digest'):
-                    gate.verify_distribution(path, member='target/README.md')
+                    gate.verify_distribution(path, member='README.md')
 
     def test_two_level_container_does_not_hide_unknown_binary(self):
         inner = archive([('readme', b'unknown\x00format')], True)
@@ -367,16 +419,17 @@ class PackageGuardTests(unittest.TestCase):
             gate.scan(outer, rule=rule)
 
     def test_prerelease_wheel_with_binary_rule(self):
-        payload = b'native\x00binary'
+        payload = source_fixture('cp310-abi3-win_amd64', 'plenora_storage/py.typed')
         policy = {'wheel-tags': gate.registry()['wheel-tags'],
-                  'wheel-windows': ['module', 'metadata-{version}'],
-                  'member_rules': {'wheel-windows': {'module': binary_rule(payload)}}}
+                  'wheel-windows': ['plenora_storage/py.typed', 'plenora_storage-{version}.dist-info/METADATA'],
+                  'member_rules': {'wheel-windows': {'plenora_storage/py.typed': binary_rule(payload)}}}
         with patch.object(gate, 'registry', return_value=policy):
-            gate.scan(archive([('module', payload), ('metadata-1.2.3rc1', b'metadata')], True),
+            gate.scan(archive([('plenora_storage/py.typed', payload),
+                               ('plenora_storage-1.2.3rc1.dist-info/METADATA', source_fixture('cp310-abi3-win_amd64', 'plenora_storage-1.2.3rc1.dist-info/METADATA'))], True),
                       'plenora_storage-1.2.3rc1-cp310-abi3-win_amd64.whl')
 
 
-class BuildOutputTests(unittest.TestCase):
+class BuildOutputTests(GitSnapshotTestCase):
     @staticmethod
     def native(target, library=False):
         data = bytearray(256)
@@ -421,7 +474,7 @@ class BuildOutputTests(unittest.TestCase):
             files = []
             for member, rule in expected.items():
                 native = gate.native_member(tag, member)
-                data = self.native('x86_64-unknown-linux-gnu' if native[2] == 'elf' else 'x86_64-pc-windows-msvc', True) if native else b'safe text'
+                data = self.native('x86_64-unknown-linux-gnu' if native[2] == 'elf' else 'x86_64-pc-windows-msvc', True) if native else source_fixture(tag, member)
                 files.append((prefix + member, data))
             gate.scan(archive(files, True), name)
             import tempfile
@@ -449,10 +502,11 @@ class BuildOutputTests(unittest.TestCase):
             concrete = name.replace('{version}', '1.2.3')
             crate = name.rsplit('/', 1)[-1].removesuffix('-{version}.crate')
             prefix = crate + '-1.2.3/'
-            files = [(prefix + item, b'safe text') for item in policy['crates'][crate]]
+            files = [(prefix + item, source_fixture('crates/' + crate, item)) for item in policy['crates'][crate]]
+            gate.scan(archive(files), concrete, rule=rule)
             for payload in (b'first build', b'second build'):
-                files[0] = (files[0][0], payload)
-                gate.scan(archive(files), concrete, rule=rule)
+                with self.assertRaises(ValueError):
+                    gate.scan(archive([(files[0][0], payload)] + files[1:]), concrete, rule=rule)
             for bad in (files[:-1], files + [(prefix + 'extra', b'safe')],
                         [(files[0][0], rsa_key())] + files[1:]):
                 with self.assertRaises(ValueError):
@@ -479,7 +533,7 @@ class BuildOutputTests(unittest.TestCase):
         self.assertEqual(before, json.dumps(rule, sort_keys=True))
         with self.assertRaisesRegex(ValueError, 'provenance'):
             record_rule({}, b'unknown\x00binary')
-        with patch.object(gate, 'source_bytes', return_value=b'tracked bytes'):
+        with patch.object(gate, 'checkout_source_bytes', return_value=b'tracked bytes'):
             with self.assertRaisesRegex(ValueError, 'differ from git'):
                 record_rule({'source': 'tracked', 'sha256': '0' * 64}, b'replacement')
 
@@ -497,7 +551,7 @@ class BuildOutputTests(unittest.TestCase):
                 elif (native := gate.native_member(context, member)):
                     payload = self.native('x86_64-unknown-linux-gnu' if native[2] == 'elf' else 'x86_64-pc-windows-msvc', native[3])
                 else:
-                    payload = b'safe text'
+                    payload = source_fixture(context, member)
                 files.append((prefix + member, payload))
             return archive(files, name.endswith(('.whl', '.zip')))
         name = 'plenora-storage-1.2.3-qualification.tar.gz'
@@ -598,7 +652,7 @@ class BuildOutputTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, 'embedded Kerberos'):
                         gate.scan_entries([('source.bin', data)], {'source.bin': binary_rule(data)}, 0)
 
-class EntryPointRegressionTests(unittest.TestCase):
+class EntryPointRegressionTests(GitSnapshotTestCase):
     def test_same_native_bytes_through_all_release_paths(self):
         import tempfile
         import verify_release
@@ -651,7 +705,7 @@ class EntryPointRegressionTests(unittest.TestCase):
         name = 'plenora_storage-1.2.3-cp310-abi3-win_amd64.whl'
         _, _, expected = gate.distribution_policy(name)
         files = [(n, BuildOutputTests.native('x86_64-pc-windows-msvc', True)
-                  if gate.native_member('cp310-abi3-win_amd64', n) else b'safe') for n in expected]
+                  if gate.native_member('cp310-abi3-win_amd64', n) else source_fixture('cp310-abi3-win_amd64', n)) for n in expected]
         payload = b'-----BEGIN PRIVATE KEY-----\nYWJj\n'
         cases = [(stat.S_IFDIR, 0x10, '/', b'', True),
                  (0, 0x10, '/', b'', True),
@@ -716,7 +770,7 @@ class EntryPointRegressionTests(unittest.TestCase):
                             gate.scan_distribution(gzip.compress(raw), name)
 
 
-class ContainerCoverageTests(unittest.TestCase):
+class ContainerCoverageTests(GitSnapshotTestCase):
     def test_native_ccache_ranges(self):
         from fuzz_parsers import synthetic_ccache
         cache = synthetic_ccache(0x0504)[:48]
@@ -730,7 +784,7 @@ class ContainerCoverageTests(unittest.TestCase):
                     'plenora-storage-1.2.3-' + target + ('.zip' if zipped else '.tar.gz'))
             _, _, expected = gate.distribution_policy(name)
             files = [(n, BuildOutputTests.native(target, native[3]) + cache
-                      if n == native[1] else gate.source_bytes(rule['source']) if 'source' in rule else b'safe')
+                      if n == native[1] else source_fixture(context, n))
                      for n, rule in expected.items()]
             for method in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
                 with self.subTest(context=context, method=method):
@@ -739,7 +793,7 @@ class ContainerCoverageTests(unittest.TestCase):
                             return gzip.compress(gzip.decompress(archive(entries)), compresslevel=0)
                         out = io.BytesIO()
                         with zipfile.ZipFile(out, 'w', compression=method) as stream:
-                            for n, payload in entries:
+                            for n, payload in wheel_record(entries):
                                 stream.writestr(n, payload)
                         return out.getvalue()
                     good = pack(files)
