@@ -1226,256 +1226,144 @@
         "container": {
           "format": "gzip",
           "distribution": true
-        },
-        "build": {
-          "role": "cargo:plenora-smb2",
-          "target": "x86_64-pc-windows-msvc"
         }
       },
       "x86_64-pc-windows-msvc/plenora-storage-cli-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
-        },
-        "build": {
-          "role": "cargo:plenora-storage-cli",
-          "target": "x86_64-pc-windows-msvc"
         }
       },
       "x86_64-pc-windows-msvc/plenora-storage-contracts-{version}.tar.gz": {
         "container": {
           "format": "gzip",
           "distribution": true
-        },
-        "build": {
-          "role": "contracts",
-          "target": "x86_64-pc-windows-msvc"
         }
       },
       "x86_64-pc-windows-msvc/plenora-storage-core-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
-        },
-        "build": {
-          "role": "cargo:plenora-storage-core",
-          "target": "x86_64-pc-windows-msvc"
         }
       },
       "x86_64-pc-windows-msvc/plenora-storage-engine-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
-        },
-        "build": {
-          "role": "cargo:plenora-storage-engine",
-          "target": "x86_64-pc-windows-msvc"
         }
       },
       "x86_64-pc-windows-msvc/plenora-storage-ftp-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
-        },
-        "build": {
-          "role": "cargo:plenora-storage-ftp",
-          "target": "x86_64-pc-windows-msvc"
         }
       },
       "x86_64-pc-windows-msvc/plenora-storage-providers-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
-        },
-        "build": {
-          "role": "cargo:plenora-storage-providers",
-          "target": "x86_64-pc-windows-msvc"
         }
       },
       "x86_64-pc-windows-msvc/plenora-storage-s3-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
-        },
-        "build": {
-          "role": "cargo:plenora-storage-s3",
-          "target": "x86_64-pc-windows-msvc"
         }
       },
       "x86_64-pc-windows-msvc/plenora-storage-sftp-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
-        },
-        "build": {
-          "role": "cargo:plenora-storage-sftp",
-          "target": "x86_64-pc-windows-msvc"
         }
       },
       "x86_64-pc-windows-msvc/plenora-storage-{version}-source.tar.gz": {
         "container": {
           "format": "gzip",
           "distribution": true
-        },
-        "build": {
-          "role": "source",
-          "target": "x86_64-pc-windows-msvc"
         }
       },
       "x86_64-pc-windows-msvc/plenora-storage-{version}-x86_64-pc-windows-msvc.zip": {
         "container": {
           "format": "zip",
           "distribution": true
-        },
-        "build": {
-          "role": "cli-archive",
-          "target": "x86_64-pc-windows-msvc"
         }
       },
       "x86_64-pc-windows-msvc/plenora_storage-{python_version}-cp310-abi3-win_amd64.whl": {
         "container": {
           "format": "zip",
           "distribution": true
-        },
-        "build": {
-          "role": "wheel",
-          "target": "x86_64-pc-windows-msvc",
-          "abi": "cp310-abi3"
         }
       },
       "x86_64-unknown-linux-gnu/plenora-smb2-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
-        },
-        "build": {
-          "role": "cargo:plenora-smb2",
-          "target": "x86_64-unknown-linux-gnu"
         }
       },
       "x86_64-unknown-linux-gnu/plenora-storage-cli-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
-        },
-        "build": {
-          "role": "cargo:plenora-storage-cli",
-          "target": "x86_64-unknown-linux-gnu"
         }
       },
       "x86_64-unknown-linux-gnu/plenora-storage-contracts-{version}.tar.gz": {
         "container": {
           "format": "gzip",
           "distribution": true
-        },
-        "build": {
-          "role": "contracts",
-          "target": "x86_64-unknown-linux-gnu"
         }
       },
       "x86_64-unknown-linux-gnu/plenora-storage-core-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
-        },
-        "build": {
-          "role": "cargo:plenora-storage-core",
-          "target": "x86_64-unknown-linux-gnu"
         }
       },
       "x86_64-unknown-linux-gnu/plenora-storage-engine-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
-        },
-        "build": {
-          "role": "cargo:plenora-storage-engine",
-          "target": "x86_64-unknown-linux-gnu"
         }
       },
       "x86_64-unknown-linux-gnu/plenora-storage-ftp-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
-        },
-        "build": {
-          "role": "cargo:plenora-storage-ftp",
-          "target": "x86_64-unknown-linux-gnu"
         }
       },
       "x86_64-unknown-linux-gnu/plenora-storage-providers-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
-        },
-        "build": {
-          "role": "cargo:plenora-storage-providers",
-          "target": "x86_64-unknown-linux-gnu"
         }
       },
       "x86_64-unknown-linux-gnu/plenora-storage-s3-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
-        },
-        "build": {
-          "role": "cargo:plenora-storage-s3",
-          "target": "x86_64-unknown-linux-gnu"
         }
       },
       "x86_64-unknown-linux-gnu/plenora-storage-sftp-{version}.crate": {
         "container": {
           "format": "gzip",
           "distribution": true
-        },
-        "build": {
-          "role": "cargo:plenora-storage-sftp",
-          "target": "x86_64-unknown-linux-gnu"
         }
       },
       "x86_64-unknown-linux-gnu/plenora-storage-{version}-source.tar.gz": {
         "container": {
           "format": "gzip",
           "distribution": true
-        },
-        "build": {
-          "role": "source",
-          "target": "x86_64-unknown-linux-gnu"
         }
       },
       "x86_64-unknown-linux-gnu/plenora-storage-{version}-x86_64-unknown-linux-gnu.tar.gz": {
         "container": {
           "format": "gzip",
           "distribution": true
-        },
-        "build": {
-          "role": "cli-archive",
-          "target": "x86_64-unknown-linux-gnu"
         }
       },
       "x86_64-unknown-linux-gnu/plenora_storage-{python_version}-cp310-abi3-manylinux_2_34_x86_64.whl": {
         "container": {
           "format": "zip",
           "distribution": true
-        },
-        "build": {
-          "role": "wheel",
-          "target": "x86_64-unknown-linux-gnu",
-          "abi": "cp310-abi3"
-        }
-      },
-      "x86_64-pc-windows-msvc/plenora-storage.exe": {
-        "build": {
-          "role": "cli",
-          "target": "x86_64-pc-windows-msvc",
-          "format": "pe"
-        }
-      },
-      "x86_64-unknown-linux-gnu/plenora-storage": {
-        "build": {
-          "role": "cli",
-          "target": "x86_64-unknown-linux-gnu",
-          "format": "elf"
         }
       }
     },
@@ -1817,13 +1705,6 @@
         },
         "sha256": "62e16f5a401c13d10f5bad7957dadab888c4d1d83b8f7c01d2a30a4d44f47cde",
         "source": "docs/evidence/performance-2026-09-27/candidate.json.gz"
-      },
-      "plenora-storage": {
-        "build": {
-          "role": "cli",
-          "target": "x86_64-unknown-linux-gnu",
-          "format": "elf"
-        }
       }
     },
     "cli-windows": {
@@ -1994,35 +1875,10 @@
         },
         "sha256": "62e16f5a401c13d10f5bad7957dadab888c4d1d83b8f7c01d2a30a4d44f47cde",
         "source": "docs/evidence/performance-2026-09-27/candidate.json.gz"
-      },
-      "plenora-storage.exe": {
-        "build": {
-          "role": "cli",
-          "target": "x86_64-pc-windows-msvc",
-          "format": "pe"
-        }
       }
     },
-    "wheel-windows": {
-      "plenora_storage/_native.pyd": {
-        "build": {
-          "role": "python-extension",
-          "target": "x86_64-pc-windows-msvc",
-          "format": "pe",
-          "abi": "cp310-abi3"
-        }
-      }
-    },
-    "wheel-linux": {
-      "plenora_storage/_native.abi3.so": {
-        "build": {
-          "role": "python-extension",
-          "target": "x86_64-unknown-linux-gnu",
-          "format": "elf",
-          "abi": "cp310-abi3"
-        }
-      }
-    }
+    "wheel-windows": {},
+    "wheel-linux": {}
   },
   "public-documents": [
     "release-qualification.json",

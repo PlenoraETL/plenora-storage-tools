@@ -60,8 +60,10 @@ Non e richiesto inseguire varianti nell'attuale perimetro.
 
 Regola: policy dei pacchetti, limite dichiarato sugli output di build opachi.
 
-Ambito: binari nativi ELF/PE ed estensioni ammessi tramite regole `build` in
-`scripts/check_packages.py`, in tutte le distribuzioni. La guardia verifica
+Ambito: esclusivamente i membri nativi elencati nella tabella in codice
+`NATIVE_DISTRIBUTIONS` di `scripts/check_packages.py`, nella distribuzione
+indicata dalla stessa tabella (tag piattaforma/ABI incluso per le wheel).
+La policy non puo dichiarare ruoli `build` o aggiungere esenzioni. La guardia verifica
 nome, ruolo, target, ABI e formato; non applica la scansione del contenuto
 agli output di build nativi. Tutti gli altri membri, inclusi sorgenti testuali
 e binari versionati, contenitori dichiarati e metadati delle wheel, restano
@@ -72,9 +74,10 @@ non come successo della guardia. Vedere la [policy dei pacchetti](package-policy
 
 Hazard: un binario prodotto da una build compromessa puo contenere payload
 non rilevati. Mitigazione: gli output di build sono prodotti dalla CI dai
-sorgenti, che sono sotto inventario esatto, digest e scansione. Una regola
-`build` non puo riclassificare un percorso tracciato da Git o appartenente
-all'inventario sorgente; il limite riguarda il contenuto del binario generato.
+sorgenti, che sono sotto inventario esatto, digest e scansione. I nomi interni sono ricondotti ai percorsi del repository; i confronti usano
+separatori `/`, Unicode NFC e casefold, rifiutando percorsi ambigui e collisioni.
+Nessun membro della tabella puo riclassificare un percorso tracciato da Git
+o appartenente all'inventario sorgente; il limite riguarda il contenuto del binario generato.
 
 Rientro: verifica di riproducibilita o attestazione della build, con prove
 riproducibili e gate eseguibile.

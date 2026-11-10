@@ -47,20 +47,25 @@ Other members are classified by provenance, never exempted by extension:
   gate compares the digest with the Git HEAD blob as well as inspecting the
   packaged bytes. This includes the 21 historical gzip evidence files; their
   bytes and historical claims remain unchanged.
-- Build outputs have a `build` rule with exact role and target, and ABI for
-  Python extensions. They cannot have a source digest. A build path must not
-  match any Git-tracked path (`git ls-files` including HEAD) or any source
-  inventory member. The guard rejects conflicting policies in
-  `check_source_digests` and on every archive, including nested members. The inventory names
-  exactly one member for each role/target/ABI. CLI executables and extension
-  libraries must be x86-64 ELF64 on Linux or PE32+ on Windows; DLL versus EXE
-  and ELF executable versus shared library types are checked. Unknown targets,
-  ABIs, native roles and opaque binary members fail closed. All native bytes
-  still undergo the private-material scanner.
-- Generated Cargo, source, contracts, CLI and wheel archives nested in the
-  qualification bundle have explicit build roles and container declarations.
-  Their contents recurse into their exact distribution inventory. A plausible
-  filename alone never authorizes a nested archive.
+- Native exemptions come exclusively from `NATIVE_DISTRIBUTIONS` in
+  `scripts/check_packages.py`: the exact distribution-relative member, target
+  format and library type are fixed in code, separately for each wheel tag.
+  Policy `build` roles are rejected, including inside nested containers.
+  CLI executables and extension libraries must be x86-64 ELF64 on Linux or
+  PE32+ on Windows; DLL versus EXE and ELF executable versus shared library
+  types are checked. Crates admit no native output. Qualification bundles
+  admit the two CLI executables at their exact target-relative paths.
+- Generated archives nested in qualification have container declarations.
+  Their contents recurse into their exact distribution inventory; they are
+  never opaque exemptions. A filename alone never authorizes a nested archive.
+
+All path comparisons use one canonical form: `/`, Unicode NFC and casefold.
+Backslashes, roots, drive prefixes, empty components, `.` and `..` are rejected,
+as are collisions in this form. Archive roots are stripped and crate members
+map to `crates/<crate>/`; wheel Python members map to the Python source tree.
+Source archives map directly to repository paths. The Python sdist remains
+undeclared and is rejected. Mapped paths are checked against Git and the source
+inventory; a native exemption cannot cover a protected source path.
 
 `wheel-tags` declares `cp310-abi3-win_amd64`,
 `cp310-abi3-manylinux_2_34_x86_64` (Bookworm release/coverage) and
@@ -71,7 +76,7 @@ than inferred from the build host. CLI distributions are exactly Windows MSVC
 ZIP and Linux GNU tar.gz. No standalone static library is distributed.
 
 A recorded source hash is checked even if replacement bytes are text. Text
-and native outputs are checked for private PEM, bare or multiline base64 private
+and non-exempt binary members are checked for private PEM, bare or multiline base64 private
 DER blocks, credential documents and fixed Samba passwords other than the exact
 public fixture value described above; structural checks for
 DER and Kerberos material remain additional checks. Traditional six-INTEGER DSA
@@ -87,7 +92,7 @@ is still in the exact inventory and subject to PR review; the limit concerns
 only encoded content inside admitted text files. The hex and prefixed-base64
 tests document non-detection as declared behavior, not guard success.
 
-Opaque native build outputs (ELF/PE executables and extensions) have name,
+Only native members in the code table, in their specified distribution, have name,
 role, target, ABI and format checks, with no content scanning. All other
 members, including textual sources, tracked binaries, declared containers
 and wheel metadata, remain subject to scanning. Appended or embedded payloads, such as a ZIP after an ELF/PE header,
@@ -103,7 +108,7 @@ Container magic is checked before accepting a binary digest: gzip, bzip2, xz,
 zstd (including skippable frames), lz4, ZIP, tar, 7z, RAR, ar and cpio. A container
 requires an explicit `container` declaration and, for a source member, an exact
 digest even when all its bytes are printable text. Generated distribution
-containers instead require their declared build role. zstd,
+containers instead require a recursive distribution declaration. zstd,
 lz4, 7z, RAR, ar and cpio are unsupported and always rejected, even when declared.
 Supported compressed streams specify `format` and a `payload` rule; ZIP/tar
 specify an exact `members` mapping of names to rules. The same rules apply
