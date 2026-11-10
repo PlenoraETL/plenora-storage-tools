@@ -61,7 +61,10 @@ Other members are classified by provenance, never exempted by extension:
 
 All path comparisons use one canonical form: `/`, Unicode NFC and casefold.
 Backslashes, roots, drive prefixes, empty components, `.` and `..` are rejected,
-as are collisions in this form. Archive roots are stripped and crate members
+as are collisions in this form. All keyed inventory, rule and native-table
+lookups use `path_lookup`, which rejects missing keys and canonical collisions.
+The complete rule table is constructed from the inventory before applying
+supplementary rules; verification never substitutes an empty rule on lookup. Archive roots are stripped and crate members
 map to `crates/<crate>/`; wheel Python members map to the Python source tree.
 Source archives map directly to repository paths. The Python sdist remains
 undeclared and is rejected. Mapped paths are checked against Git and the source
@@ -91,6 +94,21 @@ or mixed with other text, or other encodings. This is declared as
 is still in the exact inventory and subject to PR review; the limit concerns
 only encoded content inside admitted text files. The hex and prefixed-base64
 tests document non-detection as declared behavior, not guard success.
+
+Every supported container is also scanned as an entire raw byte stream after
+decompression, including headers, metadata, padding and trailing bytes, using
+the same content scanner as text members. ZIP wrapper bytes are scanned as well
+as every decompressed member. This scan also sees native member
+bytes inside a tar or ZIP; it does not recursively interpret native
+payloads or replace the declared native-content limit below.
+
+Tar accepts only regular files, empty directories and local PAX headers with
+`path`, empty `linkpath`, `size`, `mtime`, `uid`, `gid`, `uname` or `gname`.
+All other PAX keys, global PAX headers, GNU longname/longlink/sparse headers and
+other entry types are rejected before the parser consumes them. The source
+builder recreates local headers from selected Git member fields, without
+propagating Git's global commit comment. Cargo and source archives are checked
+with this closed dialect; sdist remains undeclared.
 
 Only native members in the code table, in their specified distribution, have name,
 role, target, ABI and format checks, with no content scanning. All other

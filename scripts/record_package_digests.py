@@ -15,7 +15,7 @@ def record_rule(rule, data, name='', distribution=''):
     if gate.native_member(distribution, name):
         gate.scan_entries([(name, data)], {name: rule}, 0, distribution)
         return
-    if rule.get('container', {}).get('distribution') is True:
+    if 'container' in rule and rule['container'].get('distribution') is True:
         gate.classify_member(data, name, rule=rule, distribution=distribution)
         return
     container = gate.container_format(data)
@@ -35,16 +35,16 @@ def record(paths, repository=False, member=None):
     policy = gate.registry()
     if member:
         kind, name, source = member
-        templates = policy['crates'][kind[7:]] if kind.startswith('crates/') else policy[kind]
+        templates = gate.path_lookup(gate.path_lookup(policy, 'crates'), kind[7:]) if kind.startswith('crates/') else gate.path_lookup(policy, kind)
         if gate.normalize_path(name) not in gate.inventory(templates):
             raise ValueError('member outside exact inventory')
-        rules = {gate.normalize_path(n): r for n, r in policy.get('member_rules', {}).get(kind, {}).items()}
-        rule = rules.get(gate.normalize_path(name), {})
+        rules = gate.member_rules(policy, kind)
+        rule = gate.path_lookup(rules, name)
         if any(item[0] == kind and item[1] and gate.normalize_path(item[1]) == gate.normalize_path(name) for item in gate.NATIVE_DISTRIBUTIONS.values()):
             raise ValueError('cannot record a digest for a build output')
         record_rule(rule, Path(source).read_bytes())
     if repository:
-        for rules in policy.get('member_rules', {}).values():
+        for rules in (gate.path_lookup(policy, 'member_rules').values() if 'member_rules' in policy else []):
             for rule in rules.values():
                 if 'source' in rule:
                     record_rule(rule, (gate.ROOT / rule['source']).read_bytes())
@@ -53,13 +53,13 @@ def record(paths, repository=False, member=None):
         entries = gate.members(path.read_bytes())
         entries = gate.relative_entries(entries, prefix)
         gate.compare([n for n, _ in entries], expected)
-        templates = policy['crates'][kind[7:]] if kind.startswith('crates/') else policy[kind]
+        templates = gate.path_lookup(gate.path_lookup(policy, 'crates'), kind[7:]) if kind.startswith('crates/') else gate.path_lookup(policy, kind)
         mapping = dict(zip(expected, templates))
-        rules = policy.get('member_rules', {}).get(kind, {})
+        rules = gate.member_rules(policy, kind)
         context = path.name.split('-', 2)[2][:-4] if path.name.endswith('.whl') else kind
         mapping = {gate.normalize_path(n): template for n, template in mapping.items()}
         for name, data in entries:
-            record_rule(rules.get(mapping[gate.normalize_path(name)], {}), data, name, context)
+            record_rule(gate.path_lookup(rules, gate.path_lookup(mapping, name)), data, name, context)
     gate.REGISTRY.write_text(json.dumps(policy, indent=2) + '\n', encoding='utf-8', newline='\n')
 
 

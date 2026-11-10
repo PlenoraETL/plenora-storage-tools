@@ -709,5 +709,5 @@ class EntryPointRegressionTests(unittest.TestCase):
                              'plenora_storage-1.2.3.tar.gz'):
                     if kind != tarfile.DIRTYPE or data:
                         with self.subTest(name=name, kind=kind), self.assertRaisesRegex(
-                                ValueError, 'sdist distribution|non-file archive|nonempty archive'):
+                                ValueError, 'sdist distribution|non-file archive|nonempty archive|private PEM'):
                             gate.scan_distribution(gzip.compress(raw), name)

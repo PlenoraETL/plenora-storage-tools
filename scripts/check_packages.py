@@ -62,17 +62,63 @@ def inventory(names):
     return result
 
 
+def path_lookup(mapping, name):
+    """The only keyed lookup for path inventories, rules and native tables.
+
+    Missing entries and canonical collisions fail closed; defaults belong only
+    to construction of the complete inventory, never to verification lookups.
+    """
+    inventory(mapping)
+    canonical = {normalize_path(key): value for key, value in mapping.items()}
+    try:
+        return canonical[normalize_path(name)]
+    except KeyError:
+        raise ValueError('undeclared package policy key') from None
+
+
+def member_rules(policy, kind, version=None, python_version=None):
+    """Materialize every declared member, then overlay reviewed supplements."""
+    names = (path_lookup(path_lookup(policy, 'crates'), kind[7:])
+             if normalize_path(kind).startswith('crates/') else path_lookup(policy, kind))
+    inventory(names)
+    rules = {name: {} for name in names}
+    if 'member_rules' in policy:
+        groups = path_lookup(policy, 'member_rules')
+        if normalize_path(kind) in inventory(groups):
+            supplements = path_lookup(groups, kind)
+            inventory(supplements)
+            for name, rule in supplements.items():
+                # Resolve the actual inventory spelling, retaining rule identity
+                # for the separate digest recorder.
+                actual = path_lookup({n: n for n in names}, name)
+                rules[actual] = rule
+    names = [n.replace('{version}', version) if version is not None else n for n in rules]
+    names = [n.replace('{python_version}', python_version) if python_version is not None else n for n in names]
+    inventory(names)
+    return dict(zip(names, rules.values()))
+
+
 def native_member(distribution, name):
-    for identity, item in NATIVE_DISTRIBUTIONS.items():
-        if identity == distribution or distribution == item[0] == 'qualification':
-            if item[1] and normalize_path(name) == normalize_path(item[1]):
-                return item
+    if not distribution or not name:
+        return None
+    distribution = normalize_path(distribution)
+    if distribution == 'qualification':
+        candidates = {item[1]: item for item in NATIVE_DISTRIBUTIONS.values()
+                      if item[0] == distribution}
+    elif distribution in inventory(NATIVE_DISTRIBUTIONS):
+        item = path_lookup(NATIVE_DISTRIBUTIONS, distribution)
+        candidates = {item[1]: item} if item[1] else {}
+    else:
+        return None
+    if normalize_path(name) in inventory(candidates):
+        return path_lookup(candidates, name)
     return None
 
 
 def repository_path(distribution, name):
     """Map distribution-relative names into the one repository namespace."""
     name = normalize_path(name)
+    distribution = normalize_path(distribution) if distribution else ''
     if distribution.startswith('crates/'):
         if name == 'cargo.toml.orig':
             name = 'Cargo.toml'
@@ -228,12 +274,48 @@ def check_content(data):
             raise ValueError('fixed Samba password in distribution')
 
 
+# Closed tar dialect used by Cargo and Python's tar writer. No global PAX,
+# GNU longname/longlink/sparse, vendor keys, links or special file types.
+TAR_PAX_KEYS = frozenset({'path', 'linkpath', 'size', 'mtime', 'uid', 'gid', 'uname', 'gname'})
+
+
+class DistributionTarInfo(tarfile.TarInfo):
+    def _proc_member(self, archive):
+        if self.type not in (tarfile.REGTYPE, tarfile.AREGTYPE, tarfile.DIRTYPE, tarfile.XHDTYPE):
+            raise ValueError('non-file archive member or forbidden tar extension')
+        if self.type == tarfile.XHDTYPE:
+            position = archive.fileobj.tell()
+            payload = archive.fileobj.read(self.size)
+            archive.fileobj.seek(position)
+            offset, seen = 0, set()
+            while offset < len(payload):
+                match = re.match(rb'([1-9][0-9]*) ([^=\n]+)=', payload[offset:])
+                if not match:
+                    raise ValueError('invalid PAX record')
+                end = offset + int(match[1])
+                if end > len(payload) or end <= offset + match.end() or payload[end-1:end] != b'\n':
+                    raise ValueError('invalid PAX record')
+                key = match[2].decode('ascii', errors='replace')
+                value = payload[offset + match.end():end-1]
+                if key not in TAR_PAX_KEYS or key in seen or (key == 'linkpath' and value):
+                    raise ValueError('forbidden PAX key or value')
+                seen.add(key)
+                offset = end
+        return super()._proc_member(archive)
+
+
 def members(data):
     """Read regular archive members without extraction; reject links/duplicates."""
+    # Inspect the whole expanded stream, including bytes hidden by parsers.
+    check_content(data)
+    compression = container_format(data)
+    if compression in {'gzip', 'bzip2', 'xz'}:
+        data = {'gzip': gzip.decompress, 'bzip2': bz2.decompress, 'xz': lzma.decompress}[compression](data)
+        check_content(data)
     source = io.BytesIO(data)
     directories = []
     all_names = []
-    if zipfile.is_zipfile(source):
+    if container_format(data) == 'zip':
         with zipfile.ZipFile(source) as archive:
             result = []
             for item in archive.infolist():
@@ -250,10 +332,12 @@ def members(data):
                     continue
                 if unix_type == stat.S_IFDIR or dos_directory:
                     raise ValueError('non-file archive member')
-                result.append((item.orig_filename, archive.read(item)))
+                payload = archive.read(item)
+                check_content(payload)
+                result.append((item.orig_filename, payload))
     else:
         source.seek(0)
-        with tarfile.open(fileobj=source, mode='r:*') as archive:
+        with tarfile.open(fileobj=source, mode='r:', tarinfo=DistributionTarInfo) as archive:
             result = []
             for item in archive:
                 all_names.append(item.name.removesuffix('/') if item.isdir() else item.name)
@@ -283,20 +367,19 @@ def distribution_policy(name):
     python_version = ''
     if name.endswith('.crate'):
         match = re.fullmatch(r'(plenora-[a-z0-9-]+)-(\d+\.\d+\.\d+(?:-[a-z0-9.]+)?)\.crate', name)
-        if not match or match[1] not in policy['crates']:
+        if not match or normalize_path(match[1]) not in inventory(path_lookup(policy, 'crates')):
             raise ValueError('unknown Cargo archive')
         kind = 'crates/' + match[1]
-        expected = policy['crates'][match[1]]
         prefix = name[:-6] + '/'
     elif name.endswith('.whl'):
         match = re.fullmatch(r'plenora_storage-([^-]+)-(.+)\.whl', name)
         tags = {tag: item[0] for tag, item in NATIVE_DISTRIBUTIONS.items() if tag.startswith('cp')}
-        if policy.get('wheel-tags') != tags:
+        if path_lookup(policy, 'wheel-tags') != tags:
             raise ValueError('wheel tags differ from code table')
         if not match or match[2] not in tags:
             raise ValueError('unknown wheel target or ABI')
         version = match[1]
-        kind = tags[match[2]]
+        kind = path_lookup(tags, match[2])
     elif name.startswith('plenora-storage-') and name.endswith(('.tar.gz', '.zip')):
         match = re.fullmatch(r'plenora-storage-(\d+\.\d+\.\d+(?:-[a-z0-9.]+)?)-(source|qualification|x86_64-pc-windows-msvc|x86_64-unknown-linux-gnu)\.(?:tar.gz|zip)', name)
         if match:
@@ -315,17 +398,8 @@ def distribution_policy(name):
         raise ValueError('Python sdist distribution is not declared')
     else:
         raise ValueError('unknown distribution archive')
-    if not kind.startswith('crates/'):
-        python_version = parse_version(version).python if kind == 'qualification' else version
-        expected = [n.replace('{version}', version).replace('{python_version}', python_version)
-                    for n in policy[kind]]
-    rules = policy.get('member_rules', {}).get(kind, {})
-    rules = {n.replace('{version}', version).replace('{python_version}', python_version): rule
-             for n, rule in rules.items()}
-    if not inventory(rules) <= inventory(expected):
-        raise ValueError('rules outside package inventory')
-    rules = {normalize_path(n): rule for n, rule in rules.items()}
-    return kind, prefix, {n: rules.get(normalize_path(n), {}) for n in expected}
+    python_version = parse_version(version).python if kind == 'qualification' else version
+    return kind, prefix, member_rules(policy, kind, version, python_version)
 
 
 def verify_distribution(path, member=None):
@@ -335,15 +409,11 @@ def verify_distribution(path, member=None):
     policy = registry()
     version = workspace_version().native
     kind = 'qualification' if member is not None else 'public-documents'
-    expected = {n.replace('{version}', version).replace('{python_version}', parse_version(version).python): n
-                for n in policy[kind]}
+    expected = member_rules(policy, kind, version, parse_version(version).python)
     name = member if member is not None else path.name
-    inventory(expected)
-    expected = {normalize_path(n): template for n, template in expected.items()}
-    name = normalize_path(name)
-    if name not in expected:
+    if normalize_path(name) not in inventory(expected):
         raise ValueError('undeclared standalone distribution member')
-    rule = policy.get('member_rules', {}).get(kind, {}).get(expected[name], {})
+    rule = path_lookup(expected, name)
     classify_member(path.read_bytes(), name, rule=rule, distribution=kind)
 
 
@@ -396,7 +466,7 @@ def scan_entries(entries, expected, depth, distribution=''):
     rules = {normalize_path(n): rule for n, rule in expected.items()}
     tracked = tracked_paths()
     for name, data in entries:
-        classify_member(data, name, depth, rules[normalize_path(name)], distribution, _tracked=tracked)
+        classify_member(data, name, depth, path_lookup(rules, name), distribution, _tracked=tracked)
 
 
 def classify_member(data, name='', depth=0, rule=None, distribution='', *, _tracked=None):
@@ -408,7 +478,8 @@ def classify_member(data, name='', depth=0, rule=None, distribution='', *, _trac
         return scan_distribution(data, name, depth)
     rule = rule or {}
     tracked = tracked_paths() if _tracked is None else _tracked
-    protected = inventory(registry().get('source', [])) | set(tracked)
+    policy = registry()
+    protected = (inventory(path_lookup(policy, 'source')) if 'source' in policy else set()) | set(tracked)
     source = repository_path(distribution, name) if name else None
     native = native_member(distribution, name)
     if native:
@@ -419,9 +490,9 @@ def classify_member(data, name='', depth=0, rule=None, distribution='', *, _trac
         check_native(data, native)
     else:
         if source in protected and ('source' in rule or not is_text(data)):
-            if normalize_path(rule.get('source', source)) != source:
+            if normalize_path(rule['source'] if 'source' in rule else source) != source:
                 raise ValueError('source provenance differs from repository mapping')
-            if source in tracked and hashlib.sha256(data).hexdigest() != hashlib.sha256(source_bytes(tracked[source])).hexdigest():
+            if source in tracked and hashlib.sha256(data).hexdigest() != hashlib.sha256(source_bytes(path_lookup(tracked, source))).hexdigest():
                 raise ValueError('binary source digest differs from git')
         _scan_content(data, name, depth, rule)
 
@@ -459,7 +530,10 @@ def check_native(data, native):
 
 def source_bytes(name):
     """Read a tracked source blob, never an arbitrary build artifact."""
-    name = tracked_paths().get(normalize_path(name), name)
+    tracked = tracked_paths()
+    if normalize_path(name) not in inventory(tracked):
+        raise ValueError('binary source is not tracked in HEAD')
+    name = path_lookup(tracked, name)
     result = subprocess.run(['git', 'show', 'HEAD:' + name], cwd=ROOT,
                             capture_output=True)
     if result.returncode:
@@ -474,18 +548,20 @@ def check_build_paths(rules=None):
         for rule in group.values():
             if 'build' in rule:
                 raise ValueError('policy build roles are forbidden')
-            container = rule.get('container', {})
-            check(container.get('members', {}))
-            if 'payload' in container:
-                check({'payload': container['payload']})
+            if 'container' in rule:
+                container = rule['container']
+                if 'members' in container:
+                    check(path_lookup(container, 'members'))
+                if 'payload' in container:
+                    check({'payload': container['payload']})
     policy = registry()
-    for group in list(policy.get('member_rules', {}).values()) + ([rules] if rules is not None else []):
+    for group in (list(path_lookup(policy, 'member_rules').values()) if 'member_rules' in policy else []) + ([rules] if rules is not None else []):
         check(group)
     for kind in ('cli-linux', 'cli-windows', 'wheel-linux', 'wheel-windows'):
         if kind not in policy:
             continue
         allowed = {normalize_path(item[1]) for item in NATIVE_DISTRIBUTIONS.values() if item[0] == kind}
-        for name in policy[kind]:
+        for name in path_lookup(policy, kind):
             key = normalize_path(name)
             if (key.endswith(('.so', '.pyd', '.exe', '.dll')) or key == 'plenora-storage') and key not in allowed:
                 raise ValueError('native name differs from code table')
@@ -493,9 +569,10 @@ def check_build_paths(rules=None):
 
 def check_source_digests():
     check_build_paths()
-    for rules in registry().get('member_rules', {}).values():
+    policy = registry()
+    for rules in (path_lookup(policy, 'member_rules').values() if 'member_rules' in policy else []):
         for rule in rules.values():
-            if rule.get('container', {}).get('distribution') is True:
+            if ('container' in rule and rule['container'].get('distribution') is True):
                 continue  # Contents are checked recursively, never opaque.
             if 'sha256' in rule or 'container' in rule:
                 if 'source' not in rule:
@@ -542,7 +619,7 @@ def _scan_content(data, name='', depth=0, rule=None):
         raise ValueError('unsupported container format')
     if kind and 'container' not in rule:
         raise ValueError('undeclared container')
-    recursive = rule.get('container', {}).get('distribution') is True
+    recursive = ('container' in rule and rule['container'].get('distribution') is True)
     if not recursive and ('container' in rule or 'sha256' in rule or not is_text(data)):
         if hashlib.sha256(data).hexdigest() != rule.get('sha256'):
             raise ValueError('binary digest missing or mismatched')
@@ -555,6 +632,7 @@ def _scan_content(data, name='', depth=0, rule=None):
         if kind in {'zip', 'tar'}:
             return scan_entries(members(data), declaration['members'], depth+1)
         expanded = {'gzip': gzip.decompress, 'bzip2': bz2.decompress, 'xz': lzma.decompress}[kind](data)
+        check_content(expanded)
         return classify_member(expanded, 'payload', depth+1, declaration['payload'])
     if 'container' in rule:
         raise ValueError('declared container missing')
@@ -576,7 +654,7 @@ def check_archive(path, kind, version='', prefix='', platform=''):
 def check_crate(path, name, version, has_vcs=True):
     kind, prefix, expected = distribution_policy(f'{name}-{version}.crate')
     if not has_vcs:
-        expected.pop('.cargo_vcs_info.json', None)
+        del expected[path_lookup({n: n for n in expected}, '.cargo_vcs_info.json')]
     entries = members(Path(path).read_bytes())
     scan_entries(relative_entries(entries, prefix), expected, 1, kind)
 
@@ -589,11 +667,12 @@ def check_cargo(build=False):
     check_source_digests()
     metadata = strict_json.loads(cargo('metadata', '--locked', '--offline', '--no-deps', '--format-version', '1'))
     packages = metadata['packages']
-    compare([p['name'] for p in packages], registry()['crates'])
+    compare([p['name'] for p in packages], path_lookup(registry(), 'crates'))
     vcs = (ROOT / '.git').exists()
     for package in packages:
         name = package['name']
-        expected = registry()['crates'][name]
+        rules = member_rules(registry(), 'crates/' + name)
+        expected = list(rules)
         if not vcs:
             expected = [f for f in expected if f != '.cargo_vcs_info.json']
         listing = cargo('package', '--list', '--locked', '--offline', '--allow-dirty', '-p', name)
@@ -605,7 +684,7 @@ def check_cargo(build=False):
             source = directory / ('Cargo.toml' if item == 'Cargo.toml.orig' else item)
             if not source.exists() and package.get('license_file'):
                 source = directory / package['license_file']
-            classify_member(source.read_bytes(), item, distribution='crates/' + name, rule=registry().get('member_rules', {}).get('crates/' + name, {}).get(item, {}))
+            classify_member(source.read_bytes(), item, distribution='crates/' + name, rule=path_lookup(rules, item))
         print(f'{name}: exact inventory and content PASS ({len(expected)} files)')
     if build:
         cargo('package', '--workspace', '--exclude', 'plenora-storage-py', '--no-verify', '--locked', '--offline', '--allow-dirty')
