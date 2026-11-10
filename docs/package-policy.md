@@ -91,7 +91,10 @@ The owner decision of 2026-11-10 requires **every source member**, textual or
 binary, to equal its tracked release source byte for byte. The reference comes
 from the pinned Git revision and an isolated shared clone under `target/`,
 checked out with the repository's `core.autocrlf` and `core.eol` settings.
-Git >= 2.39 is required and checked explicitly. Working-tree bytes and dirty
+Git >= 2.39 is required and checked explicitly. Each guard Git command trusts
+only the absolute source path and, when needed, the isolated clone through
+command-scoped `safe.directory`. Shallow sources are accepted explicitly;
+clone/checkout failures retain Git's diagnostic. Working-tree bytes and dirty
 attributes cannot supply the reference. `.gitattributes` and the build platform's Git EOL settings
 apply; the guard never strips CR or otherwise normalizes package bytes. The
 source builder uses the same checkout conversion. Changes to inventory or a
@@ -104,12 +107,16 @@ contain no container, and pass the private-material and credential scanner;
 it cannot carry a source/digest rule. Cargo metadata is reproduced offline by the pinned Cargo from an isolated Git
 checkout (`cargo package --workspace --no-verify --locked --offline`): normalized
 `Cargo.toml` and generated `Cargo.lock` must match byte for byte. The VCS JSON
-must contain exactly `git.sha1` for the release revision and the expected
-`path_in_vcs`, with no extra fields. Wheel `WHEEL` has only the fixed fields
-and pinned maturin version/tag; `METADATA` has only the fields derived from
-`pyproject.toml` and the declared README body (LF serialization plus maturin's final newline).
-`RECORD` lists exactly all wheel members, with SHA-256 and sizes, and its own
-empty hash/size. These checks also apply inside qualification containers.
+is serialized canonically from the release revision and expected `path_in_vcs`.
+Wheel `WHEEL` and `METADATA` are reconstructed in maturin's field order from
+`pyproject.toml`, the pinned maturin version/tag and the declared README body
+(LF serialization plus maturin's final newline). `RECORD` is reconstructed as
+LF CSV in archive member order, with SHA-256 and sizes, and its own empty
+hash/size. All these members must match the reconstructed bytes exactly;
+parser-equivalent spellings, ignored lines, BOMs and whitespace are rejected.
+These checks also apply inside qualification containers. Regression tests in
+`test_packages_canonical.py` run through the existing script-test discovery in
+CI `product-quality` and `native-windows`, including an untrusted shallow clone.
 The wheel SBOM, campaign evidence and publication documents remain scanned
 text exceptions, not content-derived provenance guarantees:
 

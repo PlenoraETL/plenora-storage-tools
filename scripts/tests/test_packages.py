@@ -97,7 +97,7 @@ def source_fixture(context, name):
         if context.startswith('crates/'):
             if name == '.cargo_vcs_info.json':
                 return json.dumps({'git': {'sha1': gate.release_revision()},
-                                   'path_in_vcs': context}).encode()
+                                   'path_in_vcs': context}, indent=2).encode()
             return cargo_fixture()[context[7:]][name]
         if context.startswith('cp'):
             from package_generated import wheel_metadata

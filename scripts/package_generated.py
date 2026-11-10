@@ -242,29 +242,29 @@ def wheel_metadata(distribution):
     if set(project) != {'name', 'version', 'description', 'requires-python', 'license',
                         'readme', 'authors', 'urls'}:
         raise ValueError('unsupported Python project metadata')
+    # Producer order is part of the byte contract, not an unordered header set.
     fields = [('Metadata-Version', '2.4'), ('Name', project['name']),
-              ('Version', project['version']), ('Summary', project['description']),
-              ('License', project['license']['text']),
+              ('Version', project['version']), ('License-File', 'LICENSE'),
+              ('Summary', project['description']),
               ('Author', ', '.join(a['name'] for a in project['authors'])),
+              ('License', project['license']['text']),
               ('Requires-Python', project['requires-python']),
               ('Description-Content-Type', 'text/markdown; charset=UTF-8; variant=GFM')]
     fields += [('Project-URL', key + ', ' + value) for key, value in project['urls'].items()]
-    # Maturin includes the workspace license alongside the PEP 621 license text.
-    fields += [('License-File', 'LICENSE')]
     readme = gate.checkout_source_bytes(base + project['readme']).decode().replace('\r\n', '\n') + '\n'
     return fields, readme, config['build-system']['requires'][0].split('==')[1]
 
 
 def validate_generated(data, name, distribution, entries=None):
     import check_packages as gate
-    import strict_json
-    from email.parser import Parser
+    import json
     distribution = gate.normalize_path(distribution)
     if distribution.startswith('crates/'):
         crate = distribution[7:]
         if name.lower() == '.cargo_vcs_info.json':
-            if strict_json.loads(data) != {'git': {'sha1': gate.release_revision()},
-                                           'path_in_vcs': 'crates/' + crate}:
+            expected = json.dumps({'git': {'sha1': gate.release_revision()},
+                                   'path_in_vcs': 'crates/' + crate}, indent=2).encode('utf-8')
+            if data != expected:
                 raise ValueError('generated Cargo VCS metadata differs from Git')
         else:
             expected = gate.git_input(('cargo-generated',), cargo_reference)
@@ -275,7 +275,7 @@ def validate_generated(data, name, distribution, entries=None):
         if leaf not in {'METADATA', 'WHEEL', 'RECORD'}:
             return  # Generated SBOM remains within STOR-LIMIT-003.
         if leaf == 'RECORD':
-            if entries is None:
+            if entries is None or (name, data) not in entries:
                 raise ValueError('wheel RECORD requires complete wheel context')
             validate_record(entries, distribution)
             return
@@ -283,14 +283,12 @@ def validate_generated(data, name, distribution, entries=None):
         if leaf == 'WHEEL':
             expected = ('Wheel-Version: 1.0\nGenerator: maturin (' + maturin + ')\n'
                         'Root-Is-Purelib: false\nTag: ' + distribution + '\n')
-            if data.decode() != expected:
+            if data != expected.encode('utf-8'):
                 raise ValueError('unexpected wheel WHEEL fields')
         else:
-            text = data.decode()
-            headers, separator, payload = text.partition('\n\n')
-            message = Parser().parsestr(headers + '\n\n')
-            if (not separator or message.defects or sorted(message.items()) != sorted(fields)
-                    or payload != body):
+            expected = ('\n'.join(key + ': ' + value for key, value in fields)
+                        + '\n\n' + body).encode('utf-8')
+            if data != expected:
                 raise ValueError('wheel METADATA differs from pyproject/README')
 
 
@@ -307,9 +305,10 @@ def validate_record(entries, distribution):
     if len(records) != 1:
         raise ValueError('invalid wheel RECORD count')
     record, data = records[0]
-    rows = list(csv.reader(io.StringIO(data.decode()), strict=True))
     expected = [[name, '' if name == record else 'sha256=' + base64.urlsafe_b64encode(
         hashlib.sha256(payload).digest()).rstrip(b'=').decode(),
         '' if name == record else str(len(payload))] for name, payload in entries]
-    if sorted(rows) != sorted(expected):
+    canonical = io.StringIO(newline='')
+    csv.writer(canonical, lineterminator='\n').writerows(expected)
+    if data != canonical.getvalue().encode('utf-8'):
         raise ValueError('wheel RECORD members, hashes or sizes differ')
