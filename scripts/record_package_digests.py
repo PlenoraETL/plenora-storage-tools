@@ -50,7 +50,7 @@ def record(paths, repository=False, member=None):
                     record_rule(rule, (gate.ROOT / rule['source']).read_bytes())
     for path in paths:
         kind, prefix, expected = gate.distribution_policy(path.name)
-        entries = gate.members(path.read_bytes())
+        entries = gate.members(path.read_bytes(), path.name)
         entries = gate.relative_entries(entries, prefix)
         gate.compare([n for n, _ in entries], expected)
         templates = gate.path_lookup(gate.path_lookup(policy, 'crates'), kind[7:]) if kind.startswith('crates/') else gate.path_lookup(policy, kind)
