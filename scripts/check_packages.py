@@ -59,9 +59,12 @@ def git_input(key, read):
 
 def git_command(*args, work=None):
     """Trust only the source checkout and, when used, its isolated clone."""
-    command = ['git', '-c', 'safe.directory=' + ROOT.resolve().as_posix()]
-    if work is not None:
-        command += ['-c', 'safe.directory=' + work.resolve().as_posix()]
+    # A local clone checks ownership of the source's .git directory, not of
+    # the working tree: trust both paths, for the checkout and its clone.
+    command = ['git']
+    for base in (ROOT, work) if work is not None else (ROOT,):
+        for path in (base.resolve(), base.resolve() / '.git'):
+            command += ['-c', 'safe.directory=' + path.as_posix()]
     return [*command, *args]
 
 
