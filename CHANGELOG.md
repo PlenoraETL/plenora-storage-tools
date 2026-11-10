@@ -1,9 +1,9 @@
 # Changelog
 
-## 3.0.4 — unreleased
+## 3.0.4 — 2026-11-10
 
-Patch release preparation; source manifests remain at 3.0.3 until release
-preparation. See [candidate notes](docs/release-notes-3.0.4.md) for scope and evidence.
+Patch release; no incompatible changes and no change to the public operations.
+See [candidate notes](docs/release-notes-3.0.4.md) for scope and evidence.
 
 - Stop distributing Kerberos test credential caches; tests generate synthetic
   inputs at runtime. Through 3.0.3 these were non-secret test data. Exact versioned

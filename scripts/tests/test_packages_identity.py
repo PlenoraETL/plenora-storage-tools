@@ -14,7 +14,7 @@ class SourceIdentityTests(unittest.TestCase):
         (gate.ROOT / 'target').mkdir(exist_ok=True)
 
     def test_policy_cannot_promote_sources_to_generated_containers(self):
-        name = 'plenora-storage-3.0.3-source.tar.gz'
+        name = 'plenora-storage-3.0.4-source.tar.gz'
         rule = {'container': {'format': 'gzip', 'distribution': True}}
         for context in ('source', 'crates/plenora-storage-core', 'cli-linux', 'qualification'):
             with self.subTest(context=context), self.assertRaisesRegex(ValueError, 'undeclared generated'):
@@ -22,7 +22,7 @@ class SourceIdentityTests(unittest.TestCase):
 
     @gate.repository_snapshot
     def test_changed_source_inside_archive_and_qualification(self):
-        name = 'plenora-storage-3.0.3-source.tar.gz'
+        name = 'plenora-storage-3.0.4-source.tar.gz'
         member = 'README.md'
         original = gate.checkout_source_bytes(member)
         nested = 'x86_64-pc-windows-msvc/' + name
@@ -31,10 +31,10 @@ class SourceIdentityTests(unittest.TestCase):
                   'member_rules': {'qualification': {nested: rule}}}
         with patch.object(gate, 'registry', return_value=policy):
             for payload in (original, original + b'changed', original + rsa_key().hex().encode()):
-                packed = archive([('plenora-storage-3.0.3/' + member, payload)])
-                bundle = archive([('3.0.3/' + nested, packed)])
+                packed = archive([('plenora-storage-3.0.4/' + member, payload)])
+                bundle = archive([('3.0.4/' + nested, packed)])
                 for data, filename in ((packed, name),
-                                       (bundle, 'plenora-storage-3.0.3-qualification.tar.gz')):
+                                       (bundle, 'plenora-storage-3.0.4-qualification.tar.gz')):
                     if payload == original:
                         gate.scan_distribution(data, filename)
                     else:
@@ -70,7 +70,7 @@ class SourceIdentityTests(unittest.TestCase):
             context = {'crates': 'crates/plenora-storage-core',
                        'wheel': 'cp310-abi3-win_amd64'}.get(kind, kind)
             for template in names:
-                name = template.replace('{version}', '3.0.3').replace('{python_version}', '3.0.3')
+                name = template.replace('{version}', '3.0.4').replace('{python_version}', '3.0.4')
                 with self.subTest(context=context, name=name):
                     for allowed in (source_fixture(context, name),):
                         gate.scan_entries([(name, allowed)], {name: {}}, 0, context)
@@ -80,7 +80,7 @@ class SourceIdentityTests(unittest.TestCase):
                     self.assertFalse(gate.generated_member(context, name + '.extra'))
                     self.assertFalse(gate.generated_member('source', name))
         self.assertFalse(gate.generated_member('cp310-abi3-win_amd64',
-                                              'plenora_storage-3.0.3.dist-info/licenses/LICENSE'))
+                                              'plenora_storage-3.0.4.dist-info/licenses/LICENSE'))
 
     def test_git_checkout_eol_and_dirty_attributes(self):
         # Only this disposable fixture gets a synthetic Git history.
@@ -147,7 +147,7 @@ class GeneratedStructureTests(unittest.TestCase):
         from test_packages import source_fixture
         cases = [('crates/plenora-storage-core', n) for n in
                  ('.cargo_vcs_info.json', 'Cargo.toml', 'Cargo.lock')]
-        cases += [('cp310-abi3-win_amd64', 'plenora_storage-3.0.3.dist-info/' + n)
+        cases += [('cp310-abi3-win_amd64', 'plenora_storage-3.0.4.dist-info/' + n)
                   for n in ('METADATA', 'WHEEL')]
         for context, name in cases:
             good = source_fixture(context, name)
@@ -166,7 +166,7 @@ class GeneratedStructureTests(unittest.TestCase):
     def test_record_exact_members_hashes_sizes_and_duplicates(self):
         from package_generated import validate_record
         from test_packages import wheel_record
-        name = 'plenora_storage-3.0.3.dist-info/RECORD'
+        name = 'plenora_storage-3.0.4.dist-info/RECORD'
         entries = wheel_record([('data.py', b'content'), (name, b'')])
         validate_record(entries, 'cp310-abi3-win_amd64')
         for bad in (entries + [('extra', b'')], entries + entries[:1],
