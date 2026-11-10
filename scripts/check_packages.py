@@ -4,6 +4,8 @@ No inventory is learned or updated by this gate. Changes require review of
 scripts/package_files.json. Diagnostics never include inspected contents.
 """
 import argparse
+import tempfile
+from contextlib import contextmanager
 import base64
 import binascii
 import bz2
@@ -20,11 +22,45 @@ import zlib
 import subprocess
 import tarfile
 import zipfile
+from contextvars import ContextVar
+from functools import wraps
+from package_generated import GENERATED_MEMBERS, GENERATED_CONTAINERS
 
 from versioning import parse_version, workspace_version
 
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY = ROOT / 'scripts/package_files.json'
+_GIT_CACHE = ContextVar('package_git_snapshot', default=None)
+
+
+def repository_snapshot(function):
+    """Reuse immutable Git inputs only during one verification operation."""
+    @wraps(function)
+    def wrapped(*args, **kwargs):
+        if _GIT_CACHE.get() is not None:
+            return function(*args, **kwargs)
+        token = _GIT_CACHE.set({})
+        try:
+            return function(*args, **kwargs)
+        finally:
+            _GIT_CACHE.reset(token)
+    return wrapped
+
+
+def git_input(key, read):
+    cache = _GIT_CACHE.get()
+    if cache is None:
+        return read()
+    key = (str(ROOT), *key)
+    if key not in cache:
+        cache[key] = read()
+    return cache[key]
+
+
+def release_revision():
+    git_input(('git-version',), check_git_version)
+    return git_input(('revision',), lambda: subprocess.check_output(
+        ['git', 'rev-parse', 'HEAD'], cwd=ROOT).decode('ascii').strip())
 
 
 def registry():
@@ -123,7 +159,8 @@ def repository_path(distribution, name):
     if distribution.startswith('crates/'):
         if name == 'cargo.toml.orig':
             name = 'Cargo.toml'
-        if name in {'license', 'readme.md'} and distribution != 'crates/plenora-smb2':
+        if name in {'license', 'readme.md'} and distribution != 'crates/plenora-smb2' and not (
+                name == 'readme.md' and distribution == 'crates/plenora-storage-py'):
             return name
         return normalize_path(distribution + '/' + name)
     if distribution in NATIVE_DISTRIBUTIONS and distribution.startswith('cp'):
@@ -132,13 +169,33 @@ def repository_path(distribution, name):
         if name.endswith('.dist-info/licenses/license'):
             return 'license'
         return None  # Generated wheel metadata.
-    if distribution in {'source', 'sdist', 'cli-linux', 'cli-windows', 'contracts'}:
+    if distribution in {'source', 'sdist', 'cli-linux', 'cli-windows', 'contracts',
+                        'qualification', 'public-documents'}:
         return name
     return None
 
 
+def generated_member(distribution, name, table=GENERATED_MEMBERS):
+    """Only exact code-declared templates may differ from repository bytes."""
+    distribution = normalize_path(distribution) if distribution else ''
+    kind = ('crates' if distribution.startswith('crates/') else
+            'wheel' if distribution in NATIVE_DISTRIBUTIONS and distribution.startswith('cp')
+            else distribution)
+    for template in table.get(kind, ()):
+        pattern = re.escape(normalize_path(template))
+        for token in ('version', 'python_version'):
+            pattern = pattern.replace(re.escape('{' + token + '}'), r'[0-9]+\.[0-9]+\.[0-9]+(?:[a-z0-9.-]+)?')
+        if re.fullmatch(pattern, normalize_path(name)):
+            return True
+    return False
+
+
 def tracked_paths():
-    names = subprocess.run(['git', 'ls-files', '--cached', '--with-tree=HEAD', '-z'],
+    return git_input(('tracked',), _tracked_paths)
+
+
+def _tracked_paths():
+    names = subprocess.run(['git', 'ls-files', '--cached', '--with-tree=' + release_revision(), '-z'],
                            cwd=ROOT, capture_output=True, check=True).stdout.decode('utf-8').split('\0')
     names = [n for n in names if n]
     inventory(names)
@@ -258,9 +315,8 @@ def check_content(data):
                 credentials(item)
     credentials(value)
     # Bare/multiline base64 key blocks, including quoted source literals.
-    # Declared limit STOR-LIMIT-003 (owner decision 2026-11-06): textual
-    # recodings (hex, prefixed/mixed base64, other encodings) are outside this
-    # guard's scope. Exact inventories and PR review still cover those files.
+    # STOR-LIMIT-003 (owner decision 2026-11-10): recodings remain a scanner
+    # limit, but every distributed source must now equal its Git checkout bytes.
     for match in re.finditer(rb'(?<![A-Za-z0-9+/])(?:[A-Za-z0-9+/]{4}[ \r\n\t]*){4,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?', data):
         try:
             decoded = base64.b64decode(re.sub(rb'\s+', b'', match[0]), validate=True)
@@ -578,6 +634,7 @@ def container_format(data):
 SUPPORTED = {'gzip', 'bzip2', 'xz', 'zip', 'tar'}
 
 
+@repository_snapshot
 def scan_entries(entries, expected, depth, distribution=''):
     check_build_paths()
     check_build_paths(expected)
@@ -585,10 +642,10 @@ def scan_entries(entries, expected, depth, distribution=''):
     rules = {normalize_path(n): rule for n, rule in expected.items()}
     tracked = tracked_paths()
     for name, data in entries:
-        classify_member(data, name, depth, path_lookup(rules, name), distribution, _tracked=tracked)
+        classify_member(data, name, depth, path_lookup(rules, name), distribution, _tracked=tracked, _entries=entries)
 
 
-def classify_member(data, name='', depth=0, rule=None, distribution='', *, _tracked=None):
+def classify_member(data, name='', depth=0, rule=None, distribution='', *, _tracked=None, _entries=None):
     """Single entry for native, source, metadata and container classification."""
     if depth > 8:
         raise ValueError('archive nesting limit exceeded')
@@ -608,12 +665,24 @@ def classify_member(data, name='', depth=0, rule=None, distribution='', *, _trac
             raise ValueError('native member cannot have a policy rule')
         check_native(data, native)
     else:
-        if source in protected and ('source' in rule or not is_text(data)):
-            if normalize_path(rule['source'] if 'source' in rule else source) != source:
+        recursive = rule.get('container', {}).get('distribution') is True
+        if distribution and recursive and not generated_member(distribution, name, GENERATED_CONTAINERS):
+            raise ValueError('undeclared generated distribution container')
+        generated = generated_member(distribution, name) if name else False
+        if generated:
+            if rule or not is_text(data) or container_format(data):
+                raise ValueError('generated member must be scanned text without source rules')
+        elif distribution and not recursive:
+            if source is None or source not in tracked:
+                raise ValueError('package source is not tracked in HEAD')
+            if 'source' in rule and normalize_path(rule['source']) != source:
                 raise ValueError('source provenance differs from repository mapping')
-            if source in tracked and hashlib.sha256(data).hexdigest() != hashlib.sha256(source_bytes(path_lookup(tracked, source))).hexdigest():
-                raise ValueError('binary source digest differs from git')
+            if data != checkout_source_bytes(path_lookup(tracked, source)):
+                raise ValueError('source digest differs from git checkout')
         _scan_content(data, name, depth, rule)
+        if generated:
+            from package_generated import validate_generated
+            validate_generated(data, name, distribution, _entries)
 
 
 def check_native(data, native):
@@ -654,11 +723,59 @@ def source_bytes(name):
     if normalize_path(name) not in inventory(tracked):
         raise ValueError('binary source is not tracked in HEAD')
     name = path_lookup(tracked, name)
-    result = subprocess.run(['git', 'show', 'HEAD:' + name], cwd=ROOT,
+    return git_input(('blob', name), lambda: _source_bytes(name))
+
+
+def _source_bytes(name):
+    result = subprocess.run(['git', 'show', release_revision() + ':' + name], cwd=ROOT,
                             capture_output=True)
     if result.returncode:
         raise ValueError('binary source is not tracked in HEAD')
     return result.stdout
+
+
+def check_git_version():
+    output = subprocess.check_output(['git', '--version'], cwd=ROOT).decode('ascii')
+    match = re.match(r'git version (\d+)\.(\d+)', output)
+    if not match or tuple(map(int, match.groups())) < (2, 39):
+        raise ValueError('package guard requires Git >= 2.39')
+
+
+@contextmanager
+def release_checkout():
+    """Isolated clone/worktree with release attributes and repository EOL config."""
+    check_git_version()
+    (ROOT / 'target').mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=ROOT / 'target', prefix='package-reference-') as tmp:
+        directory = Path(tmp)
+        work = directory / 'work'
+        result = subprocess.run(['git', 'clone', '--shared', '--no-checkout', '--quiet',
+                                 str(ROOT), str(work)], capture_output=True)
+        if result.returncode:
+            raise ValueError('cannot create isolated release checkout')
+        for key in ('core.autocrlf', 'core.eol'):
+            value = subprocess.run(['git', 'config', '--get', key], cwd=ROOT, capture_output=True)
+            if value.returncode == 0:
+                subprocess.run(['git', 'config', key, value.stdout.decode().strip()],
+                               cwd=work, check=True, capture_output=True)
+        result = subprocess.run(['git', 'checkout', '--quiet', '--detach', release_revision()],
+                                cwd=work, capture_output=True)
+        if result.returncode:
+            raise ValueError('cannot produce git checkout source bytes')
+        yield work
+
+
+def _checkout_sources():
+    with release_checkout() as work:
+        return {name: (work / name).read_bytes() for name in tracked_paths().values()}
+
+
+@repository_snapshot
+def checkout_source_bytes(name):
+    source_bytes(name)
+    name = path_lookup(tracked_paths(), name)
+    return git_input(('checkout-tree',), _checkout_sources)[name]
+
 
 
 def check_build_paths(rules=None):
@@ -687,6 +804,7 @@ def check_build_paths(rules=None):
                 raise ValueError('native name differs from code table')
 
 
+@repository_snapshot
 def check_source_digests():
     check_build_paths()
     policy = registry()
@@ -697,7 +815,7 @@ def check_source_digests():
             if 'sha256' in rule or 'container' in rule:
                 if 'source' not in rule:
                     raise ValueError('binary source provenance missing')
-                data = source_bytes(rule['source'])
+                data = checkout_source_bytes(rule['source'])
                 if hashlib.sha256(data).hexdigest() != rule.get('sha256'):
                     raise ValueError('source digest differs from git')
                 classify_member(data, rule=rule)
@@ -783,6 +901,7 @@ def cargo(*args):
     return subprocess.check_output(['cargo', *args], cwd=ROOT, text=True, encoding='utf-8')
 
 
+@repository_snapshot
 def check_cargo(build=False):
     check_source_digests()
     metadata = strict_json.loads(cargo('metadata', '--locked', '--offline', '--no-deps', '--format-version', '1'))
@@ -799,11 +918,13 @@ def check_cargo(build=False):
         compare(listing.splitlines(), expected)
         directory = Path(package['manifest_path']).parent
         for item in expected:
-            if item in {'.cargo_vcs_info.json', 'Cargo.lock'}:
+            if item in {'.cargo_vcs_info.json', 'Cargo.lock', 'Cargo.toml'}:
                 continue
             source = directory / ('Cargo.toml' if item == 'Cargo.toml.orig' else item)
-            if not source.exists() and package.get('license_file'):
-                source = directory / package['license_file']
+            if not source.exists():
+                field = 'readme' if normalize_path(item) == 'readme.md' else 'license_file'
+                if package.get(field):
+                    source = directory / package[field]
             classify_member(source.read_bytes(), item, distribution='crates/' + name, rule=path_lookup(rules, item))
         print(f'{name}: exact inventory and content PASS ({len(expected)} files)')
     if build:

@@ -34,26 +34,39 @@ questa deviazione non li qualifica ne estende automaticamente il loro ambito.
 
 ## STOR-LIMIT-003
 
-Regola: policy dei pacchetti e DECISIONE DEL TITOLARE del 06/11/2026 sulle
-guardie statiche: coprire per costruzione le forme dirette e dichiarare le
-varianti come limite, senza inseguirle.
+Regola: DECISIONE DEL TITOLARE del 10/11/2026. Ogni membro sorgente,
+testuale o binario, deve essere identico ai byte del file tracciato alla
+revisione di rilascio, dopo la conversione di checkout Git sulla piattaforma
+di build secondo `.gitattributes`. Il confronto usa la riconduzione unica
+normalizzata; inventari o digest aggiunti non autorizzano file non tracciati.
 
-Ambito: scansione dei membri testuali ammessi in tutte le distribuzioni,
-compresi i contenitori annidati, tramite `scripts/check_packages.py`.
-Riconosce PEM privati e DER privato in base64 nudo; non garantisce il
-riconoscimento di chiavi ricodificate in hex, base64 con prefisso o mescolato
-ad altro testo, o altre codifiche. I test hex e base64 con prefisso documentano
-la mancata rilevazione come comportamento dichiarato, non come successo della
-guardia. Vedere la [policy dei pacchetti](package-policy.md).
+Ambito: sorgente tar.gz, crate, file Python delle wheel, documenti e licenze
+CLI, sorgenti nel bundle di qualifica e nei pacchetti annidati. Lo sdist
+Python resta non distribuito e rifiutato. Le eccezioni generate sono un elenco
+chiuso per distribuzione in `scripts/package_generated.py`, con obbligo di
+testo UTF-8 e scansione; contenitori e nativi mantengono controlli distinti.
+Vedere la [policy dei pacchetti](package-policy.md) per elenco e controlli.
 
-Hazard: il contenuto codificato di un file testuale ammesso puo contenere una
-chiave non rilevata. Un file di testo nuovo o modificato e comunque
-nell'inventario esatto e passa dalla revisione della PR; il limite riguarda
-solo il contenuto codificato dei file testuali ammessi.
+Hazard residuo sui sorgenti: il repository puo contenere una chiave codificata
+non riconosciuta dallo scanner (hex, base64 con prefisso o mescolato ad altro
+testo, altre codifiche). Questo contenuto passa dalla revisione della PR.
+Una modifica introdotta soltanto nel pacchetto viene rifiutata anche quando
+lo scanner non riconosce la codifica. I test di non-rilevazione dello scanner
+non sono prove di successo della guardia; i test di sostituzione verificano
+separatamente il vincolo di identita con Git.
 
-Rientro: nuova decisione esplicita del titolare che estenda il perimetro a
-codifiche nominate, con prove riproducibili e gate eseguibile per quelle forme.
-Non e richiesto inseguire varianti nell'attuale perimetro.
+I 144 generati della qualifica e i cinque documenti di pubblicazione restano
+in STOR-LIMIT-003: la provenienza e garantita dalla ricevuta e dal legame
+HEAD/ricevuta/tag della pubblicazione, non dal contenuto. La sottostringa di
+successo in `deny.log` non garantisce il resto del log. Anche la SBOM generata
+della wheel resta soggetta ai limiti di codifica dello scanner: RECORD ne
+vincola i byte, non ne prova il contenuto. Il limite non e ridotto al solo
+repository. Cargo.toml e Cargo.lock sono confrontati con la generazione offline
+da Git; il JSON VCS e chiuso su revisione e percorso. WHEEL, RECORD e METADATA
+hanno controlli strutturali derivati da pyproject, README e membri della wheel.
+Rientro del residuo sui sorgenti: revisione del contenuto del repository oppure
+nuova decisione del titolare che estenda le codifiche riconosciute, con prove
+riproducibili e gate eseguibile. Le evidenze storiche non vengono riscritte.
 
 
 ## STOR-LIMIT-004

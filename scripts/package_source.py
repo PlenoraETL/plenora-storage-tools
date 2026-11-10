@@ -10,9 +10,10 @@ import tarfile
 import tempfile
 import tomllib
 import os
+import io
 
 from versioning import workspace_version
-from check_packages import verify_distribution, registry
+from check_packages import verify_distribution, registry, checkout_source_bytes, repository_snapshot
 
 ROOT = Path(__file__).resolve().parents[1]
 CONSUMER = '''use std::sync::Arc;
@@ -51,7 +52,8 @@ def extract(archive, destination, prefix):
     return destination / prefix
 
 
-def select_source_archive(raw, archive, prefix):
+@repository_snapshot
+def select_source_archive(raw, archive, prefix, *, checkout_bytes=False):
     """Write the exact source inventory using the closed distribution tar dialect."""
     allowed = set(registry()['source'])
     with tarfile.open(raw) as committed, archive.open('wb') as output_file:
@@ -64,7 +66,12 @@ def select_source_archive(raw, archive, prefix):
                         # TarInfo. Rebuild local PAX metadata from the selected
                         # member fields instead of copying Git extensions.
                         member.pax_headers = {}
-                        selected.addfile(member, committed.extractfile(member))
+                        if checkout_bytes:
+                            data = checkout_source_bytes(relative)
+                            member.size = len(data)
+                            selected.addfile(member, io.BytesIO(data))
+                        else:
+                            selected.addfile(member, committed.extractfile(member))
 
 
 def build(output, target_dir):
@@ -85,7 +92,7 @@ def build(output, target_dir):
         subprocess.run(['git', '-c', 'core.autocrlf=false', '-c', 'core.eol=lf',
                         'archive', '--format=tar', f'--prefix={prefix}/',
                         f'--output={raw}', revision], cwd=ROOT, check=True)
-        select_source_archive(raw, archive, prefix)
+        select_source_archive(raw, archive, prefix, checkout_bytes=True)
         verify_distribution(archive)
         source = extract(archive, work / 'extracted', prefix)
         for name in ['Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'LICENSE',
