@@ -12,6 +12,7 @@ import tomllib
 import os
 
 from versioning import workspace_version
+from check_packages import verify_distribution, registry
 
 ROOT = Path(__file__).resolve().parents[1]
 CONSUMER = '''use std::sync::Arc;
@@ -50,6 +51,22 @@ def extract(archive, destination, prefix):
     return destination / prefix
 
 
+def select_source_archive(raw, archive, prefix):
+    """Write the exact source inventory using the closed distribution tar dialect."""
+    allowed = set(registry()['source'])
+    with tarfile.open(raw) as committed, archive.open('wb') as output_file:
+        with gzip.GzipFile(filename='', fileobj=output_file, mode='wb', mtime=0) as compressed:
+            with tarfile.open(fileobj=compressed, mode='w|') as selected:
+                for member in committed:
+                    relative = member.name.removeprefix(prefix + '/')
+                    if member.isfile() and relative in allowed:
+                        # Git's global commit comment is inherited by every
+                        # TarInfo. Rebuild local PAX metadata from the selected
+                        # member fields instead of copying Git extensions.
+                        member.pax_headers = {}
+                        selected.addfile(member, committed.extractfile(member))
+
+
 def build(output, target_dir):
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -68,9 +85,8 @@ def build(output, target_dir):
         subprocess.run(['git', '-c', 'core.autocrlf=false', '-c', 'core.eol=lf',
                         'archive', '--format=tar', f'--prefix={prefix}/',
                         f'--output={raw}', revision], cwd=ROOT, check=True)
-        with raw.open('rb') as source, archive.open('wb') as output_file:
-            with gzip.GzipFile(filename='', fileobj=output_file, mode='wb', mtime=0) as compressed:
-                shutil.copyfileobj(source, compressed)
+        select_source_archive(raw, archive, prefix)
+        verify_distribution(archive)
         source = extract(archive, work / 'extracted', prefix)
         for name in ['Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'LICENSE',
                      'contracts/upstream/source.json', 'crates/plenora-smb2/PROVENANCE.md']:

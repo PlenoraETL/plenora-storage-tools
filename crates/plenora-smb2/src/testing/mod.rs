@@ -4,6 +4,10 @@
 //! with factory methods that return connected [`SmbClient`] instances.
 //! Enable the `testing` feature flag to use this module.
 //!
+//! Authenticated consumer fixtures use `testuser` with password `testpass`.
+//! This fixed password is a public test value, not a secret, cryptographic
+//! material or a credential cache.
+//!
 //! # Three-layer testing model
 //!
 //! **Layer 1: Rust integration tests** -- Use [`TestServers`] to get

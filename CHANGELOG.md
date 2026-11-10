@@ -5,6 +5,18 @@
 Patch release preparation; source manifests remain at 3.0.3 until release
 preparation. See [candidate notes](docs/release-notes-3.0.4.md) for scope and evidence.
 
+- Stop distributing Kerberos test credential caches; tests generate synthetic
+  inputs at runtime. Through 3.0.3 these were non-secret test data. Exact versioned
+  package inventories and recursive content checks reject extra/missing files,
+  private keys and credential containers at build and release gates.
+- Separate tracked-source digests from generated package members. Build outputs
+  use exact names, roles, targets and native formats, with recursive inventories
+  for generated containers. Declare the Ubuntu manylinux 2.39 ABI3 wheel as well
+  as the Bookworm 2.34 and Windows ABI3 wheels. Source digests remain checked
+  against Git; credential scanning and STOR-LIMIT-003 remain unchanged.
+- Make package tests create their target directory on a clean checkout.
+  Coverage now accepts the rebuilt instrumented extension through the same
+  package guard, without changing coverage thresholds.
 - Align `serde_json` 1.0.151 → 1.0.154 in the workspace and all three lockfiles,
   preserving the public compatible requirement and existing features. Finite
   JSON numbers outside the f32 range no longer compare equal to f32 infinity

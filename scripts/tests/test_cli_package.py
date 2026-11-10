@@ -6,6 +6,7 @@ import zipfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from package_cli import build, verify_archive
+import test_packages
 
 
 class CLIPackageTests(unittest.TestCase):
@@ -16,7 +17,7 @@ class CLIPackageTests(unittest.TestCase):
                                  ('x86_64-unknown-linux-gnu', 'plenora-storage')]:
                 with self.subTest(target=target):
                     binary = root / name
-                    binary.write_bytes(b'candidate executable')
+                    binary.write_bytes(test_packages.BuildOutputTests.native(target))
                     archive = build(root, binary, '1.0.0-rc.1', target)
                     binary.write_bytes(b'another executable')
                     with self.assertRaisesRegex(ValueError, 'differs'):

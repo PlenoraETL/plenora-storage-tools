@@ -1,0 +1,1895 @@
+{
+  "crates": {
+    "plenora-storage-core": [
+      ".cargo_vcs_info.json",
+      "Cargo.lock",
+      "Cargo.toml",
+      "Cargo.toml.orig",
+      "LICENSE",
+      "README.md",
+      "src/capability.rs",
+      "src/capability_tests.rs",
+      "src/control.rs",
+      "src/credentials.rs",
+      "src/engine.rs",
+      "src/engine_cursor_tests.rs",
+      "src/error.rs",
+      "src/inactivity.rs",
+      "src/inactivity_tests.rs",
+      "src/lib.rs",
+      "src/model.rs",
+      "src/model_tests.rs",
+      "src/network.rs",
+      "src/network_tests.rs",
+      "src/provider.rs",
+      "src/runtime.rs",
+      "src/runtime_admission.rs",
+      "src/runtime_admission_tests.rs",
+      "src/runtime_result_limit.rs",
+      "src/runtime_tests.rs",
+      "src/unique_json.rs",
+      "src/unique_json_tests.rs",
+      "tests/credentials.rs",
+      "tests/runtime_binding.rs"
+    ],
+    "plenora-storage-s3": [
+      ".cargo_vcs_info.json",
+      "Cargo.lock",
+      "Cargo.toml",
+      "Cargo.toml.orig",
+      "LICENSE",
+      "README.md",
+      "src/errors.rs",
+      "src/lib.rs",
+      "src/lib_tests.rs",
+      "src/list_validation.rs",
+      "src/list_validation_tests.rs",
+      "src/operations.rs",
+      "src/publication.rs",
+      "src/transfer.rs",
+      "src/validation.rs",
+      "src/watched.rs",
+      "src/watched_tests.rs",
+      "tests/minio.rs"
+    ],
+    "plenora-storage-sftp": [
+      ".cargo_vcs_info.json",
+      "Cargo.lock",
+      "Cargo.toml",
+      "Cargo.toml.orig",
+      "LICENSE",
+      "README.md",
+      "src/errors.rs",
+      "src/lib.rs",
+      "src/lib_tests.rs",
+      "src/operations.rs",
+      "src/publication.rs",
+      "src/transfer.rs",
+      "src/validation.rs",
+      "tests/sftp.rs"
+    ],
+    "plenora-storage-ftp": [
+      ".cargo_vcs_info.json",
+      "Cargo.lock",
+      "Cargo.toml",
+      "Cargo.toml.orig",
+      "LICENSE",
+      "README.md",
+      "src/errors.rs",
+      "src/lib.rs",
+      "src/lib_tests.rs",
+      "src/operations.rs",
+      "src/publication.rs",
+      "src/transfer.rs",
+      "src/validation.rs",
+      "tests/ftp.rs"
+    ],
+    "plenora-storage-providers": [
+      ".cargo_vcs_info.json",
+      "Cargo.lock",
+      "Cargo.toml",
+      "Cargo.toml.orig",
+      "LICENSE",
+      "README.md",
+      "src/azure_listing.rs",
+      "src/azure_listing_tests.rs",
+      "src/cloud.rs",
+      "src/cloud/file_upload.rs",
+      "src/cloud/file_upload_tests.rs",
+      "src/cloud/operations.rs",
+      "src/cloud/publication.rs",
+      "src/common.rs",
+      "src/common/operations.rs",
+      "src/common/spool.rs",
+      "src/common/spool_tests.rs",
+      "src/common/spooled.rs",
+      "src/common_tests.rs",
+      "src/gcs.rs",
+      "src/gcs/operations.rs",
+      "src/gcs/publication.rs",
+      "src/gcs/publication_tests.rs",
+      "src/gcs_json_tests.rs",
+      "src/http.rs",
+      "src/http_tests.rs",
+      "src/keys.rs",
+      "src/lib.rs",
+      "src/local.rs",
+      "src/local/operations.rs",
+      "src/local/publication.rs",
+      "src/smb.rs",
+      "src/smb/operations.rs",
+      "src/smb/publication.rs",
+      "src/smb_listing.rs",
+      "src/smb_listing_tests.rs",
+      "src/smb_tests.rs",
+      "src/watched.rs",
+      "src/watched_tests.rs",
+      "src/webdav.rs",
+      "src/webdav/operations.rs",
+      "src/webdav/publication.rs",
+      "src/webdav_parser_tests.rs",
+      "src/webdav_status_tests.rs",
+      "tests/local.rs"
+    ],
+    "plenora-smb2": [
+      ".cargo_vcs_info.json",
+      "Cargo.lock",
+      "Cargo.toml",
+      "Cargo.toml.orig",
+      "LICENSE-APACHE",
+      "LICENSE-MIT",
+      "PROVENANCE.md",
+      "README.md",
+      "src/auth/CLAUDE.md",
+      "src/auth/der.rs",
+      "src/auth/kerberos/authenticator.rs",
+      "src/auth/kerberos/ccache.rs",
+      "src/auth/kerberos/crypto.rs",
+      "src/auth/kerberos/kdc.rs",
+      "src/auth/kerberos/messages.rs",
+      "src/auth/kerberos/mod.rs",
+      "src/auth/mod.rs",
+      "src/auth/ntlm.rs",
+      "src/auth/spnego.rs",
+      "src/bytes.rs",
+      "src/client/CLAUDE.md",
+      "src/client/connection.rs",
+      "src/client/copy.rs",
+      "src/client/credits.rs",
+      "src/client/dfs.rs",
+      "src/client/diagnostics.rs",
+      "src/client/durable.rs",
+      "src/client/fault_injection_tests.rs",
+      "src/client/mod.rs",
+      "src/client/pipeline.rs",
+      "src/client/session.rs",
+      "src/client/shares.rs",
+      "src/client/stream.rs",
+      "src/client/test_helpers.rs",
+      "src/client/tree.rs",
+      "src/client/watcher.rs",
+      "src/crypto/CLAUDE.md",
+      "src/crypto/compression.rs",
+      "src/crypto/encryption.rs",
+      "src/crypto/kdf.rs",
+      "src/crypto/mod.rs",
+      "src/crypto/signing.rs",
+      "src/error.rs",
+      "src/fuzzing.rs",
+      "src/lib.rs",
+      "src/msg/CLAUDE.md",
+      "src/msg/cancel.rs",
+      "src/msg/change_notify.rs",
+      "src/msg/close.rs",
+      "src/msg/copychunk.rs",
+      "src/msg/create.rs",
+      "src/msg/create_context.rs",
+      "src/msg/dfs.rs",
+      "src/msg/echo.rs",
+      "src/msg/flush.rs",
+      "src/msg/header.rs",
+      "src/msg/ioctl.rs",
+      "src/msg/lock.rs",
+      "src/msg/logoff.rs",
+      "src/msg/mod.rs",
+      "src/msg/negotiate.rs",
+      "src/msg/oplock_break.rs",
+      "src/msg/query_directory.rs",
+      "src/msg/query_info.rs",
+      "src/msg/read.rs",
+      "src/msg/roundtrip_strategies.rs",
+      "src/msg/session_setup.rs",
+      "src/msg/set_info.rs",
+      "src/msg/transform.rs",
+      "src/msg/tree_connect.rs",
+      "src/msg/tree_disconnect.rs",
+      "src/msg/write.rs",
+      "src/name.rs",
+      "src/pack/CLAUDE.md",
+      "src/pack/filetime.rs",
+      "src/pack/guid.rs",
+      "src/pack/mod.rs",
+      "src/rpc/CLAUDE.md",
+      "src/rpc/mod.rs",
+      "src/rpc/srvsvc.rs",
+      "src/sync.rs",
+      "src/testing/CLAUDE.md",
+      "src/testing/fixtures/consumer/docker-compose.yml",
+      "src/testing/fixtures/consumer/smb-consumer-50shares/Dockerfile",
+      "src/testing/fixtures/consumer/smb-consumer-50shares/generate-conf.sh",
+      "src/testing/fixtures/consumer/smb-consumer-50shares/smb.conf",
+      "src/testing/fixtures/consumer/smb-consumer-auth/Dockerfile",
+      "src/testing/fixtures/consumer/smb-consumer-auth/smb.conf",
+      "src/testing/fixtures/consumer/smb-consumer-both/Dockerfile",
+      "src/testing/fixtures/consumer/smb-consumer-both/smb.conf",
+      "src/testing/fixtures/consumer/smb-consumer-deepnest/Dockerfile",
+      "src/testing/fixtures/consumer/smb-consumer-deepnest/populate.sh",
+      "src/testing/fixtures/consumer/smb-consumer-deepnest/smb.conf",
+      "src/testing/fixtures/consumer/smb-consumer-flaky/Dockerfile",
+      "src/testing/fixtures/consumer/smb-consumer-flaky/cycle.sh",
+      "src/testing/fixtures/consumer/smb-consumer-flaky/smb.conf",
+      "src/testing/fixtures/consumer/smb-consumer-guest/Dockerfile",
+      "src/testing/fixtures/consumer/smb-consumer-guest/smb.conf",
+      "src/testing/fixtures/consumer/smb-consumer-linux/Dockerfile",
+      "src/testing/fixtures/consumer/smb-consumer-linux/smb.conf",
+      "src/testing/fixtures/consumer/smb-consumer-longnames/Dockerfile",
+      "src/testing/fixtures/consumer/smb-consumer-longnames/populate.sh",
+      "src/testing/fixtures/consumer/smb-consumer-longnames/smb.conf",
+      "src/testing/fixtures/consumer/smb-consumer-manyfiles/Dockerfile",
+      "src/testing/fixtures/consumer/smb-consumer-manyfiles/smb.conf",
+      "src/testing/fixtures/consumer/smb-consumer-maxreadsize/Dockerfile",
+      "src/testing/fixtures/consumer/smb-consumer-maxreadsize/smb.conf",
+      "src/testing/fixtures/consumer/smb-consumer-readonly/Dockerfile",
+      "src/testing/fixtures/consumer/smb-consumer-readonly/smb.conf",
+      "src/testing/fixtures/consumer/smb-consumer-slow/Dockerfile",
+      "src/testing/fixtures/consumer/smb-consumer-slow/entrypoint.sh",
+      "src/testing/fixtures/consumer/smb-consumer-slow/smb.conf",
+      "src/testing/fixtures/consumer/smb-consumer-synology/Dockerfile",
+      "src/testing/fixtures/consumer/smb-consumer-synology/smb.conf",
+      "src/testing/fixtures/consumer/smb-consumer-unicode/Dockerfile",
+      "src/testing/fixtures/consumer/smb-consumer-unicode/populate.sh",
+      "src/testing/fixtures/consumer/smb-consumer-unicode/smb.conf",
+      "src/testing/fixtures/consumer/smb-consumer-windows/Dockerfile",
+      "src/testing/fixtures/consumer/smb-consumer-windows/smb.conf",
+      "src/testing/mod.rs",
+      "src/transport/CLAUDE.md",
+      "src/transport/mock.rs",
+      "src/transport/mod.rs",
+      "src/transport/tcp.rs",
+      "src/types/CLAUDE.md",
+      "src/types/flags.rs",
+      "src/types/mod.rs",
+      "src/types/status.rs"
+    ],
+    "plenora-storage-cli": [
+      ".cargo_vcs_info.json",
+      "Cargo.lock",
+      "Cargo.toml",
+      "Cargo.toml.orig",
+      "LICENSE",
+      "README.md",
+      "src/args.rs",
+      "src/commands.rs",
+      "src/commands_json_tests.rs",
+      "src/main.rs",
+      "src/main_api_inventory_tests.rs",
+      "src/output.rs",
+      "tests/preflight.rs"
+    ],
+    "plenora-storage-engine": [
+      ".cargo_vcs_info.json",
+      "Cargo.lock",
+      "Cargo.toml",
+      "Cargo.toml.orig",
+      "LICENSE",
+      "README.md",
+      "src/files.rs",
+      "src/files_tests.rs",
+      "src/lib.rs",
+      "tests/composition.rs",
+      "tests/io_faults.rs"
+    ],
+    "plenora-storage-py": [
+      ".cargo_vcs_info.json",
+      "Cargo.lock",
+      "Cargo.toml",
+      "Cargo.toml.orig",
+      "LICENSE",
+      "README.md",
+      "examples/local_roundtrip.py",
+      "pyproject.toml",
+      "python/plenora_storage/__init__.py",
+      "python/plenora_storage/__init__.pyi",
+      "python/plenora_storage/_native.pyi",
+      "python/plenora_storage/py.typed",
+      "python/plenora_storage/types.py",
+      "python/tests/test_json_duplicates.py",
+      "python/tests/test_sdk.py",
+      "src/json_tests.rs",
+      "src/lib.rs",
+      "typing/consumer.py"
+    ]
+  },
+  "source": [
+    "CHANGELOG.md",
+    "Cargo.lock",
+    "Cargo.toml",
+    "LICENSE",
+    "README.md",
+    "contracts/README.md",
+    "contracts/STORAGE-OPERATIONS-1.0-PROPOSAL.md",
+    "contracts/adoption-policy.json",
+    "contracts/bindings/rust-v1.json",
+    "contracts/examples/invalid/storage-operations-v1.json",
+    "contracts/examples/valid/storage-operations-v1.json",
+    "contracts/schemas/plenora-storage-azure-connection-v1.schema.json",
+    "contracts/schemas/plenora-storage-capability-attributes-v1.schema.json",
+    "contracts/schemas/plenora-storage-common-v1.schema.json",
+    "contracts/schemas/plenora-storage-connection-v1.schema.json",
+    "contracts/schemas/plenora-storage-copy-input-v1.schema.json",
+    "contracts/schemas/plenora-storage-copy-output-v1.schema.json",
+    "contracts/schemas/plenora-storage-delete-input-v1.schema.json",
+    "contracts/schemas/plenora-storage-delete-output-v1.schema.json",
+    "contracts/schemas/plenora-storage-ftp-connection-v1.schema.json",
+    "contracts/schemas/plenora-storage-ftps-connection-v1.schema.json",
+    "contracts/schemas/plenora-storage-gcs-connection-v1.schema.json",
+    "contracts/schemas/plenora-storage-get-input-v1.schema.json",
+    "contracts/schemas/plenora-storage-get-output-v1.schema.json",
+    "contracts/schemas/plenora-storage-list-input-v1.schema.json",
+    "contracts/schemas/plenora-storage-list-output-v1.schema.json",
+    "contracts/schemas/plenora-storage-local-connection-v1.schema.json",
+    "contracts/schemas/plenora-storage-put-input-v1.schema.json",
+    "contracts/schemas/plenora-storage-put-output-v1.schema.json",
+    "contracts/schemas/plenora-storage-s3-connection-v1.schema.json",
+    "contracts/schemas/plenora-storage-sftp-connection-v1.schema.json",
+    "contracts/schemas/plenora-storage-smb-connection-v1.schema.json",
+    "contracts/schemas/plenora-storage-stat-input-v1.schema.json",
+    "contracts/schemas/plenora-storage-stat-output-v1.schema.json",
+    "contracts/schemas/plenora-storage-test-input-v1.schema.json",
+    "contracts/schemas/plenora-storage-test-output-v1.schema.json",
+    "contracts/schemas/plenora-storage-webdav-connection-v1.schema.json",
+    "contracts/upstream/ERRORS-1.0.md",
+    "contracts/upstream/PUBLIC-CATALOGS-2.0.md",
+    "contracts/upstream/PYTHON-SDK-1.0.md",
+    "contracts/upstream/RUNTIME-BINDING-2.0.md",
+    "contracts/upstream/RUNTIME-VECTORS-1.0.md",
+    "contracts/upstream/SURFACE-BINDINGS-1.0.md",
+    "contracts/upstream/adoption-manifest-v4.schema.json",
+    "contracts/upstream/capabilities-v2.schema.json",
+    "contracts/upstream/cli-envelope-v2.schema.json",
+    "contracts/upstream/conformance_checks.py",
+    "contracts/upstream/error-v1.schema.json",
+    "contracts/upstream/json_values.py",
+    "contracts/upstream/proposed/runtime-probe-v1.schema.json",
+    "contracts/upstream/proposed/runtime-probes-v1/data-run-input-contract-malformed.json",
+    "contracts/upstream/proposed/runtime-probes-v1/data-run-input-contract-mismatch.json",
+    "contracts/upstream/proposed/runtime-probes-v1/database-read-capability-name-other.json",
+    "contracts/upstream/proposed/runtime-probes-v1/database-read-correlation-uppercase.json",
+    "contracts/upstream/proposed/runtime-probes-v1/io-read-binding-version-leading-zero.json",
+    "contracts/upstream/proposed/runtime-probes-v1/io-read-binding-version-number.json",
+    "contracts/upstream/proposed/runtime-probes-v1/io-read-binding-version-unsupported.json",
+    "contracts/upstream/proposed/runtime-probes-v1/io-read-deadline-expired.json",
+    "contracts/upstream/proposed/runtime-probes-v1/io-read-deadline-negative-zero.json",
+    "contracts/upstream/proposed/runtime-probes-v1/io-read-deadline-offset.json",
+    "contracts/upstream/proposed/runtime-probes-v1/io-read-message-id-braces.json",
+    "contracts/upstream/proposed/runtime-probes-v1/io-read-message-id-missing.json",
+    "contracts/upstream/proposed/runtime-probes-v1/io-read-operation-version-leading-zero.json",
+    "contracts/upstream/proposed/runtime-probes-v1/io-read-operation-version-missing.json",
+    "contracts/upstream/proposed/runtime-probes-v1/io-read-operation-version-number.json",
+    "contracts/upstream/proposed/runtime-probes-v1/io-read-operation-version-unknown.json",
+    "contracts/upstream/proposed/runtime-probes-v1/rest-upload-idempotency-key-empty.json",
+    "contracts/upstream/proposed/runtime-probes-v1/rest-upload-idempotency-key-null.json",
+    "contracts/upstream/proposed/runtime-probes-v1/storage-get-idempotency-key-unsupported.json",
+    "contracts/upstream/proposed/runtime-probes-v1/storage-get-operation-malformed.json",
+    "contracts/upstream/proposed/runtime-probes-v1/storage-get-operation-unknown.json",
+    "contracts/upstream/proposed/runtime-v1/storage-put-cleanup-local-error.json",
+    "contracts/upstream/proposed/runtime-v1/storage-put-cleanup-remote-error.json",
+    "contracts/upstream/proposed/source.json",
+    "contracts/upstream/public-catalog-v2.schema.json",
+    "contracts/upstream/python-sdk-v1.json",
+    "contracts/upstream/ratified/runtime-probe-v1.schema.json",
+    "contracts/upstream/ratified/runtime-probes-v1/data-run-input-contract-malformed.json",
+    "contracts/upstream/ratified/runtime-probes-v1/data-run-input-contract-mismatch.json",
+    "contracts/upstream/ratified/runtime-probes-v1/database-read-capability-name-other.json",
+    "contracts/upstream/ratified/runtime-probes-v1/database-read-correlation-uppercase.json",
+    "contracts/upstream/ratified/runtime-probes-v1/io-read-binding-version-leading-zero.json",
+    "contracts/upstream/ratified/runtime-probes-v1/io-read-binding-version-number.json",
+    "contracts/upstream/ratified/runtime-probes-v1/io-read-binding-version-unsupported.json",
+    "contracts/upstream/ratified/runtime-probes-v1/io-read-deadline-expired.json",
+    "contracts/upstream/ratified/runtime-probes-v1/io-read-deadline-negative-zero.json",
+    "contracts/upstream/ratified/runtime-probes-v1/io-read-deadline-offset.json",
+    "contracts/upstream/ratified/runtime-probes-v1/io-read-message-id-braces.json",
+    "contracts/upstream/ratified/runtime-probes-v1/io-read-message-id-missing.json",
+    "contracts/upstream/ratified/runtime-probes-v1/io-read-operation-version-leading-zero.json",
+    "contracts/upstream/ratified/runtime-probes-v1/io-read-operation-version-missing.json",
+    "contracts/upstream/ratified/runtime-probes-v1/io-read-operation-version-number.json",
+    "contracts/upstream/ratified/runtime-probes-v1/io-read-operation-version-unknown.json",
+    "contracts/upstream/ratified/runtime-probes-v1/rest-upload-idempotency-key-empty.json",
+    "contracts/upstream/ratified/runtime-probes-v1/rest-upload-idempotency-key-null.json",
+    "contracts/upstream/ratified/runtime-probes-v1/storage-get-idempotency-key-unsupported.json",
+    "contracts/upstream/ratified/runtime-probes-v1/storage-get-operation-malformed.json",
+    "contracts/upstream/ratified/runtime-probes-v1/storage-get-operation-unknown.json",
+    "contracts/upstream/ratified/runtime-v1/storage-put-cleanup-local-error.json",
+    "contracts/upstream/ratified/runtime-v1/storage-put-cleanup-remote-error.json",
+    "contracts/upstream/ratified/source.json",
+    "contracts/upstream/runtime-v1/storage-copy-request.json",
+    "contracts/upstream/runtime-v1/storage-delete-request.json",
+    "contracts/upstream/runtime-v1/storage-get-partial-error.json",
+    "contracts/upstream/runtime-v1/storage-get-request.json",
+    "contracts/upstream/runtime-v1/storage-get-success.json",
+    "contracts/upstream/runtime-v1/storage-list-request.json",
+    "contracts/upstream/runtime-v1/storage-list-success.json",
+    "contracts/upstream/runtime-v1/storage-put-request.json",
+    "contracts/upstream/runtime-v1/storage-put-success.json",
+    "contracts/upstream/runtime-v1/storage-put-unknown-error.json",
+    "contracts/upstream/runtime-v1/storage-stat-request.json",
+    "contracts/upstream/runtime-v1/storage-test-request.json",
+    "contracts/upstream/runtime-vector-v1.schema.json",
+    "contracts/upstream/source.json",
+    "contracts/upstream/storage-tools-v1.json",
+    "contracts/upstream/storage-tools.md",
+    "contracts/upstream/vendor-lock.json",
+    "crates/plenora-smb2/Cargo.toml",
+    "crates/plenora-smb2/LICENSE-APACHE",
+    "crates/plenora-smb2/LICENSE-MIT",
+    "crates/plenora-smb2/PROVENANCE.md",
+    "crates/plenora-smb2/README.md",
+    "crates/plenora-smb2/src/auth/CLAUDE.md",
+    "crates/plenora-smb2/src/auth/der.rs",
+    "crates/plenora-smb2/src/auth/kerberos/authenticator.rs",
+    "crates/plenora-smb2/src/auth/kerberos/ccache.rs",
+    "crates/plenora-smb2/src/auth/kerberos/crypto.rs",
+    "crates/plenora-smb2/src/auth/kerberos/kdc.rs",
+    "crates/plenora-smb2/src/auth/kerberos/messages.rs",
+    "crates/plenora-smb2/src/auth/kerberos/mod.rs",
+    "crates/plenora-smb2/src/auth/mod.rs",
+    "crates/plenora-smb2/src/auth/ntlm.rs",
+    "crates/plenora-smb2/src/auth/spnego.rs",
+    "crates/plenora-smb2/src/bytes.rs",
+    "crates/plenora-smb2/src/client/CLAUDE.md",
+    "crates/plenora-smb2/src/client/connection.rs",
+    "crates/plenora-smb2/src/client/copy.rs",
+    "crates/plenora-smb2/src/client/credits.rs",
+    "crates/plenora-smb2/src/client/dfs.rs",
+    "crates/plenora-smb2/src/client/diagnostics.rs",
+    "crates/plenora-smb2/src/client/durable.rs",
+    "crates/plenora-smb2/src/client/fault_injection_tests.rs",
+    "crates/plenora-smb2/src/client/mod.rs",
+    "crates/plenora-smb2/src/client/pipeline.rs",
+    "crates/plenora-smb2/src/client/session.rs",
+    "crates/plenora-smb2/src/client/shares.rs",
+    "crates/plenora-smb2/src/client/stream.rs",
+    "crates/plenora-smb2/src/client/test_helpers.rs",
+    "crates/plenora-smb2/src/client/tree.rs",
+    "crates/plenora-smb2/src/client/watcher.rs",
+    "crates/plenora-smb2/src/crypto/CLAUDE.md",
+    "crates/plenora-smb2/src/crypto/compression.rs",
+    "crates/plenora-smb2/src/crypto/encryption.rs",
+    "crates/plenora-smb2/src/crypto/kdf.rs",
+    "crates/plenora-smb2/src/crypto/mod.rs",
+    "crates/plenora-smb2/src/crypto/signing.rs",
+    "crates/plenora-smb2/src/error.rs",
+    "crates/plenora-smb2/src/fuzzing.rs",
+    "crates/plenora-smb2/src/lib.rs",
+    "crates/plenora-smb2/src/msg/CLAUDE.md",
+    "crates/plenora-smb2/src/msg/cancel.rs",
+    "crates/plenora-smb2/src/msg/change_notify.rs",
+    "crates/plenora-smb2/src/msg/close.rs",
+    "crates/plenora-smb2/src/msg/copychunk.rs",
+    "crates/plenora-smb2/src/msg/create.rs",
+    "crates/plenora-smb2/src/msg/create_context.rs",
+    "crates/plenora-smb2/src/msg/dfs.rs",
+    "crates/plenora-smb2/src/msg/echo.rs",
+    "crates/plenora-smb2/src/msg/flush.rs",
+    "crates/plenora-smb2/src/msg/header.rs",
+    "crates/plenora-smb2/src/msg/ioctl.rs",
+    "crates/plenora-smb2/src/msg/lock.rs",
+    "crates/plenora-smb2/src/msg/logoff.rs",
+    "crates/plenora-smb2/src/msg/mod.rs",
+    "crates/plenora-smb2/src/msg/negotiate.rs",
+    "crates/plenora-smb2/src/msg/oplock_break.rs",
+    "crates/plenora-smb2/src/msg/query_directory.rs",
+    "crates/plenora-smb2/src/msg/query_info.rs",
+    "crates/plenora-smb2/src/msg/read.rs",
+    "crates/plenora-smb2/src/msg/roundtrip_strategies.rs",
+    "crates/plenora-smb2/src/msg/session_setup.rs",
+    "crates/plenora-smb2/src/msg/set_info.rs",
+    "crates/plenora-smb2/src/msg/transform.rs",
+    "crates/plenora-smb2/src/msg/tree_connect.rs",
+    "crates/plenora-smb2/src/msg/tree_disconnect.rs",
+    "crates/plenora-smb2/src/msg/write.rs",
+    "crates/plenora-smb2/src/name.rs",
+    "crates/plenora-smb2/src/pack/CLAUDE.md",
+    "crates/plenora-smb2/src/pack/filetime.rs",
+    "crates/plenora-smb2/src/pack/guid.rs",
+    "crates/plenora-smb2/src/pack/mod.rs",
+    "crates/plenora-smb2/src/rpc/CLAUDE.md",
+    "crates/plenora-smb2/src/rpc/mod.rs",
+    "crates/plenora-smb2/src/rpc/srvsvc.rs",
+    "crates/plenora-smb2/src/sync.rs",
+    "crates/plenora-smb2/src/testing/CLAUDE.md",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/docker-compose.yml",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-50shares/Dockerfile",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-50shares/generate-conf.sh",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-50shares/smb.conf",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-auth/Dockerfile",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-auth/smb.conf",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-both/Dockerfile",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-both/smb.conf",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-deepnest/Dockerfile",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-deepnest/populate.sh",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-deepnest/smb.conf",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-flaky/Dockerfile",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-flaky/cycle.sh",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-flaky/smb.conf",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-guest/Dockerfile",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-guest/smb.conf",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-linux/Dockerfile",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-linux/smb.conf",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-longnames/Dockerfile",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-longnames/populate.sh",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-longnames/smb.conf",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-manyfiles/Dockerfile",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-manyfiles/smb.conf",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-maxreadsize/Dockerfile",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-maxreadsize/smb.conf",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-readonly/Dockerfile",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-readonly/smb.conf",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-slow/Dockerfile",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-slow/entrypoint.sh",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-slow/smb.conf",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-synology/Dockerfile",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-synology/smb.conf",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-unicode/Dockerfile",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-unicode/populate.sh",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-unicode/smb.conf",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-windows/Dockerfile",
+    "crates/plenora-smb2/src/testing/fixtures/consumer/smb-consumer-windows/smb.conf",
+    "crates/plenora-smb2/src/testing/mod.rs",
+    "crates/plenora-smb2/src/transport/CLAUDE.md",
+    "crates/plenora-smb2/src/transport/mock.rs",
+    "crates/plenora-smb2/src/transport/mod.rs",
+    "crates/plenora-smb2/src/transport/tcp.rs",
+    "crates/plenora-smb2/src/types/CLAUDE.md",
+    "crates/plenora-smb2/src/types/flags.rs",
+    "crates/plenora-smb2/src/types/mod.rs",
+    "crates/plenora-smb2/src/types/status.rs",
+    "crates/plenora-storage-cli/Cargo.toml",
+    "crates/plenora-storage-cli/src/args.rs",
+    "crates/plenora-storage-cli/src/commands.rs",
+    "crates/plenora-storage-cli/src/commands_json_tests.rs",
+    "crates/plenora-storage-cli/src/main.rs",
+    "crates/plenora-storage-cli/src/main_api_inventory_tests.rs",
+    "crates/plenora-storage-cli/src/output.rs",
+    "crates/plenora-storage-cli/tests/preflight.rs",
+    "crates/plenora-storage-core/Cargo.toml",
+    "crates/plenora-storage-core/src/capability.rs",
+    "crates/plenora-storage-core/src/capability_tests.rs",
+    "crates/plenora-storage-core/src/control.rs",
+    "crates/plenora-storage-core/src/credentials.rs",
+    "crates/plenora-storage-core/src/engine.rs",
+    "crates/plenora-storage-core/src/engine_cursor_tests.rs",
+    "crates/plenora-storage-core/src/error.rs",
+    "crates/plenora-storage-core/src/inactivity.rs",
+    "crates/plenora-storage-core/src/inactivity_tests.rs",
+    "crates/plenora-storage-core/src/lib.rs",
+    "crates/plenora-storage-core/src/model.rs",
+    "crates/plenora-storage-core/src/model_tests.rs",
+    "crates/plenora-storage-core/src/network.rs",
+    "crates/plenora-storage-core/src/network_tests.rs",
+    "crates/plenora-storage-core/src/provider.rs",
+    "crates/plenora-storage-core/src/runtime.rs",
+    "crates/plenora-storage-core/src/runtime_admission.rs",
+    "crates/plenora-storage-core/src/runtime_admission_tests.rs",
+    "crates/plenora-storage-core/src/runtime_result_limit.rs",
+    "crates/plenora-storage-core/src/runtime_tests.rs",
+    "crates/plenora-storage-core/src/unique_json.rs",
+    "crates/plenora-storage-core/src/unique_json_tests.rs",
+    "crates/plenora-storage-core/tests/credentials.rs",
+    "crates/plenora-storage-core/tests/runtime_binding.rs",
+    "crates/plenora-storage-engine/Cargo.toml",
+    "crates/plenora-storage-engine/src/files.rs",
+    "crates/plenora-storage-engine/src/files_tests.rs",
+    "crates/plenora-storage-engine/src/lib.rs",
+    "crates/plenora-storage-engine/tests/composition.rs",
+    "crates/plenora-storage-engine/tests/io_faults.rs",
+    "crates/plenora-storage-ftp/Cargo.toml",
+    "crates/plenora-storage-ftp/src/errors.rs",
+    "crates/plenora-storage-ftp/src/lib.rs",
+    "crates/plenora-storage-ftp/src/lib_tests.rs",
+    "crates/plenora-storage-ftp/src/operations.rs",
+    "crates/plenora-storage-ftp/src/publication.rs",
+    "crates/plenora-storage-ftp/src/transfer.rs",
+    "crates/plenora-storage-ftp/src/validation.rs",
+    "crates/plenora-storage-ftp/tests/ftp.rs",
+    "crates/plenora-storage-providers/Cargo.toml",
+    "crates/plenora-storage-providers/src/azure_listing.rs",
+    "crates/plenora-storage-providers/src/azure_listing_tests.rs",
+    "crates/plenora-storage-providers/src/cloud.rs",
+    "crates/plenora-storage-providers/src/cloud/file_upload.rs",
+    "crates/plenora-storage-providers/src/cloud/file_upload_tests.rs",
+    "crates/plenora-storage-providers/src/cloud/operations.rs",
+    "crates/plenora-storage-providers/src/cloud/publication.rs",
+    "crates/plenora-storage-providers/src/common.rs",
+    "crates/plenora-storage-providers/src/common/operations.rs",
+    "crates/plenora-storage-providers/src/common/spool.rs",
+    "crates/plenora-storage-providers/src/common/spool_tests.rs",
+    "crates/plenora-storage-providers/src/common/spooled.rs",
+    "crates/plenora-storage-providers/src/common_tests.rs",
+    "crates/plenora-storage-providers/src/gcs.rs",
+    "crates/plenora-storage-providers/src/gcs/operations.rs",
+    "crates/plenora-storage-providers/src/gcs/publication.rs",
+    "crates/plenora-storage-providers/src/gcs/publication_tests.rs",
+    "crates/plenora-storage-providers/src/gcs_json_tests.rs",
+    "crates/plenora-storage-providers/src/http.rs",
+    "crates/plenora-storage-providers/src/http_tests.rs",
+    "crates/plenora-storage-providers/src/keys.rs",
+    "crates/plenora-storage-providers/src/lib.rs",
+    "crates/plenora-storage-providers/src/local.rs",
+    "crates/plenora-storage-providers/src/local/operations.rs",
+    "crates/plenora-storage-providers/src/local/publication.rs",
+    "crates/plenora-storage-providers/src/smb.rs",
+    "crates/plenora-storage-providers/src/smb/operations.rs",
+    "crates/plenora-storage-providers/src/smb/publication.rs",
+    "crates/plenora-storage-providers/src/smb_listing.rs",
+    "crates/plenora-storage-providers/src/smb_listing_tests.rs",
+    "crates/plenora-storage-providers/src/smb_tests.rs",
+    "crates/plenora-storage-providers/src/watched.rs",
+    "crates/plenora-storage-providers/src/watched_tests.rs",
+    "crates/plenora-storage-providers/src/webdav.rs",
+    "crates/plenora-storage-providers/src/webdav/operations.rs",
+    "crates/plenora-storage-providers/src/webdav/publication.rs",
+    "crates/plenora-storage-providers/src/webdav_parser_tests.rs",
+    "crates/plenora-storage-providers/src/webdav_status_tests.rs",
+    "crates/plenora-storage-providers/tests/local.rs",
+    "crates/plenora-storage-py/Cargo.toml",
+    "crates/plenora-storage-py/README.md",
+    "crates/plenora-storage-py/examples/local_roundtrip.py",
+    "crates/plenora-storage-py/pyproject.toml",
+    "crates/plenora-storage-py/python/plenora_storage/__init__.py",
+    "crates/plenora-storage-py/python/plenora_storage/__init__.pyi",
+    "crates/plenora-storage-py/python/plenora_storage/_native.pyi",
+    "crates/plenora-storage-py/python/plenora_storage/py.typed",
+    "crates/plenora-storage-py/python/plenora_storage/types.py",
+    "crates/plenora-storage-py/python/tests/test_json_duplicates.py",
+    "crates/plenora-storage-py/python/tests/test_sdk.py",
+    "crates/plenora-storage-py/src/json_tests.rs",
+    "crates/plenora-storage-py/src/lib.rs",
+    "crates/plenora-storage-py/typing/consumer.py",
+    "crates/plenora-storage-s3/Cargo.toml",
+    "crates/plenora-storage-s3/src/errors.rs",
+    "crates/plenora-storage-s3/src/lib.rs",
+    "crates/plenora-storage-s3/src/lib_tests.rs",
+    "crates/plenora-storage-s3/src/list_validation.rs",
+    "crates/plenora-storage-s3/src/list_validation_tests.rs",
+    "crates/plenora-storage-s3/src/operations.rs",
+    "crates/plenora-storage-s3/src/publication.rs",
+    "crates/plenora-storage-s3/src/transfer.rs",
+    "crates/plenora-storage-s3/src/validation.rs",
+    "crates/plenora-storage-s3/src/watched.rs",
+    "crates/plenora-storage-s3/src/watched_tests.rs",
+    "crates/plenora-storage-s3/tests/minio.rs",
+    "crates/plenora-storage-sftp/Cargo.toml",
+    "crates/plenora-storage-sftp/src/errors.rs",
+    "crates/plenora-storage-sftp/src/lib.rs",
+    "crates/plenora-storage-sftp/src/lib_tests.rs",
+    "crates/plenora-storage-sftp/src/operations.rs",
+    "crates/plenora-storage-sftp/src/publication.rs",
+    "crates/plenora-storage-sftp/src/transfer.rs",
+    "crates/plenora-storage-sftp/src/validation.rs",
+    "crates/plenora-storage-sftp/tests/sftp.rs",
+    "docs/API-INVENTORY.md",
+    "docs/README.md",
+    "docs/STATO.md",
+    "docs/api-1.0.md",
+    "docs/architecture.md",
+    "docs/code-size-baseline-1.0.0.json",
+    "docs/compatibility-1.0.md",
+    "docs/contract-adoption.md",
+    "docs/contract-limits.md",
+    "docs/coverage-production-baseline.json",
+    "docs/database-alignment.md",
+    "docs/database-reference-review.md",
+    "docs/dependency-update-0.2.2.md",
+    "docs/evidence/2.0.0/large-transfer-first-attempt.json.gz",
+    "docs/evidence/2.0.0/large-transfer-recheck.json.gz",
+    "docs/evidence/2.0.1/disk-pressure.json.gz",
+    "docs/evidence/2.0.1/release-qualification.json.gz",
+    "docs/evidence/2.0.1/soak-completed.json.gz",
+    "docs/evidence/2.0.1/soak-interrupted.json.gz",
+    "docs/evidence/2.1.0/disk-pressure.json.gz",
+    "docs/evidence/2.1.0/host-load.jsonl.gz",
+    "docs/evidence/2.1.0/performance-baseline.json.gz",
+    "docs/evidence/2.1.0/performance-candidate.json.gz",
+    "docs/evidence/2.1.0/performance-comparison.json.gz",
+    "docs/evidence/2.1.0/performance-vm-baseline.json.gz",
+    "docs/evidence/2.1.0/performance-vm-candidate.json.gz",
+    "docs/evidence/2.1.0/performance-vm-failed.json.gz",
+    "docs/evidence/2.1.0/release-qualification.json.gz",
+    "docs/evidence/2.1.0/soak-completed.json.gz",
+    "docs/evidence/2.1.0/tail-diagnostic.json.gz",
+    "docs/evidence/2.1.0/transfers-large-default.json.gz",
+    "docs/evidence/2.1.0/transfers-large-private-file.json.gz",
+    "docs/evidence/performance-2026-09-27/baseline.json.gz",
+    "docs/evidence/performance-2026-09-27/calibrated-comparison.json",
+    "docs/evidence/performance-2026-09-27/candidate.json.gz",
+    "docs/evidence/performance-2026-09-27/original-comparison.json",
+    "docs/large-transfers.md",
+    "docs/migration-1.0.md",
+    "docs/migration-2.0.md",
+    "docs/migration-3.0.md",
+    "docs/package-policy.md",
+    "docs/performance-calibration.md",
+    "docs/progress-1.0.0-alpha.1.md",
+    "docs/progress-1.0.0.md",
+    "docs/provider-expansion.md",
+    "docs/quality-2.0.md",
+    "docs/quality-alignment-progress.md",
+    "docs/release-2.0.0.md",
+    "docs/release-2.0.1.md",
+    "docs/release-2.1.0.md",
+    "docs/release-audit-baseline.md",
+    "docs/release-campaign.md",
+    "docs/release-evidence-20260918.json",
+    "docs/release-evidence-bundle.md",
+    "docs/release-notes-2.0.1.md",
+    "docs/release-notes-2.1.0.md",
+    "docs/release-notes-3.0.0.md",
+    "docs/release-notes-3.0.1.md",
+    "docs/release-notes-3.0.2.md",
+    "docs/release-notes-3.0.3.md",
+    "docs/release-notes-3.0.4.md",
+    "docs/release-readiness-0.1.md",
+    "docs/release-readiness.md",
+    "docs/release.md",
+    "docs/reliability.md",
+    "docs/roadmap-1.0.0.md",
+    "docs/roadmap-2.0.0.md",
+    "docs/roadmap-2.1.0.md",
+    "docs/webdav-compatibility.md",
+    "rust-toolchain.toml"
+  ],
+  "cli-windows": [
+    "LICENSE",
+    "README.md",
+    "crates/plenora-smb2/LICENSE-APACHE",
+    "crates/plenora-smb2/LICENSE-MIT",
+    "crates/plenora-smb2/PROVENANCE.md",
+    "crates/plenora-storage-py/README.md",
+    "crates/plenora-storage-py/examples/local_roundtrip.py",
+    "docs/API-INVENTORY.md",
+    "docs/README.md",
+    "docs/STATO.md",
+    "docs/api-1.0.md",
+    "docs/architecture.md",
+    "docs/code-size-baseline-1.0.0.json",
+    "docs/compatibility-1.0.md",
+    "docs/contract-adoption.md",
+    "docs/contract-limits.md",
+    "docs/coverage-production-baseline.json",
+    "docs/database-alignment.md",
+    "docs/database-reference-review.md",
+    "docs/dependency-update-0.2.2.md",
+    "docs/evidence/2.0.0/large-transfer-first-attempt.json.gz",
+    "docs/evidence/2.0.0/large-transfer-recheck.json.gz",
+    "docs/evidence/2.0.1/disk-pressure.json.gz",
+    "docs/evidence/2.0.1/release-qualification.json.gz",
+    "docs/evidence/2.0.1/soak-completed.json.gz",
+    "docs/evidence/2.0.1/soak-interrupted.json.gz",
+    "docs/evidence/2.1.0/disk-pressure.json.gz",
+    "docs/evidence/2.1.0/host-load.jsonl.gz",
+    "docs/evidence/2.1.0/performance-baseline.json.gz",
+    "docs/evidence/2.1.0/performance-candidate.json.gz",
+    "docs/evidence/2.1.0/performance-comparison.json.gz",
+    "docs/evidence/2.1.0/performance-vm-baseline.json.gz",
+    "docs/evidence/2.1.0/performance-vm-candidate.json.gz",
+    "docs/evidence/2.1.0/performance-vm-failed.json.gz",
+    "docs/evidence/2.1.0/release-qualification.json.gz",
+    "docs/evidence/2.1.0/soak-completed.json.gz",
+    "docs/evidence/2.1.0/tail-diagnostic.json.gz",
+    "docs/evidence/2.1.0/transfers-large-default.json.gz",
+    "docs/evidence/2.1.0/transfers-large-private-file.json.gz",
+    "docs/evidence/performance-2026-09-27/baseline.json.gz",
+    "docs/evidence/performance-2026-09-27/calibrated-comparison.json",
+    "docs/evidence/performance-2026-09-27/candidate.json.gz",
+    "docs/evidence/performance-2026-09-27/original-comparison.json",
+    "docs/large-transfers.md",
+    "docs/migration-1.0.md",
+    "docs/migration-2.0.md",
+    "docs/migration-3.0.md",
+    "docs/package-policy.md",
+    "docs/performance-calibration.md",
+    "docs/progress-1.0.0-alpha.1.md",
+    "docs/progress-1.0.0.md",
+    "docs/provider-expansion.md",
+    "docs/quality-2.0.md",
+    "docs/quality-alignment-progress.md",
+    "docs/release-2.0.0.md",
+    "docs/release-2.0.1.md",
+    "docs/release-2.1.0.md",
+    "docs/release-audit-baseline.md",
+    "docs/release-campaign.md",
+    "docs/release-evidence-20260918.json",
+    "docs/release-evidence-bundle.md",
+    "docs/release-notes-2.0.1.md",
+    "docs/release-notes-2.1.0.md",
+    "docs/release-notes-3.0.0.md",
+    "docs/release-notes-3.0.1.md",
+    "docs/release-notes-3.0.2.md",
+    "docs/release-notes-3.0.3.md",
+    "docs/release-notes-3.0.4.md",
+    "docs/release-readiness-0.1.md",
+    "docs/release-readiness.md",
+    "docs/release.md",
+    "docs/reliability.md",
+    "docs/roadmap-1.0.0.md",
+    "docs/roadmap-2.0.0.md",
+    "docs/roadmap-2.1.0.md",
+    "docs/webdav-compatibility.md",
+    "plenora-storage.exe"
+  ],
+  "cli-linux": [
+    "LICENSE",
+    "README.md",
+    "crates/plenora-smb2/LICENSE-APACHE",
+    "crates/plenora-smb2/LICENSE-MIT",
+    "crates/plenora-smb2/PROVENANCE.md",
+    "crates/plenora-storage-py/README.md",
+    "crates/plenora-storage-py/examples/local_roundtrip.py",
+    "docs/API-INVENTORY.md",
+    "docs/README.md",
+    "docs/STATO.md",
+    "docs/api-1.0.md",
+    "docs/architecture.md",
+    "docs/code-size-baseline-1.0.0.json",
+    "docs/compatibility-1.0.md",
+    "docs/contract-adoption.md",
+    "docs/contract-limits.md",
+    "docs/coverage-production-baseline.json",
+    "docs/database-alignment.md",
+    "docs/database-reference-review.md",
+    "docs/dependency-update-0.2.2.md",
+    "docs/evidence/2.0.0/large-transfer-first-attempt.json.gz",
+    "docs/evidence/2.0.0/large-transfer-recheck.json.gz",
+    "docs/evidence/2.0.1/disk-pressure.json.gz",
+    "docs/evidence/2.0.1/release-qualification.json.gz",
+    "docs/evidence/2.0.1/soak-completed.json.gz",
+    "docs/evidence/2.0.1/soak-interrupted.json.gz",
+    "docs/evidence/2.1.0/disk-pressure.json.gz",
+    "docs/evidence/2.1.0/host-load.jsonl.gz",
+    "docs/evidence/2.1.0/performance-baseline.json.gz",
+    "docs/evidence/2.1.0/performance-candidate.json.gz",
+    "docs/evidence/2.1.0/performance-comparison.json.gz",
+    "docs/evidence/2.1.0/performance-vm-baseline.json.gz",
+    "docs/evidence/2.1.0/performance-vm-candidate.json.gz",
+    "docs/evidence/2.1.0/performance-vm-failed.json.gz",
+    "docs/evidence/2.1.0/release-qualification.json.gz",
+    "docs/evidence/2.1.0/soak-completed.json.gz",
+    "docs/evidence/2.1.0/tail-diagnostic.json.gz",
+    "docs/evidence/2.1.0/transfers-large-default.json.gz",
+    "docs/evidence/2.1.0/transfers-large-private-file.json.gz",
+    "docs/evidence/performance-2026-09-27/baseline.json.gz",
+    "docs/evidence/performance-2026-09-27/calibrated-comparison.json",
+    "docs/evidence/performance-2026-09-27/candidate.json.gz",
+    "docs/evidence/performance-2026-09-27/original-comparison.json",
+    "docs/large-transfers.md",
+    "docs/migration-1.0.md",
+    "docs/migration-2.0.md",
+    "docs/migration-3.0.md",
+    "docs/package-policy.md",
+    "docs/performance-calibration.md",
+    "docs/progress-1.0.0-alpha.1.md",
+    "docs/progress-1.0.0.md",
+    "docs/provider-expansion.md",
+    "docs/quality-2.0.md",
+    "docs/quality-alignment-progress.md",
+    "docs/release-2.0.0.md",
+    "docs/release-2.0.1.md",
+    "docs/release-2.1.0.md",
+    "docs/release-audit-baseline.md",
+    "docs/release-campaign.md",
+    "docs/release-evidence-20260918.json",
+    "docs/release-evidence-bundle.md",
+    "docs/release-notes-2.0.1.md",
+    "docs/release-notes-2.1.0.md",
+    "docs/release-notes-3.0.0.md",
+    "docs/release-notes-3.0.1.md",
+    "docs/release-notes-3.0.2.md",
+    "docs/release-notes-3.0.3.md",
+    "docs/release-notes-3.0.4.md",
+    "docs/release-readiness-0.1.md",
+    "docs/release-readiness.md",
+    "docs/release.md",
+    "docs/reliability.md",
+    "docs/roadmap-1.0.0.md",
+    "docs/roadmap-2.0.0.md",
+    "docs/roadmap-2.1.0.md",
+    "docs/webdav-compatibility.md",
+    "plenora-storage"
+  ],
+  "contracts": [
+    "contracts/README.md",
+    "contracts/STORAGE-OPERATIONS-1.0-PROPOSAL.md",
+    "contracts/adoption-policy.json",
+    "contracts/bindings/rust-v1.json",
+    "contracts/examples/invalid/storage-operations-v1.json",
+    "contracts/examples/valid/storage-operations-v1.json",
+    "contracts/schemas/plenora-storage-azure-connection-v1.schema.json",
+    "contracts/schemas/plenora-storage-capability-attributes-v1.schema.json",
+    "contracts/schemas/plenora-storage-common-v1.schema.json",
+    "contracts/schemas/plenora-storage-connection-v1.schema.json",
+    "contracts/schemas/plenora-storage-copy-input-v1.schema.json",
+    "contracts/schemas/plenora-storage-copy-output-v1.schema.json",
+    "contracts/schemas/plenora-storage-delete-input-v1.schema.json",
+    "contracts/schemas/plenora-storage-delete-output-v1.schema.json",
+    "contracts/schemas/plenora-storage-ftp-connection-v1.schema.json",
+    "contracts/schemas/plenora-storage-ftps-connection-v1.schema.json",
+    "contracts/schemas/plenora-storage-gcs-connection-v1.schema.json",
+    "contracts/schemas/plenora-storage-get-input-v1.schema.json",
+    "contracts/schemas/plenora-storage-get-output-v1.schema.json",
+    "contracts/schemas/plenora-storage-list-input-v1.schema.json",
+    "contracts/schemas/plenora-storage-list-output-v1.schema.json",
+    "contracts/schemas/plenora-storage-local-connection-v1.schema.json",
+    "contracts/schemas/plenora-storage-put-input-v1.schema.json",
+    "contracts/schemas/plenora-storage-put-output-v1.schema.json",
+    "contracts/schemas/plenora-storage-s3-connection-v1.schema.json",
+    "contracts/schemas/plenora-storage-sftp-connection-v1.schema.json",
+    "contracts/schemas/plenora-storage-smb-connection-v1.schema.json",
+    "contracts/schemas/plenora-storage-stat-input-v1.schema.json",
+    "contracts/schemas/plenora-storage-stat-output-v1.schema.json",
+    "contracts/schemas/plenora-storage-test-input-v1.schema.json",
+    "contracts/schemas/plenora-storage-test-output-v1.schema.json",
+    "contracts/schemas/plenora-storage-webdav-connection-v1.schema.json",
+    "contracts/upstream/ERRORS-1.0.md",
+    "contracts/upstream/PUBLIC-CATALOGS-2.0.md",
+    "contracts/upstream/PYTHON-SDK-1.0.md",
+    "contracts/upstream/RUNTIME-BINDING-2.0.md",
+    "contracts/upstream/RUNTIME-VECTORS-1.0.md",
+    "contracts/upstream/SURFACE-BINDINGS-1.0.md",
+    "contracts/upstream/adoption-manifest-v4.schema.json",
+    "contracts/upstream/capabilities-v2.schema.json",
+    "contracts/upstream/cli-envelope-v2.schema.json",
+    "contracts/upstream/conformance_checks.py",
+    "contracts/upstream/error-v1.schema.json",
+    "contracts/upstream/json_values.py",
+    "contracts/upstream/proposed/runtime-probe-v1.schema.json",
+    "contracts/upstream/proposed/runtime-probes-v1/data-run-input-contract-malformed.json",
+    "contracts/upstream/proposed/runtime-probes-v1/data-run-input-contract-mismatch.json",
+    "contracts/upstream/proposed/runtime-probes-v1/database-read-capability-name-other.json",
+    "contracts/upstream/proposed/runtime-probes-v1/database-read-correlation-uppercase.json",
+    "contracts/upstream/proposed/runtime-probes-v1/io-read-binding-version-leading-zero.json",
+    "contracts/upstream/proposed/runtime-probes-v1/io-read-binding-version-number.json",
+    "contracts/upstream/proposed/runtime-probes-v1/io-read-binding-version-unsupported.json",
+    "contracts/upstream/proposed/runtime-probes-v1/io-read-deadline-expired.json",
+    "contracts/upstream/proposed/runtime-probes-v1/io-read-deadline-negative-zero.json",
+    "contracts/upstream/proposed/runtime-probes-v1/io-read-deadline-offset.json",
+    "contracts/upstream/proposed/runtime-probes-v1/io-read-message-id-braces.json",
+    "contracts/upstream/proposed/runtime-probes-v1/io-read-message-id-missing.json",
+    "contracts/upstream/proposed/runtime-probes-v1/io-read-operation-version-leading-zero.json",
+    "contracts/upstream/proposed/runtime-probes-v1/io-read-operation-version-missing.json",
+    "contracts/upstream/proposed/runtime-probes-v1/io-read-operation-version-number.json",
+    "contracts/upstream/proposed/runtime-probes-v1/io-read-operation-version-unknown.json",
+    "contracts/upstream/proposed/runtime-probes-v1/rest-upload-idempotency-key-empty.json",
+    "contracts/upstream/proposed/runtime-probes-v1/rest-upload-idempotency-key-null.json",
+    "contracts/upstream/proposed/runtime-probes-v1/storage-get-idempotency-key-unsupported.json",
+    "contracts/upstream/proposed/runtime-probes-v1/storage-get-operation-malformed.json",
+    "contracts/upstream/proposed/runtime-probes-v1/storage-get-operation-unknown.json",
+    "contracts/upstream/proposed/runtime-v1/storage-put-cleanup-local-error.json",
+    "contracts/upstream/proposed/runtime-v1/storage-put-cleanup-remote-error.json",
+    "contracts/upstream/proposed/source.json",
+    "contracts/upstream/public-catalog-v2.schema.json",
+    "contracts/upstream/python-sdk-v1.json",
+    "contracts/upstream/ratified/runtime-probe-v1.schema.json",
+    "contracts/upstream/ratified/runtime-probes-v1/data-run-input-contract-malformed.json",
+    "contracts/upstream/ratified/runtime-probes-v1/data-run-input-contract-mismatch.json",
+    "contracts/upstream/ratified/runtime-probes-v1/database-read-capability-name-other.json",
+    "contracts/upstream/ratified/runtime-probes-v1/database-read-correlation-uppercase.json",
+    "contracts/upstream/ratified/runtime-probes-v1/io-read-binding-version-leading-zero.json",
+    "contracts/upstream/ratified/runtime-probes-v1/io-read-binding-version-number.json",
+    "contracts/upstream/ratified/runtime-probes-v1/io-read-binding-version-unsupported.json",
+    "contracts/upstream/ratified/runtime-probes-v1/io-read-deadline-expired.json",
+    "contracts/upstream/ratified/runtime-probes-v1/io-read-deadline-negative-zero.json",
+    "contracts/upstream/ratified/runtime-probes-v1/io-read-deadline-offset.json",
+    "contracts/upstream/ratified/runtime-probes-v1/io-read-message-id-braces.json",
+    "contracts/upstream/ratified/runtime-probes-v1/io-read-message-id-missing.json",
+    "contracts/upstream/ratified/runtime-probes-v1/io-read-operation-version-leading-zero.json",
+    "contracts/upstream/ratified/runtime-probes-v1/io-read-operation-version-missing.json",
+    "contracts/upstream/ratified/runtime-probes-v1/io-read-operation-version-number.json",
+    "contracts/upstream/ratified/runtime-probes-v1/io-read-operation-version-unknown.json",
+    "contracts/upstream/ratified/runtime-probes-v1/rest-upload-idempotency-key-empty.json",
+    "contracts/upstream/ratified/runtime-probes-v1/rest-upload-idempotency-key-null.json",
+    "contracts/upstream/ratified/runtime-probes-v1/storage-get-idempotency-key-unsupported.json",
+    "contracts/upstream/ratified/runtime-probes-v1/storage-get-operation-malformed.json",
+    "contracts/upstream/ratified/runtime-probes-v1/storage-get-operation-unknown.json",
+    "contracts/upstream/ratified/runtime-v1/storage-put-cleanup-local-error.json",
+    "contracts/upstream/ratified/runtime-v1/storage-put-cleanup-remote-error.json",
+    "contracts/upstream/ratified/source.json",
+    "contracts/upstream/runtime-v1/storage-copy-request.json",
+    "contracts/upstream/runtime-v1/storage-delete-request.json",
+    "contracts/upstream/runtime-v1/storage-get-partial-error.json",
+    "contracts/upstream/runtime-v1/storage-get-request.json",
+    "contracts/upstream/runtime-v1/storage-get-success.json",
+    "contracts/upstream/runtime-v1/storage-list-request.json",
+    "contracts/upstream/runtime-v1/storage-list-success.json",
+    "contracts/upstream/runtime-v1/storage-put-request.json",
+    "contracts/upstream/runtime-v1/storage-put-success.json",
+    "contracts/upstream/runtime-v1/storage-put-unknown-error.json",
+    "contracts/upstream/runtime-v1/storage-stat-request.json",
+    "contracts/upstream/runtime-v1/storage-test-request.json",
+    "contracts/upstream/runtime-vector-v1.schema.json",
+    "contracts/upstream/source.json",
+    "contracts/upstream/storage-tools-v1.json",
+    "contracts/upstream/storage-tools.md",
+    "contracts/upstream/vendor-lock.json"
+  ],
+  "wheel-windows": [
+    "plenora_storage-{version}.dist-info/METADATA",
+    "plenora_storage-{version}.dist-info/RECORD",
+    "plenora_storage-{version}.dist-info/WHEEL",
+    "plenora_storage-{version}.dist-info/licenses/LICENSE",
+    "plenora_storage-{version}.dist-info/sboms/plenora-storage-py.cyclonedx.json",
+    "plenora_storage/__init__.py",
+    "plenora_storage/__init__.pyi",
+    "plenora_storage/_native.pyd",
+    "plenora_storage/_native.pyi",
+    "plenora_storage/py.typed",
+    "plenora_storage/types.py"
+  ],
+  "wheel-linux": [
+    "plenora_storage-{version}.dist-info/METADATA",
+    "plenora_storage-{version}.dist-info/RECORD",
+    "plenora_storage-{version}.dist-info/WHEEL",
+    "plenora_storage-{version}.dist-info/licenses/LICENSE",
+    "plenora_storage-{version}.dist-info/sboms/plenora-storage-py.cyclonedx.json",
+    "plenora_storage/__init__.py",
+    "plenora_storage/__init__.pyi",
+    "plenora_storage/_native.abi3.so",
+    "plenora_storage/_native.pyi",
+    "plenora_storage/py.typed",
+    "plenora_storage/types.py"
+  ],
+  "qualification": [
+    "SHA256SUMS",
+    "evidence/audit.json",
+    "evidence/deny.log",
+    "evidence/gates/api/x86_64-pc-windows-msvc/plenora-smb2.txt",
+    "evidence/gates/api/x86_64-pc-windows-msvc/plenora-storage-core.txt",
+    "evidence/gates/api/x86_64-pc-windows-msvc/plenora-storage-engine.txt",
+    "evidence/gates/api/x86_64-pc-windows-msvc/plenora-storage-ftp.txt",
+    "evidence/gates/api/x86_64-pc-windows-msvc/plenora-storage-providers.txt",
+    "evidence/gates/api/x86_64-pc-windows-msvc/plenora-storage-s3.txt",
+    "evidence/gates/api/x86_64-pc-windows-msvc/plenora-storage-sftp.txt",
+    "evidence/gates/api/x86_64-pc-windows-msvc/report.json",
+    "evidence/gates/api/x86_64-unknown-linux-gnu/plenora-smb2.txt",
+    "evidence/gates/api/x86_64-unknown-linux-gnu/plenora-storage-core.txt",
+    "evidence/gates/api/x86_64-unknown-linux-gnu/plenora-storage-engine.txt",
+    "evidence/gates/api/x86_64-unknown-linux-gnu/plenora-storage-ftp.txt",
+    "evidence/gates/api/x86_64-unknown-linux-gnu/plenora-storage-providers.txt",
+    "evidence/gates/api/x86_64-unknown-linux-gnu/plenora-storage-s3.txt",
+    "evidence/gates/api/x86_64-unknown-linux-gnu/plenora-storage-sftp.txt",
+    "evidence/gates/api/x86_64-unknown-linux-gnu/report.json",
+    "evidence/gates/coverage/coverage-summary.json",
+    "evidence/gates/coverage/rust-coverage.json",
+    "evidence/gates/disk-pressure/report.json",
+    "evidence/gates/fuzz/azure_xml/run.log",
+    "evidence/gates/fuzz/ftp_listing/run.log",
+    "evidence/gates/fuzz/kerberos_messages/run.log",
+    "evidence/gates/fuzz/ntlm_challenge/run.log",
+    "evidence/gates/fuzz/report.json",
+    "evidence/gates/fuzz/s3_xml/run.log",
+    "evidence/gates/fuzz/smb2_messages/run.log",
+    "evidence/gates/fuzz/spnego_der/run.log",
+    "evidence/gates/fuzz/webdav_xml/run.log",
+    "evidence/gates/native-components/x86_64-pc-windows-msvc/cli.cdx.json",
+    "evidence/gates/native-components/x86_64-pc-windows-msvc/cli.syft.json",
+    "evidence/gates/native-components/x86_64-pc-windows-msvc/report.json",
+    "evidence/gates/native-components/x86_64-pc-windows-msvc/wheel.cdx.json",
+    "evidence/gates/native-components/x86_64-pc-windows-msvc/wheel.syft.json",
+    "evidence/gates/native-components/x86_64-unknown-linux-gnu/cli.cdx.json",
+    "evidence/gates/native-components/x86_64-unknown-linux-gnu/cli.syft.json",
+    "evidence/gates/native-components/x86_64-unknown-linux-gnu/report.json",
+    "evidence/gates/native-components/x86_64-unknown-linux-gnu/wheel.cdx.json",
+    "evidence/gates/native-components/x86_64-unknown-linux-gnu/wheel.syft.json",
+    "evidence/gates/performance/baseline.json",
+    "evidence/gates/performance/candidate.json",
+    "evidence/gates/performance/report.json",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.10/coverage.json",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.10/sdk-tests.json",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.10/sdk-tests.log",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.10/sdk-typing.json",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.10/sdk-typing.log",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.11/coverage.json",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.11/sdk-tests.json",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.11/sdk-tests.log",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.11/sdk-typing.json",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.11/sdk-typing.log",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.12/coverage.json",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.12/sdk-tests.json",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.12/sdk-tests.log",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.12/sdk-typing.json",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.12/sdk-typing.log",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.13/coverage.json",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.13/sdk-tests.json",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.13/sdk-tests.log",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.13/sdk-typing.json",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.13/sdk-typing.log",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.14/coverage.json",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.14/sdk-tests.json",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.14/sdk-tests.log",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.14/sdk-typing.json",
+    "evidence/gates/sdk/x86_64-pc-windows-msvc/3.14/sdk-typing.log",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.10/coverage.json",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.10/sdk-tests.json",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.10/sdk-tests.log",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.10/sdk-typing.json",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.10/sdk-typing.log",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.11/coverage.json",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.11/sdk-tests.json",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.11/sdk-tests.log",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.11/sdk-typing.json",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.11/sdk-typing.log",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.12/coverage.json",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.12/sdk-tests.json",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.12/sdk-tests.log",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.12/sdk-typing.json",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.12/sdk-typing.log",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.13/coverage.json",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.13/sdk-tests.json",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.13/sdk-tests.log",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.13/sdk-typing.json",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.13/sdk-typing.log",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.14/coverage.json",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.14/sdk-tests.json",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.14/sdk-tests.log",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.14/sdk-typing.json",
+    "evidence/gates/sdk/x86_64-unknown-linux-gnu/3.14/sdk-typing.log",
+    "evidence/gates/soak/report.json",
+    "evidence/gates/transfers-spooled/large.json",
+    "evidence/gates/transfers-spooled/workers16.json",
+    "evidence/gates/transfers-spooled/workers4.json",
+    "evidence/gates/transfers/large.json",
+    "evidence/gates/transfers/workers16.json",
+    "evidence/gates/transfers/workers4.json",
+    "evidence/smb-upstream-audit.json",
+    "evidence/x86_64-pc-windows-msvc-tests.log",
+    "evidence/x86_64-unknown-linux-gnu-tests.log",
+    "release-qualification.json",
+    "x86_64-pc-windows-msvc/SHA256SUMS",
+    "x86_64-pc-windows-msvc/adoption-manifest-v4.json",
+    "x86_64-pc-windows-msvc/cli-regressions.json",
+    "x86_64-pc-windows-msvc/extended-qualification.json",
+    "x86_64-pc-windows-msvc/extended-regressions.json",
+    "x86_64-pc-windows-msvc/plenora-smb2-{version}.crate",
+    "x86_64-pc-windows-msvc/plenora-storage-cli-{version}.crate",
+    "x86_64-pc-windows-msvc/plenora-storage-contracts-{version}.tar.gz",
+    "x86_64-pc-windows-msvc/plenora-storage-core-{version}.crate",
+    "x86_64-pc-windows-msvc/plenora-storage-engine-{version}.crate",
+    "x86_64-pc-windows-msvc/plenora-storage-ftp-{version}.crate",
+    "x86_64-pc-windows-msvc/plenora-storage-providers-{version}.crate",
+    "x86_64-pc-windows-msvc/plenora-storage-s3-{version}.crate",
+    "x86_64-pc-windows-msvc/plenora-storage-sftp-{version}.crate",
+    "x86_64-pc-windows-msvc/plenora-storage-{version}-source.tar.gz",
+    "x86_64-pc-windows-msvc/plenora-storage-{version}-x86_64-pc-windows-msvc.zip",
+    "x86_64-pc-windows-msvc/plenora-storage.exe",
+    "x86_64-pc-windows-msvc/plenora_storage-{python_version}-cp310-abi3-win_amd64.whl",
+    "x86_64-pc-windows-msvc/python-qualification.json",
+    "x86_64-pc-windows-msvc/python-tests.json",
+    "x86_64-pc-windows-msvc/python-tests.log",
+    "x86_64-pc-windows-msvc/qualification-sbom.cdx.json",
+    "x86_64-pc-windows-msvc/qualification.json",
+    "x86_64-pc-windows-msvc/release-manifest.json",
+    "x86_64-pc-windows-msvc/source-consumer.json",
+    "x86_64-pc-windows-msvc/source-consumer.log",
+    "x86_64-pc-windows-msvc/spooled-python-qualification.json",
+    "x86_64-pc-windows-msvc/spooled-qualification.json",
+    "x86_64-pc-windows-msvc/spooled-regressions.json",
+    "x86_64-pc-windows-msvc/storage-sbom.cdx.json",
+    "x86_64-pc-windows-msvc/webdav-fixture.json",
+    "x86_64-unknown-linux-gnu/SHA256SUMS",
+    "x86_64-unknown-linux-gnu/adoption-manifest-v4.json",
+    "x86_64-unknown-linux-gnu/cli-regressions.json",
+    "x86_64-unknown-linux-gnu/commit-faults.json",
+    "x86_64-unknown-linux-gnu/extended-qualification.json",
+    "x86_64-unknown-linux-gnu/extended-regressions.json",
+    "x86_64-unknown-linux-gnu/local-faults.json",
+    "x86_64-unknown-linux-gnu/plenora-smb2-{version}.crate",
+    "x86_64-unknown-linux-gnu/plenora-storage",
+    "x86_64-unknown-linux-gnu/plenora-storage-cli-{version}.crate",
+    "x86_64-unknown-linux-gnu/plenora-storage-contracts-{version}.tar.gz",
+    "x86_64-unknown-linux-gnu/plenora-storage-core-{version}.crate",
+    "x86_64-unknown-linux-gnu/plenora-storage-engine-{version}.crate",
+    "x86_64-unknown-linux-gnu/plenora-storage-ftp-{version}.crate",
+    "x86_64-unknown-linux-gnu/plenora-storage-providers-{version}.crate",
+    "x86_64-unknown-linux-gnu/plenora-storage-s3-{version}.crate",
+    "x86_64-unknown-linux-gnu/plenora-storage-sftp-{version}.crate",
+    "x86_64-unknown-linux-gnu/plenora-storage-{version}-source.tar.gz",
+    "x86_64-unknown-linux-gnu/plenora-storage-{version}-x86_64-unknown-linux-gnu.tar.gz",
+    "x86_64-unknown-linux-gnu/plenora_storage-{python_version}-cp310-abi3-manylinux_2_34_x86_64.whl",
+    "x86_64-unknown-linux-gnu/python-qualification.json",
+    "x86_64-unknown-linux-gnu/python-tests.json",
+    "x86_64-unknown-linux-gnu/python-tests.log",
+    "x86_64-unknown-linux-gnu/qualification-sbom.cdx.json",
+    "x86_64-unknown-linux-gnu/qualification.json",
+    "x86_64-unknown-linux-gnu/release-manifest.json",
+    "x86_64-unknown-linux-gnu/source-consumer.json",
+    "x86_64-unknown-linux-gnu/source-consumer.log",
+    "x86_64-unknown-linux-gnu/spooled-local-faults.json",
+    "x86_64-unknown-linux-gnu/spooled-python-qualification.json",
+    "x86_64-unknown-linux-gnu/spooled-qualification.json",
+    "x86_64-unknown-linux-gnu/spooled-regressions.json",
+    "x86_64-unknown-linux-gnu/storage-sbom.cdx.json",
+    "x86_64-unknown-linux-gnu/webdav-fixture.json"
+  ],
+  "member_rules": {
+    "qualification": {
+      "x86_64-pc-windows-msvc/plenora-smb2-{version}.crate": {
+        "container": {
+          "format": "gzip",
+          "distribution": true
+        }
+      },
+      "x86_64-pc-windows-msvc/plenora-storage-cli-{version}.crate": {
+        "container": {
+          "format": "gzip",
+          "distribution": true
+        }
+      },
+      "x86_64-pc-windows-msvc/plenora-storage-contracts-{version}.tar.gz": {
+        "container": {
+          "format": "gzip",
+          "distribution": true
+        }
+      },
+      "x86_64-pc-windows-msvc/plenora-storage-core-{version}.crate": {
+        "container": {
+          "format": "gzip",
+          "distribution": true
+        }
+      },
+      "x86_64-pc-windows-msvc/plenora-storage-engine-{version}.crate": {
+        "container": {
+          "format": "gzip",
+          "distribution": true
+        }
+      },
+      "x86_64-pc-windows-msvc/plenora-storage-ftp-{version}.crate": {
+        "container": {
+          "format": "gzip",
+          "distribution": true
+        }
+      },
+      "x86_64-pc-windows-msvc/plenora-storage-providers-{version}.crate": {
+        "container": {
+          "format": "gzip",
+          "distribution": true
+        }
+      },
+      "x86_64-pc-windows-msvc/plenora-storage-s3-{version}.crate": {
+        "container": {
+          "format": "gzip",
+          "distribution": true
+        }
+      },
+      "x86_64-pc-windows-msvc/plenora-storage-sftp-{version}.crate": {
+        "container": {
+          "format": "gzip",
+          "distribution": true
+        }
+      },
+      "x86_64-pc-windows-msvc/plenora-storage-{version}-source.tar.gz": {
+        "container": {
+          "format": "gzip",
+          "distribution": true
+        }
+      },
+      "x86_64-pc-windows-msvc/plenora-storage-{version}-x86_64-pc-windows-msvc.zip": {
+        "container": {
+          "format": "zip",
+          "distribution": true
+        }
+      },
+      "x86_64-pc-windows-msvc/plenora_storage-{python_version}-cp310-abi3-win_amd64.whl": {
+        "container": {
+          "format": "zip",
+          "distribution": true
+        }
+      },
+      "x86_64-unknown-linux-gnu/plenora-smb2-{version}.crate": {
+        "container": {
+          "format": "gzip",
+          "distribution": true
+        }
+      },
+      "x86_64-unknown-linux-gnu/plenora-storage-cli-{version}.crate": {
+        "container": {
+          "format": "gzip",
+          "distribution": true
+        }
+      },
+      "x86_64-unknown-linux-gnu/plenora-storage-contracts-{version}.tar.gz": {
+        "container": {
+          "format": "gzip",
+          "distribution": true
+        }
+      },
+      "x86_64-unknown-linux-gnu/plenora-storage-core-{version}.crate": {
+        "container": {
+          "format": "gzip",
+          "distribution": true
+        }
+      },
+      "x86_64-unknown-linux-gnu/plenora-storage-engine-{version}.crate": {
+        "container": {
+          "format": "gzip",
+          "distribution": true
+        }
+      },
+      "x86_64-unknown-linux-gnu/plenora-storage-ftp-{version}.crate": {
+        "container": {
+          "format": "gzip",
+          "distribution": true
+        }
+      },
+      "x86_64-unknown-linux-gnu/plenora-storage-providers-{version}.crate": {
+        "container": {
+          "format": "gzip",
+          "distribution": true
+        }
+      },
+      "x86_64-unknown-linux-gnu/plenora-storage-s3-{version}.crate": {
+        "container": {
+          "format": "gzip",
+          "distribution": true
+        }
+      },
+      "x86_64-unknown-linux-gnu/plenora-storage-sftp-{version}.crate": {
+        "container": {
+          "format": "gzip",
+          "distribution": true
+        }
+      },
+      "x86_64-unknown-linux-gnu/plenora-storage-{version}-source.tar.gz": {
+        "container": {
+          "format": "gzip",
+          "distribution": true
+        }
+      },
+      "x86_64-unknown-linux-gnu/plenora-storage-{version}-x86_64-unknown-linux-gnu.tar.gz": {
+        "container": {
+          "format": "gzip",
+          "distribution": true
+        }
+      },
+      "x86_64-unknown-linux-gnu/plenora_storage-{python_version}-cp310-abi3-manylinux_2_34_x86_64.whl": {
+        "container": {
+          "format": "zip",
+          "distribution": true
+        }
+      }
+    },
+    "source": {
+      "docs/evidence/2.0.0/large-transfer-first-attempt.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "2a7bec7824c436693a0b8110f71c51b7598feb6416088dc10a056389f79d2ab4",
+        "source": "docs/evidence/2.0.0/large-transfer-first-attempt.json.gz"
+      },
+      "docs/evidence/2.0.0/large-transfer-recheck.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "34c747e956d487a970fb8a94c0332a33ba7d611aeed61a95427418666f416aaa",
+        "source": "docs/evidence/2.0.0/large-transfer-recheck.json.gz"
+      },
+      "docs/evidence/2.0.1/disk-pressure.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "5b6245a76267ad9d59bc3fd13d2d8cea817af1a0bbd80cd8d41549235738d1e2",
+        "source": "docs/evidence/2.0.1/disk-pressure.json.gz"
+      },
+      "docs/evidence/2.0.1/release-qualification.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "9aa75a6e912866b95af71ceac676c81a01aa5cce12b31217ade41a5915050959",
+        "source": "docs/evidence/2.0.1/release-qualification.json.gz"
+      },
+      "docs/evidence/2.0.1/soak-completed.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "2f0da1a1fb0f42c6088fb14a264c761661b4e82f028041f59729363782beabe7",
+        "source": "docs/evidence/2.0.1/soak-completed.json.gz"
+      },
+      "docs/evidence/2.0.1/soak-interrupted.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "97b4bca35ca969e384f4925c7ad2bc7ca9886e5ec4f1ba97ac63871083e3e1a2",
+        "source": "docs/evidence/2.0.1/soak-interrupted.json.gz"
+      },
+      "docs/evidence/2.1.0/disk-pressure.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "6638c4357f21c2887ce49a25f6a04376d48b6a2e0993467e0d0dca955f858e21",
+        "source": "docs/evidence/2.1.0/disk-pressure.json.gz"
+      },
+      "docs/evidence/2.1.0/host-load.jsonl.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "56b9c3a63940bd1945c9a5995326f1e4aa3b8d0936fa9297a22f3f876b1a3115",
+        "source": "docs/evidence/2.1.0/host-load.jsonl.gz"
+      },
+      "docs/evidence/2.1.0/performance-baseline.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "deb16db1717a747b9eb7eeb38a2d2fbd461d4aa585e8d78f4e65ca3b8258555b",
+        "source": "docs/evidence/2.1.0/performance-baseline.json.gz"
+      },
+      "docs/evidence/2.1.0/performance-candidate.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "5b87f89e06b65b7639634142fcc781ea798cf26086ab4c283944afcb2fc1dc34",
+        "source": "docs/evidence/2.1.0/performance-candidate.json.gz"
+      },
+      "docs/evidence/2.1.0/performance-comparison.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "82544b060838608e2fe7c93556f539441783e67064ca0403a711c66c1f2280c5",
+        "source": "docs/evidence/2.1.0/performance-comparison.json.gz"
+      },
+      "docs/evidence/2.1.0/performance-vm-baseline.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "a61b8be6ae5a36a2ea0037f5501186c415eae2d7882540e45ecaa762688f2ee2",
+        "source": "docs/evidence/2.1.0/performance-vm-baseline.json.gz"
+      },
+      "docs/evidence/2.1.0/performance-vm-candidate.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "b412bd9f6fdce5a8530f80669421fd1e306ab78c3e837199f3e06665098e5b65",
+        "source": "docs/evidence/2.1.0/performance-vm-candidate.json.gz"
+      },
+      "docs/evidence/2.1.0/performance-vm-failed.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "bad54cd17222a3563b873ffe7e3f06fdab1bc5d4742fadf2c9c0565008db72b4",
+        "source": "docs/evidence/2.1.0/performance-vm-failed.json.gz"
+      },
+      "docs/evidence/2.1.0/release-qualification.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "67846f200198a1308fc078203a3502888573ecf27e9621fb57cf43baea411648",
+        "source": "docs/evidence/2.1.0/release-qualification.json.gz"
+      },
+      "docs/evidence/2.1.0/soak-completed.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "9623f435021a8215c0d5c9dda260d151b885c1b9feca605adb5f4938363402a3",
+        "source": "docs/evidence/2.1.0/soak-completed.json.gz"
+      },
+      "docs/evidence/2.1.0/tail-diagnostic.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "61af6b8bb101c14d590d28f7064bf90bb9461f0ae19c54b642cb034771a77972",
+        "source": "docs/evidence/2.1.0/tail-diagnostic.json.gz"
+      },
+      "docs/evidence/2.1.0/transfers-large-default.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "f3f459e5fdecb36a0240e24e898346e5da5d422a8ce002688df7808daf510db3",
+        "source": "docs/evidence/2.1.0/transfers-large-default.json.gz"
+      },
+      "docs/evidence/2.1.0/transfers-large-private-file.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "c6c4bba36d9ce7c17064a2f745f869ce175b23f1124845a9e8d7d2d7e1ba79d3",
+        "source": "docs/evidence/2.1.0/transfers-large-private-file.json.gz"
+      },
+      "docs/evidence/performance-2026-09-27/baseline.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "9465c56a0a3d0b14a730de35bd9aac886c388dccb3aea29270aa538c72e12ab2",
+        "source": "docs/evidence/performance-2026-09-27/baseline.json.gz"
+      },
+      "docs/evidence/performance-2026-09-27/candidate.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "62e16f5a401c13d10f5bad7957dadab888c4d1d83b8f7c01d2a30a4d44f47cde",
+        "source": "docs/evidence/performance-2026-09-27/candidate.json.gz"
+      }
+    },
+    "cli-linux": {
+      "docs/evidence/2.0.0/large-transfer-first-attempt.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "2a7bec7824c436693a0b8110f71c51b7598feb6416088dc10a056389f79d2ab4",
+        "source": "docs/evidence/2.0.0/large-transfer-first-attempt.json.gz"
+      },
+      "docs/evidence/2.0.0/large-transfer-recheck.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "34c747e956d487a970fb8a94c0332a33ba7d611aeed61a95427418666f416aaa",
+        "source": "docs/evidence/2.0.0/large-transfer-recheck.json.gz"
+      },
+      "docs/evidence/2.0.1/disk-pressure.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "5b6245a76267ad9d59bc3fd13d2d8cea817af1a0bbd80cd8d41549235738d1e2",
+        "source": "docs/evidence/2.0.1/disk-pressure.json.gz"
+      },
+      "docs/evidence/2.0.1/release-qualification.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "9aa75a6e912866b95af71ceac676c81a01aa5cce12b31217ade41a5915050959",
+        "source": "docs/evidence/2.0.1/release-qualification.json.gz"
+      },
+      "docs/evidence/2.0.1/soak-completed.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "2f0da1a1fb0f42c6088fb14a264c761661b4e82f028041f59729363782beabe7",
+        "source": "docs/evidence/2.0.1/soak-completed.json.gz"
+      },
+      "docs/evidence/2.0.1/soak-interrupted.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "97b4bca35ca969e384f4925c7ad2bc7ca9886e5ec4f1ba97ac63871083e3e1a2",
+        "source": "docs/evidence/2.0.1/soak-interrupted.json.gz"
+      },
+      "docs/evidence/2.1.0/disk-pressure.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "6638c4357f21c2887ce49a25f6a04376d48b6a2e0993467e0d0dca955f858e21",
+        "source": "docs/evidence/2.1.0/disk-pressure.json.gz"
+      },
+      "docs/evidence/2.1.0/host-load.jsonl.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "56b9c3a63940bd1945c9a5995326f1e4aa3b8d0936fa9297a22f3f876b1a3115",
+        "source": "docs/evidence/2.1.0/host-load.jsonl.gz"
+      },
+      "docs/evidence/2.1.0/performance-baseline.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "deb16db1717a747b9eb7eeb38a2d2fbd461d4aa585e8d78f4e65ca3b8258555b",
+        "source": "docs/evidence/2.1.0/performance-baseline.json.gz"
+      },
+      "docs/evidence/2.1.0/performance-candidate.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "5b87f89e06b65b7639634142fcc781ea798cf26086ab4c283944afcb2fc1dc34",
+        "source": "docs/evidence/2.1.0/performance-candidate.json.gz"
+      },
+      "docs/evidence/2.1.0/performance-comparison.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "82544b060838608e2fe7c93556f539441783e67064ca0403a711c66c1f2280c5",
+        "source": "docs/evidence/2.1.0/performance-comparison.json.gz"
+      },
+      "docs/evidence/2.1.0/performance-vm-baseline.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "a61b8be6ae5a36a2ea0037f5501186c415eae2d7882540e45ecaa762688f2ee2",
+        "source": "docs/evidence/2.1.0/performance-vm-baseline.json.gz"
+      },
+      "docs/evidence/2.1.0/performance-vm-candidate.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "b412bd9f6fdce5a8530f80669421fd1e306ab78c3e837199f3e06665098e5b65",
+        "source": "docs/evidence/2.1.0/performance-vm-candidate.json.gz"
+      },
+      "docs/evidence/2.1.0/performance-vm-failed.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "bad54cd17222a3563b873ffe7e3f06fdab1bc5d4742fadf2c9c0565008db72b4",
+        "source": "docs/evidence/2.1.0/performance-vm-failed.json.gz"
+      },
+      "docs/evidence/2.1.0/release-qualification.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "67846f200198a1308fc078203a3502888573ecf27e9621fb57cf43baea411648",
+        "source": "docs/evidence/2.1.0/release-qualification.json.gz"
+      },
+      "docs/evidence/2.1.0/soak-completed.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "9623f435021a8215c0d5c9dda260d151b885c1b9feca605adb5f4938363402a3",
+        "source": "docs/evidence/2.1.0/soak-completed.json.gz"
+      },
+      "docs/evidence/2.1.0/tail-diagnostic.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "61af6b8bb101c14d590d28f7064bf90bb9461f0ae19c54b642cb034771a77972",
+        "source": "docs/evidence/2.1.0/tail-diagnostic.json.gz"
+      },
+      "docs/evidence/2.1.0/transfers-large-default.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "f3f459e5fdecb36a0240e24e898346e5da5d422a8ce002688df7808daf510db3",
+        "source": "docs/evidence/2.1.0/transfers-large-default.json.gz"
+      },
+      "docs/evidence/2.1.0/transfers-large-private-file.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "c6c4bba36d9ce7c17064a2f745f869ce175b23f1124845a9e8d7d2d7e1ba79d3",
+        "source": "docs/evidence/2.1.0/transfers-large-private-file.json.gz"
+      },
+      "docs/evidence/performance-2026-09-27/baseline.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "9465c56a0a3d0b14a730de35bd9aac886c388dccb3aea29270aa538c72e12ab2",
+        "source": "docs/evidence/performance-2026-09-27/baseline.json.gz"
+      },
+      "docs/evidence/performance-2026-09-27/candidate.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "62e16f5a401c13d10f5bad7957dadab888c4d1d83b8f7c01d2a30a4d44f47cde",
+        "source": "docs/evidence/performance-2026-09-27/candidate.json.gz"
+      }
+    },
+    "cli-windows": {
+      "docs/evidence/2.0.0/large-transfer-first-attempt.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "2a7bec7824c436693a0b8110f71c51b7598feb6416088dc10a056389f79d2ab4",
+        "source": "docs/evidence/2.0.0/large-transfer-first-attempt.json.gz"
+      },
+      "docs/evidence/2.0.0/large-transfer-recheck.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "34c747e956d487a970fb8a94c0332a33ba7d611aeed61a95427418666f416aaa",
+        "source": "docs/evidence/2.0.0/large-transfer-recheck.json.gz"
+      },
+      "docs/evidence/2.0.1/disk-pressure.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "5b6245a76267ad9d59bc3fd13d2d8cea817af1a0bbd80cd8d41549235738d1e2",
+        "source": "docs/evidence/2.0.1/disk-pressure.json.gz"
+      },
+      "docs/evidence/2.0.1/release-qualification.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "9aa75a6e912866b95af71ceac676c81a01aa5cce12b31217ade41a5915050959",
+        "source": "docs/evidence/2.0.1/release-qualification.json.gz"
+      },
+      "docs/evidence/2.0.1/soak-completed.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "2f0da1a1fb0f42c6088fb14a264c761661b4e82f028041f59729363782beabe7",
+        "source": "docs/evidence/2.0.1/soak-completed.json.gz"
+      },
+      "docs/evidence/2.0.1/soak-interrupted.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "97b4bca35ca969e384f4925c7ad2bc7ca9886e5ec4f1ba97ac63871083e3e1a2",
+        "source": "docs/evidence/2.0.1/soak-interrupted.json.gz"
+      },
+      "docs/evidence/2.1.0/disk-pressure.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "6638c4357f21c2887ce49a25f6a04376d48b6a2e0993467e0d0dca955f858e21",
+        "source": "docs/evidence/2.1.0/disk-pressure.json.gz"
+      },
+      "docs/evidence/2.1.0/host-load.jsonl.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "56b9c3a63940bd1945c9a5995326f1e4aa3b8d0936fa9297a22f3f876b1a3115",
+        "source": "docs/evidence/2.1.0/host-load.jsonl.gz"
+      },
+      "docs/evidence/2.1.0/performance-baseline.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "deb16db1717a747b9eb7eeb38a2d2fbd461d4aa585e8d78f4e65ca3b8258555b",
+        "source": "docs/evidence/2.1.0/performance-baseline.json.gz"
+      },
+      "docs/evidence/2.1.0/performance-candidate.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "5b87f89e06b65b7639634142fcc781ea798cf26086ab4c283944afcb2fc1dc34",
+        "source": "docs/evidence/2.1.0/performance-candidate.json.gz"
+      },
+      "docs/evidence/2.1.0/performance-comparison.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "82544b060838608e2fe7c93556f539441783e67064ca0403a711c66c1f2280c5",
+        "source": "docs/evidence/2.1.0/performance-comparison.json.gz"
+      },
+      "docs/evidence/2.1.0/performance-vm-baseline.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "a61b8be6ae5a36a2ea0037f5501186c415eae2d7882540e45ecaa762688f2ee2",
+        "source": "docs/evidence/2.1.0/performance-vm-baseline.json.gz"
+      },
+      "docs/evidence/2.1.0/performance-vm-candidate.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "b412bd9f6fdce5a8530f80669421fd1e306ab78c3e837199f3e06665098e5b65",
+        "source": "docs/evidence/2.1.0/performance-vm-candidate.json.gz"
+      },
+      "docs/evidence/2.1.0/performance-vm-failed.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "bad54cd17222a3563b873ffe7e3f06fdab1bc5d4742fadf2c9c0565008db72b4",
+        "source": "docs/evidence/2.1.0/performance-vm-failed.json.gz"
+      },
+      "docs/evidence/2.1.0/release-qualification.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "67846f200198a1308fc078203a3502888573ecf27e9621fb57cf43baea411648",
+        "source": "docs/evidence/2.1.0/release-qualification.json.gz"
+      },
+      "docs/evidence/2.1.0/soak-completed.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "9623f435021a8215c0d5c9dda260d151b885c1b9feca605adb5f4938363402a3",
+        "source": "docs/evidence/2.1.0/soak-completed.json.gz"
+      },
+      "docs/evidence/2.1.0/tail-diagnostic.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "61af6b8bb101c14d590d28f7064bf90bb9461f0ae19c54b642cb034771a77972",
+        "source": "docs/evidence/2.1.0/tail-diagnostic.json.gz"
+      },
+      "docs/evidence/2.1.0/transfers-large-default.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "f3f459e5fdecb36a0240e24e898346e5da5d422a8ce002688df7808daf510db3",
+        "source": "docs/evidence/2.1.0/transfers-large-default.json.gz"
+      },
+      "docs/evidence/2.1.0/transfers-large-private-file.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "c6c4bba36d9ce7c17064a2f745f869ce175b23f1124845a9e8d7d2d7e1ba79d3",
+        "source": "docs/evidence/2.1.0/transfers-large-private-file.json.gz"
+      },
+      "docs/evidence/performance-2026-09-27/baseline.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "9465c56a0a3d0b14a730de35bd9aac886c388dccb3aea29270aa538c72e12ab2",
+        "source": "docs/evidence/performance-2026-09-27/baseline.json.gz"
+      },
+      "docs/evidence/performance-2026-09-27/candidate.json.gz": {
+        "container": {
+          "format": "gzip",
+          "payload": {}
+        },
+        "sha256": "62e16f5a401c13d10f5bad7957dadab888c4d1d83b8f7c01d2a30a4d44f47cde",
+        "source": "docs/evidence/performance-2026-09-27/candidate.json.gz"
+      }
+    },
+    "wheel-windows": {},
+    "wheel-linux": {}
+  },
+  "public-documents": [
+    "release-qualification.json",
+    "plenora-storage-{version}-x86_64-pc-windows-msvc.sbom.cdx.json",
+    "plenora-storage-{version}-x86_64-pc-windows-msvc.adoption-manifest-v4.json",
+    "plenora-storage-{version}-x86_64-unknown-linux-gnu.sbom.cdx.json",
+    "plenora-storage-{version}-x86_64-unknown-linux-gnu.adoption-manifest-v4.json"
+  ],
+  "wheel-tags": {
+    "cp310-abi3-win_amd64": "wheel-windows",
+    "cp310-abi3-manylinux_2_34_x86_64": "wheel-linux",
+    "cp310-abi3-manylinux_2_39_x86_64": "wheel-linux"
+  }
+}

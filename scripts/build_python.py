@@ -8,6 +8,7 @@ import sys
 import tempfile
 import venv
 from versioning import workspace_version
+from check_packages import verify_distribution
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -26,6 +27,7 @@ def build(output, release=True, environment=None):
     if len(wheels) != 1:
         raise ValueError('expected exactly one storage wheel in the output directory')
     wheel = wheels[0]
+    verify_distribution(wheel)
     environment = Path(environment).resolve() if environment is not None else ROOT / 'target/python-sdk-test'
     venv.EnvBuilder(with_pip=True).create(environment)
     python = environment / ('Scripts/python.exe' if sys.platform == 'win32' else 'bin/python')

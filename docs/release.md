@@ -106,8 +106,11 @@ includono licenze e documentazione. `verify_release.py` controlla anche che
 l'eseguibile estratto abbia gli stessi byte del binario qualificato: il solo
 checksum dell'archivio non dimostra questa corrispondenza.
 
-Il bundle `plenora-storage-<version>-source.tar.gz` contiene l'intero workspace
-committato, Cargo.lock, contratti e licenze. `scripts/package_source.py` lo
+Il bundle `plenora-storage-<version>-source.tar.gz` contiene i sorgenti del workspace
+necessari alla build, Cargo.lock, contratti, documentazione e licenze secondo
+l'inventario esatto in `scripts/package_files.json`; esclude rig di sviluppo
+e corpus fuzz. La [policy dei pacchetti](package-policy.md) descrive i controlli
+bidirezionali e la scansione ricorsiva del materiale non distribuibile. `scripts/package_source.py` lo
 estrae fuori dal checkout e compila/esegue un consumer con dipendenze path da
 core ed engine, senza patch del registry. Il report `source-consumer.json`
 lega esito, commit, archivio e log tramite digest; la CI esegue la prova su

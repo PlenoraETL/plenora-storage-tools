@@ -2,6 +2,7 @@
 from copy import deepcopy
 import hashlib
 import json
+import shutil
 from pathlib import Path
 import sys
 import tempfile
@@ -97,9 +98,13 @@ class ReleaseEvidenceTests(unittest.TestCase):
         targets = {}
         for target in FUZZ_TARGETS:
             self.write(f'fuzz/{target}/run.log', b'#120 DONE cov: 54\nstat::number_of_executed_units: 120\n')
-            seed = self.write(f'fuzz/{target}/corpus/fixture', b'fixture')
+            from fuzz_parsers import boundary_seeds
+            corpus = self.root / f'fuzz/{target}/corpus'
+            shutil.copytree(ROOT / 'fuzz/seeds' / target, corpus)
+            boundary_seeds(target, corpus)
+            seeds = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in corpus.iterdir()}
             targets[target] = dict(status='PASS', returncode=0, executions=120, coverage_edges=54,
-                                   elapsed_seconds=61, seeds={'fixture': seed})
+                                   elapsed_seconds=61, seeds=seeds)
         self.write('fuzz/report.json', dict(status='PASS', source_commit=REVISION, dirty=False,
                    sanitizer='address', seconds_per_target=60, targets=targets,
                    lock_sha256=hashlib.sha256((ROOT / 'fuzz/Cargo.lock').read_bytes()).hexdigest()))
@@ -124,6 +129,7 @@ class ReleaseEvidenceTests(unittest.TestCase):
         self.bundle()
         files = validate_bundle(self.root, REVISION, self.subjects, '1.0.0rc1')
         self.assertGreater(len(files), 60)
+        self.assertFalse(any('/corpus/' in entry['name'] for entry in files))
         for name in ['soak/report.json', 'transfers/workers16.json', 'fuzz/report.json',
                      'coverage/rust-coverage.json', 'performance/baseline.json',
                      f'api/{TARGETS[1]}/report.json', f'sdk/{TARGETS[1]}/3.14/sdk-tests.json']:
@@ -134,6 +140,21 @@ class ReleaseEvidenceTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     validate_bundle(self.root, REVISION, self.subjects, '1.0.0rc1')
                 path.write_bytes(raw)
+
+    def test_fuzz_seed_hashes_are_verified_without_distributing_credentials(self):
+        self.bundle()
+        for target in FUZZ_TARGETS:
+            corpus = self.root / f'fuzz/{target}/corpus'
+            for seed in corpus.iterdir():
+                seed.unlink()
+            corpus.rmdir()
+        validate_bundle(self.root, REVISION, self.subjects, '1.0.0rc1')
+        report = json.loads((self.root / 'fuzz/report.json').read_text())
+        seeds = report['targets'][FUZZ_TARGETS[0]]['seeds']
+        seeds[next(iter(seeds))] = '0' * 64
+        self.write('fuzz/report.json', report)
+        with self.assertRaisesRegex(ValueError, 'fuzz seeds differ'):
+            validate_bundle(self.root, REVISION, self.subjects, '1.0.0rc1')
 
     def test_pass_cannot_hide_stale_source_different_wheel_or_modified_raw_log(self):
         self.bundle()

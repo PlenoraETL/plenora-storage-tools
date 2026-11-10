@@ -40,7 +40,27 @@ def check_lock_alignment(product, fuzz):
             raise ValueError('fuzz dependencies differ from the product lockfile')
 
 
+def synthetic_ccache(version):
+    """Generate a deliberately synthetic cache for parser coverage, never a KDC ticket."""
+    import struct
+    def field(value):
+        return struct.pack('>I', len(value)) + value
+    def principal(parts):
+        return struct.pack('>II', 1, len(parts)) + field(b'EXAMPLE.INVALID') + b''.join(field(p) for p in parts)
+    client = principal([b'parser-test'])
+    server = principal([b'krbtgt', b'EXAMPLE.INVALID'])
+    header = struct.pack('>H', version) + (bytes(2) if version == 0x0504 else b'')
+    credential = client + server + struct.pack('>H', 18) + field(bytes(range(32)))
+    credential += struct.pack('>IIIIBIII', 1, 1, 2, 3, 0, 0, 0, 0)
+    return header + client + credential + field(b'synthetic-ticket') + field(b'')
+
+
 def boundary_seeds(target, corpus):
+    if target == 'kerberos_messages':
+        for version in (3, 4):
+            (corpus / f'ccache-v{version}').write_bytes(synthetic_ccache(0x0500 + version))
+        (corpus / 'regression-ccache-component-count').write_bytes(
+            bytes([5, 4, 0, 0]) + (1).to_bytes(4, 'big') + (2**32-1).to_bytes(4, 'big') + bytes([0, 0, 0, 1, 82]))
     if target == 'ftp_listing':
         for size in (32768, 32769):
             (corpus / f'boundary-{size}').write_bytes(b'x' * size)
