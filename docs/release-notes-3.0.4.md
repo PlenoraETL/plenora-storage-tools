@@ -1,11 +1,21 @@
 # Plenora Storage Tools 3.0.4
 
-Status: dependency alignment candidate, unreleased and not qualified. The source
-manifests still identify 3.0.3. The 3.0.3 preparation commit `ce49505` bumped
-manifests, locks and generated state together; that is the release preparation
-step, not a prerequisite for this dependency PR. A later release preparation
-must update them consistently before qualifying 3.0.4. No evidence from 3.0.3
+Status: prepared on 2026-11-10; unreleased and not qualified. Workspace
+manifests, lockfiles and generated state identify 3.0.4. No evidence from 3.0.3
 is reused as qualification of this candidate.
+
+3.0.4 is a patch release with no incompatible changes from 3.0.3 and no change
+to the public operations.
+
+- Align serde_json to 1.0.154 and the SDK build backend to maturin 1.16.0 (#40).
+- Generate synthetic Kerberos test credentials at runtime instead of shipping
+  saved caches; enforce exact recursive package inventories (#41).
+- Require every packaged source member to match the release Git checkout,
+  and reproduce Cargo and wheel generated metadata for comparison (#42).
+
+Qualification notes: the evidence below records earlier dependency work, not
+qualification of the final 3.0.4 artifacts. Release CI and the dedicated VM
+campaign remain required, using the verified 3.0.3 Linux CLI as baseline.
 
 ## Dependency scope
 
