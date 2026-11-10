@@ -10,12 +10,13 @@ import bz2
 import hashlib
 import lzma
 import unicodedata
-import gzip
 import io
 import strict_json
 from pathlib import Path, PurePosixPath
 import re
 import stat
+import struct
+import zlib
 import subprocess
 import tarfile
 import zipfile
@@ -286,7 +287,10 @@ class DistributionTarInfo(tarfile.TarInfo):
         if self.type == tarfile.XHDTYPE:
             position = archive.fileobj.tell()
             payload = archive.fileobj.read(self.size)
+            padding = archive.fileobj.read((-self.size) % 512)
             archive.fileobj.seek(position)
+            if len(payload) != self.size or any(padding):
+                raise ValueError('invalid PAX payload or padding')
             offset, seen = 0, set()
             while offset < len(payload):
                 match = re.match(rb'([1-9][0-9]*) ([^=\n]+)=', payload[offset:])
@@ -304,19 +308,102 @@ class DistributionTarInfo(tarfile.TarInfo):
         return super()._proc_member(archive)
 
 
-def members(data):
+def expand(data, kind, name=''):
+    """Consume one stream; optional gzip names must match the distribution."""
+    if kind == 'gzip':
+        if len(data) < 18 or data[2] != 8 or data[3] not in (0, 8):
+            raise ValueError('undeclared gzip header fields')
+        if data[3] == 8:
+            end = data.find(b'\0', 10)
+            allowed = {name.encode(), name.removesuffix('.gz').encode()} if name else set()
+            if end < 0 or data[10:end] not in allowed:
+                raise ValueError('undeclared gzip filename')
+        decoder = zlib.decompressobj(31)
+    else:
+        decoder = {'bzip2': bz2.BZ2Decompressor, 'xz': lzma.LZMADecompressor}[kind]()
+    expanded = decoder.decompress(data)
+    if not decoder.eof or decoder.unused_data:
+        raise ValueError('incomplete or trailing compression stream')
+    return expanded
+
+
+def validate_zip(data, archive):
+    """Closed ZIP32 layout: every physical record must be accounted for."""
+    if len(data) < 22 or data[-22:-18] != b'PK\x05\x06':
+        raise ValueError('ZIP must have one final uncommented EOCD')
+    disk, cd_disk, count_disk, count, size, start, comment = struct.unpack_from('<4H2IH', data, len(data)-18)
+    if disk or cd_disk or comment or count_disk != count or count == 65535 or start + size != len(data)-22:
+        raise ValueError('unsupported ZIP directory layout')
+    items = archive.infolist()
+    if len(items) != count or archive.start_dir != start:
+        raise ValueError('ZIP directory mismatch')
+    cursor = start
+    ranges = []
+    for item in items:
+        if data[cursor:cursor+4] != b'PK\x01\x02' or cursor + 46 > len(data)-22:
+            raise ValueError('invalid ZIP central header')
+        central = struct.unpack_from('<6H3I5H2I', data, cursor+4)
+        _, version, flags, method, _, _, crc, packed, unpacked, names, extras, comments, disk, _, _, offset = central
+        end = cursor + 46 + names + extras + comments
+        raw_name = data[cursor+46:cursor+46+names]
+        if extras or comments or disk or version >= 45 or flags & ~0x808 or method not in (0, 8):
+            raise ValueError('undeclared ZIP extension')
+        if end > len(data)-22 or offset != item.header_offset or data[offset:offset+4] != b'PK\x03\x04':
+            raise ValueError('ZIP local header offset mismatch')
+        if offset + 30 > start:
+            raise ValueError('truncated ZIP local header')
+        lv, lf, lm, _, _, lc, lp, lu, ln, le = struct.unpack_from('<5H3I2H', data, offset+4)
+        begin = offset + 30 + ln + le
+        if lv != version or lf != flags or lm != method or le or data[offset+30:offset+30+ln] != raw_name:
+            raise ValueError('ZIP local and central headers differ')
+        if (lc, lp, lu) != (crc, packed, unpacked) and not (flags & 8 and (lc, lp, lu) == (0, 0, 0)):
+            raise ValueError('ZIP local sizes or CRC differ')
+        stop = begin + packed
+        if stop > start:
+            raise ValueError('ZIP data overlaps directory')
+        compressed = data[begin:stop]
+        if method == 8:
+            decoder = zlib.decompressobj(-15)
+            payload = decoder.decompress(compressed)
+            if not decoder.eof or decoder.unused_data:
+                raise ValueError('unaccounted ZIP compressed bytes')
+        else:
+            payload = compressed
+        if len(payload) != unpacked or zlib.crc32(payload) != crc:
+            raise ValueError('ZIP size or CRC mismatch')
+        if flags & 8:
+            if data[stop:stop+4] == b'PK\x07\x08':
+                stop += 4
+            if data[stop:stop+12] != struct.pack('<3I', crc, packed, unpacked):
+                raise ValueError('ZIP data descriptor mismatch')
+            stop += 12
+        ranges.append((offset, stop))
+        cursor = end
+    if cursor != start + size:
+        raise ValueError('unaccounted ZIP directory bytes')
+    cursor = 0
+    for begin, end in sorted(ranges):
+        if begin != cursor or end <= begin:
+            raise ValueError('ZIP gap or overlap')
+        cursor = end
+    if cursor != start:
+        raise ValueError('unaccounted ZIP bytes')
+
+
+def members(data, name=''):
     """Read regular archive members without extraction; reject links/duplicates."""
     # Inspect the whole expanded stream, including bytes hidden by parsers.
     check_content(data)
     compression = container_format(data)
     if compression in {'gzip', 'bzip2', 'xz'}:
-        data = {'gzip': gzip.decompress, 'bzip2': bz2.decompress, 'xz': lzma.decompress}[compression](data)
+        data = expand(data, compression, name)
         check_content(data)
     source = io.BytesIO(data)
     directories = []
     all_names = []
     if container_format(data) == 'zip':
         with zipfile.ZipFile(source) as archive:
+            validate_zip(data, archive)
             result = []
             for item in archive.infolist():
                 all_names.append(item.orig_filename.removesuffix('/') if item.is_dir() else item.orig_filename)
@@ -339,7 +426,13 @@ def members(data):
         source.seek(0)
         with tarfile.open(fileobj=source, mode='r:', tarinfo=DistributionTarInfo) as archive:
             result = []
+            cursor = 0
             for item in archive:
+                if item.offset != cursor:
+                    raise ValueError('unaccounted tar bytes')
+                cursor = archive.offset
+                if cursor > len(data) or any(data[item.offset_data+item.size:cursor]):
+                    raise ValueError('invalid tar data padding')
                 all_names.append(item.name.removesuffix('/') if item.isdir() else item.name)
                 if item.isdir():
                     if item.size != 0:
@@ -349,6 +442,8 @@ def members(data):
                 if item.type not in (tarfile.REGTYPE, tarfile.AREGTYPE):
                     raise ValueError('non-file archive member')
                 result.append((item.name, archive.extractfile(item).read()))
+            if len(data) % 512 or len(data) < cursor + 1024 or any(data[cursor:]):
+                raise ValueError('invalid tar terminator or trailing bytes')
     inventory(all_names)
     parents = {normalize_path(str(parent)) for name, _ in result for parent in PurePosixPath(name).parents if str(parent) != '.'}
     if not inventory(directories) <= parents:
@@ -503,7 +598,8 @@ def check_native(data, native):
     target = 'x86_64-unknown-linux-gnu' if format == 'elf' else 'x86_64-pc-windows-msvc'
     role = 'python-extension' if library else 'cli'
     # STOR-LIMIT-004: native build outputs are checked only for format,
-    # not scanned for content (including appended/embedded payloads).
+    # not scanned individually. The enclosing container still scans all
+    # expanded bytes, including native bytes (STOR-LIMIT-004).
     # CI builds from inventoried, digested/scanned sources mitigate a
     # compromised build. Reproducibility or build attestation closes it.
     if target == 'x86_64-unknown-linux-gnu':
@@ -603,7 +699,7 @@ def scan_distribution(data, name, depth=0):
     expected_format = 'zip' if distribution in {'wheel-windows', 'wheel-linux', 'cli-windows'} else 'gzip'
     if container_format(data) != expected_format:
         raise ValueError('distribution container format mismatch')
-    entries = members(data)
+    entries = members(data, normalize_path(name).rsplit('/', 1)[-1])
     identity = normalize_path(name).rsplit('/', 1)[-1]
     context = identity.split('-', 2)[2][:-4] if identity.endswith('.whl') else distribution
     scan_entries(relative_entries(entries, prefix), expected, depth+1, context)
@@ -631,7 +727,7 @@ def _scan_content(data, name='', depth=0, rule=None):
             return scan_distribution(data, name, depth+1)
         if kind in {'zip', 'tar'}:
             return scan_entries(members(data), declaration['members'], depth+1)
-        expanded = {'gzip': gzip.decompress, 'bzip2': bz2.decompress, 'xz': lzma.decompress}[kind](data)
+        expanded = expand(data, kind)
         check_content(expanded)
         return classify_member(expanded, 'payload', depth+1, declaration['payload'])
     if 'container' in rule:
@@ -655,7 +751,7 @@ def check_crate(path, name, version, has_vcs=True):
     kind, prefix, expected = distribution_policy(f'{name}-{version}.crate')
     if not has_vcs:
         del expected[path_lookup({n: n for n in expected}, '.cargo_vcs_info.json')]
-    entries = members(Path(path).read_bytes())
+    entries = members(Path(path).read_bytes(), Path(path).name)
     scan_entries(relative_entries(entries, prefix), expected, 1, kind)
 
 

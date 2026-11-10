@@ -64,13 +64,16 @@ Ambito: esclusivamente i membri nativi elencati nella tabella in codice
 `NATIVE_DISTRIBUTIONS` di `scripts/check_packages.py`, nella distribuzione
 indicata dalla stessa tabella (tag piattaforma/ABI incluso per le wheel).
 La policy non puo dichiarare ruoli `build` o aggiungere esenzioni. La guardia verifica
-nome, ruolo, target, ABI e formato; non applica la scansione del contenuto
-agli output di build nativi. Tutti gli altri membri, inclusi sorgenti testuali
+nome, ruolo, target, ABI e formato; il classificatore non scansiona il membro
+nativo come membro singolo. Il contenitore applica comunque la scansione ai
+propri byte espansi, che includono anche i nativi. Tutti gli altri membri,
+inclusi sorgenti testuali
 e binari versionati, contenitori dichiarati e metadati delle wheel, restano
-scansionati. Un payload accodato o incorporato, per esempio uno ZIP dopo
-un'intestazione ELF/PE, non e ispezionato. Il test ELF/PE per CLI
-ed estensioni documenta la mancata rilevazione come comportamento dichiarato,
-non come successo della guardia. Vedere la [policy dei pacchetti](package-policy.md).
+scansionati. Il classificatore del singolo nativo non apre un payload accodato
+o incorporato, per esempio uno ZIP dopo un'intestazione ELF/PE; la scansione
+del contenitore puo comunque rilevare materiale privato nei byte del nativo.
+Il test ELF/PE per CLI ed estensioni documenta l'esenzione del classificatore
+come limite dichiarato, non come successo della guardia. Vedere la [policy dei pacchetti](package-policy.md).
 
 Hazard: un binario prodotto da una build compromessa puo contenere payload
 non rilevati. Mitigazione: gli output di build sono prodotti dalla CI dai

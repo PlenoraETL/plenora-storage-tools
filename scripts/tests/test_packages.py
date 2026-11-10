@@ -223,14 +223,17 @@ class PackageGuardTests(unittest.TestCase):
             self.assertTrue(all(32 <= byte < 127 for byte in candidate))
             self.assertTrue(gate.is_text(candidate))
             self.assertEqual(gate.container_format(candidate), 'tar')
-            self.assertEqual(gate.members(candidate), [('p' * 155 + '/' + 'a' * 100, candidate[512:])])
+            with self.assertRaisesRegex(ValueError, 'terminator'):
+                gate.members(candidate)
             with self.assertRaisesRegex(ValueError, 'digest'):
                 gate.scan(candidate, rule={'container': declaration})
         rule = binary_rule(data, declaration)
-        gate.scan(data, rule=rule)
+        with self.assertRaisesRegex(ValueError, 'terminator'):
+            gate.scan(data, rule=rule)
         with self.assertRaisesRegex(ValueError, 'digest'):
             gate.scan(changed, rule=rule)
-        gate.scan(changed, rule=binary_rule(changed, declaration))
+        with self.assertRaisesRegex(ValueError, 'terminator'):
+            gate.scan(changed, rule=binary_rule(changed, declaration))
 
     def test_declared_limit_hex_private_key_is_not_detected(self):
         # STOR-LIMIT-003: documents non-detection, NOT guard protection.
@@ -245,12 +248,12 @@ class PackageGuardTests(unittest.TestCase):
         encoded = b'prefix' + base64.b64encode(key)
         gate.scan_entries([('admitted.txt', encoded)], {'admitted.txt': {}}, 0)
 
-    def test_printable_container_digest_recording(self):
+    def test_terminated_tar_container_digest_recording(self):
         import tempfile
         from record_package_digests import record
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            data = printable_tar()
+            data = printable_tar() + bytes(1024)
             (root / 'nested').write_bytes(data)
             package = root / 'plenora-storage-1.2.3-x86_64-pc-windows-msvc.zip'
             package.write_bytes(archive([('nested', data)], True))
@@ -711,3 +714,73 @@ class EntryPointRegressionTests(unittest.TestCase):
                         with self.subTest(name=name, kind=kind), self.assertRaisesRegex(
                                 ValueError, 'sdist distribution|non-file archive|nonempty archive|private PEM'):
                             gate.scan_distribution(gzip.compress(raw), name)
+
+
+class ContainerCoverageTests(unittest.TestCase):
+    def test_complete_distributions_with_hidden_compressed_keys(self):
+        crate = 'plenora-storage-core-3.0.3.crate'
+        wheel = 'plenora_storage-3.0.3-cp310-abi3-win_amd64.whl'
+        for name in (crate, wheel):
+            _, prefix, expected = gate.distribution_policy(name)
+            files = [(prefix + member, b'safe') for member in expected]
+            complete = archive(files, name == wheel)
+            if name == crate:
+                hidden = gzip.decompress(archive([('hidden.gz', gzip.compress(rsa_key()))]))
+                bad = gzip.compress(gzip.decompress(complete) + hidden)
+            else:
+                output = io.BytesIO()
+                with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED) as stream:
+                    stream.writestr('hidden', b'-----BEGIN PRIVATE KEY-----\nYWJj\n')
+                bad = output.getvalue() + complete
+            # Inventory is complete; failure must precede member classification.
+            with patch.object(gate, 'scan_entries') as scan:
+                gate.scan_distribution(complete, name)
+                scan.assert_called_once()
+                scan.reset_mock()
+                with self.assertRaises(ValueError):
+                    gate.scan_distribution(bad, name)
+                scan.assert_not_called()
+
+    def test_zip_gaps_comments_and_inconsistent_headers(self):
+        good = archive([('one', b'safe'), ('two', b'safe')], True)
+        gate.members(good)
+        out = io.BytesIO()
+        with zipfile.ZipFile(out, 'w') as stream:
+            stream.writestr('one', b'safe')
+            stream.fp.write(b'garbage')
+            stream.start_dir = stream.fp.tell()
+            stream.writestr('two', b'safe')
+        bad = [out.getvalue()]
+        out = io.BytesIO(good)
+        with zipfile.ZipFile(out, 'a') as stream:
+            stream.comment = b'comment'
+        bad.append(out.getvalue())
+        for offset in (14, 18, 22, 30):  # CRC, sizes, name
+            changed = bytearray(good)
+            changed[offset] ^= 1
+            bad.append(bytes(changed))
+        bad.extend((good + b'junk', good + good))
+        for data in bad:
+            with self.subTest(case=bad.index(data)), self.assertRaises(ValueError):
+                gate.members(data)
+
+    def test_gzip_stream_and_metadata_coverage_at_every_level(self):
+        good = archive([('one', b'safe')])
+        for bad in (good + gzip.compress(b'safe'), good + b'junk', good[:-1],
+                    good[:3] + b'\x10' + good[4:10] + b'comment\0' + good[10:],
+                    good[:3] + b'\x08' + good[4:10] + b'unknown\0' + good[10:],
+                    good[:3] + b'\x04' + good[4:10] + b'\x01\0x' + good[10:]):
+            with self.subTest(length=len(bad)):
+                with self.assertRaises(ValueError):
+                    gate.members(bad)
+                rule = binary_rule(bad, {'format': 'gzip', 'payload': {}})
+                with self.assertRaises(ValueError):
+                    gate.scan(bad, rule=rule)
+
+    def test_tar_terminator_and_padding_coverage(self):
+        raw = gzip.decompress(archive([('one', b'safe')]))
+        gate.members(raw)
+        for bad in (raw[:1024], raw[:1024] + bytes(512), raw + b'x',
+                    raw[:516] + b'x' + raw[517:], raw + raw):
+            with self.assertRaises(ValueError):
+                gate.members(bad)
