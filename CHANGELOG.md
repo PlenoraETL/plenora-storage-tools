@@ -15,6 +15,11 @@ See [candidate notes](docs/release-notes-3.0.5.md) for scope and evidence.
 - Add a CI regression that builds Cargo archives and rechecks them with the
   publication package guard on a separate Ubuntu 24.04 runner, plus checks that
   its prerequisites stay aligned with the release jobs.
+- Produce plain Cargo logs for source consumers and release evidence even when
+  the runner forces terminal colors; generated-text scanning remains strict.
+- Exercise complete candidate artifacts on Windows and Debian Bookworm in PR CI,
+  then recheck both builds and publication containers on a fresh Ubuntu runner.
+  Workflow regressions compare release guard invocations with the CI coverage.
 
 ## 3.0.4 — 2026-11-10
 

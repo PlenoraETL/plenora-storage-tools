@@ -23,7 +23,7 @@ def prerequisites(job):
         raise ValueError('missing explicit Git/Rust/fetch prerequisite')
     if not checkout.start() < rust.start() < fetch.start():
         raise ValueError('prerequisites out of order')
-    guard = re.search(r'python scripts/(?:release_publication|check_release_packages|verify_release|qualify_release)\.py', job)
+    guard = re.search(r'python(?:3)? scripts/(?:release_publication|check_release_packages|verify_release|qualify_release|qualify_windows_candidate|build_release)\.py', job)
     if guard and fetch.end() > guard.start():
         raise ValueError('fetch must precede release verification')
     return rust.groups()
@@ -61,7 +61,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
                          re.search(python_setup, ci['release-package-recheck']).groups())
         for job in (release['qualify'], ci['release-package-recheck']):
             self.assertIn('python -m pip install -r scripts/requirements-quality.txt', job)
-        self.assertIn('needs: release-package-build', ci['release-package-recheck'])
+        self.assertIn('needs: [release-package-build, docker-conformance, native-windows]', ci['release-package-recheck'])
         self.assertNotIn('actions/cache@', ci['release-package-recheck'])
 
     def test_missing_or_late_prerequisites_are_rejected(self):

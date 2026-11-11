@@ -74,6 +74,18 @@ def select_source_archive(raw, archive, prefix, *, checkout_bytes=False):
                             selected.addfile(member, committed.extractfile(member))
 
 
+def run_consumer(consumer, toolchain, target_dir, log):
+    # Cargo's CI action forces ANSI color even for redirected output. Evidence
+    # is scanned UTF-8 text: prevent terminal controls rather than stripping
+    # bytes after capture or relaxing the generated-member classifier.
+    with log.open('wb') as stream:
+        return subprocess.run(['cargo', 'run', '--offline', '--manifest-path', str(consumer / 'Cargo.toml')],
+                              cwd=consumer, env=dict(os.environ, RUSTUP_TOOLCHAIN=toolchain,
+                                                    CARGO_TARGET_DIR=str(Path(target_dir).resolve()),
+                                                    CARGO_TERM_COLOR='never'),
+                              stdout=stream, stderr=subprocess.STDOUT)
+
+
 def build(output, target_dir):
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -109,11 +121,7 @@ def build(output, target_dir):
         (consumer / 'src/main.rs').write_text(CONSUMER, encoding='utf-8')
         log = output / 'source-consumer.log'
         toolchain = tomllib.loads((source / 'rust-toolchain.toml').read_text())['toolchain']['channel']
-        with log.open('wb') as stream:
-            result = subprocess.run(['cargo', 'run', '--offline', '--manifest-path', str(consumer / 'Cargo.toml')],
-                                    cwd=consumer, env=dict(os.environ, RUSTUP_TOOLCHAIN=toolchain,
-                                                          CARGO_TARGET_DIR=str(Path(target_dir).resolve())),
-                                    stdout=stream, stderr=subprocess.STDOUT)
+        result = run_consumer(consumer, toolchain, target_dir, log)
         if result.returncode:
             raise RuntimeError(f'extracted source consumer failed: {log}')
     report = output / 'source-consumer.json'
