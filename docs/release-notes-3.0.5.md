@@ -24,6 +24,10 @@ its artifacts, tag, draft and historical notes are not rewritten or republished.
 - Build Cargo archives in CI and recheck them on a separate Ubuntu 24.04 runner;
   workflow tests keep its prerequisites aligned with the publication jobs (#44).
 
+- Update rustix 1.1.5 -> 1.1.6 for RUSTSEC-2026-0486 (unsound xattr functions
+  with a zero-length buffer); no code in the storage graph calls the affected
+  functions, so no published release was exposed.
+
 ## Dependency scope
 
 | Component | Previous published release (3.0.3) | Candidate |

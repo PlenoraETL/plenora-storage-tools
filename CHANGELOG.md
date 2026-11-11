@@ -7,6 +7,7 @@ Includes all changes listed for 3.0.4 plus the release workflow correction below
 unpublished. Workspace manifests, lockfiles and generated state identify 3.0.5.
 See [candidate notes](docs/release-notes-3.0.5.md) for scope and evidence.
 
+- Security: rustix 1.1.5 -> 1.1.6 for RUSTSEC-2026-0486 (unsound xattr functions with a zero-length buffer). No code in the storage graph calls the affected `rustix::fs::*xattr` functions (checked in the registry sources of cap-primitives, cap-std, fs-set-times, rustix-linux-procfs and tempfile), so no published release was exposed; the update keeps `cargo audit --deny warnings` green.
 - Install pinned Rust 1.98.1 and run `cargo fetch --locked` on the tagged checkout
   in both publication jobs that recheck Cargo archives (`qualify` and `publish`).
   Offline regeneration of Cargo metadata requires both the toolchain and registry
