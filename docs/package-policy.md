@@ -1,4 +1,4 @@
-# Package contents policy (3.0.4 candidate)
+# Package contents policy (3.0.5 candidate)
 
 The owner decision of 2026-11-09 excludes private cryptographic material and
 saved test credentials from distributions. Tests generate those inputs when run.
