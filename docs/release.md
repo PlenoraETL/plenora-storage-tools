@@ -60,15 +60,29 @@ La riverifica di pubblicazione richiede Git, Rust 1.98.1 e la cache del registry
 della guardia che rigenera offline i metadati Cargo. `download-smoke` controlla
 digest, CLI e wheel installata senza rigenerare i metadati dei crate.
 
-La CI costruisce tutti gli archivi Cargo in `release-package-build` e li passa
-a `release-package-recheck`, un runner Ubuntu 24.04 separato con Python 3.11,
-senza cache Cargo del produttore. `check_release_packages.py` esegue su quei byte
-lo stesso `verify_distribution` usato da `verify_release.py` e dalla
-pubblicazione. `test_release_workflow.py` vincola toolchain e ordine dei
-prerequisiti dei job di rilascio alla prova CI e verifica i pin delle action.
-Questa prova copre il percorso Git/Cargo della guardia senza richiedere una
-campagna completa con fixture e soak; non sostituisce la qualifica degli
-artefatti finali o il roundtrip GitHub della pubblicazione.
+La CI costruisce tutti gli archivi Cargo in `release-package-build` e i candidati
+completi con `build_release.py` nei job `native-windows` e `docker-conformance`.
+Le verifiche usano `qualify_windows_candidate.py` su Windows e `qualify_target.py`
+nel servizio Debian Bookworm del candidato Linux; entrambi richiamano
+`verify_release.py`. Il candidato Windows e la CI condividono anche lo stesso
+script per i report localhost sul binario finale.
+`release-package-recheck`, un runner Ubuntu 24.04 separato con Python 3.11 e senza
+cache Cargo del produttore, riceve entrambi i candidati e gli archivi Cargo.
+`check_release_packages.py --release` riesegue `verify_release.py`, verifica gli
+asset standalone e un contenitore con l'inventario completo della qualifica,
+tramite la stessa funzione `verify_publication` usata da prepare/upload/publish.
+Nel contenitore di regressione i byte dei prodotti e dei report di build sono
+reali; soltanto le evidenze di campagna mancanti sono testo fixture esplicitamente
+marcato, senza ricevuta qualificata. Questa prova della guardia non sostituisce
+la qualifica, il soak o il roundtrip GitHub.
+
+`check_release_guard_coverage.py` confronta le invocazioni dirette e indirette nei
+workflow di rilascio con i percorsi CI, i runner e il passaggio degli artefatti;
+i suoi test negativi rimuovono verifiche, cambiano piattaforma e aggiungono una
+nuova invocazione non coperta. `test_release_workflow.py` vincola inoltre toolchain,
+ordine dei prerequisiti e pin delle action. I log Cargo destinati agli artefatti
+sono prodotti senza colori anche se il runner imposta `CARGO_TERM_COLOR=always`:
+la guardia continua a rifiutare caratteri di controllo e materiale privato.
 
 1. `cargo fmt --all -- --check` e Clippy con tutti i target e feature.
 2. Test locali; i test di integrazione devono risultare esplicitamente ignored
