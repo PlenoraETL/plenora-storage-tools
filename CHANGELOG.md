@@ -1,5 +1,19 @@
 # Changelog
 
+## 3.0.5 — Unreleased
+
+Includes all changes listed for 3.0.4 plus the release workflow correction below.
+3.0.4 was qualified but not published; tag `v3.0.4` and its draft remain
+unpublished. Manifest version updates are a separate step.
+
+- Install pinned Rust 1.98.1 and run `cargo fetch --locked` on the tagged checkout
+  in both publication jobs that recheck Cargo archives (`qualify` and `publish`).
+  Offline regeneration of Cargo metadata requires both the toolchain and registry
+  cache, including when the qualification bundle is checked recursively.
+- Add a CI regression that builds Cargo archives and rechecks them with the
+  publication package guard on a separate Ubuntu 24.04 runner, plus checks that
+  its prerequisites stay aligned with the release jobs.
+
 ## 3.0.4 — 2026-11-10
 
 Patch release; no incompatible changes and no change to the public operations.
