@@ -54,6 +54,22 @@ artefatto prodotto da un checkout modificato o privo delle evidenze richieste.
 
 ## Gate
 
+La riverifica di pubblicazione richiede Git, Rust 1.98.1 e la cache del registry:
+`release.yml` installa la stessa action Rust pinnata della CI ed esegue
+`cargo fetch --locked` sul checkout del tag in `qualify` e `publish`, prima
+della guardia che rigenera offline i metadati Cargo. `download-smoke` controlla
+digest, CLI e wheel installata senza rigenerare i metadati dei crate.
+
+La CI costruisce tutti gli archivi Cargo in `release-package-build` e li passa
+a `release-package-recheck`, un runner Ubuntu 24.04 separato con Python 3.11,
+senza cache Cargo del produttore. `check_release_packages.py` esegue su quei byte
+lo stesso `verify_distribution` usato da `verify_release.py` e dalla
+pubblicazione. `test_release_workflow.py` vincola toolchain e ordine dei
+prerequisiti dei job di rilascio alla prova CI e verifica i pin delle action.
+Questa prova copre il percorso Git/Cargo della guardia senza richiedere una
+campagna completa con fixture e soak; non sostituisce la qualifica degli
+artefatti finali o il roundtrip GitHub della pubblicazione.
+
 1. `cargo fmt --all -- --check` e Clippy con tutti i target e feature.
 2. Test locali; i test di integrazione devono risultare esplicitamente ignored
    quando le fixture non sono disponibili.
