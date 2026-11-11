@@ -15,7 +15,7 @@ class CanonicalGeneratedTests(GitSnapshotTestCase):
     def test_generated_bytes_reject_parser_tolerance(self):
         cases = [('crates/plenora-storage-core', name) for name in
                  ('.cargo_vcs_info.json', 'Cargo.toml', 'Cargo.lock')]
-        cases += [('cp310-abi3-win_amd64', 'plenora_storage-3.0.4.dist-info/' + name)
+        cases += [('cp310-abi3-win_amd64', 'plenora_storage-3.0.5.dist-info/' + name)
                   for name in ('METADATA', 'WHEEL')]
         for context, name in cases:
             good = source_fixture(context, name)
@@ -38,7 +38,7 @@ class CanonicalGeneratedTests(GitSnapshotTestCase):
                     validate_generated(bad, name, context)
 
     def test_record_serialization_is_canonical(self):
-        name = 'plenora_storage-3.0.4.dist-info/RECORD'
+        name = 'plenora_storage-3.0.5.dist-info/RECORD'
         entries = wheel_record([('a.py', b'a'), ('b.py', b'b'), (name, b'')])
         good = entries[-1][1]
         validate_record(entries, 'cp310-abi3-win_amd64')

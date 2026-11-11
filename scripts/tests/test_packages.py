@@ -250,9 +250,9 @@ class PackageGuardTests(GitSnapshotTestCase):
                      bz2.compress(gzip.decompress(inner)), dsa, b'unknown\x00binary'):
             with self.subTest(size=len(data)), patch.object(gate, 'registry', return_value={
                     'crates': {'plenora-storage-core': ['README.md']}}):
-                package = archive([('plenora-storage-core-3.0.4/README.md', data)])
+                package = archive([('plenora-storage-core-3.0.5/README.md', data)])
                 with self.assertRaises(ValueError):
-                    gate.scan(package, 'plenora-storage-core-3.0.4.crate')
+                    gate.scan(package, 'plenora-storage-core-3.0.5.crate')
         for data in (dsa, rsa_key()):
             with self.assertRaisesRegex(ValueError, 'base64'):
                 gate.scan(base64.b64encode(data))
@@ -828,8 +828,8 @@ class ContainerCoverageTests(GitSnapshotTestCase):
                         self.assertIn(good[end:], scanned)
 
     def test_complete_distributions_with_hidden_compressed_keys(self):
-        crate = 'plenora-storage-core-3.0.4.crate'
-        wheel = 'plenora_storage-3.0.4-cp310-abi3-win_amd64.whl'
+        crate = 'plenora-storage-core-3.0.5.crate'
+        wheel = 'plenora_storage-3.0.5-cp310-abi3-win_amd64.whl'
         for name in (crate, wheel):
             _, prefix, expected = gate.distribution_policy(name)
             files = [(prefix + member, b'safe') for member in expected]

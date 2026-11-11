@@ -166,9 +166,9 @@ provider TLS. Il lock mantiene `aws-lc-sys 0.45.0`; `rustls 0.23.46` e
 non cambia trust store, verifica dei certificati o pin delle host key e non
 qualifica server diversi dalle fixture dichiarate.
 
-Il controllo del candidato 3.0.4 conserva queste versioni. Per provenienza,
+Il controllo del candidato 3.0.5 conserva queste versioni. Per provenienza,
 raggiungibilità di defmt/bitflags e contenuto dei pacchetti, vedere le
-[note del candidato](release-notes-3.0.4.md).
+[note del candidato](release-notes-3.0.5.md).
 
 ## Ambito e limiti operativi
 

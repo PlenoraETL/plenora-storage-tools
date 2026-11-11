@@ -1,10 +1,11 @@
 # Changelog
 
-## 3.0.5 — Unreleased
+## 3.0.5 — 2026-11-11
 
 Includes all changes listed for 3.0.4 plus the release workflow correction below.
 3.0.4 was qualified but not published; tag `v3.0.4` and its draft remain
-unpublished. Manifest version updates are a separate step.
+unpublished. Workspace manifests, lockfiles and generated state identify 3.0.5.
+See [candidate notes](docs/release-notes-3.0.5.md) for scope and evidence.
 
 - Install pinned Rust 1.98.1 and run `cargo fetch --locked` on the tagged checkout
   in both publication jobs that recheck Cargo archives (`qualify` and `publish`).

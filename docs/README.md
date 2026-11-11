@@ -32,7 +32,8 @@ artefatti attestano una qualifica.
 | [Migrazione 3.0](migration-3.0.md) | Incompatibilità della 3.0: `null` non più assente, firme Rust, licenza |
 | [Note 3.0.0](release-notes-3.0.0.md) | Contenuto della 3.0.0 in preparazione, non pubblicata |
 | [Note 3.0.1](release-notes-3.0.1.md) | Patch rustls in preparazione, baseline 3.0.0 e nuova qualifica richiesta |
-| [Note 3.0.4](release-notes-3.0.4.md) | Preparazione 3.0.4, non ancora qualificata |
+| [Note 3.0.5](release-notes-3.0.5.md) | Preparazione 3.0.5, include 3.0.4 qualificata ma non pubblicata |
+| [Note 3.0.4](release-notes-3.0.4.md) | Note storiche della preparazione 3.0.4 |
 | [Piano 1.0](roadmap-1.0.0.md) | Piano storico: milestone, perimetro e criteri di uscita della prima release |
 
 ## Resoconti e baseline storiche
