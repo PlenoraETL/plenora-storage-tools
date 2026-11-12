@@ -130,6 +130,16 @@ subjects maps target triples to binary_sha256 and wheel_sha256 from manifests
 already checked by verify_release.py. No caller-supplied waiver is accepted.
 """
     evidence = Evidence(root)
+    reduced = (Path(root) / 'profile.json').exists()
+    if reduced:
+        from release_profile import validate
+        validate(evidence.json('profile.json'), revision)
+        installation = evidence.json('install-sdk.json')
+        require(installation['sha256'] == subjects[TARGETS[0]]['wheel_sha256'],
+                'dependency-patch SDK installation differs')
+        install_log = evidence.read('install-sdk.log', installation['log_sha256']).decode('utf-8')
+        require('Successfully installed plenora-storage-' + python_version in install_log,
+                'dependency-patch SDK installation did not complete')
     version_core = tuple(map(int, re.match(r'(\d+)\.(\d+)\.(\d+)', python_version).groups()))
     if version_core >= (2, 0, 1):
         validate_disk_pressure(evidence.json('disk-pressure/report.json'), revision, subjects[TARGETS[0]]['binary_sha256'])
@@ -242,6 +252,8 @@ already checked by verify_release.py. No caller-supplied waiver is accepted.
             clean_source(report, revision)
             validate_transfers(report, linux['binary_sha256'], size=size, workers=workers,
                                rounds=max(rounds, 2) if name == 'large' else rounds, spool_uploads=True)
+    if reduced:
+        return [{'name': name, 'sha256': digest} for name, digest in sorted(evidence.files.items())]
     validate_soak(evidence.json('soak/report.json'), linux['wheel_sha256'], python_version, minimum_soak_seconds,
                   both_upload_modes=version_core >= (2, 1, 0))
     performance = evidence.json('performance/report.json')
