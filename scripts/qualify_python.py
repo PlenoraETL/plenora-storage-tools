@@ -1,5 +1,6 @@
 """Qualify the installed Python wheel against all nine dedicated storage fixtures."""
 import argparse
+from proof_collection import Collection
 import asyncio
 import hashlib
 import json
@@ -32,6 +33,7 @@ def main():
     ca = Path(os.environ.get('PLENORA_FTPS_CA', ROOT / '.fixtures/extended/server.crt')).read_text()
     pin = os.environ.get('PLENORA_SFTP_HOST_KEY_SHA256') or (ROOT / '.fixtures/sftp-fingerprint').read_text().strip()
     policy = EngineConfig(allow_private_network=True, allow_insecure_http=True, allow_insecure_ftp=True)
+    collection = Collection()
     results = []
     with tempfile.TemporaryDirectory(prefix='storage-python-live-') as temporary:
         work = Path(temporary)
@@ -65,46 +67,51 @@ def main():
         options = {'spool_uploads': True} if args.spool_uploads else {}
         with Engine(policy, credential_resolver=resolver, **options) as engine:
             for provider, config in configs.items():
-                connection = Connection(provider, f'plenora-storage-{provider}-connection-v1', config,
-                                        'local:process' if provider == 'local' else f'fixture:{provider}')
-                prefix = f'qualification/python-{uuid.uuid4().hex}'
-                key, copied = prefix + '/source', prefix + '/copy'
-                publication = 'atomic_required' if provider in {'local', 's3', 'sftp', 'azure', 'gcs'} else 'best_effort'
-                engine.test(connection, timeout_ms=60_000)
-                try:
-                    engine.put(connection, key, source, overwrite=True, publication_policy=publication, timeout_ms=60_000)
-                    assert engine.stat(connection, key)['size'] == len(payload)
-                    engine.copy(connection, key, copied, overwrite=True, publication_policy=publication, timeout_ms=60_000)
-                    output = work / 'download'
-                    transfer = engine.get(connection, copied, output, overwrite=True, timeout_ms=60_000)
-                    assert output.read_bytes() == payload
-                    assert transfer['checksum']['value'] == hashlib.sha256(payload).hexdigest()
-                    page = engine.list(connection, prefix=prefix, max_items=1)
-                    objects = list(page['objects'])
-                    while page['truncated']:
-                        page = engine.list(connection, prefix=prefix, max_items=1, cursor=page['next_cursor'])
-                        objects.extend(page['objects'])
-                    assert {item['key'] for item in objects} == {key, copied}
-                    async def async_stat():
-                        async with AsyncEngine(policy, credential_resolver=resolver, **options) as asynchronous:
-                            assert (await asynchronous.stat(connection, key))['size'] == len(payload)
-                    asyncio.run(async_stat())
-                finally:
-                    for name in [key, copied]:
-                        engine.delete(connection, name, ignore_missing=True, timeout_ms=60_000)
-                try:
-                    engine.stat(connection, copied)
-                except StorageError as error:
-                    assert error.category == 'not_found'
-                else:
-                    raise AssertionError('deleted object remains')
-                results.append({'provider': provider, 'operations': 7, 'status': 'PASS', 'async_stat': 'PASS'})
-                print(f'PASS installed Python SDK: {provider}', flush=True)
+                with collection.case(provider):
+                    connection = Connection(provider, f'plenora-storage-{provider}-connection-v1', config,
+                                            'local:process' if provider == 'local' else f'fixture:{provider}')
+                    prefix = f'qualification/python-{uuid.uuid4().hex}'
+                    key, copied = prefix + '/source', prefix + '/copy'
+                    publication = 'atomic_required' if provider in {'local', 's3', 'sftp', 'azure', 'gcs'} else 'best_effort'
+                    engine.test(connection, timeout_ms=60_000)
+                    try:
+                        engine.put(connection, key, source, overwrite=True, publication_policy=publication, timeout_ms=60_000)
+                        assert engine.stat(connection, key)['size'] == len(payload)
+                        engine.copy(connection, key, copied, overwrite=True, publication_policy=publication, timeout_ms=60_000)
+                        output = work / 'download'
+                        transfer = engine.get(connection, copied, output, overwrite=True, timeout_ms=60_000)
+                        assert output.read_bytes() == payload
+                        assert transfer['checksum']['value'] == hashlib.sha256(payload).hexdigest()
+                        page = engine.list(connection, prefix=prefix, max_items=1)
+                        objects = list(page['objects'])
+                        while page['truncated']:
+                            page = engine.list(connection, prefix=prefix, max_items=1, cursor=page['next_cursor'])
+                            objects.extend(page['objects'])
+                        assert {item['key'] for item in objects} == {key, copied}
+                        async def async_stat():
+                            async with AsyncEngine(policy, credential_resolver=resolver, **options) as asynchronous:
+                                assert (await asynchronous.stat(connection, key))['size'] == len(payload)
+                        asyncio.run(async_stat())
+                    finally:
+                        for name in [key, copied]:
+                            engine.delete(connection, name, ignore_missing=True, timeout_ms=60_000)
+                    try:
+                        engine.stat(connection, copied)
+                    except StorageError as error:
+                        assert error.category == 'not_found'
+                    else:
+                        raise AssertionError('deleted object remains')
+                    results.append({'provider': provider, 'operations': 7, 'status': 'PASS', 'async_stat': 'PASS'})
+                    print(f'PASS installed Python SDK: {provider}', flush=True)
+                if collection.results[-1]['status'] != 'PASS':
+                    results.append({'provider': provider, 'status': 'FAIL', 'failure_type': collection.results[-1]['failure_type']})
     report = {'version': engine.capabilities()['component_version'], 'package_version': __version__, 'wheel': args.wheel.name,
               'spool_uploads': args.spool_uploads,
               'wheel_sha256': hashlib.sha256(args.wheel.read_bytes()).hexdigest(), 'results': results}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
+
+    collection.finish()
 
 
 if __name__ == '__main__':

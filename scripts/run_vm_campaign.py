@@ -10,13 +10,15 @@ import sys
 import tempfile
 import venv
 
-from campaign_fence import held
+from campaign_fence import held, CampaignBusy, CampaignFenced
 from campaign_state import Campaign, digest, exclusive, logged, write_json
 from check_disk_space import GIB, inspect
 from check_memory import available as available_memory, inspect as inspect_memory
 from soak_policy import SOAK_DURATION_SECONDS
 from performance_order import SCHEME
 from versioning import parse_version
+from proof_collection import Collection
+from proof_sources import passed_names
 
 ROOT = Path(__file__).resolve().parents[1]
 # The container's own filesystem: no host directory is mounted there, so
@@ -43,9 +45,8 @@ PERFORMANCE_PHASE_TIMEOUT = 7500
 TRANSFER_ROUND_TIMEOUT = 10800
 TRANSFER_PHASE_TIMEOUT = 14400
 COMMAND_TIMEOUT = 14400
-SPOOLED_PHASES = ('spooled-large', 'spooled-workers4', 'spooled-workers16')
-PHASES = ('qualify-linux', 'install-sdk', 'performance-ab', 'performance-compare', 'transfers-large',
-          'transfers-workers4', 'transfers-workers16', *SPOOLED_PHASES, 'soak')
+PHASES = tuple(sorted(passed_names('scripts/run_vm_campaign.py', function='phase')))
+SPOOLED_PHASES = tuple(name for name in PHASES if name.startswith('spooled-'))
 
 
 def phases_for(version):
@@ -278,8 +279,22 @@ def measure(folder, baseline, private, output, fixture_state, retries, reason, b
         campaign = Campaign(output, subject)
         campaign.validate_retries(retries, phases_for(subject['version']))
 
-        def phase(name, action):
-            return fenced_phase(campaign, fence, name, action, retry=name in retries, reason=reason)
+        collection = Collection(fatal=(CampaignBusy, CampaignFenced))
+        failed = set()
+
+        def phase(name, action, dependencies=()):
+            # Admission/input failures are fatal, unlike an independent probe
+            # failure: never continue measuring after a fence is lost.
+            fence()
+            result = output / name / 'not-selected'
+            with collection.case(name):
+                if failed.intersection(dependencies):
+                    raise RuntimeError('qualification prerequisite failed')
+                result = fenced_phase(campaign, fence, name, action, retry=name in retries, reason=reason)
+            fence()
+            if collection.results[-1]['status'] != 'PASS':
+                failed.add(name)
+            return result
 
         def command(path, script, *arguments, environment=env, python=sys.executable, timeout=COMMAND_TIMEOUT):
             logged([str(python), str(ROOT / 'scripts' / script), *map(str, arguments)],
@@ -336,7 +351,7 @@ def measure(folder, baseline, private, output, fixture_state, retries, reason, b
                                                                 rounds=PERFORMANCE_ROUNDS, paired=True))
         old, new = paired / 'baseline.json', paired / 'candidate.json'
         comparison = phase('performance-compare', lambda path: command(path, 'check_performance.py',
-                           old, new, '--output', path / 'report.json'))
+                           old, new, '--output', path / 'report.json'), dependencies=('performance-ab',))
         large = phase('transfers-large', lambda path: transfers(path, size=GIB, workers=1, rounds=2))
         four = phase('transfers-workers4', lambda path: transfers(path, size=1024**2, workers=4, rounds=2))
         sixteen = phase('transfers-workers16', lambda path: transfers(path, size=1024**2, workers=16, rounds=1))
@@ -350,7 +365,8 @@ def measure(folder, baseline, private, output, fixture_state, retries, reason, b
         soak = phase('soak', lambda path: command(path, 'stress_python.py', '--wheel', wheel, '--workers', 4,
                      '--interval-seconds', 30, '--duration-seconds', SOAK_DURATION_SECONDS,
                      *(['--both-upload-modes'] if spooled else []),
-                     '--output', path / 'report.json', python=installed_python(private)))
+                     '--output', path / 'report.json', python=installed_python(private)), dependencies=('install-sdk',))
+        collection.finish(output / 'collection.json')
         selected = {'performance/baseline.json': old,
                     'performance/candidate.json': new, 'performance/report.json': comparison / 'report.json',
                     'transfers/large.json': large / 'report.json', 'transfers/workers4.json': four / 'report.json',

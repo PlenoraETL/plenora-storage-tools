@@ -9,11 +9,11 @@ import shutil
 import subprocess
 import time
 import tomllib
+from proof_sources import fuzz_targets
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOLCHAIN = 'nightly-2026-09-20'
-TARGETS = ('s3_xml', 'azure_xml', 'webdav_xml', 'ftp_listing',
-           'smb2_messages', 'spnego_der', 'ntlm_challenge', 'kerberos_messages')
+TARGETS = fuzz_targets()
 XML_ROOTS = {'s3_xml': b'ListBucketResult', 'azure_xml': b'EnumerationResults',
              'webdav_xml': b'multistatus'}
 # Server-controlled lengths that claim more bytes than the frame carries.

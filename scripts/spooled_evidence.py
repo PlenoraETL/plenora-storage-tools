@@ -3,9 +3,10 @@ import json
 import strict_json
 
 from qualify_extended_faults import EXPECTED_TESTS
+from proof_sources import dictionary_keys
 
-EXTENDED = {'local', 'ftps', 'azure', 'gcs', 'smb', 'webdav'}
-PROVIDERS = EXTENDED | {'s3', 'sftp', 'ftp'}
+EXTENDED = set(dictionary_keys('scripts/qualify_extended.py', 'configs'))
+PROVIDERS = set(dictionary_keys('scripts/qualify_python.py', 'configs'))
 
 
 def validate_rows(report, field, expected):

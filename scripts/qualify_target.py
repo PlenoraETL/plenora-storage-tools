@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 import venv
+from proof_collection import Collection
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -43,51 +44,70 @@ def qualify(folder, host=None, ca=None, pin=None):
     }.items():
         env[f'PLENORA_{provider}_CREDENTIALS'] = json.dumps(credentials)
 
-    def run(name, output=None):
-        command = [sys.executable, str(ROOT / 'scripts' / (name + '.py'))]
-        if output:
-            with (folder / output).open('wb') as stream:
-                subprocess.run(command, cwd=ROOT, env=env, stdout=stream, check=True)
-        else:
-            subprocess.run(command, cwd=ROOT, env=env, check=True)
+    collection = Collection()
 
-    subprocess.run([sys.executable, str(ROOT / 'scripts/check_webdav_fixture.py'),
-                    '--output', str(folder / 'webdav-fixture.json')], cwd=ROOT, env=env, check=True)
+    def command(name, argv, **kwargs):
+        with collection.case(name):
+            if '--output' in argv:
+                Path(argv[argv.index('--output') + 1]).unlink(missing_ok=True)
+            subprocess.run(argv, check=True, **kwargs)
+        return collection.results[-1]['status'] == 'PASS'
+
+    def run(name, output=None, source=None, arguments=()):
+        argv = [sys.executable, str(ROOT / 'scripts' / (name + '.py')), *arguments]
+        with collection.case(output or name):
+            if output and output.endswith('.json'):
+                (folder / output).unlink(missing_ok=True)
+            if '--output' in arguments:
+                Path(arguments[arguments.index('--output') + 1]).unlink(missing_ok=True)
+            if source:
+                # Never copy a stale report left by an earlier invocation.
+                source.unlink(missing_ok=True)
+            if output and not source and not arguments:
+                with (folder / output).open('wb') as stream:
+                    subprocess.run(argv, cwd=ROOT, env=env, stdout=stream, check=True)
+            else:
+                subprocess.run(argv, cwd=ROOT, env=env, check=True)
+                if source:
+                    shutil.copyfile(source, folder / output)
+
+    command('webdav-fixture', [sys.executable, str(ROOT / 'scripts/check_webdav_fixture.py'),
+            '--output', str(folder / 'webdav-fixture.json')], cwd=ROOT, env=env)
     run('qualify_cli', 'qualification.json')
     for name, report, destination in [
         ('qualify_extended', 'extended-qualification.json', 'extended-qualification.json'),
         ('qualify_extended_faults', 'extended-regressions.json', 'extended-regressions.json'),
         ('audit_release_readiness', 'results.json', 'cli-regressions.json'),
     ]:
-        run(name)
-        shutil.copyfile(ROOT / 'target/release-readiness' / report, folder / destination)
+        run(name, destination, ROOT / 'target/release-readiness' / report)
     if spooled:
         for script, name in [('qualify_extended', 'spooled-qualification'), ('qualify_extended_faults', 'spooled-regressions')]:
-            subprocess.run([sys.executable, str(ROOT / 'scripts' / (script + '.py')), '--spool-uploads',
-                            '--output', str(folder / (name + '.json'))], cwd=ROOT, env=env, check=True)
+            run(script, name, arguments=('--spool-uploads', '--output', str(folder / (name + '.json'))))
     if not windows:
         run('qualify_commit_faults', 'commit-faults.json')
-        run('qualify_local_faults')
-        shutil.copyfile(ROOT / 'target/release-readiness/local-faults.json', folder / 'local-faults.json')
+        run('qualify_local_faults', 'local-faults.json', ROOT / 'target/release-readiness/local-faults.json')
         if spooled:
-            subprocess.run([sys.executable, str(ROOT / 'scripts/qualify_local_faults.py'), '--spool-uploads',
-                            '--output', str(folder / 'spooled-local-faults.json')], cwd=ROOT, env=env, check=True)
-    wheels = [folder / p['name'] for p in manifest['artifacts'] if p['name'].endswith('.whl')]
-    if len(wheels) != 1:
-        raise ValueError('expected one manifested wheel for the target')
-    with tempfile.TemporaryDirectory(prefix='storage-installed-sdk-') as temporary:
-        environment = Path(temporary)
-        venv.EnvBuilder(with_pip=True).create(environment)
-        python = environment / ('Scripts/python.exe' if windows else 'bin/python')
-        subprocess.run([str(python), '-m', 'pip', 'install', '--no-index', str(wheels[0])], check=True)
-        subprocess.run([str(python), str(ROOT / 'scripts/qualify_python.py'),
-                        '--wheel', str(wheels[0]), '--output', str(folder / 'python-qualification.json')],
-                       cwd=environment, env=env, check=True)
-        if spooled:
-            subprocess.run([str(python), str(ROOT / 'scripts/qualify_python.py'), '--spool-uploads',
-                            '--wheel', str(wheels[0]), '--output', str(folder / 'spooled-python-qualification.json')],
-                           cwd=environment, env=env, check=True)
-    subprocess.run([sys.executable, str(ROOT / 'scripts/verify_release.py'), str(folder.parent)], check=True)
+            run('qualify_local_faults', 'spooled-local-faults', arguments=('--spool-uploads',
+                '--output', str(folder / 'spooled-local-faults.json')))
+    with collection.case('installed-sdk'):
+        wheels = [folder / p['name'] for p in manifest['artifacts'] if p['name'].endswith('.whl')]
+        if len(wheels) != 1:
+            raise ValueError('expected one manifested wheel for the target')
+        with tempfile.TemporaryDirectory(prefix='storage-installed-sdk-') as temporary:
+            environment = Path(temporary)
+            venv.EnvBuilder(with_pip=True).create(environment)
+            python = environment / ('Scripts/python.exe' if windows else 'bin/python')
+            subprocess.run([str(python), '-m', 'pip', 'install', '--no-index', str(wheels[0])], check=True)
+            command('python-qualification', [str(python), str(ROOT / 'scripts/qualify_python.py'),
+                            '--wheel', str(wheels[0]), '--output', str(folder / 'python-qualification.json')],
+                           cwd=environment, env=env)
+            if spooled:
+                command('python-qualification', [str(python), str(ROOT / 'scripts/qualify_python.py'), '--spool-uploads',
+                                '--wheel', str(wheels[0]), '--output', str(folder / 'spooled-python-qualification.json')],
+                               cwd=environment, env=env)
+    command('verify-release', [sys.executable, str(ROOT / 'scripts/verify_release.py'), str(folder.parent)])
+    collection.finish(ROOT / 'target/release-readiness' / (folder.name + '-collection.json'))
+
 
 
 if __name__ == '__main__':

@@ -11,6 +11,8 @@ import subprocess
 import tempfile
 import threading
 import time
+from proof_collection import Collection
+from proof_sources import passed_names
 
 ROOT = Path(__file__).resolve().parents[1]
 BINARY = Path(os.environ.get('PLENORA_CLI_BIN', ROOT / 'target/debug' / ('plenora-storage.exe' if os.name == 'nt' else 'plenora-storage'))).resolve()
@@ -21,9 +23,7 @@ LEGACY_TESTS = {
     'webdav_absent_optional_property', 'webdav_outside_root_rejected',
     'webdav_partial_multistatus_not_success', 'webdav_commit_deadline_unknown',
 }
-EXPECTED_TESTS = LEGACY_TESTS | {'webdav_parent_race_reconciled', 'webdav_parent_not_directory_rejected'} | {
-    provider + suffix for provider in ['s3', 'azure', 'gcs', 'webdav']
-    for suffix in ('_mutation_not_retried', '_disk_pressure_redacted')}
+EXPECTED_TESTS = passed_names('scripts/qualify_extended_faults.py')
 ENV = dict(os.environ, PLENORA_FAULT_CREDENTIALS=json.dumps({
     'bearer_token': SECRET, 'access_key_id': 'fixture', 'secret_access_key': SECRET}))
 
@@ -65,6 +65,7 @@ def main():
     parser.add_argument('--output', type=Path, default=ROOT / 'target/release-readiness/extended-regressions.json')
     options = parser.parse_args()
     results = []
+    checks = Collection()
     with tempfile.TemporaryDirectory(prefix='storage-faults-') as temporary, \
             http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler) as server, \
             http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler) as redirect_target:
@@ -105,72 +106,86 @@ def main():
             results.append({'name': name, 'status': 'PASS'})
 
         for provider in ['s3', 'azure', 'gcs', 'webdav']:
-            for status in [500, 503, 429, 507]:
-                server.status = status
-                server.body = (b'<Error><Code>XMinioStorageFull</Code><Message>untrusted-backend-diagnostic '
-                               + SECRET.encode() + b'</Message></Error>') if status == 507 else b''
-                before = server.calls
-                policy = 'best-effort' if provider == 'webdav' else 'atomic-required'
-                result = invoke(provider, 'put', ('--key', 'payload', '--input', str(source),
-                                '--overwrite', 'false', '--publication-policy', policy))
-                assert server.calls == before + 1, 'mutation was automatically retried'
-                assert result['error']['remote_effect'] == 'unknown', result
-                assert result['error']['retry']['kind'] == 'requires_recovery', result
-                if status == 507:
-                    passed(provider + '_disk_pressure_redacted')
-            passed(provider + '_mutation_not_retried')
+            with checks.case(provider + '_mutations'):
+                for status in [500, 503, 429, 507]:
+                    server.status = status
+                    server.body = (b'<Error><Code>XMinioStorageFull</Code><Message>untrusted-backend-diagnostic '
+                                   + SECRET.encode() + b'</Message></Error>') if status == 507 else b''
+                    before = server.calls
+                    policy = 'best-effort' if provider == 'webdav' else 'atomic-required'
+                    result = invoke(provider, 'put', ('--key', 'payload', '--input', str(source),
+                                    '--overwrite', 'false', '--publication-policy', policy))
+                    assert server.calls == before + 1, 'mutation was automatically retried'
+                    assert result['error']['remote_effect'] == 'unknown', result
+                    assert result['error']['retry']['kind'] == 'requires_recovery', result
+                    if status == 507:
+                        passed(provider + '_disk_pressure_redacted')
+                passed(provider + '_mutation_not_retried')
 
         server.body = b''
         server.status = 307
         server.redirect = f'http://127.0.0.1:{redirect_target.server_port}/stolen'
         for provider in ['azure', 'gcs', 'webdav']:
-            invoke(provider)
-            assert redirect_target.calls == 0, 'redirect followed'
-            passed(provider + '_redirect_blocked')
+            with checks.case(provider + '_redirect_blocked'):
+                invoke(provider)
+                assert redirect_target.calls == 0, 'redirect followed'
+                passed(provider + '_redirect_blocked')
+
         server.status, server.redirect = 200, None
-        server.body = b'<EnumerationResults><Blobs><Blob><Name>folder/</Name></Blob></Blobs></EnumerationResults>'
-        invoke('azure')
-        passed('azure_raw_key_rejected')
-        server.body = b'{"items":[{"name":"folder/","size":"1","generation":"1"}]}'
-        invoke('gcs')
-        passed('gcs_raw_key_rejected')
-        server.body = b'{"items":[],"nextPageToken":"repeated"}'
-        before = server.calls
-        invoke('gcs')
-        assert server.calls - before <= 3, 'unbounded continuation loop'
-        passed('gcs_repeated_page_token_rejected')
-        server.status = 207
-        server.body = b'<d:multistatus xmlns:d="DAV:"><d:response><d:href>/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:getcontentlength/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response></d:multistatus>'
-        invoke('webdav', 'test', success=True)
-        passed('webdav_absent_optional_property')
-        server.body = b'<d:multistatus xmlns:d="DAV:"><d:response><d:href>http://elsewhere.invalid/file</d:href></d:response></d:multistatus>'
-        invoke('webdav')
-        passed('webdav_outside_root_rejected')
-        server.body = b'<d:multistatus xmlns:d="DAV:"/>'
-        args = ('--key', 'payload', '--input', str(source), '--overwrite', 'true', '--publication-policy', 'best-effort')
-        error = invoke('webdav', 'put', args)['error']
-        assert error['remote_effect'] == 'unknown', error
-        passed('webdav_partial_multistatus_not_success')
-        server.status, server.body, server.delay = 201, b'', 2
-        deadline = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=1)).isoformat()
-        error = invoke('webdav', 'put', args, ('--deadline', deadline))['error']
-        assert error['category'] == 'timeout' and error['remote_effect'] == 'unknown', error
-        passed('webdav_commit_deadline_unknown')
+        with checks.case('azure_raw_key_rejected'):
+            server.body = b'<EnumerationResults><Blobs><Blob><Name>folder/</Name></Blob></Blobs></EnumerationResults>'
+            invoke('azure')
+            passed('azure_raw_key_rejected')
+        with checks.case('gcs_raw_key_rejected'):
+            server.body = b'{"items":[{"name":"folder/","size":"1","generation":"1"}]}'
+            invoke('gcs')
+            passed('gcs_raw_key_rejected')
+        with checks.case('gcs_repeated_page_token_rejected'):
+            server.body = b'{"items":[],"nextPageToken":"repeated"}'
+            before = server.calls
+            invoke('gcs')
+            assert server.calls - before <= 3, 'unbounded continuation loop'
+            passed('gcs_repeated_page_token_rejected')
+        with checks.case('webdav_absent_optional_property'):
+            server.status = 207
+            server.body = b'<d:multistatus xmlns:d="DAV:"><d:response><d:href>/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:getcontentlength/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response></d:multistatus>'
+            invoke('webdav', 'test', success=True)
+            passed('webdav_absent_optional_property')
+        with checks.case('webdav_outside_root_rejected'):
+            server.body = b'<d:multistatus xmlns:d="DAV:"><d:response><d:href>http://elsewhere.invalid/file</d:href></d:response></d:multistatus>'
+            invoke('webdav')
+            passed('webdav_outside_root_rejected')
+        with checks.case('webdav_partial_multistatus_not_success'):
+            server.body = b'<d:multistatus xmlns:d="DAV:"/>'
+            args = ('--key', 'payload', '--input', str(source), '--overwrite', 'true', '--publication-policy', 'best-effort')
+            error = invoke('webdav', 'put', args)['error']
+            assert error['remote_effect'] == 'unknown', error
+            passed('webdav_partial_multistatus_not_success')
+        with checks.case('webdav_commit_deadline_unknown'):
+            server.status, server.body, server.delay = 201, b'', 2
+            deadline = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=1)).isoformat()
+            error = invoke('webdav', 'put', args, ('--deadline', deadline))['error']
+            assert error['category'] == 'timeout' and error['remote_effect'] == 'unknown', error
+            passed('webdav_commit_deadline_unknown')
         server.delay = 0
         args = ('--key', 'parent/payload', '--input', str(source), '--overwrite', 'true', '--publication-policy', 'best-effort')
         collection = b'<d:multistatus xmlns:d="DAV:"><d:response><d:href>/parent/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>'
-        for status in [405, 409, 500]:
-            server.responses = {'MKCOL': (status, b''), 'PROPFIND': (207, collection), 'PUT': (201, b'')}
-            invoke('webdav', 'put', args, success=True)
-        passed('webdav_parent_race_reconciled')
-        for body in [collection.replace(b'<d:collection/>', b'<d:not-a-collection/>').replace(b'</d:prop>', b'<d:getcontentlength>0</d:getcontentlength></d:prop>'), b'invalid XML']:
-            server.responses = {'MKCOL': (500, b''), 'PROPFIND': (207, body), 'PUT': (201, b'')}
-            before = server.methods.count('PUT')
-            invoke('webdav', 'put', args)
-            assert server.methods.count('PUT') == before, 'upload attempted without a directory proof'
-        passed('webdav_parent_not_directory_rejected')
+        with checks.case('webdav_parent_race_reconciled'):
+            for status in [405, 409, 500]:
+                server.responses = {'MKCOL': (status, b''), 'PROPFIND': (207, collection), 'PUT': (201, b'')}
+                invoke('webdav', 'put', args, success=True)
+            passed('webdav_parent_race_reconciled')
+        with checks.case('webdav_parent_not_directory_rejected'):
+            for body in [collection.replace(b'<d:collection/>', b'<d:not-a-collection/>').replace(b'</d:prop>', b'<d:getcontentlength>0</d:getcontentlength></d:prop>'), b'invalid XML']:
+                server.responses = {'MKCOL': (500, b''), 'PROPFIND': (207, body), 'PUT': (201, b'')}
+                before = server.methods.count('PUT')
+                invoke('webdav', 'put', args)
+                assert server.methods.count('PUT') == before, 'upload attempted without a directory proof'
+            passed('webdav_parent_not_directory_rejected')
         server.shutdown()
         redirect_target.shutdown()
+    present = {row['name'] for row in results}
+    results.extend({'name': name, 'status': 'FAIL'} for name in sorted(EXPECTED_TESTS - present))
     report = {'binary_sha256': hashlib.sha256(BINARY.read_bytes()).hexdigest(), 'results': results,
               'spool_uploads': options.spool_uploads}
     assert {result['name'] for result in results} == EXPECTED_TESTS
@@ -178,6 +193,7 @@ def main():
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))
+    checks.finish()
 
 
 if __name__ == '__main__':

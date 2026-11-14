@@ -1,9 +1,10 @@
 """Public test identities for the isolated storage fixtures, never production."""
 import os
 from pathlib import Path
+from proof_sources import dictionary_keys
 
 ROOT = Path(__file__).resolve().parents[1]
-PROVIDERS = ('local', 's3', 'sftp', 'ftp', 'ftps', 'azure', 'gcs', 'smb', 'webdav')
+PROVIDERS = dictionary_keys('scripts/fixture_connections.py', 'configurations')
 BUFFERED = frozenset({'local', 'azure', 'gcs', 'smb', 'webdav'})
 ATOMIC = frozenset({'local', 's3', 'sftp', 'azure', 'gcs'})
 
