@@ -9,10 +9,10 @@ import subprocess
 import tarfile
 import tempfile
 import tomllib
-import os
 import io
 
 from versioning import workspace_version
+from package_runner import run_consumer
 from check_packages import verify_distribution, registry, checkout_source_bytes, repository_snapshot
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -72,18 +72,6 @@ def select_source_archive(raw, archive, prefix, *, checkout_bytes=False):
                             selected.addfile(member, io.BytesIO(data))
                         else:
                             selected.addfile(member, committed.extractfile(member))
-
-
-def run_consumer(consumer, toolchain, target_dir, log):
-    # Cargo's CI action forces ANSI color even for redirected output. Evidence
-    # is scanned UTF-8 text: prevent terminal controls rather than stripping
-    # bytes after capture or relaxing the generated-member classifier.
-    with log.open('wb') as stream:
-        return subprocess.run(['cargo', 'run', '--offline', '--manifest-path', str(consumer / 'Cargo.toml')],
-                              cwd=consumer, env=dict(os.environ, RUSTUP_TOOLCHAIN=toolchain,
-                                                    CARGO_TARGET_DIR=str(Path(target_dir).resolve()),
-                                                    CARGO_TERM_COLOR='never'),
-                              stdout=stream, stderr=subprocess.STDOUT)
 
 
 def build(output, target_dir):

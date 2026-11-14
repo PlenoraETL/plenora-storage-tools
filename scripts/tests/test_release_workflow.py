@@ -1,32 +1,40 @@
-"""Keep the clean-runner regression coupled to publication prerequisites."""
+"""Preserve prerequisite policy using the single workflow reader and graph."""
+from copy import deepcopy
 from pathlib import Path
 import re
+import sys
 import tomllib
 import unittest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from ci_plan import workflows, compile_plan, job_plan
+from ci_policy import actions, runs
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 def jobs(name):
-    text = (ROOT / '.github/workflows' / name).read_text()
-    return dict(re.findall(r'^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
-                           text.split('jobs:\n', 1)[1], re.M | re.S))
+    documents = workflows(ROOT)
+    graph = compile_plan(documents)
+    return {name_: job_plan(graph, name, name_) for name_, value in documents[name]['jobs'].items()
+            if 'steps' in value}
 
 
 def prerequisites(job):
-    # Deliberately require unconditional standalone steps, before any guard.
-    rust = re.search(r'^      - uses: (dtolnay/rust-toolchain@[0-9a-f]{40})\n'
-                     r'        with:\n          toolchain: \'([^\']+)\'\n', job, re.M)
-    fetch = re.search(r'^      - run: cargo fetch --locked\n', job, re.M)
-    checkout = re.search(r'^      - uses: actions/checkout@[0-9a-f]{40}', job, re.M)
-    if not rust or not fetch or not checkout:
+    steps = job['steps']
+    def position(predicate):
+        return next((i for i, step in enumerate(steps) if 'if' not in step and predicate(step)), None)
+    rust = position(lambda s: re.fullmatch(r'dtolnay/rust-toolchain@[0-9a-f]{40}', s.get('uses', '')))
+    fetch = position(lambda s: s.get('run', '').strip() == 'cargo fetch --locked')
+    checkout = position(lambda s: re.fullmatch(r'actions/checkout@[0-9a-f]{40}', s.get('uses', '')))
+    if any(value is None for value in (rust, fetch, checkout)):
         raise ValueError('missing explicit Git/Rust/fetch prerequisite')
-    if not checkout.start() < rust.start() < fetch.start():
+    if not checkout < rust < fetch:
         raise ValueError('prerequisites out of order')
-    guard = re.search(r'python(?:3)? scripts/(?:release_publication|check_release_packages|verify_release|qualify_release|qualify_windows_candidate|build_release)\.py', job)
-    if guard and fetch.end() > guard.start():
+    guard = position(lambda s: re.search(r'python(?:3)? scripts/(?:release_publication|check_release_packages|verify_release|qualify_release|qualify_windows_candidate|build_release)\.py', s.get('run', '')))
+    if guard is not None and fetch > guard:
         raise ValueError('fetch must precede release verification')
-    return rust.groups()
+    return steps[rust]['uses'], steps[rust]['with']['toolchain']
 
 
 class ReleaseWorkflowTests(unittest.TestCase):
@@ -35,7 +43,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
                  r'scripts/release_publication\.py\s+(?:prepare|upload|publish|bundle)\b')
         checked = set()
         for name, job in jobs('release.yml').items():
-            if re.search(guard, job):
+            if any(re.search(guard, command) for command in runs(job)):
                 with self.subTest(job=name):
                     prerequisites(job)
                 checked.add(name)
@@ -51,33 +59,39 @@ class ReleaseWorkflowTests(unittest.TestCase):
                     jobs('release-candidate.yml')['windows']):
             self.assertEqual(prerequisites(job), reference)
         for name in ('qualify', 'publish'):
-            self.assertIn('ref: ${{ inputs.tag }}', release[name])
-            self.assertIn('fetch-depth: 0', release[name])
-            self.assertIn('runs-on: ubuntu-24.04', release[name])
-        self.assertIn('runs-on: ubuntu-24.04', ci['release-package-recheck'])
-        self.assertIn("python-version-file: .python-version", ci['release-package-recheck'])
-        python_setup = r'uses: (actions/setup-python@[0-9a-f]{40})[^\n]*\n        with:\n          python-version-file: (.+)'
-        self.assertEqual(re.search(python_setup, release['qualify']).groups(),
-                         re.search(python_setup, ci['release-package-recheck']).groups())
+            checkout = actions(release[name], 'actions/checkout')[0]['with']
+            self.assertEqual(checkout['ref'], '${{ inputs.tag }}')
+            self.assertEqual(checkout['fetch-depth'], 0)
+            self.assertEqual(release[name]['runs-on'], 'ubuntu-24.04')
+        self.assertEqual(ci['release-package-recheck']['runs-on'], 'ubuntu-24.04')
+        setup = actions(ci['release-package-recheck'], 'actions/setup-python')[0]
+        self.assertEqual(setup['with']['python-version-file'], '.python-version')
+        self.assertEqual(actions(release['qualify'], 'actions/setup-python')[0], setup)
         for job in (release['qualify'], ci['release-package-recheck']):
-            self.assertIn('python -m pip install -r scripts/requirements-quality.txt', job)
-        self.assertIn('needs: [release-package-build, docker-conformance, native-windows]', ci['release-package-recheck'])
-        self.assertNotIn('actions/cache@', ci['release-package-recheck'])
+            self.assertIn('python -m pip install -r scripts/requirements-quality.txt', runs(job))
+        self.assertEqual(ci['release-package-recheck']['needs'], ['release-package-build', 'docker-conformance', 'native-windows'])
+        self.assertFalse(actions(ci['release-package-recheck'], 'actions/cache'))
 
     def test_missing_or_late_prerequisites_are_rejected(self):
-        job = jobs('release.yml')['qualify']
-        mutations = [re.sub(r'^      - uses: dtolnay/.*?\n', '', job, flags=re.M),
-                     job.replace('      - run: cargo fetch --locked\n', ''),
-                     job.replace('      - uses: actions/checkout@', '      - uses: other/checkout@'),
-                     job.replace('      - run: cargo fetch --locked\n', '')
-                     + '      - run: cargo fetch --locked\n']
-        for mutated in mutations:
-            with self.subTest(job=mutated), self.assertRaises(ValueError):
-                prerequisites(mutated)
+        original = jobs('release.yml')['qualify']
+        for mutation in ('rust', 'fetch', 'checkout', 'order'):
+            job = deepcopy(original)
+            if mutation == 'rust':
+                job['steps'] = [s for s in job['steps'] if not s.get('uses', '').startswith('dtolnay/')]
+            elif mutation == 'checkout':
+                actions(job, 'actions/checkout')[0]['uses'] = 'other/checkout@' + 'a' * 40
+            else:
+                fetch = next(s for s in job['steps'] if s.get('run') == 'cargo fetch --locked')
+                job['steps'].remove(fetch)
+                if mutation == 'order':
+                    job['steps'].append(fetch)
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                prerequisites(job)
 
     def test_external_actions_are_pinned(self):
-        for path in (ROOT / '.github/workflows').glob('*.yml'):
-            for action in re.findall(r'\buses: ([^\s#]+)', path.read_text()):
-                if not action.startswith('./'):
-                    with self.subTest(workflow=path.name, action=action):
-                        self.assertRegex(action, r'^[\w./-]+@[0-9a-f]{40}$')
+        graph = compile_plan(workflows(ROOT))
+        for node in graph['nodes'].values():
+            action = node['definition'].get('uses')
+            if action and not action.startswith('./'):
+                with self.subTest(action=action):
+                    self.assertRegex(action, r'^[\w./-]+@[0-9a-f]{40}$')
