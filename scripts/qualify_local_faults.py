@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+from proof_collection import Collection
 import strict_json
 import os
 from pathlib import Path
@@ -109,38 +110,43 @@ def main():
                 report['results'].append({'name': name, 'status': 'PASS', 'category': category, 'phase': phase,
                                           'remote_effect': error['remote_effect'], 'retry': error['retry']})
 
+            checks = Collection()
             sentinel = b'previous-content-must-survive'
             destination = full / 'existing'
             destination.write_bytes(sentinel)
             destination.chmod(0o666)
-            check('download_disk_full', normal, 'get', ['--key', 'source', '--output', destination, '--overwrite', 'true'],
-                  'resource_limit', 'write', 'rolled_back')
-            if destination.read_bytes() != sentinel or set(full.iterdir()) != {destination}:
-                raise ValueError('failed download altered final content or left staging files')
-            check('upload_disk_full', constrained, 'put', ['--key', 'existing', '--input', source, '--overwrite', 'true',
-                                                         '--publication-policy', 'atomic-required'], 'resource_limit', 'write', 'rolled_back')
-            if destination.read_bytes() != sentinel or set(full.iterdir()) != {destination}:
-                raise ValueError('failed upload altered final content or left staging files')
-            source.chmod(0)
-            try:
-                check('input_permission_denied', normal, 'put', ['--key', 'new', '--input', source, '--overwrite', 'false',
-                                                               '--publication-policy', 'atomic-required'], 'authorization', 'read')
-            finally:
-                source.chmod(0o644)
-            protected = root / 'protected'
-            protected.mkdir()
-            existing = protected / 'existing'
-            existing.write_bytes(sentinel)
-            protected.chmod(0o555)
-            try:
-                check('output_permission_denied', normal, 'get', ['--key', 'source', '--output', existing, '--overwrite', 'true'],
-                      'authorization', 'prepare')
-                if existing.read_bytes() != sentinel or set(protected.iterdir()) != {existing}:
-                    raise ValueError('denied download altered final content or left staging files')
-            finally:
-                protected.chmod(0o755)
-            if set(storage.iterdir()) != {storage / 'source'}:
-                raise ValueError('denied upload produced remote effects')
+            with checks.case('download_disk_full'):
+                check('download_disk_full', normal, 'get', ['--key', 'source', '--output', destination, '--overwrite', 'true'],
+                      'resource_limit', 'write', 'rolled_back')
+                if destination.read_bytes() != sentinel or set(full.iterdir()) != {destination}:
+                    raise ValueError('failed download altered final content or left staging files')
+            with checks.case('upload_disk_full'):
+                check('upload_disk_full', constrained, 'put', ['--key', 'existing', '--input', source, '--overwrite', 'true',
+                                                             '--publication-policy', 'atomic-required'], 'resource_limit', 'write', 'rolled_back')
+                if destination.read_bytes() != sentinel or set(full.iterdir()) != {destination}:
+                    raise ValueError('failed upload altered final content or left staging files')
+            with checks.case('input_permission_denied'):
+                source.chmod(0)
+                try:
+                    check('input_permission_denied', normal, 'put', ['--key', 'new', '--input', source, '--overwrite', 'false',
+                                                                   '--publication-policy', 'atomic-required'], 'authorization', 'read')
+                finally:
+                    source.chmod(0o644)
+            with checks.case('output_permission_denied'):
+                protected = root / 'protected'
+                protected.mkdir()
+                existing = protected / 'existing'
+                existing.write_bytes(sentinel)
+                protected.chmod(0o555)
+                try:
+                    check('output_permission_denied', normal, 'get', ['--key', 'source', '--output', existing, '--overwrite', 'true'],
+                          'authorization', 'prepare')
+                    if existing.read_bytes() != sentinel or set(protected.iterdir()) != {existing}:
+                        raise ValueError('denied download altered final content or left staging files')
+                finally:
+                    protected.chmod(0o755)
+                if set(storage.iterdir()) != {storage / 'source'}:
+                    raise ValueError('denied upload produced remote effects')
             if args.spool_uploads:
                 preserved = storage / 'existing'
                 preserved.write_bytes(sentinel)
@@ -154,15 +160,20 @@ def main():
                             ('upload', ['--key', 'existing', '--input', source]),
                             ('copy', ['--source-key', 'source', '--destination-key', 'existing']),
                         ]:
-                            check(f'{operation}_preparation_{fault}', normal, 'put' if operation == 'upload' else 'copy',
-                                  [*arguments, '--overwrite', 'true', '--publication-policy', 'atomic-required'],
-                                  category, 'prepare', environment=environment)
-                            if preserved.read_bytes() != sentinel or set(storage.iterdir()) != {preserved, storage / 'source'}:
-                                raise ValueError('preparation failure changed destination or left staging files')
-                            if set(full.iterdir()) != {destination} or os.statvfs(full).f_bavail != free_before:
-                                raise ValueError('preparation failure leaked private temporary storage')
+                            with checks.case(f'{operation}_preparation_{fault}'):
+                                check(f'{operation}_preparation_{fault}', normal, 'put' if operation == 'upload' else 'copy',
+                                      [*arguments, '--overwrite', 'true', '--publication-policy', 'atomic-required'],
+                                      category, 'prepare', environment=environment)
+                                if preserved.read_bytes() != sentinel or set(storage.iterdir()) != {preserved, storage / 'source'}:
+                                    raise ValueError('preparation failure changed destination or left staging files')
+                                if set(full.iterdir()) != {destination} or os.statvfs(full).f_bavail != free_before:
+                                    raise ValueError('preparation failure leaked private temporary storage')
                     finally:
                         full.chmod(0o777)
+        failures = {row['name'] for row in checks.results if row['status'] != 'PASS'}
+        report['results'] = [row for row in report['results'] if row['name'] not in failures]
+        report['results'].extend({'name': name, 'status': 'FAIL'} for name in sorted(failures))
+        checks.finish()
         report['status'] = 'PASS'
         validate_report(report, report['binary_sha256'], spool_uploads=args.spool_uploads)
     except BaseException as error:

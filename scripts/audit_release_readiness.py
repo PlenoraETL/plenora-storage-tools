@@ -8,6 +8,7 @@ import datetime
 import hashlib
 import http.server
 import json
+from proof_collection import Collection
 import strict_json
 import os
 import pathlib
@@ -59,49 +60,53 @@ class S3(http.server.BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 results = {}
+collection = Collection()
 with http.server.ThreadingHTTPServer(('127.0.0.1', 0), S3) as server:
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     config = connection('s3', {'endpoint': f'http://127.0.0.1:{server.server_port}', 'bucket': 'audit'})
-    args = BASE + ['--allow-insecure-http', 'list', '--connection', config, '--max-items', '1']
-    first = subprocess.run(args, env=ENV, capture_output=True, text=True, timeout=10)
-    first_json = strict_json.loads(first.stdout)
-    assert first.returncode == 2 and first_json['error']['code'] == 'CLI_LIST_PAGINATION_REQUIRED', first_json
-    complete = subprocess.run(args + ['--all'], env=ENV, capture_output=True, text=True, timeout=10)
-    value = strict_json.loads(complete.stdout)
-    assert complete.returncode == 0, value
-    assert [item['key'] for item in value['result']['objects']] == ['a', 'b', 'c'], value
-    assert value['result']['next_cursor'] is None and value['result']['truncated'] is False
-    bounded = subprocess.run(args + ['--all', '--max-list-items', '2'], env=ENV, capture_output=True, text=True, timeout=10)
-    bound = strict_json.loads(bounded.stdout)
-    assert bounded.returncode == 4 and bound['error']['code'] == 'CLI_LIST_LIMIT_EXCEEDED', bound
-    cursor = subprocess.run(args + ['--cursor', 'cursor://expired'], env=ENV, capture_output=True, text=True, timeout=10)
-    assert strict_json.loads(cursor.stdout)['error']['code'] == 'CLI_CURSOR_SESSION_REQUIRED'
-    results['cli_pagination'] = {'status': 'PASS', 'pages': 3, 'bounded': True}
+    with collection.case('cli_pagination'):
+        args = BASE + ['--allow-insecure-http', 'list', '--connection', config, '--max-items', '1']
+        first = subprocess.run(args, env=ENV, capture_output=True, text=True, timeout=10)
+        first_json = strict_json.loads(first.stdout)
+        assert first.returncode == 2 and first_json['error']['code'] == 'CLI_LIST_PAGINATION_REQUIRED', first_json
+        complete = subprocess.run(args + ['--all'], env=ENV, capture_output=True, text=True, timeout=10)
+        value = strict_json.loads(complete.stdout)
+        assert complete.returncode == 0, value
+        assert [item['key'] for item in value['result']['objects']] == ['a', 'b', 'c'], value
+        assert value['result']['next_cursor'] is None and value['result']['truncated'] is False
+        bounded = subprocess.run(args + ['--all', '--max-list-items', '2'], env=ENV, capture_output=True, text=True, timeout=10)
+        bound = strict_json.loads(bounded.stdout)
+        assert bounded.returncode == 4 and bound['error']['code'] == 'CLI_LIST_LIMIT_EXCEEDED', bound
+        cursor = subprocess.run(args + ['--cursor', 'cursor://expired'], env=ENV, capture_output=True, text=True, timeout=10)
+        assert strict_json.loads(cursor.stdout)['error']['code'] == 'CLI_CURSOR_SESSION_REQUIRED'
+        results['cli_pagination'] = {'status': 'PASS', 'pages': 3, 'bounded': True}
 
-    destination = WORK / 'existing-output.txt'
-    get_args = BASE + ['--allow-insecure-http', 'get', '--connection', config,
-                       '--key', 'object', '--output', str(destination)]
-    destination.write_bytes(b'original')
-    conflict = subprocess.run(get_args + ['--overwrite', 'false'], env=ENV, capture_output=True, text=True, timeout=10)
-    assert conflict.returncode == 5 and strict_json.loads(conflict.stdout)['error']['code'] == 'OUTPUT_EXISTS', conflict.stdout
-    assert destination.read_bytes() == b'original'
-    limited = subprocess.run(get_args + ['--overwrite', 'true', '--max-transfer-bytes', '1'], env=ENV, capture_output=True, text=True, timeout=10)
-    assert limited.returncode == 4, limited.stdout
-    assert destination.read_bytes() == b'original'
-    replaced = subprocess.run(get_args + ['--overwrite', 'true'], env=ENV, capture_output=True, text=True, timeout=10)
-    assert replaced.returncode == 0 and destination.read_bytes() == b'qualified download', replaced.stdout
-    assert not list(WORK.glob('.existing-output.txt.plenora-storage-*.part'))
-    results['cli_download_publication'] = {'status': 'PASS', 'existing_file_preserved_on_failure': True}
+    with collection.case('cli_download_publication'):
+        destination = WORK / 'existing-output.txt'
+        get_args = BASE + ['--allow-insecure-http', 'get', '--connection', config,
+                           '--key', 'object', '--output', str(destination)]
+        destination.write_bytes(b'original')
+        conflict = subprocess.run(get_args + ['--overwrite', 'false'], env=ENV, capture_output=True, text=True, timeout=10)
+        assert conflict.returncode == 5 and strict_json.loads(conflict.stdout)['error']['code'] == 'OUTPUT_EXISTS', conflict.stdout
+        assert destination.read_bytes() == b'original'
+        limited = subprocess.run(get_args + ['--overwrite', 'true', '--max-transfer-bytes', '1'], env=ENV, capture_output=True, text=True, timeout=10)
+        assert limited.returncode == 4, limited.stdout
+        assert destination.read_bytes() == b'original'
+        replaced = subprocess.run(get_args + ['--overwrite', 'true'], env=ENV, capture_output=True, text=True, timeout=10)
+        assert replaced.returncode == 0 and destination.read_bytes() == b'qualified download', replaced.stdout
+        assert not list(WORK.glob('.existing-output.txt.plenora-storage-*.part'))
+        results['cli_download_publication'] = {'status': 'PASS', 'existing_file_preserved_on_failure': True}
     server.shutdown()
     thread.join()
 
 # Bounded connection reads reject oversized files before JSON decoding.
-large = WORK / 'oversized-connection.json'
-large.write_bytes(b' ' * 1_048_577)
-rejected = subprocess.run(BASE + ['test', '--connection', str(large)], env=ENV, capture_output=True, text=True, timeout=10)
-assert rejected.returncode == 4 and strict_json.loads(rejected.stdout)['error']['code'] == 'CONNECTION_FILE_TOO_LARGE'
-results['connection_file_bound'] = {'status': 'PASS'}
+with collection.case('connection_file_bound'):
+    large = WORK / 'oversized-connection.json'
+    large.write_bytes(b' ' * 1_048_577)
+    rejected = subprocess.run(BASE + ['test', '--connection', str(large)], env=ENV, capture_output=True, text=True, timeout=10)
+    assert rejected.returncode == 4 and strict_json.loads(rejected.stdout)['error']['code'] == 'CONNECTION_FILE_TOO_LARGE'
+    results['connection_file_bound'] = {'status': 'PASS'}
 
 seen = threading.Event()
 release = threading.Event()
@@ -122,31 +127,38 @@ class FTP(socketserver.StreamRequestHandler):
 with socketserver.ThreadingTCPServer(('127.0.0.1', 0), FTP) as server:
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    config = connection('ftp', {'host': '127.0.0.1', 'port': server.server_address[1]})
-    source = WORK / 'input.txt'
-    source.write_text('audit')
-    deadline = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=2)
-    args = BASE + ['--allow-insecure-ftp', '--deadline', deadline.isoformat(), 'put', '--connection', config, '--key', 'parent/object', '--input', str(source), '--overwrite', 'true', '--publication-policy', 'best-effort']
-    started = time.monotonic()
-    process = subprocess.Popen(args, env=ENV, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    try:
-        assert seen.wait(3), 'FTP parent probe was not reached'
+    with collection.case('ftp_parent_deadline'):
+        config = connection('ftp', {'host': '127.0.0.1', 'port': server.server_address[1]})
+        source = WORK / 'input.txt'
+        source.write_text('audit')
+        deadline = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=2)
+        args = BASE + ['--allow-insecure-ftp', '--deadline', deadline.isoformat(), 'put', '--connection', config, '--key', 'parent/object', '--input', str(source), '--overwrite', 'true', '--publication-policy', 'best-effort']
+        started = time.monotonic()
+        process = subprocess.Popen(args, env=ENV, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         try:
-            stdout, stderr = process.communicate(timeout=4)
-            value = strict_json.loads(stdout)
-            assert process.returncode == 5 and value['error']['category'] == 'timeout', value
-            assert value['error']['remote_effect'] == 'none', value
-            results['ftp_parent_deadline'] = {'status': 'PASS', 'elapsed': round(time.monotonic() - started, 2)}
-        except subprocess.TimeoutExpired:
-            raise AssertionError('FTP directory probe exceeded its deadline') from None
-    finally:
-        if process.poll() is None:
-            process.kill()
-        process.communicate()
-        release.set()
-        server.shutdown()
-        thread.join()
+            assert seen.wait(3), 'FTP parent probe was not reached'
+            try:
+                stdout, stderr = process.communicate(timeout=4)
+                value = strict_json.loads(stdout)
+                assert process.returncode == 5 and value['error']['category'] == 'timeout', value
+                assert value['error']['remote_effect'] == 'none', value
+                results['ftp_parent_deadline'] = {'status': 'PASS', 'elapsed': round(time.monotonic() - started, 2)}
+            except subprocess.TimeoutExpired:
+                raise AssertionError('FTP directory probe exceeded its deadline') from None
+        finally:
+            if process.poll() is None:
+                process.kill()
+            process.communicate()
+            release.set()
+            server.shutdown()
+            thread.join()
+
+for row in collection.results:
+    if row['status'] != 'PASS':
+        results[row['name']] = row
 
 evidence = {'binary_sha256': hashlib.sha256(CLI.read_bytes()).hexdigest(), 'results': results}
 (WORK / 'results.json').write_text(json.dumps(evidence, indent=2), encoding='utf-8')
 print(json.dumps(evidence, indent=2))
+
+collection.finish()

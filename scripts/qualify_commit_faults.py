@@ -8,6 +8,7 @@ import hashlib
 import http.client
 import http.server
 import json
+from proof_collection import Collection
 import strict_json
 import os
 from pathlib import Path
@@ -140,10 +141,17 @@ def qualify(mode, interruption, work):
 def main():
     assert os.name == 'posix', 'SIGTERM qualification runs in the Linux fixture runner'
     with tempfile.TemporaryDirectory(prefix='storage-commit-faults-') as directory:
-        results = [qualify(mode, interruption, Path(directory))
-                   for mode in ['before_commit', 'after_commit']
-                   for interruption in ['deadline', 'sigterm']]
+        results = []
+        collection = Collection()
+        for mode in ['before_commit', 'after_commit']:
+            for interruption in ['deadline', 'sigterm']:
+                with collection.case(mode + '-' + interruption):
+                    results.append(qualify(mode, interruption, Path(directory)))
+                if collection.results[-1]['status'] != 'PASS':
+                    results.append({'mode': mode, 'interruption': interruption, 'status': 'FAIL'})
     print(json.dumps({'binary_sha256': hashlib.sha256(BINARY.read_bytes()).hexdigest(), 'results': results}))
+
+    collection.finish()
 
 
 if __name__ == '__main__':

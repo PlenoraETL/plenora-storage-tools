@@ -26,10 +26,13 @@ from campaign_fence import (FENCED, LABEL, LOCK_HELD, ROOT_PATH, CampaignBusy, C
                            supervised)
 from campaign_state import Campaign, digest, exclusive, logged, write_json
 from versioning import parse_version, workspace_version
+from release_evidence import PYTHONS
+from proof_collection import Collection
+from proof_sources import passed_names
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS = {'linux': 'x86_64-unknown-linux-gnu', 'windows': 'x86_64-pc-windows-msvc'}
-LOCAL_PHASES = ('workflows', 'download', 'assemble', 'prepare-vm', 'qualify-windows', 'qualify-vm', 'seal')
+LOCAL_PHASES = tuple(sorted(passed_names('scripts/release_campaign.py', function='phase')))
 # The runner's own directory in the container's filesystem, which no mount
 # reaches: its source, its working files and its evidence.
 RUNNER_WORK = '/tmp/plenora-runner'
@@ -551,7 +554,7 @@ def run(config_path, output, retries, reason, connect_host=None):
                 shutil.copyfile(one(source, target + '-tests.log'), evidence / (target + '-tests.log'))
                 api = artifacts / ('api-compatibility-Linux' if system == 'linux' else 'api-compatibility-Windows')
                 shutil.copytree(one(api, 'report.json').parent, evidence / 'gates/api' / target)
-                for python in ('3.10', '3.11', '3.12', '3.13', '3.14'):
+                for python in PYTHONS:
                     label = 'ubuntu-24.04' if system == 'linux' else 'windows-latest'
                     sdk = artifacts / f'release-python-{label}-{python}'
                     shutil.copytree(one(sdk, 'sdk-tests.json').parent, evidence / 'gates/sdk' / target / python)
@@ -618,7 +621,10 @@ def run(config_path, output, retries, reason, connect_host=None):
                            path / 'command.log', session, cwd=ROOT, env=dict(os.environ, PLENORA_WEBDAV_PORT='8088'))
                 session.check(remote)
 
-            windows_result = phase('qualify-windows', windows)
+            qualifications = Collection(fatal=(CampaignBusy, CampaignFenced))
+            with qualifications.case('qualify-windows'):
+                windows_result = phase('qualify-windows', windows)
+            session.check(remote)
 
             def vm(path):
                 if connect_host:
@@ -732,9 +738,12 @@ def run(config_path, output, retries, reason, connect_host=None):
                 check_selected(runner, identity, linux, expected, runner / 'campaign.json', session.epoch, nonce)
                 session.check(remote)
 
-            vm_result = phase('qualify-vm', vm)
+            with qualifications.case('qualify-vm'):
+                vm_result = phase('qualify-vm', vm)
+            session.check(remote)
             held.__exit__(None, None, None)
             held = None
+            qualifications.finish(output / 'qualification-collection.json')
 
             def seal(path):
                 release = path / 'dist' / version

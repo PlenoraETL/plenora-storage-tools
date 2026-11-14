@@ -8,7 +8,6 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
-import traceback
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -140,8 +139,7 @@ def main():
                 assert not invoke('delete', '--key', key, '--ignore-missing', 'true')['deleted']
                 results.append({'provider': provider, 'status': 'PASS', 'operations': 7, 'bytes': len(payload)})
             except Exception as error:
-                traceback.print_exc()
-                results.append({'provider': provider, 'status': 'FAIL', 'error': str(error)})
+                results.append({'provider': provider, 'status': 'FAIL', 'failure_type': type(error).__name__})
             print(json.dumps(results[-1]), flush=True)
         report = {'binary_sha256': hashlib.sha256(BINARY.read_bytes()).hexdigest(), 'results': results,
                   'spool_uploads': options.spool_uploads,
