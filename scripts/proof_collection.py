@@ -1,6 +1,6 @@
 """Collect independent checks; never convert a failed prerequisite into PASS."""
 from contextlib import contextmanager
-import json
+from campaign_model import write_json, transition
 
 
 class Collection:
@@ -10,23 +10,22 @@ class Collection:
 
     @contextmanager
     def case(self, name):
-        row = {'name': name, 'status': 'RUNNING'}
+        row = {'name': name, 'status': transition('phase', 'NEW', 'start')}
         self.results.append(row)
         try:
             yield
         except Exception as error:
             # Callback and subprocess messages may contain private material.
-            row.update(status='FAIL', failure_type=type(error).__name__)
+            row.update(status=transition('phase', row['status'], 'failure'), failure_type=type(error).__name__)
             if isinstance(error, self.fatal):
                 raise
         else:
-            row['status'] = 'PASS'
+            row['status'] = transition('phase', row['status'], 'success')
 
     def finish(self, output=None):
         passed = bool(self.results) and all(r['status'] == 'PASS' for r in self.results)
         if output is not None:
             output.parent.mkdir(parents=True, exist_ok=True)
-            output.write_text(json.dumps({'status': 'PASS' if passed else 'FAIL',
-                                          'results': self.results}, indent=2) + '\n', encoding='utf-8')
+            write_json(output, {'status': 'PASS' if passed else 'FAIL', 'results': self.results})
         if not passed:
             raise RuntimeError('qualification checks failed; inspect the collection report')

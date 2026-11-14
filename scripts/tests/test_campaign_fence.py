@@ -23,6 +23,7 @@ from campaign_state import Campaign, digest
 import campaign_fence
 import release_campaign
 import run_vm_campaign
+from campaign_model import preparation_sources
 
 ROOT = Path(__file__).resolve().parents[2]
 EPOCH = '7-' + '0' * 32
@@ -2026,19 +2027,11 @@ class PreparationProtocolTests(ProtocolCase):
         return run_vm_campaign.check_fixture_state(self.checkout / '.fixtures/campaign', nonce)
 
     def install_real_preparation(self):
-        # The preparation runs for real: copy the scripts and every helper they
-        # invoke from scripts/, so a new helper cannot be silently missing here.
-        pending = ['prepare-fixtures.sh', 'prepare-extended-fixtures.sh', 'prepare-sftp-keys.sh']
-        copied = set()
-        while pending:
-            name = pending.pop()
-            if name in copied:
-                continue
-            copied.add(name)
-            source = (ROOT / 'scripts' / name).read_text('utf-8')
-            shutil.copyfile(ROOT / 'scripts' / name, self.checkout / 'scripts' / name)
-            pending.extend(re.findall(r'scripts/([A-Za-z0-9_.-]+\.(?:sh|py))', source))
-        # Only Docker is substituted; host-side fixture preparation runs for real.
+        # The same closure checked before deployment, with live-service probes
+        # deliberately replaced by setUp's stubs. Source text is not a manifest.
+        for name in preparation_sources('runtime'):
+            shutil.copyfile(ROOT / name, self.checkout / name)
+        # Docker and reset probes are doubles; TLS/key preparation is real.
         (self.root / 'bin/docker').write_text(
             '#!/bin/sh\ncase "$*" in *ssh-keygen*) echo "256 SHA256:fixture host";; '
             '*authorized_keys*) cat >/dev/null;; esac\n')

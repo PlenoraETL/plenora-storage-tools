@@ -1,4 +1,5 @@
 """Generate ephemeral fixture identities and verify them with strict Python TLS."""
+from campaign_model import creation_profile, TLS_SECONDS
 import argparse
 import ipaddress
 import os
@@ -37,11 +38,8 @@ def verify_pair(cert, key, trust, hostname):
 def generate(kind, root, host='127.0.0.1'):
     # Also protect direct callers, before mkdir/write_text or OpenSSL creates
     # anything. Public certificates stay readable by fixture containers.
-    previous = os.umask(0o022)
-    try:
+    with creation_profile('fixture_file'):
         _generate(kind, root, host)
-    finally:
-        os.umask(previous)
 
 
 def _generate(kind, root, host):
@@ -50,7 +48,7 @@ def _generate(kind, root, host):
 
     def openssl(*arguments):
         subprocess.run(['openssl', *arguments], cwd=root, check=True,
-                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=TLS_SECONDS)
 
     if kind == 'minio':
         (root / 'minio').mkdir(exist_ok=True)

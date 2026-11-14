@@ -167,8 +167,8 @@ def check(root=ROOT):
     faults = passed_names('scripts/qualify_extended_faults.py', root)
     if not set(literal('scripts/qualify_extended_faults.py', 'LEGACY_TESTS', root)) <= faults:
         raise ValueError('historical fault subset no longer has producer probes')
-    campaigns = {name: sorted(passed_names('scripts/' + name, root, function='phase'))
-                 for name in ('run_vm_campaign.py', 'release_campaign.py')}
+    campaigns = {name: sorted(phases) for name, phases in
+                 literal('scripts/campaign_model.py', 'CAMPAIGN_PHASES', root).items()}
     return {'schema_version': 1, 'kind': 'static_source_inventory', 'workflows': workflow_inventory,
             'scripts': scripts, 'python_tests': tests, 'providers': list(expected),
             'fixture_probes': probe_names, 'fuzz_targets': list(targets), 'python_versions': list(pythons),

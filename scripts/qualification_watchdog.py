@@ -1,7 +1,7 @@
 """Fail-closed lifetime bounds for qualification (not performance thresholds)."""
+from campaign_model import WATCHDOG_POLL, WATCHDOG_JOIN, PhaseBudget, positive_seconds, WORKER_SHUTDOWN_SECONDS
 from concurrent.futures import Future
 import json
-import math
 import os
 from pathlib import Path
 import queue
@@ -12,11 +12,6 @@ import time
 import traceback
 
 
-def positive_seconds(value):
-    value = float(value)
-    if not math.isfinite(value) or value <= 0:
-        raise ValueError('watchdog seconds must be finite and positive')
-    return value
 
 
 def diagnostic(where, error=None):
@@ -54,11 +49,9 @@ def kill_descendants(pid):
     stop(pid)
 
 
-class Watchdog:
+class Watchdog(PhaseBudget):
     def __init__(self, seconds):
-        self.phase_deadline = time.monotonic() + positive_seconds(seconds)
-        self.round_deadline = None
-        self.round_number = None
+        super().__init__(seconds)
         self.stopped = threading.Event()
         self.thread = threading.Thread(target=self.watch, daemon=True, name='qualification-watchdog')
 
@@ -66,12 +59,8 @@ class Watchdog:
         self.thread.start()
         return self
 
-    def round(self, number, seconds):
-        self.round_number = number
-        self.round_deadline = time.monotonic() + positive_seconds(seconds)
-
     def watch(self):
-        while not self.stopped.wait(.05):
+        while not self.stopped.wait(WATCHDOG_POLL):
             now = time.monotonic()
             reason = None
             if not threading.main_thread().is_alive():
@@ -89,7 +78,7 @@ class Watchdog:
 
     def __exit__(self, *exc):
         self.stopped.set()
-        self.thread.join(timeout=1)
+        self.thread.join(timeout=WATCHDOG_JOIN)
 
 
 class WorkerPool:
@@ -132,7 +121,7 @@ class WorkerPool:
         for _ in self.threads:
             self.queue.put(None)
         if kind is None:
-            deadline = time.monotonic() + 5
+            deadline = time.monotonic() + WORKER_SHUTDOWN_SECONDS
             for thread in self.threads:
                 thread.join(timeout=max(0, deadline - time.monotonic()))
             if any(thread.is_alive() for thread in self.threads):

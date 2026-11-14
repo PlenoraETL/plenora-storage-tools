@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-umask 022
 cd "$(dirname "$0")/.."
+profile=$(python3 scripts/campaign_shell.py fixture_file)
+eval "$profile"
 mkdir -p .fixtures/minio
 trap 'status=$?; if [ -f .fixtures/certificate-generation.log ]; then tail -n 30 .fixtures/certificate-generation.log >&2; fi; exit "$status"' ERR
 # Reject invalid identities before building or starting any fixture container.
