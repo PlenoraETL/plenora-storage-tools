@@ -103,9 +103,9 @@ def registry():
 NATIVE_DISTRIBUTIONS = {
     'cli-linux': ('cli-linux', 'plenora-storage', 'elf', False),
     'cli-windows': ('cli-windows', 'plenora-storage.exe', 'pe', False),
-    'cp310-abi3-win_amd64': ('wheel-windows', 'plenora_storage/_native.pyd', 'pe', True),
-    'cp310-abi3-manylinux_2_34_x86_64': ('wheel-linux', 'plenora_storage/_native.abi3.so', 'elf', True),
-    'cp310-abi3-manylinux_2_39_x86_64': ('wheel-linux', 'plenora_storage/_native.abi3.so', 'elf', True),
+    'cp314-abi3-win_amd64': ('wheel-windows', 'plenora_storage/_native.pyd', 'pe', True),
+    'cp314-abi3-manylinux_2_34_x86_64': ('wheel-linux', 'plenora_storage/_native.abi3.so', 'elf', True),
+    'cp314-abi3-manylinux_2_39_x86_64': ('wheel-linux', 'plenora_storage/_native.abi3.so', 'elf', True),
     'qualification-linux': ('qualification', 'x86_64-unknown-linux-gnu/plenora-storage', 'elf', False),
     'qualification-windows': ('qualification', 'x86_64-pc-windows-msvc/plenora-storage.exe', 'pe', False),
     '.crate': (None, None, None, None),

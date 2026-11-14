@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.0.0
+
+- Breaking: Python minimum is now 3.14, with cp314 ABI3 wheels; Python <3.14 is no longer supported. `.python-version` defines the CI, SDK and release runtime policy.
+- Adopt the approved Plenora dependency snapshot and Linux CI checker; align exact public dependency pins, base64 0.23.1 and proptest 1.12.0.
+- Align compatible transitive dependencies to the first-wave references; retain AWS-LC TLS and only the exceptions declared by the common manifest.
+- Fix Docker fixture certificates for Python 3.14 strict TLS verification; verify application readiness and report sanitized startup failures without retrying permanent TLS errors.
+
 ## 3.0.5 — 2026-11-11
 
 Includes all changes listed for 3.0.4 plus the release workflow correction below.

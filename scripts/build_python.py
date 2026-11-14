@@ -14,6 +14,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def build(output, release=True, environment=None):
+    from check_python_version import check
+    errors = check(runtime=True)
+    if errors:
+        raise ValueError('; '.join(errors))
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
     command = ['maturin', 'build', '--locked', '--offline', '--manifest-path',

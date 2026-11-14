@@ -128,7 +128,7 @@ class ReleaseEvidenceTests(unittest.TestCase):
     def test_complete_bundle_records_raw_files_and_rejects_every_missing_gate(self):
         self.bundle()
         files = validate_bundle(self.root, REVISION, self.subjects, '1.0.0rc1')
-        self.assertGreater(len(files), 60)
+        self.assertEqual(len(files), 34 + len(TARGETS) * len(PYTHONS) * 5)
         self.assertFalse(any('/corpus/' in entry['name'] for entry in files))
         for name in ['soak/report.json', 'transfers/workers16.json', 'fuzz/report.json',
                      'coverage/rust-coverage.json', 'performance/baseline.json',
@@ -164,7 +164,7 @@ class ReleaseEvidenceTests(unittest.TestCase):
         wrong[TARGETS[1]]['wheel_sha256'] = 'f' * 64
         with self.assertRaises(ValueError):
             validate_bundle(self.root, REVISION, wrong, '1.0.0rc1')
-        self.write(f'sdk/{TARGETS[0]}/3.10/sdk-tests.log', b'Ran 25 tests in 1.0s\nFAILED\n')
+        self.write(f'sdk/{TARGETS[0]}/3.14/sdk-tests.log', b'Ran 25 tests in 1.0s\nFAILED\n')
         with self.assertRaises(ValueError):
             validate_bundle(self.root, REVISION, self.subjects, '1.0.0rc1')
 

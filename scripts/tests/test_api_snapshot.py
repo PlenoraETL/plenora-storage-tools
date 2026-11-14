@@ -11,15 +11,12 @@ from check_python_api import syntax
 
 
 class ApiSnapshotTests(unittest.TestCase):
-    def test_python_ast_empty_fields_do_not_depend_on_interpreter_version(self):
+    def test_python_ast_preserves_empty_and_nonempty_type_parameters(self):
         old = ast.parse('class Token:\n def cancel(self) -> None: ...').body[0]
         new = ast.parse('class Token:\n def cancel(self) -> None: ...').body[0]
-        # Model the fields introduced by Python 3.12, even when this test is
-        # running on an older interpreter.
-        new._fields = (*new._fields, 'type_params') if 'type_params' not in new._fields else new._fields
-        new.type_params = []
+        self.assertEqual(syntax(old)['type_params'], [])
         self.assertEqual(syntax(old), syntax(new))
-        new.name = 'DifferentToken'
+        new.type_params = [ast.TypeVar(name='T', bound=None, default_value=None)]
         self.assertNotEqual(syntax(old), syntax(new))
 
     def test_rust_comparison_retains_duplicate_items_and_ignores_only_order(self):

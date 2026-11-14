@@ -15,7 +15,7 @@ class CanonicalGeneratedTests(GitSnapshotTestCase):
     def test_generated_bytes_reject_parser_tolerance(self):
         cases = [('crates/plenora-storage-core', name) for name in
                  ('.cargo_vcs_info.json', 'Cargo.toml', 'Cargo.lock')]
-        cases += [('cp310-abi3-win_amd64', 'plenora_storage-3.0.5.dist-info/' + name)
+        cases += [('cp314-abi3-win_amd64', 'plenora_storage-3.0.5.dist-info/' + name)
                   for name in ('METADATA', 'WHEEL')]
         for context, name in cases:
             good = source_fixture(context, name)
@@ -41,10 +41,10 @@ class CanonicalGeneratedTests(GitSnapshotTestCase):
         name = 'plenora_storage-3.0.5.dist-info/RECORD'
         entries = wheel_record([('a.py', b'a'), ('b.py', b'b'), (name, b'')])
         good = entries[-1][1]
-        validate_record(entries, 'cp310-abi3-win_amd64')
+        validate_record(entries, 'cp314-abi3-win_amd64')
         for context in (entries[:-1], entries):
             with self.assertRaisesRegex(ValueError, 'complete wheel context'):
-                validate_generated(b'arbitrary', name, 'cp310-abi3-win_amd64', context)
+                validate_generated(b'arbitrary', name, 'cp314-abi3-win_amd64', context)
         lines = good.splitlines(keepends=True)
         for bad in (b'From 7061796c6f6164\n' + good, lines[0] + good,
                     good.replace(b'\n', b'\r\n'), good.replace(b'\n', b'\r'),
@@ -52,7 +52,7 @@ class CanonicalGeneratedTests(GitSnapshotTestCase):
                     good.replace(b'a.py', b'"a.py"'), good.replace(b'\n', b' \n', 1),
                     good.replace(b'\n', b'\n ', 1), b'\xef\xbb\xbf' + good):
             with self.subTest(bad=bad[:20]), self.assertRaises(ValueError):
-                validate_record(entries[:-1] + [(name, bad)], 'cp310-abi3-win_amd64')
+                validate_record(entries[:-1] + [(name, bad)], 'cp314-abi3-win_amd64')
 
 
 class ReleaseCheckoutTests(unittest.TestCase):

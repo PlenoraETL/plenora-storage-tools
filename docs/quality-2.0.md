@@ -72,12 +72,10 @@ La prosa non viene certificata da una ricerca di parole chiave.
 ## Dipendenze e inventari
 
 `python scripts/check_dependencies.py` richiede pin esatti per dipendenze dirette
-private e strumenti Cargo. Le sei dipendenze i cui tipi o trait attraversano
-l'API Rust pubblica (`async-trait`, `bytes`, `serde`, `serde_json`, `tokio`,
-`tokio-util`) mantengono un requisito compatibile: è la deviazione dichiarata
-`DEP-RANGE-1`, con regola, ambito, rischio e condizione di rientro in
-`scripts/dependency-policy.json` e la motivazione di ciascuna accanto alla riga
-di `Cargo.toml`; il controllo rifiuta un intervallo senza quella motivazione.
+private e strumenti Cargo. Dalla major 4.0 anche le dipendenze pubbliche
+usano pin esatti; la deviazione `DEP-RANGE-1` è chiusa. Lo snapshot in
+`.ci/plenora-dependencies/` aggiunge la politica comune di famiglia, eseguita
+dal workflow Linux `dependencies.yml` con verifica dei digest e report JSON.
 Il lockfile fissa comunque la risoluzione usata per build, audit e qualifica. I vincoli upstream del fork
 SMB sono conservati e verificati tramite lock, audit, deny e audit del nome
 upstream. I pin non equivalgono alla promessa di essere sempre all'ultima versione.

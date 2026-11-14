@@ -5,8 +5,17 @@ WORKDIR /workspace
 # Compose mounts the user's committed checkout into this root-owned test image.
 RUN git config --global --add safe.directory /workspace
 
-RUN apt-get update && apt-get install -y --no-install-recommends python3-dev python3-venv \
-    && python3 -m venv /opt/storage-python-build \
+COPY .python-version /tmp/.python-version
+COPY scripts/install_python.sh /tmp/install_python.sh
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential curl xz-utils libssl-dev zlib1g-dev libbz2-dev libreadline-dev \
+    libsqlite3-dev libffi-dev liblzma-dev uuid-dev \
+    && test "$(cut -d. -f1,2 /tmp/.python-version)" = "3.14" \
+    && sh /tmp/install_python.sh /opt/python
+ENV LD_LIBRARY_PATH="/opt/python/lib"
+ENV PATH="/opt/python/bin:${PATH}"
+
+RUN python3 -m venv /opt/storage-python-build \
     && /opt/storage-python-build/bin/pip install --no-cache-dir maturin==1.16.0
 ENV PATH="/opt/storage-python-build/bin:${PATH}"
 

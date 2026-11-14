@@ -1,5 +1,6 @@
-"""Qualify a downloaded ABI3 wheel on the selected Python interpreter (>=3.10)."""
+"""Qualify a downloaded ABI3 wheel on the selected Python interpreter (>=3.14)."""
 import argparse
+from email.parser import BytesParser
 import hashlib
 import json
 import strict_json
@@ -54,7 +55,29 @@ def enforce_coverage(files, policy):
             raise ValueError('Python coverage is below the per-module release floor')
 
 
+def verify_wheel_policy(wheel):
+    """Reject an obsolete ABI or metadata before installing a candidate."""
+    from versioning import workspace_version
+    minimum = (ROOT / '.python-version').read_text().strip()
+    version = workspace_version().python
+    prefix = f'plenora_storage-{version}.dist-info/'
+    with zipfile.ZipFile(wheel) as archive:
+        metadata = BytesParser().parsebytes(archive.read(prefix + 'METADATA'))
+        tags = BytesParser().parsebytes(archive.read(prefix + 'WHEEL')).get_all('Tag', [])
+    abi = 'cp' + minimum.replace('.', '') + '-abi3-'
+    if (metadata.get_all('Requires-Python') != ['>=' + minimum]
+            or metadata.get_all('Version') != [version]
+            or not tags or any(not tag.startswith(abi) for tag in tags)
+            or not wheel.name.startswith(f'plenora_storage-{version}-' + abi)):
+        raise ValueError('wheel Python minimum, version or ABI differs from policy')
+
+
 def qualify(wheel, output, measure, typing=False):
+    from check_python_version import check
+    errors = check(runtime=True)
+    if errors:
+        raise ValueError('; '.join(errors))
+    verify_wheel_policy(wheel)
     subprocess.run([sys.executable, '-I', '-m', 'pip', 'install', '--no-index', '--force-reinstall', str(wheel)], check=True)
     with tempfile.TemporaryDirectory(prefix='storage-sdk-compatibility-') as temporary:
         prefix = [sys.executable, '-I', '-m']

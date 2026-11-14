@@ -37,7 +37,7 @@ class ProofInventoryTests(unittest.TestCase):
         self.mutate('scripts/qualify_python.py', "'s3': {'endpoint':", "'unwired': {'endpoint':", "qualify_python.py")
 
     def test_removed_python_matrix_version_is_rejected(self):
-        self.mutate('.github/workflows/release-candidate.yml', "'3.13', '3.14'", "'3.13'", "Python versions")
+        self.mutate('.github/workflows/release-candidate.yml', "['3.14']", "['3.13']", "Python versions")
 
     def test_removed_fixture_probe_is_rejected(self):
         self.mutate('scripts/check_fixtures.py', "'smb': lambda:", "'unknown': lambda:", "fixture application probes")

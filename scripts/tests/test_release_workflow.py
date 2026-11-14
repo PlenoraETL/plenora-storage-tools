@@ -55,8 +55,8 @@ class ReleaseWorkflowTests(unittest.TestCase):
             self.assertIn('fetch-depth: 0', release[name])
             self.assertIn('runs-on: ubuntu-24.04', release[name])
         self.assertIn('runs-on: ubuntu-24.04', ci['release-package-recheck'])
-        self.assertIn("python-version: '3.11'", ci['release-package-recheck'])
-        python_setup = r'uses: (actions/setup-python@[0-9a-f]{40})[^\n]*\n        with:\n          python-version: (.+)'
+        self.assertIn("python-version-file: .python-version", ci['release-package-recheck'])
+        python_setup = r'uses: (actions/setup-python@[0-9a-f]{40})[^\n]*\n        with:\n          python-version-file: (.+)'
         self.assertEqual(re.search(python_setup, release['qualify']).groups(),
                          re.search(python_setup, ci['release-package-recheck']).groups())
         for job in (release['qualify'], ci['release-package-recheck']):

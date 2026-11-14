@@ -109,7 +109,7 @@ Il confronto usa i conteggi esatti; arrotondare la percentuale non permette di
 superare una soglia. Le soglie non vengono ridotte senza una misura conservata.
 Restano da censire e chiudere i percorsi di sicurezza/commit non coperti.
 
-Il wrapper Python ha un gate distinto nella matrice CPython 3.10–3.14 su Linux
+Il wrapper Python ha un gate distinto nella matrice CPython 3.14 su Linux
 e Windows. `scripts/check_installed_sdk.py --coverage` usa coverage.py 7.16.1
 sulla wheel installata, da una directory esterna al checkout, misurando righe e
 rami. Confronta i file misurati con i byte nell'archivio wheel e rifiuta moduli
@@ -213,7 +213,7 @@ le nuove prove usano un report distinto e terminano tutti i cicli e il cleanup.
 
 ## Compatibilità Python
 
-La CI installa la medesima wheel ABI3 su CPython 3.10–3.14, Linux e Windows,
+La CI installa la medesima wheel ABI3 su CPython 3.14, Linux e Windows,
 poi esegue i test da una directory esterna in modalità isolata. Un interprete
 è qualificato solo quando il relativo job ha superato import, identità, typing,
 lifecycle e operazioni; il solo tag ABI3 non costituisce quella prova.

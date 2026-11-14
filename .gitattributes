@@ -22,3 +22,6 @@ fuzz/seeds/smb2_messages/** binary
 fuzz/seeds/spnego_der/** binary
 fuzz/seeds/ntlm_challenge/** binary
 fuzz/seeds/kerberos_messages/** binary
+
+.python-version text eol=lf
+.ci/plenora-dependencies/* text eol=lf

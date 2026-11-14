@@ -1,49 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 022
 cd "$(dirname "$0")/.."
 mkdir -p .fixtures/extended
-fixture_san="$(python3 - <<'PY'
-import ipaddress
-import os
-import re
-
-host = os.environ.get('PLENORA_FIXTURE_HOST', '127.0.0.1')
-try:
-    identity = 'IP:' + str(ipaddress.ip_address(host))
-except ValueError:
-    if not re.fullmatch(r'[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?', host):
-        raise SystemExit('Invalid fixture TLS host') from None
-    identity = 'DNS:' + host
-print('subjectAltName=DNS:ftps,' + identity)
-PY
-)"
 trap 'status=$?; tail -n 30 .fixtures/extended/certificate-generation.log >&2; exit "$status"' ERR
-openssl req -x509 -newkey rsa:2048 -nodes -days 2 \
-  -keyout .fixtures/extended/server.key -out .fixtures/extended/server.crt \
-  -subj '/CN=ftps' -addext "$fixture_san" \
-  -addext 'basicConstraints=critical,CA:FALSE' >.fixtures/extended/certificate-generation.log 2>&1
+python3 scripts/fixture_tls.py ftps --output .fixtures/extended > .fixtures/extended/certificate-generation.log 2>&1
+
 docker compose -f docker-compose.yml -f compose.extended.yml build ftps
 # PLENORA_FIXTURE_RECREATE=1 recreates the containers: the in-memory servers
 # start empty and every server serves the certificate generated above.
 recreate=()
 if [ "${PLENORA_FIXTURE_RECREATE:-0}" = 1 ]; then recreate=(--force-recreate); fi
 docker compose -f docker-compose.yml -f compose.extended.yml up -d --wait "${recreate[@]}" azure gcs ftps webdav smb
-for attempt in $(seq 1 30); do
-  if docker compose -f docker-compose.yml -f compose.extended.yml run --rm --no-deps azure-init; then break; fi
-  if [ "$attempt" = 30 ]; then exit 1; fi
-  sleep 1
-done
-docker compose -f docker-compose.yml -f compose.extended.yml run --rm --no-deps --entrypoint python azure-init -c '
-import urllib.request, urllib.error, time
-for attempt in range(30):
-    try:
-        request = urllib.request.Request("http://gcs:4443/storage/v1/b", data=b"{\"name\":\"plenora-test\"}", headers={"Content-Type": "application/json"})
-        urllib.request.urlopen(request, timeout=5).read()
-        break
-    except urllib.error.HTTPError as error:
-        if error.code == 409: break
-        if attempt == 29: raise
-    except OSError:
-        if attempt == 29: raise
-    time.sleep(1)
-'
+docker compose -f docker-compose.yml -f compose.extended.yml run --rm --no-deps azure-init
+docker compose -f docker-compose.yml -f compose.extended.yml run --rm --no-deps azure-init gcs

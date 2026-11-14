@@ -49,16 +49,5 @@ elif mode == 'webdav':
     # rejecting a body early while forcing connection close can lose the 412.
     server.keep_alive_conn_limit = 256
     server.start()
-elif mode == 'azure-init':
-    from azure.storage.blob import BlobServiceClient
-    from azure.core.exceptions import ResourceExistsError
-    client = BlobServiceClient('http://azure:10000/devstoreaccount1', credential={
-        'account_name': 'devstoreaccount1',
-        'account_key': 'Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==',
-    })
-    try:
-        client.create_container('plenora-test')
-    except ResourceExistsError:
-        pass
 else:
     raise SystemExit('unknown fixture')

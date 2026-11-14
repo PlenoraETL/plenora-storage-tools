@@ -1,6 +1,6 @@
 # Plenora Storage Python SDK
 
-Python >= 3.10, backed by the same Rust engine as the CLI. The standard wheel
+Python >= 3.14, backed by the same Rust engine as the CLI. The standard wheel
 contains local, S3, SFTP, FTP, explicit FTPS, Azure Blob, GCS, SMB and WebDAV.
 
 ## Installation
@@ -59,7 +59,7 @@ an asyncio task signals Rust and waits for the operation to settle. Pass the
 caught exception to `cancellation_outcome(error)` before retrying a mutation:
 it returns the settled result dictionary, a `PlenoraError`, or `None` when no
 outcome is known. `None` never proves that a mutation had no effect. The helper
-also follows `wait_for` timeout causes and Python 3.10 cancellation contexts;
+also follows `wait_for` timeout causes and chained cancellation contexts;
 direct access to `.storage_error`/`.storage_result` is not portable across
 these wrappers. Do not suppress the cancellation after inspecting its outcome.
 `StorageError`, a subclass of `PlenoraError`, exposes `code`, `category`, `phase`, `remote_effect`, `retry`, and
@@ -97,7 +97,7 @@ The [local example](examples/local_roundtrip.py) exercises sync upload and async
 download in a temporary directory and needs no account. Run it with
 `python crates/plenora-storage-py/examples/local_roundtrip.py` from the repository
 after installing the wheel. The CI matrix runs this example, installed-wheel
-tests and a strict mypy consumer on Python 3.10–3.14 on Linux and Windows.
+tests and a strict mypy consumer on Python 3.14 on Linux and Windows.
 The consumer also checks that invalid policy values, unknown controls and wrong
 result types are rejected. Dynamic provider configuration and capability
 extensions remain open mappings.

@@ -55,15 +55,15 @@ class HiddenMetadataRegressionTests(GitSnapshotTestCase):
 
     def test_deflated_zip_members_are_scanned_after_expansion(self):
         from test_packages import BuildOutputTests
-        name = 'plenora_storage-1.2.3-cp310-abi3-win_amd64.whl'
+        name = 'plenora_storage-1.2.3-cp314-abi3-win_amd64.whl'
         _, _, expected = gate.distribution_policy(name)
         for private_native in (True, False):
             out = io.BytesIO()
             with zipfile.ZipFile(out, 'w', compression=zipfile.ZIP_DEFLATED) as stream:
                 files = []
                 for member in expected:
-                    native = gate.native_member('cp310-abi3-win_amd64', member)
-                    data = BuildOutputTests.native('x86_64-pc-windows-msvc', True) if native else source_fixture('cp310-abi3-win_amd64', member)
+                    native = gate.native_member('cp314-abi3-win_amd64', member)
+                    data = BuildOutputTests.native('x86_64-pc-windows-msvc', True) if native else source_fixture('cp314-abi3-win_amd64', member)
                     if bool(native) == private_native:
                         data += b'-----BEGIN PRIVATE KEY-----\nYWJj\n'
                     files.append((member, data))

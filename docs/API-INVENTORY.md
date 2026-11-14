@@ -50,7 +50,7 @@ con parametri, default, obbligatorietà, valori ammessi ed exit code.
 
 Comandi: `capabilities`, `test`, `list`, `stat`, `get`, `put`, `copy`, `delete`, `help`.
 
-Requisiti: Rust **1.98**, Python **>=3.10**.
+Requisiti: Rust **1.98**, Python **>=3.14**.
 [Metadati](../api/metadata.json): 34 schemi JSON, feature dei crate e riferimento upstream.
 
 ## Gate

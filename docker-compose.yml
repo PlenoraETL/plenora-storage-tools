@@ -2,7 +2,9 @@ name: plenora-storage-tools
 
 services:
   minio:
-    build: docker/minio
+    build:
+      context: docker
+      dockerfile: minio/Dockerfile
     image: plenora-storage-minio-fixture:2025-09-07
     command: server /data --console-address ":9001"
     environment:

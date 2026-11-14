@@ -72,9 +72,9 @@ Source archives map directly to repository paths. The Python sdist remains
 undeclared and is rejected. Mapped paths are checked against Git and the source
 inventory; a native exemption cannot cover a protected source path.
 
-`wheel-tags` declares `cp310-abi3-win_amd64`,
-`cp310-abi3-manylinux_2_34_x86_64` (Bookworm release/coverage) and
-`cp310-abi3-manylinux_2_39_x86_64` (Ubuntu quality CI). Both Linux tags use the
+`wheel-tags` declares `cp314-abi3-win_amd64`,
+`cp314-abi3-manylinux_2_34_x86_64` (Bookworm release/coverage) and
+`cp314-abi3-manylinux_2_39_x86_64` (Ubuntu quality CI). Both Linux tags use the
 same exact member inventory. The release qualification inventory requires the
 Bookworm wheel, not both Linux CI variants. Undeclared tags are rejected rather
 than inferred from the build host. CLI distributions are exactly Windows MSVC

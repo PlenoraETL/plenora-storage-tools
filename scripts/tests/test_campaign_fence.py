@@ -9,6 +9,7 @@ import json
 import os
 import shlex
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -1744,6 +1745,7 @@ class ProtocolCase(unittest.TestCase):
 
     def admitted(self, **values):
         process, line = self.admit(**values)
+        self.assertEqual(len(line), 3, 'admission did not announce a complete locked record')
         self.assertEqual(line[0], 'locked')
         return process, line[1]
 
@@ -1851,6 +1853,9 @@ class AdmissionProtocolTests(ProtocolCase):
                 if content is None:
                     (self.directory / 'epoch').unlink()
                 else:
+                    # The None case removed the private inode. Recreate it
+                    # privately so this tests epoch bytes, not the account umask.
+                    (self.directory / 'epoch').touch(mode=0o600)
                     (self.directory / 'epoch').write_text(content)
                 self.assertEqual(self.refused(), 1)
                 if content is None:
@@ -2010,9 +2015,9 @@ class PreparationProtocolTests(ProtocolCase):
             (self.checkout / '.fixtures' / name).chmod(0o600)
         return self.checkout / f'.fixtures/prepare-{nonce}-run.sh'
 
-    def execute(self, nonce, epoch, *, script=None, **values):
+    def execute(self, nonce, epoch, *, script=None, reset=True, **values):
         """Run the wrapper; returns its exit code and the one it recorded."""
-        code = subprocess.run(['bash', str(self.write(nonce, epoch, script=script))], stdin=subprocess.DEVNULL,
+        code = subprocess.run(['bash', str(self.write(nonce, epoch, script=script, reset=reset))], stdin=subprocess.DEVNULL,
                               env=self.environment(**values), check=False).returncode
         recorded = (self.checkout / f'.fixtures/signals/prepare-{nonce}.exit').read_text().strip()
         return code, recorded
@@ -2020,16 +2025,61 @@ class PreparationProtocolTests(ProtocolCase):
     def state(self, nonce):
         return run_vm_campaign.check_fixture_state(self.checkout / '.fixtures/campaign', nonce)
 
-    def test_everything_a_preparation_creates_is_unshared_under_a_group_umask(self):
-        for name in ('prepare-fixtures.sh', 'prepare-extended-fixtures.sh', 'prepare-sftp-keys.sh'):
+    def install_real_preparation(self):
+        # The preparation runs for real: copy the scripts and every helper they
+        # invoke from scripts/, so a new helper cannot be silently missing here.
+        pending = ['prepare-fixtures.sh', 'prepare-extended-fixtures.sh', 'prepare-sftp-keys.sh']
+        copied = set()
+        while pending:
+            name = pending.pop()
+            if name in copied:
+                continue
+            copied.add(name)
+            source = (ROOT / 'scripts' / name).read_text('utf-8')
             shutil.copyfile(ROOT / 'scripts' / name, self.checkout / 'scripts' / name)
+            pending.extend(re.findall(r'scripts/([A-Za-z0-9_.-]+\.(?:sh|py))', source))
         # Only Docker is substituted; host-side fixture preparation runs for real.
         (self.root / 'bin/docker').write_text(
             '#!/bin/sh\ncase "$*" in *ssh-keygen*) echo "256 SHA256:fixture host";; '
             '*authorized_keys*) cat >/dev/null;; esac\n')
+
+    def assert_generated_modes(self):
+        root = self.checkout / '.fixtures'
+        paths = [root, *sorted(root.rglob('*'))]
+        names = {path.relative_to(root).as_posix() for path in paths}
+        self.assertTrue({'ca.key', 'ca.crt', 'ca.srl', 'minio.csr', 'minio.ext',
+                         'minio/private.key', 'minio/public.crt', 'certificate-generation.log',
+                         'extended/server.key', 'extended/server.crt',
+                         'extended/certificate-generation.log', 'sftp-fingerprint',
+                         'sftp-client', 'sftp-client.pub', 'sftp-client-encrypted',
+                         'sftp-client-encrypted.pub'} <= names, names)
+        for path in paths:
+            with self.subTest(path=path.relative_to(root).as_posix()):
+                self.assertEqual(path.stat().st_mode & 0o022, 0)
+
+    def test_standalone_preparation_creates_unshared_files_under_any_umask(self):
+        self.install_real_preparation()
+        for mask in (0o000, 0o002, 0o077):
+            with self.subTest(umask=oct(mask)):
+                shutil.rmtree(self.checkout / '.fixtures')
+                # No wrapper and no pre-existing fixture directories/files.
+                for script in ('prepare-sftp-keys.sh', 'prepare-fixtures.sh', 'prepare-extended-fixtures.sh'):
+                    result = subprocess.run(['bash', '-c', f'umask {mask:03o}; bash scripts/{script}'],
+                                            cwd=self.checkout, env=self.environment(), capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                self.assert_generated_modes()
+
+    def test_everything_a_preparation_creates_is_unshared_under_a_group_umask(self):
+        self.install_real_preparation()
+        # The controller creates this directory privately before uploading the
+        # wrapper. Discard setUp's stub material, whose modes predate execute().
+        shutil.rmtree(self.checkout / '.fixtures')
+        (self.checkout / '.fixtures').mkdir(mode=0o700)
         controller, epoch = self.admitted()
         with GroupUmask():
-            self.assertEqual(self.execute('a' * 32, epoch), (0, '0'))
+            self.assertEqual(self.execute('a' * 32, epoch, reset=False), (0, '0'))
+            self.assertEqual(self.execute('b' * 32, epoch), (0, '0'))
+        self.assert_generated_modes()
         result = subprocess.run(campaign_fence.tree_unshared_command(str(self.checkout / '.fixtures')), shell=True,
                                 capture_output=True, text=True)
         self.assertEqual((result.returncode, result.stdout.strip()), (0, 'unshared'))
