@@ -1,4 +1,4 @@
-FROM python:3.12-slim-bookworm
+FROM python:3.14.6-slim-trixie@sha256:7bec7ddcddeff7975d6ba9b4be7dd6f6b2f55e7491539145e2978f7f97ce9144
 RUN apt-get update && apt-get install -y --no-install-recommends samba smbclient openssl \
     && rm -rf /var/lib/apt/lists/* \
     && pip install --no-cache-dir pyftpdlib==2.2.0 pyOpenSSL==26.4.0 WsgiDAV==4.3.5 cheroot==11.1.2 azure-storage-blob==12.30.2

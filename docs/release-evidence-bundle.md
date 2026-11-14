@@ -14,7 +14,7 @@ passata a `qualify_release.py --evidence` aggiungere `gates/` con questa struttu
 | Percorso relativo a gates | Origine e controllo |
 | --- | --- |
 | `api/<target>/report.json` e i sette `.txt` | `check_rust_api.py`: Linux e Windows, commit pulito, confronto delle API con la baseline e digest dei testi |
-| `sdk/<target>/<python>/sdk-tests.json`, `sdk-tests.log`, `coverage.json`, `sdk-typing.json`, `sdk-typing.log` | `check_installed_sdk.py --coverage --typing`: dieci combinazioni di target e CPython 3.10–3.14, stessa wheel qualificata per target, test senza skip, coverage e consumer statico |
+| `sdk/<target>/<python>/sdk-tests.json`, `sdk-tests.log`, `coverage.json`, `sdk-typing.json`, `sdk-typing.log` | `check_installed_sdk.py --coverage --typing`: due combinazioni di target e CPython 3.14, stessa wheel qualificata per target, test senza skip, coverage e consumer statico |
 | `fuzz/report.json`, `<parser>/run.log`, `<parser>/corpus/<seed>` | `fuzz_parsers.py`: quattro parser, ASan, almeno 60 secondi per parser, contatori dei log e digest dei seed originali; conservare anche il corpus evoluto nell'archivio della campagna |
 | `coverage/coverage-summary.json`, `coverage/rust-coverage.json` | `coverage.sh`: commit pulito, contatori ricalcolati dal report LLVM e soglie per crate correnti |
 | `transfers/large.json` | `qualify_transfers.py`: 1 GiB, un worker, nove provider con distinzione tra streaming riuscito e rifiuto previsto |
@@ -23,7 +23,7 @@ passata a `qualify_release.py --evidence` aggiungere `gates/` con questa struttu
 | `performance/baseline.json`, `performance/candidate.json`, `performance/report.json` | Due campagne indipendenti e confronto descritto sotto |
 
 I target sono `x86_64-unknown-linux-gnu` e `x86_64-pc-windows-msvc`; i nomi Python
-sono `3.10`, `3.11`, `3.12`, `3.13`, `3.14`. Dal 28 settembre 2026 la soglia
+sono `3.14`. Dal 28 settembre 2026 la soglia
 provvisoria del soak è **due ore per tutte le versioni**, incluse alfa, beta,
 RC e stabili, come definito in `scripts/soak_policy.py`. La durata sarà
 rivalutata prima del rilascio definitivo. Non sommare campagne parziali e non riassegnare

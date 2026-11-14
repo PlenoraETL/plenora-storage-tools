@@ -89,8 +89,8 @@ def main():
     if not exceptions <= set(workspace['workspace']['dependencies']):
         raise ValueError('stale dependency exception')
     deviation = policy.get('deviation')
-    failures = check_deviation(deviation)
-    if not failures:
+    failures = check_deviation(deviation) if exceptions else []
+    if exceptions and not failures:
         failures.extend(check_range_motivations(manifest_text, exceptions, deviation['id']))
     manifests = [ROOT / 'Cargo.toml', *sorted((ROOT / 'crates').glob('*/Cargo.toml')),
                  ROOT / 'fuzz/Cargo.toml', ROOT / 'tools/api-inventory/Cargo.toml']

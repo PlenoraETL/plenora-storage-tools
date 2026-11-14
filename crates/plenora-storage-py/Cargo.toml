@@ -29,9 +29,9 @@ smb = ["plenora-storage-engine/smb"]
 webdav = ["plenora-storage-engine/webdav"]
 
 [dependencies]
-plenora-storage-core = { path = "../plenora-storage-core", version = "3.0.5" }
-plenora-storage-engine = { path = "../plenora-storage-engine", version = "3.0.5", default-features = false }
-pyo3 = { version = "=0.29.2", features = ["abi3-py310"] }
+plenora-storage-core = { path = "../plenora-storage-core", version = "4.0.0" }
+plenora-storage-engine = { path = "../plenora-storage-engine", version = "4.0.0", default-features = false }
+pyo3 = { version = "=0.29.2", features = ["abi3-py314"] }
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true

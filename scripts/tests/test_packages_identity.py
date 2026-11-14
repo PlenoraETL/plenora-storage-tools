@@ -48,8 +48,8 @@ class SourceIdentityTests(unittest.TestCase):
                  ('crates/plenora-storage-core', 'README.md'),
                  ('crates/plenora-storage-core', 'Cargo.toml.orig'),
                  ('crates/plenora-storage-py', 'README.md'),
-                 ('cp310-abi3-win_amd64', 'plenora_storage/__init__.py'),
-                 ('cp310-abi3-manylinux_2_34_x86_64', 'plenora_storage/__init__.pyi'),
+                 ('cp314-abi3-win_amd64', 'plenora_storage/__init__.py'),
+                 ('cp314-abi3-manylinux_2_34_x86_64', 'plenora_storage/__init__.pyi'),
                  ('qualification', 'README.md'), ('public-documents', 'README.md')]
         for context, name in cases:
             with self.subTest(context=context, name=name):
@@ -68,7 +68,7 @@ class SourceIdentityTests(unittest.TestCase):
     def test_every_generated_exception_is_scanned_and_closed(self):
         for kind, names in gate.GENERATED_MEMBERS.items():
             context = {'crates': 'crates/plenora-storage-core',
-                       'wheel': 'cp310-abi3-win_amd64'}.get(kind, kind)
+                       'wheel': 'cp314-abi3-win_amd64'}.get(kind, kind)
             for template in names:
                 name = template.replace('{version}', '3.0.5').replace('{python_version}', '3.0.5')
                 with self.subTest(context=context, name=name):
@@ -79,7 +79,7 @@ class SourceIdentityTests(unittest.TestCase):
                             gate.scan_entries([(name, forbidden)], {name: {}}, 0, context)
                     self.assertFalse(gate.generated_member(context, name + '.extra'))
                     self.assertFalse(gate.generated_member('source', name))
-        self.assertFalse(gate.generated_member('cp310-abi3-win_amd64',
+        self.assertFalse(gate.generated_member('cp314-abi3-win_amd64',
                                               'plenora_storage-3.0.5.dist-info/licenses/LICENSE'))
 
     def test_git_checkout_eol_and_dirty_attributes(self):
@@ -147,7 +147,7 @@ class GeneratedStructureTests(unittest.TestCase):
         from test_packages import source_fixture
         cases = [('crates/plenora-storage-core', n) for n in
                  ('.cargo_vcs_info.json', 'Cargo.toml', 'Cargo.lock')]
-        cases += [('cp310-abi3-win_amd64', 'plenora_storage-3.0.5.dist-info/' + n)
+        cases += [('cp314-abi3-win_amd64', 'plenora_storage-3.0.5.dist-info/' + n)
                   for n in ('METADATA', 'WHEEL')]
         for context, name in cases:
             good = source_fixture(context, name)
@@ -168,15 +168,15 @@ class GeneratedStructureTests(unittest.TestCase):
         from test_packages import wheel_record
         name = 'plenora_storage-3.0.5.dist-info/RECORD'
         entries = wheel_record([('data.py', b'content'), (name, b'')])
-        validate_record(entries, 'cp310-abi3-win_amd64')
+        validate_record(entries, 'cp314-abi3-win_amd64')
         for bad in (entries + [('extra', b'')], entries + entries[:1],
                     [('data.py', b'changed'), entries[1]],
                     [entries[0], (name, entries[1][1].replace(b',7', b',8'))],
                     [entries[0], (name, entries[1][1] + entries[1][1])]):
             with self.assertRaises(ValueError):
-                validate_record(bad, 'cp310-abi3-win_amd64')
+                validate_record(bad, 'cp314-abi3-win_amd64')
         with self.assertRaisesRegex(ValueError, 'complete wheel'):
-            gate.classify_member(entries[1][1], name, rule={}, distribution='cp310-abi3-win_amd64')
+            gate.classify_member(entries[1][1], name, rule={}, distribution='cp314-abi3-win_amd64')
 
     def test_text_member_recorder_rejects_substitution_without_digest(self):
         import record_package_digests as recorder

@@ -10,14 +10,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def syntax(node):
-    # Python 3.12 added empty type_params fields; ast.dump also changes which
-    # empty fields it displays across releases. Normalize these representation
-    # differences while retaining every nonempty part of a type declaration.
+    # Preserve the complete AST of the repository's selected Python runtime.
     if node is Ellipsis:
         return {'literal': 'ellipsis'}
     if isinstance(node, ast.AST):
-        return {'node': type(node).__name__, **{name: syntax(value) for name, value in ast.iter_fields(node)
-                                              if value is not None and value != []}}
+        return {'node': type(node).__name__, **{name: syntax(value) for name, value in ast.iter_fields(node)}}
     if isinstance(node, list):
         return [syntax(value) for value in node]
     return node
