@@ -15,7 +15,7 @@ Seguire questi principi non significa avere già la stessa maturità del riferim
 | Core indipendente dai provider | `plenora-storage-core` conserva modelli, errori, policy, lifecycle e runtime binding |
 | Motore applicativo condiviso | `plenora-storage-engine::build_engine` compone i provider; CLI e Python usano questa factory |
 | Provider selezionabili | Feature Cargo indipendenti, verificate da `scripts/check_features.py` |
-| SDK Python nativo | PyO3, wheel ABI stabile Python >= 3.10, API sync/asyncio, marker PEP 561 e test della wheel installata |
+| SDK Python nativo | PyO3, wheel ABI stabile Python >= 3.14, API sync/asyncio, marker PEP 561 e test della wheel installata |
 | Discovery dal codice | `docs/STATO.md` deriva dai manifest e dall'esecuzione della CLI completa |
 | Documentazione verificata | `scripts/check_docs.py` verifica inventario, versioni Python e link locali |
 | Inventario dipendenze | SBOM CycloneDX 1.6 deterministico, grafo completo di Cargo.lock e digest degli artefatti |

@@ -26,6 +26,9 @@ jobs:
       FUZZ_SECONDS: ${{ inputs.seconds || '60' }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version-file: .python-version
       - run: docker build -t storage-parser-fuzz -f fuzz/Dockerfile .
       - name: Fetch the committed fuzz dependency graph
         run: docker run --rm -v "$PWD:/workspace" -v storage-fuzz-registry:/usr/local/cargo/registry storage-parser-fuzz cargo +nightly-2026-09-20 fetch --manifest-path fuzz/Cargo.toml --locked

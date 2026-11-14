@@ -210,8 +210,8 @@ class PackageGuardTests(GitSnapshotTestCase):
             ('contracts', 'plenora-storage-contracts-1.2.3.tar.gz', ''),
             ('cli-windows', 'plenora-storage-1.2.3-x86_64-pc-windows-msvc.zip', ''),
             ('cli-linux', 'plenora-storage-1.2.3-x86_64-unknown-linux-gnu.tar.gz', ''),
-            ('wheel-windows', 'plenora_storage-1.2.3-cp310-abi3-win_amd64.whl', ''),
-            ('wheel-linux', 'plenora_storage-1.2.3-cp310-abi3-manylinux_2_34_x86_64.whl', ''),
+            ('wheel-windows', 'plenora_storage-1.2.3-cp314-abi3-win_amd64.whl', ''),
+            ('wheel-linux', 'plenora_storage-1.2.3-cp314-abi3-manylinux_2_34_x86_64.whl', ''),
         ]
         for kind, name, prefix in cases:
             with self.subTest(kind=kind), patch.object(gate, 'registry', return_value={kind: ['one', 'two'], 'wheel-tags': gate.registry()['wheel-tags']}), patch.object(gate, 'classify_member'):
@@ -419,14 +419,14 @@ class PackageGuardTests(GitSnapshotTestCase):
             gate.scan(outer, rule=rule)
 
     def test_prerelease_wheel_with_binary_rule(self):
-        payload = source_fixture('cp310-abi3-win_amd64', 'plenora_storage/py.typed')
+        payload = source_fixture('cp314-abi3-win_amd64', 'plenora_storage/py.typed')
         policy = {'wheel-tags': gate.registry()['wheel-tags'],
                   'wheel-windows': ['plenora_storage/py.typed', 'plenora_storage-{version}.dist-info/METADATA'],
                   'member_rules': {'wheel-windows': {'plenora_storage/py.typed': binary_rule(payload)}}}
         with patch.object(gate, 'registry', return_value=policy):
             gate.scan(archive([('plenora_storage/py.typed', payload),
-                               ('plenora_storage-1.2.3rc1.dist-info/METADATA', source_fixture('cp310-abi3-win_amd64', 'plenora_storage-1.2.3rc1.dist-info/METADATA'))], True),
-                      'plenora_storage-1.2.3rc1-cp310-abi3-win_amd64.whl')
+                               ('plenora_storage-1.2.3rc1.dist-info/METADATA', source_fixture('cp314-abi3-win_amd64', 'plenora_storage-1.2.3rc1.dist-info/METADATA'))], True),
+                      'plenora_storage-1.2.3rc1-cp314-abi3-win_amd64.whl')
 
 
 class BuildOutputTests(GitSnapshotTestCase):
@@ -487,8 +487,8 @@ class BuildOutputTests(GitSnapshotTestCase):
             for bad in (files[:-1], files + [('extra.so', self.native('x86_64-unknown-linux-gnu', True))]):
                 with self.assertRaisesRegex(ValueError, 'inventory mismatch'):
                     gate.scan(archive(bad, True), name)
-        for tag in ('cp311-cp311-win_amd64', 'cp310-abi3-win_arm64',
-                    'cp310-abi3-manylinux_2_40_x86_64', 'cp310-abi3-linux_x86_64'):
+        for tag in ('cp311-cp311-win_amd64', 'cp314-abi3-win_arm64',
+                    'cp314-abi3-manylinux_2_40_x86_64', 'cp314-abi3-linux_x86_64'):
             with self.assertRaisesRegex(ValueError, 'unknown wheel'):
                 gate.distribution_policy('plenora_storage-1.2.3-' + tag + '.whl')
         with self.assertRaisesRegex(ValueError, 'unknown distribution'):
@@ -573,7 +573,7 @@ class BuildOutputTests(GitSnapshotTestCase):
 
     def test_generated_container_role_target_abi_and_format_are_binding(self):
         policy = gate.registry()
-        name = 'x86_64-pc-windows-msvc/plenora_storage-1.2.3-cp310-abi3-win_amd64.whl'
+        name = 'x86_64-pc-windows-msvc/plenora_storage-1.2.3-cp314-abi3-win_amd64.whl'
         rule = policy['member_rules']['qualification'][name.replace('1.2.3', '{python_version}')]
         for field, value in (('role', 'source'), ('target', 'x86_64-unknown-linux-gnu'), ('abi', 'cp311-cp311')):
             bad = dict(rule, build={field: value})
@@ -585,7 +585,7 @@ class BuildOutputTests(GitSnapshotTestCase):
                 gate.distribution_policy(name)
         with self.assertRaisesRegex(ValueError, 'container format mismatch'):
             gate.scan_distribution(archive([('safe', b'safe')]),
-                                   'plenora_storage-1.2.3-cp310-abi3-win_amd64.whl')
+                                   'plenora_storage-1.2.3-cp314-abi3-win_amd64.whl')
 
 
     def test_three_policy_role_bypasses_are_rejected(self):
@@ -603,7 +603,7 @@ class BuildOutputTests(GitSnapshotTestCase):
                     gate.check_source_digests()
         # Removing the old role must not authorize the same binary substitution.
         for context, name in [('source', 'agents.md'), ('crates/plenora-storage-core', 'src/lib.rs'),
-                              ('cp310-abi3-win_amd64', 'plenora_storage-1.2.3.dist-info/METADATA')]:
+                              ('cp314-abi3-win_amd64', 'plenora_storage-1.2.3.dist-info/METADATA')]:
             with self.subTest(context=context), self.assertRaises(ValueError):
                 gate.scan_entries([(name, native)], {name: {}}, 0, context)
         with self.assertRaisesRegex(ValueError, 'differs from git'):
@@ -629,7 +629,7 @@ class BuildOutputTests(GitSnapshotTestCase):
         name = 'plenora_storage/_native.abi3.so'
         data = self.native('x86_64-unknown-linux-gnu', True)
         with self.assertRaises(ValueError):
-            gate.scan_entries([(name, data)], {name: {}}, 0, 'cp310-abi3-win_amd64')
+            gate.scan_entries([(name, data)], {name: {}}, 0, 'cp314-abi3-win_amd64')
         policy = gate.registry()
         policy['wheel-windows'].append(name)
         with patch.object(gate, 'registry', return_value=policy), self.assertRaisesRegex(ValueError, 'code table'):
@@ -702,10 +702,10 @@ class EntryPointRegressionTests(GitSnapshotTestCase):
 
     def test_zip_entry_types_in_complete_wheel_and_nested_zip(self):
         import stat
-        name = 'plenora_storage-1.2.3-cp310-abi3-win_amd64.whl'
+        name = 'plenora_storage-1.2.3-cp314-abi3-win_amd64.whl'
         _, _, expected = gate.distribution_policy(name)
         files = [(n, BuildOutputTests.native('x86_64-pc-windows-msvc', True)
-                  if gate.native_member('cp310-abi3-win_amd64', n) else source_fixture('cp310-abi3-win_amd64', n)) for n in expected]
+                  if gate.native_member('cp314-abi3-win_amd64', n) else source_fixture('cp314-abi3-win_amd64', n)) for n in expected]
         payload = b'-----BEGIN PRIVATE KEY-----\nYWJj\n'
         cases = [(stat.S_IFDIR, 0x10, '/', b'', True),
                  (0, 0x10, '/', b'', True),
@@ -829,7 +829,7 @@ class ContainerCoverageTests(GitSnapshotTestCase):
 
     def test_complete_distributions_with_hidden_compressed_keys(self):
         crate = 'plenora-storage-core-3.0.5.crate'
-        wheel = 'plenora_storage-3.0.5-cp310-abi3-win_amd64.whl'
+        wheel = 'plenora_storage-3.0.5-cp314-abi3-win_amd64.whl'
         for name in (crate, wheel):
             _, prefix, expected = gate.distribution_policy(name)
             files = [(prefix + member, b'safe') for member in expected]

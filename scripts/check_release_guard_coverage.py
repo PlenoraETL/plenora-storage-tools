@@ -50,6 +50,7 @@ def check(candidate=None, release=None, ci=None):
     release = jobs('release.yml') if release is None else release
     ci = jobs('ci.yml') if ci is None else ci
     expected = {
+        ('release-candidate.yml', 'python-compatibility'): [('check_installed_sdk', '')],
         ('release-candidate.yml', 'linux'): [('build_release', ''), ('qualify_target', '')],
         ('release-candidate.yml', 'windows'): [('build_release', ''), ('qualify_windows_candidate', '')],
         ('release.yml', 'qualify'): [('release_publication', 'prepare'), ('release_publication', 'upload')],
@@ -60,6 +61,13 @@ def check(candidate=None, release=None, ci=None):
               for name, job in collection.items() if invocations(job)}
     if actual != expected:
         raise ValueError('release guard invocation changed; extend the PR regression mapping')
+    for collection in (candidate, ci):
+        sdk = collection['python-compatibility']
+        if (invocations(sdk) != [('check_installed_sdk', '')]
+                or 'os: [ubuntu-24.04, windows-latest]' not in sdk
+                or 'python-version-file: .python-version' not in sdk
+                or 'downloaded-wheel --coverage --typing' not in sdk):
+            raise ValueError('installed wheel guard missing its two-platform CI counterpart')
     pairs = [('linux', 'docker-conformance'), ('windows', 'native-windows')]
     for source, destination in pairs:
         runner = re.search(r'^    runs-on: (.+)$', candidate[source], re.M).group(1)

@@ -482,21 +482,31 @@
         }
       },
       "stub": {
+        "bases": [],
         "body": [
           {
             "args": {
               "args": [
                 {
+                  "annotation": null,
                   "arg": "self",
-                  "node": "arg"
+                  "node": "arg",
+                  "type_comment": null
                 }
               ],
-              "node": "arguments"
+              "defaults": [],
+              "kw_defaults": [],
+              "kwarg": null,
+              "kwonlyargs": [],
+              "node": "arguments",
+              "posonlyargs": [],
+              "vararg": null
             },
             "body": [
               {
                 "node": "Expr",
                 "value": {
+                  "kind": null,
                   "node": "Constant",
                   "value": {
                     "literal": "ellipsis"
@@ -504,26 +514,40 @@
                 }
               }
             ],
+            "decorator_list": [],
             "name": "__init__",
             "node": "FunctionDef",
             "returns": {
-              "node": "Constant"
-            }
+              "kind": null,
+              "node": "Constant",
+              "value": null
+            },
+            "type_comment": null,
+            "type_params": []
           },
           {
             "args": {
               "args": [
                 {
+                  "annotation": null,
                   "arg": "self",
-                  "node": "arg"
+                  "node": "arg",
+                  "type_comment": null
                 }
               ],
-              "node": "arguments"
+              "defaults": [],
+              "kw_defaults": [],
+              "kwarg": null,
+              "kwonlyargs": [],
+              "node": "arguments",
+              "posonlyargs": [],
+              "vararg": null
             },
             "body": [
               {
                 "node": "Expr",
                 "value": {
+                  "kind": null,
                   "node": "Constant",
                   "value": {
                     "literal": "ellipsis"
@@ -531,26 +555,40 @@
                 }
               }
             ],
+            "decorator_list": [],
             "name": "cancel",
             "node": "FunctionDef",
             "returns": {
-              "node": "Constant"
-            }
+              "kind": null,
+              "node": "Constant",
+              "value": null
+            },
+            "type_comment": null,
+            "type_params": []
           },
           {
             "args": {
               "args": [
                 {
+                  "annotation": null,
                   "arg": "self",
-                  "node": "arg"
+                  "node": "arg",
+                  "type_comment": null
                 }
               ],
-              "node": "arguments"
+              "defaults": [],
+              "kw_defaults": [],
+              "kwarg": null,
+              "kwonlyargs": [],
+              "node": "arguments",
+              "posonlyargs": [],
+              "vararg": null
             },
             "body": [
               {
                 "node": "Expr",
                 "value": {
+                  "kind": null,
                   "node": "Constant",
                   "value": {
                     "literal": "ellipsis"
@@ -575,11 +613,16 @@
               },
               "id": "bool",
               "node": "Name"
-            }
+            },
+            "type_comment": null,
+            "type_params": []
           }
         ],
+        "decorator_list": [],
+        "keywords": [],
         "name": "CancellationToken",
-        "node": "ClassDef"
+        "node": "ClassDef",
+        "type_params": []
       }
     },
     "Connection": {
@@ -1268,6 +1311,7 @@
           "module": "dataclasses",
           "names": [
             {
+              "asname": null,
               "name": "dataclass",
               "node": "alias"
             }
@@ -1279,6 +1323,7 @@
           "module": "os",
           "names": [
             {
+              "asname": null,
               "name": "PathLike",
               "node": "alias"
             }
@@ -1290,14 +1335,17 @@
           "module": "typing",
           "names": [
             {
+              "asname": null,
               "name": "Any",
               "node": "alias"
             },
             {
+              "asname": null,
               "name": "Callable",
               "node": "alias"
             },
             {
+              "asname": null,
               "name": "Mapping",
               "node": "alias"
             }
@@ -1321,30 +1369,37 @@
           "module": "types",
           "names": [
             {
+              "asname": null,
               "name": "DeleteResult",
               "node": "alias"
             },
             {
+              "asname": null,
               "name": "ListResult",
               "node": "alias"
             },
             {
+              "asname": null,
               "name": "ObjectInfo",
               "node": "alias"
             },
             {
+              "asname": null,
               "name": "OperationResult",
               "node": "alias"
             },
             {
+              "asname": null,
               "name": "PublicationPolicy",
               "node": "alias"
             },
             {
+              "asname": null,
               "name": "TestResult",
               "node": "alias"
             },
             {
+              "asname": null,
               "name": "TransferResult",
               "node": "alias"
             }
@@ -1367,7 +1422,8 @@
             },
             "id": "__version__",
             "node": "Name"
-          }
+          },
+          "value": null
         },
         {
           "annotation": {
@@ -1398,7 +1454,8 @@
             },
             "id": "__all__",
             "node": "Name"
-          }
+          },
+          "value": null
         },
         {
           "node": "Assign",
@@ -1411,6 +1468,7 @@
               "node": "Name"
             }
           ],
+          "type_comment": null,
           "value": {
             "ctx": {
               "node": "Load"
@@ -1485,12 +1543,20 @@
         },
         {
           "args": {
-            "node": "arguments"
+            "args": [],
+            "defaults": [],
+            "kw_defaults": [],
+            "kwarg": null,
+            "kwonlyargs": [],
+            "node": "arguments",
+            "posonlyargs": [],
+            "vararg": null
           },
           "body": [
             {
               "node": "Expr",
               "value": {
+                "kind": null,
                 "node": "Constant",
                 "value": {
                   "literal": "ellipsis"
@@ -1498,6 +1564,7 @@
               }
             }
           ],
+          "decorator_list": [],
           "name": "version",
           "node": "FunctionDef",
           "returns": {
@@ -1506,7 +1573,9 @@
             },
             "id": "str",
             "node": "Name"
-          }
+          },
+          "type_comment": null,
+          "type_params": []
         },
         {
           "args": {
@@ -1520,15 +1589,23 @@
                   "node": "Name"
                 },
                 "arg": "error",
-                "node": "arg"
+                "node": "arg",
+                "type_comment": null
               }
             ],
-            "node": "arguments"
+            "defaults": [],
+            "kw_defaults": [],
+            "kwarg": null,
+            "kwonlyargs": [],
+            "node": "arguments",
+            "posonlyargs": [],
+            "vararg": null
           },
           "body": [
             {
               "node": "Expr",
               "value": {
+                "kind": null,
                 "node": "Constant",
                 "value": {
                   "literal": "ellipsis"
@@ -1536,6 +1613,7 @@
               }
             }
           ],
+          "decorator_list": [],
           "name": "cancellation_outcome",
           "node": "FunctionDef",
           "returns": {
@@ -1564,9 +1642,13 @@
               "node": "BitOr"
             },
             "right": {
-              "node": "Constant"
+              "kind": null,
+              "node": "Constant",
+              "value": null
             }
-          }
+          },
+          "type_comment": null,
+          "type_params": []
         },
         {
           "bases": [
@@ -1595,7 +1677,8 @@
                 },
                 "id": "code",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -1613,7 +1696,8 @@
                 },
                 "id": "category",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -1631,7 +1715,8 @@
                 },
                 "id": "phase",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -1649,7 +1734,8 @@
                 },
                 "id": "remote_effect",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -1695,7 +1781,8 @@
                 },
                 "id": "retry",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -1711,7 +1798,9 @@
                   "node": "BitOr"
                 },
                 "right": {
-                  "node": "Constant"
+                  "kind": null,
+                  "node": "Constant",
+                  "value": null
                 }
               },
               "node": "AnnAssign",
@@ -1722,7 +1811,8 @@
                 },
                 "id": "provider",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -1738,7 +1828,9 @@
                   "node": "BitOr"
                 },
                 "right": {
-                  "node": "Constant"
+                  "kind": null,
+                  "node": "Constant",
+                  "value": null
                 }
               },
               "node": "AnnAssign",
@@ -1749,7 +1841,8 @@
                 },
                 "id": "execution_id",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -1795,7 +1888,8 @@
                 },
                 "id": "details",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -1813,14 +1907,17 @@
                 },
                 "id": "message",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -1859,15 +1956,23 @@
                       }
                     },
                     "arg": "document",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "defaults": [],
+                "kw_defaults": [],
+                "kwarg": null,
+                "kwonlyargs": [],
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -1875,15 +1980,23 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "__init__",
               "node": "FunctionDef",
               "returns": {
-                "node": "Constant"
-              }
+                "kind": null,
+                "node": "Constant",
+                "value": null
+              },
+              "type_comment": null,
+              "type_params": []
             }
           ],
+          "decorator_list": [],
+          "keywords": [],
           "name": "PlenoraError",
-          "node": "ClassDef"
+          "node": "ClassDef",
+          "type_params": []
         },
         {
           "bases": [
@@ -1899,6 +2012,7 @@
             {
               "node": "Expr",
               "value": {
+                "kind": null,
                 "node": "Constant",
                 "value": {
                   "literal": "ellipsis"
@@ -1906,10 +2020,14 @@
               }
             }
           ],
+          "decorator_list": [],
+          "keywords": [],
           "name": "StorageError",
-          "node": "ClassDef"
+          "node": "ClassDef",
+          "type_params": []
         },
         {
+          "bases": [],
           "body": [
             {
               "annotation": {
@@ -1929,6 +2047,7 @@
                 "node": "Name"
               },
               "value": {
+                "kind": null,
                 "node": "Constant",
                 "value": false
               }
@@ -1951,6 +2070,7 @@
                 "node": "Name"
               },
               "value": {
+                "kind": null,
                 "node": "Constant",
                 "value": false
               }
@@ -1973,6 +2093,7 @@
                 "node": "Name"
               },
               "value": {
+                "kind": null,
                 "node": "Constant",
                 "value": false
               }
@@ -1995,6 +2116,7 @@
                 "node": "Name"
               },
               "value": {
+                "kind": null,
                 "node": "Constant",
                 "value": false
               }
@@ -2017,6 +2139,7 @@
                 "node": "Name"
               },
               "value": {
+                "kind": null,
                 "node": "Constant",
                 "value": 1073741824
               }
@@ -2039,6 +2162,7 @@
                 "node": "Name"
               },
               "value": {
+                "kind": null,
                 "node": "Constant",
                 "value": 10000
               }
@@ -2061,6 +2185,7 @@
                 "node": "Name"
               },
               "value": {
+                "kind": null,
                 "node": "Constant",
                 "value": 67108864
               }
@@ -2068,6 +2193,7 @@
           ],
           "decorator_list": [
             {
+              "args": [],
               "func": {
                 "ctx": {
                   "node": "Load"
@@ -2080,6 +2206,7 @@
                   "arg": "frozen",
                   "node": "keyword",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": true
                   }
@@ -2088,10 +2215,13 @@
               "node": "Call"
             }
           ],
+          "keywords": [],
           "name": "EngineConfig",
-          "node": "ClassDef"
+          "node": "ClassDef",
+          "type_params": []
         },
         {
+          "bases": [],
           "body": [
             {
               "annotation": {
@@ -2109,7 +2239,8 @@
                 },
                 "id": "provider",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -2127,7 +2258,8 @@
                 },
                 "id": "config_contract",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -2173,7 +2305,8 @@
                 },
                 "id": "config",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -2191,11 +2324,13 @@
                 },
                 "id": "credential_ref",
                 "node": "Name"
-              }
+              },
+              "value": null
             }
           ],
           "decorator_list": [
             {
+              "args": [],
               "func": {
                 "ctx": {
                   "node": "Load"
@@ -2208,6 +2343,7 @@
                   "arg": "frozen",
                   "node": "keyword",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": true
                   }
@@ -2216,6 +2352,7 @@
                   "arg": "repr",
                   "node": "keyword",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": false
                   }
@@ -2224,17 +2361,22 @@
               "node": "Call"
             }
           ],
+          "keywords": [],
           "name": "Connection",
-          "node": "ClassDef"
+          "node": "ClassDef",
+          "type_params": []
         },
         {
+          "bases": [],
           "body": [
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -2250,27 +2392,36 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "config",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
                 "defaults": [
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   }
                 ],
                 "kw_defaults": [
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   },
                   {
+                    "kind": null,
                     "node": "Constant",
                     "value": false
                   }
                 ],
+                "kwarg": null,
                 "kwonlyargs": [
                   {
                     "annotation": {
@@ -2286,11 +2437,14 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "credential_resolver",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -2301,15 +2455,19 @@
                       "node": "Name"
                     },
                     "arg": "spool_uploads",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -2317,26 +2475,40 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "__init__",
               "node": "FunctionDef",
               "returns": {
-                "node": "Constant"
-              }
+                "kind": null,
+                "node": "Constant",
+                "value": null
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "defaults": [],
+                "kw_defaults": [],
+                "kwarg": null,
+                "kwonlyargs": [],
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -2361,22 +2533,33 @@
                 },
                 "id": "bool",
                 "node": "Name"
-              }
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "defaults": [],
+                "kw_defaults": [],
+                "kwarg": null,
+                "kwonlyargs": [],
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -2384,26 +2567,40 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "close",
               "node": "FunctionDef",
               "returns": {
-                "node": "Constant"
-              }
+                "kind": null,
+                "node": "Constant",
+                "value": null
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "defaults": [],
+                "kw_defaults": [],
+                "kwarg": null,
+                "kwonlyargs": [],
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -2411,6 +2608,7 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "__enter__",
               "node": "FunctionDef",
               "returns": {
@@ -2419,17 +2617,26 @@
                 },
                 "id": "Engine",
                 "node": "Name"
-              }
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
+                "defaults": [],
+                "kw_defaults": [],
+                "kwarg": null,
+                "kwonlyargs": [],
                 "node": "arguments",
+                "posonlyargs": [],
                 "vararg": {
                   "annotation": {
                     "ctx": {
@@ -2439,13 +2646,15 @@
                     "node": "Name"
                   },
                   "arg": "_args",
-                  "node": "arg"
+                  "node": "arg",
+                  "type_comment": null
                 }
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -2453,26 +2662,40 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "__exit__",
               "node": "FunctionDef",
               "returns": {
-                "node": "Constant"
-              }
+                "kind": null,
+                "node": "Constant",
+                "value": null
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "defaults": [],
+                "kw_defaults": [],
+                "kwarg": null,
+                "kwonlyargs": [],
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -2480,6 +2703,7 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "capabilities",
               "node": "FunctionDef",
               "returns": {
@@ -2516,14 +2740,18 @@
                   "id": "dict",
                   "node": "Name"
                 }
-              }
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -2534,17 +2762,24 @@
                       "node": "Name"
                     },
                     "arg": "connection",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
+                "defaults": [],
                 "kw_defaults": [
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   },
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   }
                 ],
+                "kwarg": null,
                 "kwonlyargs": [
                   {
                     "annotation": {
@@ -2560,11 +2795,14 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "cancellation",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -2580,19 +2818,25 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "timeout_ms",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -2600,6 +2844,7 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "test",
               "node": "FunctionDef",
               "returns": {
@@ -2608,14 +2853,18 @@
                 },
                 "id": "TestResult",
                 "node": "Name"
-              }
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -2626,26 +2875,39 @@
                       "node": "Name"
                     },
                     "arg": "connection",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
+                "defaults": [],
                 "kw_defaults": [
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   },
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   },
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   },
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   },
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   }
                 ],
+                "kwarg": null,
                 "kwonlyargs": [
                   {
                     "annotation": {
@@ -2661,11 +2923,14 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "prefix",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -2681,11 +2946,14 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "cursor",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -2701,11 +2969,14 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "max_items",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -2721,11 +2992,14 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "cancellation",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -2741,19 +3015,25 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "timeout_ms",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -2761,6 +3041,7 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "list",
               "node": "FunctionDef",
               "returns": {
@@ -2769,14 +3050,18 @@
                 },
                 "id": "ListResult",
                 "node": "Name"
-              }
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -2787,7 +3072,8 @@
                       "node": "Name"
                     },
                     "arg": "connection",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -2798,17 +3084,24 @@
                       "node": "Name"
                     },
                     "arg": "key",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
+                "defaults": [],
                 "kw_defaults": [
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   },
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   }
                 ],
+                "kwarg": null,
                 "kwonlyargs": [
                   {
                     "annotation": {
@@ -2824,11 +3117,14 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "cancellation",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -2844,19 +3140,25 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "timeout_ms",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -2864,6 +3166,7 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "stat",
               "node": "FunctionDef",
               "returns": {
@@ -2872,14 +3175,18 @@
                 },
                 "id": "ObjectInfo",
                 "node": "Name"
-              }
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -2890,7 +3197,8 @@
                       "node": "Name"
                     },
                     "arg": "connection",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -2901,7 +3209,8 @@
                       "node": "Name"
                     },
                     "arg": "key",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -2938,18 +3247,25 @@
                       }
                     },
                     "arg": "output",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
+                "defaults": [],
                 "kw_defaults": [
                   null,
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   },
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   }
                 ],
+                "kwarg": null,
                 "kwonlyargs": [
                   {
                     "annotation": {
@@ -2960,7 +3276,8 @@
                       "node": "Name"
                     },
                     "arg": "overwrite",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -2976,11 +3293,14 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "cancellation",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -2996,19 +3316,25 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "timeout_ms",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -3016,6 +3342,7 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "get",
               "node": "FunctionDef",
               "returns": {
@@ -3024,14 +3351,18 @@
                 },
                 "id": "TransferResult",
                 "node": "Name"
-              }
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3042,7 +3373,8 @@
                       "node": "Name"
                     },
                     "arg": "connection",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3053,7 +3385,8 @@
                       "node": "Name"
                     },
                     "arg": "key",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3090,22 +3423,31 @@
                       }
                     },
                     "arg": "input",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
+                "defaults": [],
                 "kw_defaults": [
                   null,
                   null,
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   },
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   },
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   }
                 ],
+                "kwarg": null,
                 "kwonlyargs": [
                   {
                     "annotation": {
@@ -3116,7 +3458,8 @@
                       "node": "Name"
                     },
                     "arg": "overwrite",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3127,7 +3470,8 @@
                       "node": "Name"
                     },
                     "arg": "publication_policy",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3143,11 +3487,14 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "content_type",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3163,11 +3510,14 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "cancellation",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3183,19 +3533,25 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "timeout_ms",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -3203,6 +3559,7 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "put",
               "node": "FunctionDef",
               "returns": {
@@ -3211,14 +3568,18 @@
                 },
                 "id": "TransferResult",
                 "node": "Name"
-              }
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3229,7 +3590,8 @@
                       "node": "Name"
                     },
                     "arg": "connection",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3240,7 +3602,8 @@
                       "node": "Name"
                     },
                     "arg": "source_key",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3251,19 +3614,26 @@
                       "node": "Name"
                     },
                     "arg": "destination_key",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
+                "defaults": [],
                 "kw_defaults": [
                   null,
                   null,
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   },
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   }
                 ],
+                "kwarg": null,
                 "kwonlyargs": [
                   {
                     "annotation": {
@@ -3274,7 +3644,8 @@
                       "node": "Name"
                     },
                     "arg": "overwrite",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3285,7 +3656,8 @@
                       "node": "Name"
                     },
                     "arg": "publication_policy",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3301,11 +3673,14 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "cancellation",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3321,19 +3696,25 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "timeout_ms",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -3341,6 +3722,7 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "copy",
               "node": "FunctionDef",
               "returns": {
@@ -3349,14 +3731,18 @@
                 },
                 "id": "ObjectInfo",
                 "node": "Name"
-              }
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3367,7 +3753,8 @@
                       "node": "Name"
                     },
                     "arg": "connection",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3378,18 +3765,25 @@
                       "node": "Name"
                     },
                     "arg": "key",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
+                "defaults": [],
                 "kw_defaults": [
                   null,
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   },
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   }
                 ],
+                "kwarg": null,
                 "kwonlyargs": [
                   {
                     "annotation": {
@@ -3400,7 +3794,8 @@
                       "node": "Name"
                     },
                     "arg": "ignore_missing",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3416,11 +3811,14 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "cancellation",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3436,19 +3834,25 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "timeout_ms",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -3456,6 +3860,7 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "delete",
               "node": "FunctionDef",
               "returns": {
@@ -3464,20 +3869,28 @@
                 },
                 "id": "DeleteResult",
                 "node": "Name"
-              }
+              },
+              "type_comment": null,
+              "type_params": []
             }
           ],
+          "decorator_list": [],
+          "keywords": [],
           "name": "Engine",
-          "node": "ClassDef"
+          "node": "ClassDef",
+          "type_params": []
         },
         {
+          "bases": [],
           "body": [
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3493,27 +3906,36 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "config",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
                 "defaults": [
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   }
                 ],
                 "kw_defaults": [
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   },
                   {
+                    "kind": null,
                     "node": "Constant",
                     "value": false
                   }
                 ],
+                "kwarg": null,
                 "kwonlyargs": [
                   {
                     "annotation": {
@@ -3529,11 +3951,14 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "credential_resolver",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3544,15 +3969,19 @@
                       "node": "Name"
                     },
                     "arg": "spool_uploads",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -3560,26 +3989,40 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "__init__",
               "node": "FunctionDef",
               "returns": {
-                "node": "Constant"
-              }
+                "kind": null,
+                "node": "Constant",
+                "value": null
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "defaults": [],
+                "kw_defaults": [],
+                "kwarg": null,
+                "kwonlyargs": [],
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -3604,22 +4047,33 @@
                 },
                 "id": "bool",
                 "node": "Name"
-              }
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "defaults": [],
+                "kw_defaults": [],
+                "kwarg": null,
+                "kwonlyargs": [],
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -3627,26 +4081,40 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "close",
               "node": "AsyncFunctionDef",
               "returns": {
-                "node": "Constant"
-              }
+                "kind": null,
+                "node": "Constant",
+                "value": null
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "defaults": [],
+                "kw_defaults": [],
+                "kwarg": null,
+                "kwonlyargs": [],
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -3654,26 +4122,40 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "aclose",
               "node": "AsyncFunctionDef",
               "returns": {
-                "node": "Constant"
-              }
+                "kind": null,
+                "node": "Constant",
+                "value": null
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "defaults": [],
+                "kw_defaults": [],
+                "kwarg": null,
+                "kwonlyargs": [],
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -3681,6 +4163,7 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "__aenter__",
               "node": "AsyncFunctionDef",
               "returns": {
@@ -3689,17 +4172,26 @@
                 },
                 "id": "AsyncEngine",
                 "node": "Name"
-              }
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
+                "defaults": [],
+                "kw_defaults": [],
+                "kwarg": null,
+                "kwonlyargs": [],
                 "node": "arguments",
+                "posonlyargs": [],
                 "vararg": {
                   "annotation": {
                     "ctx": {
@@ -3709,13 +4201,15 @@
                     "node": "Name"
                   },
                   "arg": "_args",
-                  "node": "arg"
+                  "node": "arg",
+                  "type_comment": null
                 }
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -3723,26 +4217,40 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "__aexit__",
               "node": "AsyncFunctionDef",
               "returns": {
-                "node": "Constant"
-              }
+                "kind": null,
+                "node": "Constant",
+                "value": null
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "defaults": [],
+                "kw_defaults": [],
+                "kwarg": null,
+                "kwonlyargs": [],
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -3750,6 +4258,7 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "capabilities",
               "node": "FunctionDef",
               "returns": {
@@ -3786,14 +4295,18 @@
                   "id": "dict",
                   "node": "Name"
                 }
-              }
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3804,17 +4317,24 @@
                       "node": "Name"
                     },
                     "arg": "connection",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
+                "defaults": [],
                 "kw_defaults": [
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   },
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   }
                 ],
+                "kwarg": null,
                 "kwonlyargs": [
                   {
                     "annotation": {
@@ -3830,11 +4350,14 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "cancellation",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3850,19 +4373,25 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "timeout_ms",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -3870,6 +4399,7 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "test",
               "node": "AsyncFunctionDef",
               "returns": {
@@ -3878,14 +4408,18 @@
                 },
                 "id": "TestResult",
                 "node": "Name"
-              }
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3896,26 +4430,39 @@
                       "node": "Name"
                     },
                     "arg": "connection",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
+                "defaults": [],
                 "kw_defaults": [
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   },
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   },
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   },
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   },
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   }
                 ],
+                "kwarg": null,
                 "kwonlyargs": [
                   {
                     "annotation": {
@@ -3931,11 +4478,14 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "prefix",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3951,11 +4501,14 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "cursor",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3971,11 +4524,14 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "max_items",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -3991,11 +4547,14 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "cancellation",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4011,19 +4570,25 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "timeout_ms",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -4031,6 +4596,7 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "list",
               "node": "AsyncFunctionDef",
               "returns": {
@@ -4039,14 +4605,18 @@
                 },
                 "id": "ListResult",
                 "node": "Name"
-              }
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4057,7 +4627,8 @@
                       "node": "Name"
                     },
                     "arg": "connection",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4068,17 +4639,24 @@
                       "node": "Name"
                     },
                     "arg": "key",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
+                "defaults": [],
                 "kw_defaults": [
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   },
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   }
                 ],
+                "kwarg": null,
                 "kwonlyargs": [
                   {
                     "annotation": {
@@ -4094,11 +4672,14 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "cancellation",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4114,19 +4695,25 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "timeout_ms",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -4134,6 +4721,7 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "stat",
               "node": "AsyncFunctionDef",
               "returns": {
@@ -4142,14 +4730,18 @@
                 },
                 "id": "ObjectInfo",
                 "node": "Name"
-              }
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4160,7 +4752,8 @@
                       "node": "Name"
                     },
                     "arg": "connection",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4171,7 +4764,8 @@
                       "node": "Name"
                     },
                     "arg": "key",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4208,18 +4802,25 @@
                       }
                     },
                     "arg": "output",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
+                "defaults": [],
                 "kw_defaults": [
                   null,
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   },
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   }
                 ],
+                "kwarg": null,
                 "kwonlyargs": [
                   {
                     "annotation": {
@@ -4230,7 +4831,8 @@
                       "node": "Name"
                     },
                     "arg": "overwrite",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4246,11 +4848,14 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "cancellation",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4266,19 +4871,25 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "timeout_ms",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -4286,6 +4897,7 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "get",
               "node": "AsyncFunctionDef",
               "returns": {
@@ -4294,14 +4906,18 @@
                 },
                 "id": "TransferResult",
                 "node": "Name"
-              }
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4312,7 +4928,8 @@
                       "node": "Name"
                     },
                     "arg": "connection",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4323,7 +4940,8 @@
                       "node": "Name"
                     },
                     "arg": "key",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4360,22 +4978,31 @@
                       }
                     },
                     "arg": "input",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
+                "defaults": [],
                 "kw_defaults": [
                   null,
                   null,
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   },
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   },
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   }
                 ],
+                "kwarg": null,
                 "kwonlyargs": [
                   {
                     "annotation": {
@@ -4386,7 +5013,8 @@
                       "node": "Name"
                     },
                     "arg": "overwrite",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4397,7 +5025,8 @@
                       "node": "Name"
                     },
                     "arg": "publication_policy",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4413,11 +5042,14 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "content_type",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4433,11 +5065,14 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "cancellation",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4453,19 +5088,25 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "timeout_ms",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -4473,6 +5114,7 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "put",
               "node": "AsyncFunctionDef",
               "returns": {
@@ -4481,14 +5123,18 @@
                 },
                 "id": "TransferResult",
                 "node": "Name"
-              }
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4499,7 +5145,8 @@
                       "node": "Name"
                     },
                     "arg": "connection",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4510,7 +5157,8 @@
                       "node": "Name"
                     },
                     "arg": "source_key",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4521,19 +5169,26 @@
                       "node": "Name"
                     },
                     "arg": "destination_key",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
+                "defaults": [],
                 "kw_defaults": [
                   null,
                   null,
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   },
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   }
                 ],
+                "kwarg": null,
                 "kwonlyargs": [
                   {
                     "annotation": {
@@ -4544,7 +5199,8 @@
                       "node": "Name"
                     },
                     "arg": "overwrite",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4555,7 +5211,8 @@
                       "node": "Name"
                     },
                     "arg": "publication_policy",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4571,11 +5228,14 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "cancellation",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4591,19 +5251,25 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "timeout_ms",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -4611,6 +5277,7 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "copy",
               "node": "AsyncFunctionDef",
               "returns": {
@@ -4619,14 +5286,18 @@
                 },
                 "id": "ObjectInfo",
                 "node": "Name"
-              }
+              },
+              "type_comment": null,
+              "type_params": []
             },
             {
               "args": {
                 "args": [
                   {
+                    "annotation": null,
                     "arg": "self",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4637,7 +5308,8 @@
                       "node": "Name"
                     },
                     "arg": "connection",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4648,18 +5320,25 @@
                       "node": "Name"
                     },
                     "arg": "key",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
+                "defaults": [],
                 "kw_defaults": [
                   null,
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   },
                   {
-                    "node": "Constant"
+                    "kind": null,
+                    "node": "Constant",
+                    "value": null
                   }
                 ],
+                "kwarg": null,
                 "kwonlyargs": [
                   {
                     "annotation": {
@@ -4670,7 +5349,8 @@
                       "node": "Name"
                     },
                     "arg": "ignore_missing",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4686,11 +5366,14 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "cancellation",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   },
                   {
                     "annotation": {
@@ -4706,19 +5389,25 @@
                         "node": "BitOr"
                       },
                       "right": {
-                        "node": "Constant"
+                        "kind": null,
+                        "node": "Constant",
+                        "value": null
                       }
                     },
                     "arg": "timeout_ms",
-                    "node": "arg"
+                    "node": "arg",
+                    "type_comment": null
                   }
                 ],
-                "node": "arguments"
+                "node": "arguments",
+                "posonlyargs": [],
+                "vararg": null
               },
               "body": [
                 {
                   "node": "Expr",
                   "value": {
+                    "kind": null,
                     "node": "Constant",
                     "value": {
                       "literal": "ellipsis"
@@ -4726,6 +5415,7 @@
                   }
                 }
               ],
+              "decorator_list": [],
               "name": "delete",
               "node": "AsyncFunctionDef",
               "returns": {
@@ -4734,20 +5424,27 @@
                 },
                 "id": "DeleteResult",
                 "node": "Name"
-              }
+              },
+              "type_comment": null,
+              "type_params": []
             }
           ],
+          "decorator_list": [],
+          "keywords": [],
           "name": "AsyncEngine",
-          "node": "ClassDef"
+          "node": "ClassDef",
+          "type_params": []
         }
       ],
-      "node": "Module"
+      "node": "Module",
+      "type_ignores": []
     },
     "types.py": {
       "body": [
         {
           "node": "Expr",
           "value": {
+            "kind": null,
             "node": "Constant",
             "value": "Public result shapes; values remain ordinary dictionaries at runtime.\n\nKeys follow the storage v1 schemas. Nullable metadata is always present: None\nmeans the provider did not supply that value, not that the object is absent.\n"
           }
@@ -4757,10 +5454,12 @@
           "module": "typing",
           "names": [
             {
+              "asname": null,
               "name": "Literal",
               "node": "alias"
             },
             {
+              "asname": null,
               "name": "TypedDict",
               "node": "alias"
             }
@@ -4778,6 +5477,7 @@
               "node": "Name"
             }
           ],
+          "type_comment": null,
           "value": {
             "ctx": {
               "node": "Load"
@@ -4789,10 +5489,12 @@
               },
               "elts": [
                 {
+                  "kind": null,
                   "node": "Constant",
                   "value": "best_effort"
                 },
                 {
+                  "kind": null,
                   "node": "Constant",
                   "value": "atomic_required"
                 }
@@ -4835,7 +5537,8 @@
                 },
                 "id": "provider",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -4853,11 +5556,15 @@
                 },
                 "id": "reachable",
                 "node": "Name"
-              }
+              },
+              "value": null
             }
           ],
+          "decorator_list": [],
+          "keywords": [],
           "name": "TestResult",
-          "node": "ClassDef"
+          "node": "ClassDef",
+          "type_params": []
         },
         {
           "bases": [
@@ -4886,7 +5593,8 @@
                 },
                 "id": "key",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -4904,7 +5612,8 @@
                 },
                 "id": "size",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -4920,7 +5629,9 @@
                   "node": "BitOr"
                 },
                 "right": {
-                  "node": "Constant"
+                  "kind": null,
+                  "node": "Constant",
+                  "value": null
                 }
               },
               "node": "AnnAssign",
@@ -4931,7 +5642,8 @@
                 },
                 "id": "last_modified",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -4947,7 +5659,9 @@
                   "node": "BitOr"
                 },
                 "right": {
-                  "node": "Constant"
+                  "kind": null,
+                  "node": "Constant",
+                  "value": null
                 }
               },
               "node": "AnnAssign",
@@ -4958,7 +5672,8 @@
                 },
                 "id": "etag",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -4974,7 +5689,9 @@
                   "node": "BitOr"
                 },
                 "right": {
-                  "node": "Constant"
+                  "kind": null,
+                  "node": "Constant",
+                  "value": null
                 }
               },
               "node": "AnnAssign",
@@ -4985,11 +5702,15 @@
                 },
                 "id": "version",
                 "node": "Name"
-              }
+              },
+              "value": null
             }
           ],
+          "decorator_list": [],
+          "keywords": [],
           "name": "ObjectInfo",
-          "node": "ClassDef"
+          "node": "ClassDef",
+          "type_params": []
         },
         {
           "bases": [
@@ -5031,7 +5752,8 @@
                 },
                 "id": "objects",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -5049,7 +5771,8 @@
                 },
                 "id": "truncated",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -5065,7 +5788,9 @@
                   "node": "BitOr"
                 },
                 "right": {
-                  "node": "Constant"
+                  "kind": null,
+                  "node": "Constant",
+                  "value": null
                 }
               },
               "node": "AnnAssign",
@@ -5076,11 +5801,15 @@
                 },
                 "id": "next_cursor",
                 "node": "Name"
-              }
+              },
+              "value": null
             }
           ],
+          "decorator_list": [],
+          "keywords": [],
           "name": "ListResult",
-          "node": "ClassDef"
+          "node": "ClassDef",
+          "type_params": []
         },
         {
           "bases": [
@@ -5100,6 +5829,7 @@
                 },
                 "node": "Subscript",
                 "slice": {
+                  "kind": null,
                   "node": "Constant",
                   "value": "sha256"
                 },
@@ -5119,7 +5849,8 @@
                 },
                 "id": "algorithm",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -5137,11 +5868,15 @@
                 },
                 "id": "value",
                 "node": "Name"
-              }
+              },
+              "value": null
             }
           ],
+          "decorator_list": [],
+          "keywords": [],
           "name": "Checksum",
-          "node": "ClassDef"
+          "node": "ClassDef",
+          "type_params": []
         },
         {
           "bases": [
@@ -5168,7 +5903,9 @@
                   "node": "BitOr"
                 },
                 "right": {
-                  "node": "Constant"
+                  "kind": null,
+                  "node": "Constant",
+                  "value": null
                 }
               },
               "node": "AnnAssign",
@@ -5179,7 +5916,8 @@
                 },
                 "id": "content_type",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -5195,7 +5933,9 @@
                   "node": "BitOr"
                 },
                 "right": {
-                  "node": "Constant"
+                  "kind": null,
+                  "node": "Constant",
+                  "value": null
                 }
               },
               "node": "AnnAssign",
@@ -5206,7 +5946,8 @@
                 },
                 "id": "size",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -5222,7 +5963,9 @@
                   "node": "BitOr"
                 },
                 "right": {
-                  "node": "Constant"
+                  "kind": null,
+                  "node": "Constant",
+                  "value": null
                 }
               },
               "node": "AnnAssign",
@@ -5233,11 +5976,15 @@
                 },
                 "id": "sha256",
                 "node": "Name"
-              }
+              },
+              "value": null
             }
           ],
+          "decorator_list": [],
+          "keywords": [],
           "name": "ArtifactMetadata",
-          "node": "ClassDef"
+          "node": "ClassDef",
+          "type_params": []
         },
         {
           "bases": [
@@ -5266,7 +6013,8 @@
                 },
                 "id": "key",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -5284,7 +6032,8 @@
                 },
                 "id": "bytes_transferred",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -5302,7 +6051,8 @@
                 },
                 "id": "checksum",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -5320,7 +6070,8 @@
                 },
                 "id": "artifact",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -5336,7 +6087,9 @@
                   "node": "BitOr"
                 },
                 "right": {
-                  "node": "Constant"
+                  "kind": null,
+                  "node": "Constant",
+                  "value": null
                 }
               },
               "node": "AnnAssign",
@@ -5347,7 +6100,8 @@
                 },
                 "id": "etag",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -5363,7 +6117,9 @@
                   "node": "BitOr"
                 },
                 "right": {
-                  "node": "Constant"
+                  "kind": null,
+                  "node": "Constant",
+                  "value": null
                 }
               },
               "node": "AnnAssign",
@@ -5374,11 +6130,15 @@
                 },
                 "id": "version",
                 "node": "Name"
-              }
+              },
+              "value": null
             }
           ],
+          "decorator_list": [],
+          "keywords": [],
           "name": "TransferResult",
-          "node": "ClassDef"
+          "node": "ClassDef",
+          "type_params": []
         },
         {
           "bases": [
@@ -5407,7 +6167,8 @@
                 },
                 "id": "key",
                 "node": "Name"
-              }
+              },
+              "value": null
             },
             {
               "annotation": {
@@ -5425,11 +6186,15 @@
                 },
                 "id": "deleted",
                 "node": "Name"
-              }
+              },
+              "value": null
             }
           ],
+          "decorator_list": [],
+          "keywords": [],
           "name": "DeleteResult",
-          "node": "ClassDef"
+          "node": "ClassDef",
+          "type_params": []
         },
         {
           "node": "Assign",
@@ -5442,6 +6207,7 @@
               "node": "Name"
             }
           ],
+          "type_comment": null,
           "value": {
             "left": {
               "left": {
@@ -5503,7 +6269,8 @@
           }
         }
       ],
-      "node": "Module"
+      "node": "Module",
+      "type_ignores": []
     }
   },
   "root_error": true,

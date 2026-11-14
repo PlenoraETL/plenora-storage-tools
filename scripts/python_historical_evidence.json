@@ -1,0 +1,64 @@
+{
+  "CHANGELOG.md": {
+    "lines": [
+      "- Measure installed Python wrapper line/branch coverage against wheel bytes on CPython 3.10–3.14; enforce per-module floors and test repeated cancellation, native error redaction and all async operations.",
+      "- Preserve access to settled async cancellation outcomes through Python 3.10 and `wait_for` wrappers with `cancellation_outcome()`."
+    ]
+  },
+  "docs/api-1.0.md": {
+    "sha256": "0e11c82bf5fb5943a6c1b769c3b4deab6a576f63f2d5db1c0f58fddbd5c82a73"
+  },
+  "docs/database-reference-review.md": {
+    "sha256": "a796b69e0b12ea578c21aa06dfbce523fa36f37f4ff8ed5a8d17f2d05a5534e6"
+  },
+  "docs/migration-1.0.md": {
+    "sha256": "2fc0a662b19fab9bd784810507a92272aadc148d3366f168b67b4bcb6918cf00"
+  },
+  "docs/migration-2.0.md": {
+    "sha256": "af2528a4b1f11de404a049cac21cba95234eb7b4cf256e2e800e3400fd6726d7"
+  },
+  "docs/progress-1.0.0-alpha.1.md": {
+    "sha256": "f428f1d10f717b1084d46419c1f7f6b946afe538a5d647d7f40bbbd11b62ad63"
+  },
+  "docs/quality-alignment-progress.md": {
+    "sha256": "20114a0e3fc9bb66ec8ea38bad5b58e01bb6eec8bab30c62f4e3538e492aa8ad"
+  },
+  "docs/release-2.0.0.md": {
+    "sha256": "14c07ae03034fe9d8e5ca5222ad599f3da2d2a2c71b175b4d675016ee095a53e"
+  },
+  "docs/release-2.0.1.md": {
+    "sha256": "a4b9b2a099399cb3bbc821a4f96714a48581cfc47be182f49f0c8067e8d35f04"
+  },
+  "docs/release-2.1.0.md": {
+    "sha256": "a15f0e52b554d856d6901ff64a4dcfc784b87b3761b4705a451ed2b3a10e920d"
+  },
+  "docs/release-notes-2.0.1.md": {
+    "sha256": "161ae74c88706babf869db5f8af01be6846a0b285ce46393c177065eb90406d4"
+  },
+  "docs/release-notes-2.1.0.md": {
+    "sha256": "81457954eba83b4bf502d69a1a5d02bfce469ec7dcdee06771f0e8572e4cdaf7"
+  },
+  "docs/release-notes-3.0.0.md": {
+    "sha256": "07063601d3a691f83eee67b0cd12dd5edfbbe5f31ed0eaffd9b4d7ad49410ef2"
+  },
+  "docs/release-notes-3.0.1.md": {
+    "sha256": "84a249f1bbe5d27a6ba909796408ac49d22017a0ce5ec166aaf853e2ae58f351"
+  },
+  "docs/release-notes-3.0.4.md": {
+    "sha256": "99de166eb484a443a4747f34def17eb4a291049aa2675f2816c8d7d8b1e51573"
+  },
+  "docs/release-notes-3.0.5.md": {
+    "sha256": "c8594766f52f7ea4322f840442ac522926e2da4cccb8bc10910ff0310f359622"
+  },
+  "docs/reliability.md": {
+    "lines": [
+      "La prima misura Windows/Python 3.11 dopo l'estensione a 25 test raggiunge"
+    ]
+  },
+  "docs/roadmap-2.0.0.md": {
+    "sha256": "caf3b724e3f1fe66fe285b9469d52caebb5cfcf3e0a553996d5e918b9fcefb4d"
+  },
+  "docs/roadmap-2.1.0.md": {
+    "sha256": "8526a73fff418882b34d35299657c2b85593aff62ea7b0385b8e0fe3cd3e458d"
+  }
+}

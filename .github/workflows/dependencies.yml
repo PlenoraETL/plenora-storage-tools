@@ -14,6 +14,26 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version-file: .python-version
+      - name: Politica comune dipendenze Plenora
+        shell: bash
+        env:
+          PLENORA_REPO: plenora-storage-tools
+        run: |
+          set -euo pipefail
+          cd .ci/plenora-dependencies
+          echo '108229ef52f81334ecb2f45f8539015a442bad5af9eccaa37620dd879cf7fc6f  plenora-dependencies.toml' | sha256sum -c -
+          sha256sum -c snapshot.sha256
+          python3 controlla_dipendenze.py \
+            --repo ../.. --nome "$PLENORA_REPO" \
+            --json ../../dipendenze-report.json
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dependency-policy
+          path: dipendenze-report.json
       - run: cargo install cargo-audit --version 0.22.2 --locked
       - run: cargo install cargo-deny --version 0.20.2 --locked
       - run: cargo audit --deny warnings

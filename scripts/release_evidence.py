@@ -24,7 +24,7 @@ from qualify_s3_disk_pressure import validate as validate_disk_pressure
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS = ('x86_64-unknown-linux-gnu', 'x86_64-pc-windows-msvc')
-PYTHONS = ('3.10', '3.11', '3.12', '3.13', '3.14')
+PYTHONS = ('3.14',)
 
 
 def require(condition, message):

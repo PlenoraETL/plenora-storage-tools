@@ -52,7 +52,7 @@ class StorageError(PlenoraError):
 def cancellation_outcome(error: BaseException) -> dict[str, Any] | PlenoraError | None:
     """Find the settled storage outcome through asyncio cancellation wrappers.
 
-    Python 3.10 creates new CancelledError instances linked via __context__;
+    Cancellation wrappers can link CancelledError instances via __context__;
     wait_for timeouts also wrap cancellation in __cause__. None means no known
     storage outcome, never proof that a remote mutation had no effect.
     """
@@ -270,7 +270,7 @@ class AsyncEngine:
     """Asyncio facade with cooperative Rust cancellation and operation draining.
 
     When a task is cancelled, use ``cancellation_outcome(error)`` to retrieve
-    the settled result or storage error, including through Python 3.10 and
+    the settled result or storage error, including through chained cancellation and
     wait_for exception wrappers. Inspect that outcome before retrying a mutation.
     """
 

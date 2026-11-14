@@ -8,7 +8,7 @@ del soak resta 7200 secondi. Account cloud reali rimangono fuori dal perimetro.
 
 Il coordinatore viene eseguito su Windows, dove prova la distribuzione Windows;
 la VM Linux dedicata esegue fixture, trasferimenti, prestazioni e soak.
-Servono Git, GitHub CLI autenticato, Python 3.11 e:
+Servono Git, GitHub CLI autenticato, Python 3.14 e:
 
 ```powershell
 python -m pip install -r scripts/requirements-campaign.txt

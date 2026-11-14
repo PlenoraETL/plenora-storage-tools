@@ -9,7 +9,7 @@ RUN go build -mod=readonly -trimpath -buildvcs=false \
     -ldflags='-s -w -X github.com/minio/minio/cmd.Version=RELEASE.2025-09-07T16-13-09Z -X github.com/minio/minio/cmd.CommitID=07c3a429bfed433e49018cb0f78a52145d4bedeb -X github.com/minio/minio/cmd.ReleaseTag=RELEASE.2025-09-07T16-13-09Z' \
     -o /out/minio .
 
-FROM python:3.12-slim-bookworm@sha256:1aaa65a85fda306ffb8b910824d4e93bdce61e212c7e87168123ea3073b41a1a
+FROM python:3.14.6-slim-trixie@sha256:7bec7ddcddeff7975d6ba9b4be7dd6f6b2f55e7491539145e2978f7f97ce9144
 COPY --from=build /out/minio /usr/local/bin/minio
 COPY --from=build /source/LICENSE /usr/share/licenses/minio/LICENSE
 COPY init.py /init.py

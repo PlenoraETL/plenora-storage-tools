@@ -66,7 +66,7 @@ Le verifiche usano `qualify_windows_candidate.py` su Windows e `qualify_target.p
 nel servizio Debian Bookworm del candidato Linux; entrambi richiamano
 `verify_release.py`. Il candidato Windows e la CI condividono anche lo stesso
 script per i report localhost sul binario finale.
-`release-package-recheck`, un runner Ubuntu 24.04 separato con Python 3.11 e senza
+`release-package-recheck`, un runner Ubuntu 24.04 separato con Python 3.14 e senza
 cache Cargo del produttore, riceve entrambi i candidati e gli archivi Cargo.
 `check_release_packages.py --release` riesegue `verify_release.py`, verifica gli
 asset standalone e un contenitore con l'inventario completo della qualifica,
@@ -127,7 +127,7 @@ permessi dei server remoti.
 Il runner Docker deve eseguire i comandi relativi alla fiducia della CA come
 root: la CA è effimera ed è installata solo nel container di test. Le chiavi in
 `.fixtures` non sono artefatti di release. `COMPOSE_PROJECT_NAME` e `COMPOSE_FILE`
-permettono di isolare una qualifica sulla VM. Python 3.11 o successivo è richiesto
+permettono di isolare una qualifica sulla VM. Python 3.14 o successivo è richiesto
 dagli script. I test contrattuali che leggono fixture del workspace sono esclusi
 dal pacchetto core; i contratti sono distribuiti in un archivio separato.
 

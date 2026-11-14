@@ -1,5 +1,8 @@
 # plenora-storage-tools
 
+La serie 4.0 richiede **Python >=3.14** per SDK, strumenti e qualifica;
+la fonte normativa è `.python-version`. Le wheel usano ABI3 minimo `cp314`.
+
 Libreria Rust, CLI e SDK Python per accedere a nove sistemi di storage con gli stessi
 contratti pubblici: S3-compatible, SFTP, FTP, filesystem locale, FTPS,
 Azure Blob / ADLS Gen2, SMB, Google Cloud Storage e WebDAV.
