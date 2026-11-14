@@ -12,13 +12,15 @@ services:
     command: ["-scheme", "http", "-port", "4443", "-public-host", "gcs:4443", "-external-url", "http://gcs:4443", "-backend", "memory"]
     ports: ["4443:4443"]
   ftps:
-    build: docker/extended
+    build:
+      context: docker
+      dockerfile: extended/Dockerfile
     image: plenora-storage-extended-fixtures:0.2
     command: ["ftps"]
     ports: ["2122:21", "30100-30163:30100-30163"]
     volumes: ["./.fixtures/extended:/certs:ro"]
     healthcheck:
-      test: [CMD, python, -c, 'import ftplib, ssl; c = ftplib.FTP_TLS(context=ssl.create_default_context(cafile=''/certs/server.crt''), timeout=5); c.connect(''ftps'', 21); c.auth(); c.login(''plenora'', ''plenora-fixture-secret''); c.prot_p(); c.nlst(); c.close()']
+      test: [CMD, python, /health.py, ftps]
       interval: 2s
       timeout: 10s
       retries: 30
@@ -27,7 +29,7 @@ services:
     command: ["webdav"]
     ports: ["8088:8080"]
     healthcheck:
-      test: [CMD, python, -c, 'import base64, urllib.request as u; t = base64.b64encode(b''plenora:plenora-fixture-secret'').decode(); r = u.Request(''http://127.0.0.1:8080/'', method=''PROPFIND'', data=b'''', headers={''Depth'': ''0'', ''Authorization'': ''Basic '' + t}); assert u.urlopen(r, timeout=5).status == 207']
+      test: [CMD, python, /health.py, webdav]
       interval: 2s
       timeout: 10s
       retries: 30
@@ -36,13 +38,14 @@ services:
     command: ["smb"]
     ports: ["1445:445"]
     healthcheck:
-      test: [CMD, smbclient, //127.0.0.1/storage, -U, plenora%plenora-fixture-secret, -m, SMB3, --option=client smb encrypt=required, -c, ls]
+      test: [CMD, python, /health.py, smb]
       interval: 2s
       timeout: 10s
       retries: 30
   azure-init:
     image: plenora-storage-extended-fixtures:0.2
-    command: ["azure-init"]
+    entrypoint: ["python", "/init.py"]
+    command: ["azure"]
   storage-rust:
     environment:
       PLENORA_EXTENDED_TEST: "1"

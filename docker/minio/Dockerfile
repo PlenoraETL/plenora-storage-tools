@@ -12,7 +12,8 @@ RUN go build -mod=readonly -trimpath -buildvcs=false \
 FROM python:3.14.6-slim-trixie@sha256:7bec7ddcddeff7975d6ba9b4be7dd6f6b2f55e7491539145e2978f7f97ce9144
 COPY --from=build /out/minio /usr/local/bin/minio
 COPY --from=build /source/LICENSE /usr/share/licenses/minio/LICENSE
-COPY init.py /init.py
+COPY minio/init.py /init.py
+COPY fixture_readiness.py /fixture_readiness.py
 LABEL org.opencontainers.image.source="https://github.com/minio/minio" \
       org.opencontainers.image.revision="07c3a429bfed433e49018cb0f78a52145d4bedeb" \
       org.opencontainers.image.licenses="AGPL-3.0-only"
