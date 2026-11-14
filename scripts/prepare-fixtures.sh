@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 022
 cd "$(dirname "$0")/.."
 mkdir -p .fixtures/minio
 trap 'status=$?; if [ -f .fixtures/certificate-generation.log ]; then tail -n 30 .fixtures/certificate-generation.log >&2; fi; exit "$status"' ERR

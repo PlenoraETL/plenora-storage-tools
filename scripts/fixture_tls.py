@@ -35,6 +35,16 @@ def verify_pair(cert, key, trust, hostname):
 
 
 def generate(kind, root, host='127.0.0.1'):
+    # Also protect direct callers, before mkdir/write_text or OpenSSL creates
+    # anything. Public certificates stay readable by fixture containers.
+    previous = os.umask(0o022)
+    try:
+        _generate(kind, root, host)
+    finally:
+        os.umask(previous)
+
+
+def _generate(kind, root, host):
     root = Path(root).resolve()
     root.mkdir(parents=True, exist_ok=True)
 

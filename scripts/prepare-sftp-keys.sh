@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 022
 cd "$(dirname "$0")/.."
 mkdir -p .fixtures
 if [ ! -s .fixtures/sftp-client ]; then
@@ -10,6 +11,7 @@ if [ ! -s .fixtures/sftp-client-encrypted ]; then
 fi
 cat .fixtures/sftp-client.pub .fixtures/sftp-client-encrypted.pub | \
   docker compose exec -T sftp sh -c '
+    umask 077
     mkdir -p /home/plenora/.ssh
     cat >> /home/plenora/.ssh/authorized_keys
     chown -R plenora:users /home/plenora/.ssh

@@ -2,6 +2,7 @@
 import contextlib
 import importlib.util
 import io
+import os
 from pathlib import Path
 import ssl
 import subprocess
@@ -82,6 +83,37 @@ class FixtureTlsTests(unittest.TestCase):
             fixture_tls.main()
         self.assertNotIn('PRIVATE', str(failure.exception))
         self.assertIn('retry=never', str(failure.exception))
+
+
+class FixtureTlsModeTests(unittest.TestCase):
+    @unittest.skipIf(sys.platform == 'win32', 'POSIX modes and umask')
+    def test_direct_generation_creates_only_unshared_paths(self):
+        for mask in (0o000, 0o002, 0o077):
+            with self.subTest(umask=oct(mask)), tempfile.TemporaryDirectory() as temporary:
+                previous = os.umask(mask)
+                try:
+                    root = Path(temporary) / 'new' / 'fixtures'
+                    fixture_tls.generate('minio', root)
+                    fixture_tls.generate('ftps', root / 'extended')
+                    self.assertEqual(os.umask(mask), mask)
+                    self.assertEqual({p.relative_to(root).as_posix() for p in root.rglob('*')},
+                                     {'ca.key', 'ca.crt', 'ca.srl', 'minio', 'minio/private.key',
+                                      'minio/public.crt', 'minio.csr', 'minio.ext', 'extended',
+                                      'extended/server.key', 'extended/server.crt'})
+                    for path in Path(temporary).rglob('*'):
+                        with self.subTest(path=path.relative_to(temporary).as_posix()):
+                            self.assertEqual(path.stat().st_mode & 0o022, 0)
+                finally:
+                    os.umask(previous)
+
+    def test_umask_is_set_before_generation_and_restored_on_failure(self):
+        with patch.object(fixture_tls.os, 'umask', return_value=0o002) as mask:
+            def fail(*args):
+                mask.assert_called_once_with(0o022)
+                raise OSError('test failure')
+            with patch.object(fixture_tls, '_generate', side_effect=fail), self.assertRaises(OSError):
+                fixture_tls.generate('minio', 'unused')
+            self.assertEqual([call.args for call in mask.call_args_list], [(0o022,), (0o002,)])
 
 
 class FixtureReadinessTests(unittest.TestCase):
