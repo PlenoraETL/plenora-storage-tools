@@ -11,10 +11,13 @@ import tarfile
 import unittest
 import zipfile
 from unittest.mock import patch
-from functools import lru_cache
+from functools import lru_cache, partial
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import check_packages as gate
+
+
+gzip_bytes = partial(gzip.compress, mtime=0)
 
 
 def der(tag, payload):
@@ -38,14 +41,14 @@ def archive(files, zip_format=False):
     if zip_format:
         with zipfile.ZipFile(output, 'w') as stream:
             for name, data in files:
-                stream.writestr(name, data)
+                stream.writestr(zipfile.ZipInfo(name), data)
     else:
-        with tarfile.open(fileobj=output, mode='w:gz') as stream:
+        with tarfile.open(fileobj=output, mode='w') as stream:
             for name, data in files:
                 member = tarfile.TarInfo(name)
                 member.size = len(data)
                 stream.addfile(member, io.BytesIO(data))
-    return output.getvalue()
+    return output.getvalue() if zip_format else gzip_bytes(output.getvalue())
 
 
 def printable_tar(payload=b'a' * 512):
@@ -182,7 +185,7 @@ class PackageGuardTests(GitSnapshotTestCase):
 
     def test_compressed_material_and_links_are_rejected(self):
         with self.assertRaises(ValueError):
-            gate.scan(gzip.compress(rsa_key()))
+            gate.scan(gzip_bytes(rsa_key()))
         output = io.BytesIO()
         with tarfile.open(fileobj=output, mode='w:gz') as stream:
             member = tarfile.TarInfo('link')
@@ -351,7 +354,7 @@ class PackageGuardTests(GitSnapshotTestCase):
 
     def test_declared_compression_recurses_into_tar(self):
         raw = gzip.decompress(archive([('readme', b'hello')]))
-        for kind, compress in (('gzip', gzip.compress), ('bzip2', bz2.compress), ('xz', lzma.compress)):
+        for kind, compress in (('gzip', gzip_bytes), ('bzip2', bz2.compress), ('xz', lzma.compress)):
             data = compress(raw)
             rule = binary_rule(data, {'format': kind, 'payload': binary_rule(raw, {
                 'format': 'tar', 'members': {'readme': {}}})})
@@ -381,7 +384,7 @@ class PackageGuardTests(GitSnapshotTestCase):
                 with self.assertRaisesRegex(ValueError, 'inventory mismatch'):
                     record([package])
                 self.assertEqual(first, policy.read_bytes())
-                package.write_bytes(archive([('app', gzip.compress(b'safe'))], True))
+                package.write_bytes(archive([('app', gzip_bytes(b'safe'))], True))
                 with self.assertRaisesRegex(ValueError, 'undeclared'):
                     record([package])
                 self.assertEqual(first, policy.read_bytes())
@@ -458,7 +461,7 @@ class BuildOutputTests(GitSnapshotTestCase):
             with self.subTest(context=context, name=name):
                 for candidate in (data, data + b'another build'):
                     gate.scan_entries([(name, candidate)], {name: {}}, 0, context)
-                for bad in (b'text', b'MZ', gzip.compress(data), self.native('wrong' if fmt == 'elf' else 'x86_64-unknown-linux-gnu', library)):
+                for bad in (b'text', b'MZ', gzip_bytes(data), self.native('wrong' if fmt == 'elf' else 'x86_64-unknown-linux-gnu', library)):
                     with self.assertRaises(ValueError):
                         gate.scan_entries([(name, bad)], {name: {}}, 0, context)
                 with self.assertRaises(ValueError):
@@ -755,7 +758,7 @@ class EntryPointRegressionTests(GitSnapshotTestCase):
                         ('tar', raw, {'format': 'tar', 'members': {'root/directory/file': {}}}),
                         *[(fmt, compress(raw), {'format': fmt, 'payload': binary_rule(raw, {
                             'format': 'tar', 'members': {'root/directory/file': {}}})})
-                          for fmt, compress in (('gzip', gzip.compress), ('bzip2', bz2.compress), ('xz', lzma.compress))]):
+                          for fmt, compress in (('gzip', gzip_bytes), ('bzip2', bz2.compress), ('xz', lzma.compress))]):
                     with self.subTest(kind=kind, payload=bool(data), format=fmt):
                         if kind == tarfile.DIRTYPE and not data:
                             gate.classify_member(packed, rule=binary_rule(packed, declaration))
@@ -767,7 +770,7 @@ class EntryPointRegressionTests(GitSnapshotTestCase):
                     if kind != tarfile.DIRTYPE or data:
                         with self.subTest(name=name, kind=kind), self.assertRaisesRegex(
                                 ValueError, 'sdist distribution|non-file archive|nonempty archive|private PEM'):
-                            gate.scan_distribution(gzip.compress(raw), name)
+                            gate.scan_distribution(gzip_bytes(raw), name)
 
 
 class ContainerCoverageTests(GitSnapshotTestCase):
@@ -790,11 +793,11 @@ class ContainerCoverageTests(GitSnapshotTestCase):
                 with self.subTest(context=context, method=method):
                     def pack(entries):
                         if not zipped:
-                            return gzip.compress(gzip.decompress(archive(entries)), compresslevel=0)
+                            return gzip_bytes(gzip.decompress(archive(entries)), compresslevel=0)
                         out = io.BytesIO()
                         with zipfile.ZipFile(out, 'w', compression=method) as stream:
                             for n, payload in wheel_record(entries):
-                                stream.writestr(n, payload)
+                                stream.writestr(zipfile.ZipInfo(n), payload, compress_type=method)
                         return out.getvalue()
                     good = pack(files)
                     gate.scan_distribution(good, name)
@@ -813,11 +816,11 @@ class ContainerCoverageTests(GitSnapshotTestCase):
                         changed = raw[:]
                         changed[item.offset_data-512:item.offset_data] = header
                         with self.assertRaisesRegex(ValueError, 'Kerberos'):
-                            gate.scan_distribution(gzip.compress(changed), name)
+                            gate.scan_distribution(gzip_bytes(changed), name)
                         end = item.offset_data + item.size
                         raw[end:end+len(marker)] = marker
                         with self.assertRaisesRegex(ValueError, 'padding'):
-                            gate.scan_distribution(gzip.compress(raw), name)
+                            gate.scan_distribution(gzip_bytes(raw), name)
                     else:
                         with patch.object(gate, 'check_content', wraps=gate.check_content) as scan:
                             gate.scan_distribution(good, name)
@@ -835,8 +838,8 @@ class ContainerCoverageTests(GitSnapshotTestCase):
             files = [(prefix + member, b'safe') for member in expected]
             complete = archive(files, name == wheel)
             if name == crate:
-                hidden = gzip.decompress(archive([('hidden.gz', gzip.compress(rsa_key()))]))
-                bad = gzip.compress(gzip.decompress(complete) + hidden)
+                hidden = gzip.decompress(archive([('hidden.gz', gzip_bytes(rsa_key()))]))
+                bad = gzip_bytes(gzip.decompress(complete) + hidden)
             else:
                 output = io.BytesIO()
                 with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED) as stream:
@@ -876,7 +879,7 @@ class ContainerCoverageTests(GitSnapshotTestCase):
 
     def test_gzip_stream_and_metadata_coverage_at_every_level(self):
         good = archive([('one', b'safe')])
-        for bad in (good + gzip.compress(b'safe'), good + b'junk', good[:-1],
+        for bad in (good + gzip_bytes(b'safe'), good + b'junk', good[:-1],
                     good[:3] + b'\x10' + good[4:10] + b'comment\0' + good[10:],
                     good[:3] + b'\x08' + good[4:10] + b'unknown\0' + good[10:],
                     good[:3] + b'\x04' + good[4:10] + b'\x01\0x' + good[10:]):

@@ -25,6 +25,16 @@ COPY_DIRS = ('scripts', 'docker', '.github/workflows')
 # Identity/input catalog; outcomes are observed by unittest, not this table.
 # Mutation text is an injection recipe, never a source-text acceptance guard.
 CASES = [
+    ('test_frozen_compression.CompressionTests.test_zip_library_decode_errors_use_the_same_boundary',
+     'check_packages.py', 'payload = decode_compressed(archive.read, item)', 'payload = archive.read(item)', False),
+    ('test_frozen_compression.CompressionTests.test_cli_deflate_date_bytes_preserve_streams_and_native_ranges',
+     'check_packages.py', '    check_content(data[cursor:])', '    pass  # omitted trailing native range scan', False),
+    ('test_frozen_compression.CompressionTests.test_mtime_bytes_and_corrupt_streams',
+     'package_classifier.py', "raise ValueError('invalid compression stream') from None", 'raise', False),
+    ('test_frozen_compression.CompressionTests.test_zip_deflate_uses_same_failure_boundary',
+     'package_classifier.py', 'payload = decode_compressed(decoder.decompress, compressed)', 'payload = decoder.decompress(compressed)', False),
+    ('test_frozen_compression.CompressionTests.test_archive_fixtures_do_not_read_wall_clock',
+     'tests/test_packages.py', 'partial(gzip.compress, mtime=0)', 'partial(gzip.compress, mtime=None)', False),
     ('test_frozen_workflow_reader.WorkflowReaderTests.test_values_and_literal_shell_bytes_survive_structured_read',
      'check_release_guard_coverage.py', 'return content, i', 'return content.rstrip(), i', False),
     ('test_frozen_workflow_reader.WorkflowReaderTests.test_duplicate_keys_cannot_silently_replace_obligations',

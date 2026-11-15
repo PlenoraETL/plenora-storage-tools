@@ -198,6 +198,14 @@ class DistributionTarInfo(tarfile.TarInfo):
         return super()._proc_member(archive)
 
 
+def decode_compressed(operation, data):
+    """Invalid compressed bytes have one public, payload-free failure category."""
+    try:
+        return operation(data)
+    except (zlib.error, OSError, EOFError, lzma.LZMAError):
+        raise ValueError('invalid compression stream') from None
+
+
 def expand(data, kind, name=''):
     """Consume one stream; optional gzip names must match the distribution."""
     if kind == 'gzip':
@@ -211,7 +219,7 @@ def expand(data, kind, name=''):
         decoder = zlib.decompressobj(31)
     else:
         decoder = {'bzip2': bz2.BZ2Decompressor, 'xz': lzma.LZMADecompressor}[kind]()
-    expanded = decoder.decompress(data)
+    expanded = decode_compressed(decoder.decompress, data)
     if not decoder.eof or decoder.unused_data:
         raise ValueError('incomplete or trailing compression stream')
     return expanded
@@ -256,7 +264,7 @@ def validate_zip(data, archive):
         compressed = data[begin:stop]
         if method == 8:
             decoder = zlib.decompressobj(-15)
-            payload = decoder.decompress(compressed)
+            payload = decode_compressed(decoder.decompress, compressed)
             if not decoder.eof or decoder.unused_data:
                 raise ValueError('unaccounted ZIP compressed bytes')
         else:

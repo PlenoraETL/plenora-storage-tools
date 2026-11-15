@@ -13,7 +13,7 @@ import package_runner
 from package_classifier import (
     normalize_path, inventory, path_lookup, tlv, private_der, kerberos_container,
     check_content, DistributionTarInfo, expand, validate_zip, is_tar, is_text,
-    container_format, check_native, TAR_PAX_KEYS, SUPPORTED)
+    container_format, check_native, decode_compressed, TAR_PAX_KEYS, SUPPORTED)
 import hashlib
 import io
 import strict_json
@@ -218,13 +218,13 @@ def members(data, name=''):
                     raise ValueError('non-file archive member')
                 if item.is_dir():
                     if (unix_type not in (0, stat.S_IFDIR) or not dos_directory
-                            or item.file_size != 0 or archive.read(item) != b''):
+                            or item.file_size != 0 or decode_compressed(archive.read, item) != b''):
                         raise ValueError('invalid archive directory')
                     directories.append(item.orig_filename.removesuffix('/'))
                     continue
                 if unix_type == stat.S_IFDIR or dos_directory:
                     raise ValueError('non-file archive member')
-                payload = archive.read(item)
+                payload = decode_compressed(archive.read, item)
                 if is_native(item.orig_filename):
                     excluded.append(payload_ranges[item.orig_filename])
                 else:
