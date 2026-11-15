@@ -3,6 +3,7 @@ from copy import deepcopy
 from pathlib import Path
 import sys
 import shutil
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -13,11 +14,27 @@ import ci_artifacts as artifacts
 import ci_policy as policy
 import ci_shell as shell
 import check_release_guard_coverage as coverage
+from path_fixtures import short_path
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 class ExecutionTests(unittest.TestCase):
+    def test_handoff_canonicalizes_real_short_roots_for_upload_and_download(self):
+        with tempfile.TemporaryDirectory(prefix='long handoff root fixture ') as temp:
+            short = short_path(Path(temp))
+            graph = plan.compile_plan(plan.workflows(ROOT))
+            with patch.object(tempfile, 'tempdir', str(short)):
+                result = contract.handoff(graph, {'revision': 'short-path-fixture'})
+                self.assertEqual(len(result['consumer']), 3)
+                self.assertEqual({r['status'] for r in result['execution']['receipts'].values()}, {'PASS'})
+                with self.assertRaises(ValueError):
+                    artifacts.confined(short, '../outside')
+                def unresolved(self, workspaces):
+                    self.workspaces, self.store = workspaces, {}
+                with patch.object(artifacts.ArtifactExecutor, '__init__', unresolved), self.assertRaises(ValueError):
+                    contract.handoff(graph, {'revision': 'short-path-fixture'})
+
     def test_real_shell_receipts_reject_unreachable_commands_and_omitted_dispatch(self):
         graph = plan.compile_plan(plan.workflows(ROOT))
         receipt = shell.contracts(graph, coverage.invocations)

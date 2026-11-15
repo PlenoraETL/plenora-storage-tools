@@ -17,6 +17,8 @@ import unittest
 import uuid
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'scripts'))
+from filesystem_paths import canonical_path
 IMPORT_INPUTS = ('Cargo.toml', '.python-version', 'fuzz/Cargo.toml')
 COPY_DIRS = ('scripts', 'docker', '.github/workflows')
 
@@ -120,6 +122,7 @@ def sha(path):
 
 
 def inventory(root):
+    root = canonical_path(root)
     sources = {p.relative_to(root).as_posix(): sha(p)
             for folder in COPY_DIRS for p in sorted((root / folder).rglob('*'))
             if p.is_file() and '__pycache__' not in p.parts and p.suffix != '.pyc'}
@@ -140,7 +143,7 @@ def validate(receipt, subject, required, folder):
     for attachments in (receipt.get('details', {}), receipt.get('plan_contract', {}).get('files', {})):
         for name, expected_digest in attachments.items():
             path = folder / name
-            if not path.resolve().is_relative_to(folder.resolve()) or sha(path) != expected_digest:
+            if not canonical_path(path).is_relative_to(canonical_path(folder)) or sha(path) != expected_digest:
                 raise ValueError('receipt attachment differs')
     artifacts = receipt.get('artifacts', {})
     if not artifacts or set(artifacts) != {row['artifact'] for row in rows}:
@@ -242,7 +245,7 @@ def main():
     args = parser.parse_args()
     if args.worker:
         return worker(args.worker, args.output)
-    args.output = args.output.resolve()
+    args.output = canonical_path(args.output)
     args.output.mkdir(parents=True, exist_ok=False)
     subject = {'sources': inventory(ROOT), 'target': sys.platform,
                'revision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),

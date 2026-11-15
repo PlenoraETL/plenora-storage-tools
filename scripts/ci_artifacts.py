@@ -5,6 +5,7 @@ This proves the handoff contract on disjoint filesystems, not GitHub transport.
 import fnmatch
 import hashlib
 from pathlib import Path
+from filesystem_paths import canonical_path
 
 
 def sha(data):
@@ -12,15 +13,17 @@ def sha(data):
 
 
 def confined(root, relative):
-    path = (root / relative).resolve()
-    if not path.is_relative_to(root.resolve()):
+    path = canonical_path(root / relative)
+    if not path.is_relative_to(canonical_path(root)):
         raise ValueError('artifact path outside workspace')
     return path
 
 
 class ArtifactExecutor:
     def __init__(self, workspaces):
-        self.workspaces = workspaces
+        # Every subsequent glob, containment check and relative name must use
+        # this same namespace; mixing resolved children and 8.3 roots fails.
+        self.workspaces = {name: canonical_path(path) for name, path in workspaces.items()}
         self.store = {}
 
     def __call__(self, identifier, node, subject, incoming):
