@@ -4,10 +4,10 @@ use super::{
     ArtifactMetadata, AsyncBufRead, AsyncBufReadExt, AsyncFtpStream, AsyncRead, AsyncReadExt,
     AsyncRustlsStream, AsyncWrite, AsyncWriteExt, BufReader, CLEANUP_BUDGET, Digest, ErrorCategory,
     ErrorPhase, File, FtpError, IntegrityMetadata, ListParser, MAX_MLSD_LINE_BYTES, ObjectMetadata,
-    OffsetDateTime, OperationContext, PROVIDER_ID, ParseError, ProviderListRequest, RemoteEffect,
-    RetryDisposition, Rfc3339, Sha256, Status, StorageError, StorageResult, SystemTime,
-    TransferResult, TransferStream, list_parse_error, list_scan_limit_error, map_ftp_error,
-    transfer_io_error, transfer_limit_error,
+    OperationContext, PROVIDER_ID, ParseError, ProviderListRequest, RemoteEffect, RetryDisposition,
+    Sha256, Status, StorageError, StorageResult, SystemTime, TransferResult, TransferStream,
+    list_parse_error, list_scan_limit_error, map_ftp_error, transfer_io_error,
+    transfer_limit_error,
 };
 
 pub async fn ensure_parent_directories(
@@ -341,7 +341,7 @@ pub fn public_metadata(key: String, file: &File) -> ObjectMetadata {
 }
 
 pub fn format_system_time(value: SystemTime) -> Option<String> {
-    OffsetDateTime::from(value).format(&Rfc3339).ok()
+    plenora_storage_core::rfc3339_from_system_time(value)
 }
 
 pub fn transfer_result(key: String, bytes_transferred: u64, digest: Sha256) -> TransferResult {

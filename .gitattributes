@@ -25,3 +25,5 @@ fuzz/seeds/kerberos_messages/** binary
 
 .python-version text eol=lf
 .ci/plenora-dependencies/* text eol=lf
+# Byte del listato che ha fatto andare in panic la conversione delle date: non testo.
+fuzz/seeds/ftp_listing/regression-date-out-of-range.bin binary
