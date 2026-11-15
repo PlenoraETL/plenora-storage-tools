@@ -17,6 +17,7 @@ import plenora_storage
 from plenora_storage import Connection, Engine, EngineConfig, StorageError
 from fixture_connections import ATOMIC, PROVIDERS, fixture
 from soak_policy import SOAK_DURATION_SECONDS
+from campaign_model import SOAK_INTERVAL_SECONDS
 
 
 def resources():
@@ -32,7 +33,7 @@ def main():
     parser.add_argument('--duration-seconds', type=int, default=SOAK_DURATION_SECONDS,
                         help='Soak duration (default: 2 hours for every version; provisional policy)')
     parser.add_argument('--workers', type=int, default=4)
-    parser.add_argument('--interval-seconds', type=float, default=30)
+    parser.add_argument('--interval-seconds', type=float, default=SOAK_INTERVAL_SECONDS)
     parser.add_argument('--both-upload-modes', action='store_true',
                         help='Exercise persistent default and private-file engines within the same soak duration')
     args = parser.parse_args()

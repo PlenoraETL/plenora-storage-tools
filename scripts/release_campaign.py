@@ -24,15 +24,21 @@ import uuid
 from campaign_fence import (FENCED, LABEL, LOCK_HELD, ROOT_PATH, CampaignBusy, CampaignFenced, RemoteFailure,
                            admission, check_owned, check_private_root, check_tree_unshared, fence_lines,
                            supervised)
+from campaign_shell import (fixture_scripts, checkout_command, extract_inputs_command,
+                            runner_bootstrap, shell_umask)
+from campaign_model import (PERMISSIONS, atomic_write, CONNECT_SECONDS, REMOTE_SECONDS,
+    EXPORT_SECONDS, PREPARATION_POLL, PREPARATION_SECONDS, KEEPALIVE_SECONDS,
+    RUNNER_ACTIVE, FIXTURE_STATE, Deadline, WORKFLOW_SECONDS, VM_SECONDS, REMOTE_POLL_SECONDS)
 from campaign_state import Campaign, digest, exclusive, logged, write_json
+from campaign_model import require_preparation_sources
 from versioning import parse_version, workspace_version
 from release_evidence import PYTHONS
 from proof_collection import Collection
-from proof_sources import passed_names
+from campaign_model import CAMPAIGN_PHASES
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS = {'linux': 'x86_64-unknown-linux-gnu', 'windows': 'x86_64-pc-windows-msvc'}
-LOCAL_PHASES = tuple(sorted(passed_names('scripts/release_campaign.py', function='phase')))
+LOCAL_PHASES = tuple(sorted(CAMPAIGN_PHASES['release_campaign.py']))
 # The runner's own directory in the container's filesystem, which no mount
 # reaches: its source, its working files and its evidence.
 RUNNER_WORK = '/tmp/plenora-runner'
@@ -57,24 +63,24 @@ class Remote:
         self.client.load_host_keys(str(Path(config.get('known_hosts', '~/.ssh/known_hosts')).expanduser()))
         key = config.get('ssh_key')
         password = None if key else getpass.getpass('Dedicated VM password: ')
-        transport = socket.create_connection((connect_host, config.get('port', 22)), timeout=15) if connect_host else None
+        transport = socket.create_connection((connect_host, config.get('port', 22)), timeout=CONNECT_SECONDS) if connect_host else None
         try:
             # The logical host remains the known_hosts lookup identity when a
             # reboot changes only its network address. Never trust a new key.
             self.client.connect(config['host'], port=config.get('port', 22), username=config['user'],
                                 key_filename=str(Path(key).expanduser()) if key else None, password=password,
-                                sock=transport, allow_agent=False, look_for_keys=False, timeout=15)
+                                sock=transport, allow_agent=False, look_for_keys=False, timeout=CONNECT_SECONDS)
         except BaseException:
             if transport:
                 transport.close()
             raise
-        self.client.get_transport().set_keepalive(30)
+        self.client.get_transport().set_keepalive(KEEPALIVE_SECONDS)
 
     def run(self, command):
         """Run `command` on the VM and return its stripped output. A failure
         raises RemoteFailure, which keeps the command's standard error apart
         from its message, for the checks that read a refusal code from it."""
-        _, out, err = self.client.exec_command(command, timeout=60)
+        _, out, err = self.client.exec_command(command, timeout=REMOTE_SECONDS)
         text = out.read().decode()
         errors = err.read().decode(errors='replace')
         if out.channel.recv_exit_status():
@@ -96,7 +102,7 @@ class Remote:
     # after it is created and before any byte is written: the SFTP server
     # applies the account's umask, which may leave it writable by the group
     # (0002 is the Ubuntu default). The mode and the size are checked after.
-    def upload(self, path, remote, mode=0o600):
+    def upload(self, path, remote, mode=PERMISSIONS["private_file"].mode):
         with self.client.open_sftp() as sftp, open(path, 'rb') as source:
             with sftp.open(remote, 'wb') as stream:
                 stream.chmod(mode)
@@ -105,7 +111,7 @@ class Remote:
                 shutil.copyfileobj(source, stream, 1024 * 1024)
             self.created(sftp, remote, mode, Path(path).stat().st_size)
 
-    def write(self, remote, text, mode=0o600):
+    def write(self, remote, text, mode=PERMISSIONS["private_file"].mode):
         data = text.encode('utf-8')
         with self.client.open_sftp() as sftp:
             with sftp.open(remote, 'wb') as stream:
@@ -119,7 +125,7 @@ class Remote:
         if attributes.st_mode & 0o7777 != mode or attributes.st_size != size:
             raise RuntimeError('a file created on the VM does not have the expected mode or size')
 
-    def stream(self, command, path, timeout=600):
+    def stream(self, command, path, timeout=EXPORT_SECONDS):
         """Write the standard output of `command` to the local `path`, bytes as
         they are; nothing is written on the VM.
 
@@ -143,12 +149,20 @@ class Remote:
         # open below and then renamed or removed, never kept.
         try:
             _, out, err = self.client.exec_command(command, timeout=timeout)
-            with open(partial, 'wb') as stream:
+            code, errors = None, ''
+            class Unsuccessful(Exception):
+                pass
+            def receive(stream):
+                nonlocal code, errors
                 shutil.copyfileobj(out, stream)
-            errors = err.read().decode(errors='replace')
-            code = out.channel.recv_exit_status()
-            if not code:
-                partial.replace(path)
+                errors = err.read().decode(errors='replace')
+                code = out.channel.recv_exit_status()
+                if code:
+                    raise Unsuccessful
+            try:
+                atomic_write(path, receive, temporary=partial, binary=True)
+            except Unsuccessful:
+                pass
         except Exception as error:  # every failure of the transfer is the same failure
             raise RuntimeError('dedicated VM transfer interrupted (' + type(error).__name__ + ')' + discard()) from None
         if code == -1:
@@ -160,6 +174,19 @@ class Remote:
         path.parent.mkdir(parents=True, exist_ok=True)
         with self.client.open_sftp() as sftp:
             sftp.get(remote, str(path))
+
+
+def source_bundle(path, folder, revision, *, name='command.log'):
+    """Both VM checkouts receive the complete, immutable Git revision.
+
+    Validate the preparation closure in that revision, not uncommitted local
+    files that git bundle would silently leave behind. No upload on failure.
+    """
+    tracked = subprocess.check_output(
+        ['git', 'ls-tree', '-r', '--name-only', revision], cwd=ROOT, text=True).splitlines()
+    require_preparation_sources(tracked)
+    # A bundle needs a named ref; consumers check FETCH_HEAD against revision.
+    logged(['git', 'bundle', 'create', str(path), 'HEAD'], folder, cwd=ROOT, name=name)
 
 
 def configuration(path):
@@ -192,97 +219,7 @@ def validate_transport_resume(state, connect_host, reason):
             raise ValueError('transport address change requires completed pre-VM qualification')
 
 
-RUNNER_ACTIVE = 76
-
-
-FIXTURE_STATE = '.fixtures/campaign/fixture-state.json'
-def fixture_scripts(remote_root, project, host, label, nonce, *, reset, directory, epoch):
-    """The fixture preparation script of one execution, and the wrapper that runs it.
-
-    Every execution has its own `nonce`, which names its signal files: a signal
-    left by an earlier execution, of this or another campaign, is never read
-    as this one's. The wrapper holds the VM campaign lock (campaign_fence)
-    shared, inherited by the script and its children, so no other controller
-    is admitted while the preparation lives; it also holds the campaign's
-    ledger lock, so the preparation never overlaps this campaign's runner.
-    When a lock is held it exits with LOCK_HELD before the script touches
-    anything; any other lock error keeps its own code, and a LOCK_HELD from
-    the script itself, which never refuses with it, becomes a failure. The
-    script checks the admission `epoch` at its start, before changing
-    fixtures and before its final record, and exits with FENCED once another
-    controller was admitted. The wrapper always records the real exit code
-    and exits with it. Every preparation recreates every fixture container,
-    so no connection of an earlier activity survives it, and regenerates
-    certificates and the SFTP fingerprint. The script ends by recording its
-    nonce in FIXTURE_STATE, which the runner checks before it measures
-    anything.
-
-    A `reset` also refuses (RUNNER_ACTIVE) while a runner container of this
-    campaign is running, archives the fixtures' state, logs and certificates
-    first (a failed collection stops it before anything is recreated), checks
-    the memory for the fixtures and then that every fixture serves requests.
-    """
-    q = shlex.quote
-
-    def state_lines(state):
-        return [f"printf '{{\"nonce\": \"%s\", \"kind\": \"%s\"}}\\n' {q(nonce)} {state} >{FIXTURE_STATE}.pending",
-                f'mv {FIXTURE_STATE}.pending {FIXTURE_STATE}']
-
-    signal = '.fixtures/signals/' + label + '-' + nonce
-    diagnostics = '.fixtures/diagnostics/' + label + '-' + nonce
-    compose_all = 'docker compose -f docker-compose.yml -f compose.extended.yml'
-    kind = 'reset' if reset else 'prepare'
-    lines = ['#!/usr/bin/env bash', 'set -euo pipefail', 'umask 022', 'cd ' + q(remote_root),
-             f'exec >{signal}.log 2>&1',
-             'export COMPOSE_PROJECT_NAME=' + q(project),
-             'export PLENORA_FIXTURE_HOST=' + q(host),
-             *fence_lines(), 'fence']
-    if reset:
-        lines += [
-            # A failed listing is an error, never an empty list.
-            f"containers=$(docker ps --format '{{{{.Names}}}}') "
-            "|| { echo 'cannot list the running containers'; exit 1; }",
-            f'if grep -q {q("^" + project + "-campaign-")} <<<"$containers"; then',
-            f"  echo 'a VM runner container of this campaign is still running'; exit {RUNNER_ACTIVE}",
-            'fi',
-            # From here on the fixtures may change: a preparation that stops
-            # anywhere below leaves this state, which no runner accepts.
-            'fence',
-            *state_lines('in-progress'),
-            f'mkdir -p {diagnostics}',
-            f'{compose_all} ps --all --format json >{diagnostics}/containers.json',
-            f'{compose_all} logs --no-color --timestamps >{diagnostics}/fixtures.log 2>&1',
-            'for file in .fixtures/ca.crt .fixtures/minio/public.crt .fixtures/extended/server.crt '
-            f'.fixtures/sftp-fingerprint; do cp "$file" {diagnostics}/; done',
-            f'tar -czf {diagnostics}.tar.gz -C {diagnostics} .',
-            f'python3 scripts/check_memory.py --output {signal}-memory.json',
-            'fence']
-    else:
-        lines += ['fence', *state_lines('in-progress')]
-    lines += ['export PLENORA_FIXTURE_RECREATE=1',
-              'bash scripts/prepare-fixtures.sh', 'bash scripts/prepare-extended-fixtures.sh']
-    if reset:
-        lines += [f'python3 scripts/check_fixtures.py --output {signal}-check.json']
-    lines += ['fence', *state_lines(kind)]
-    wrapper = ('umask 022\n'
-               f'cd {q(remote_root)} && mkdir -p .fixtures/campaign .fixtures/signals || exit 1\n'
-               '(\n'
-               f'  exec 9<{q(directory + "/lock")} || exit 1\n'
-               f'  flock -n -E {LOCK_HELD} -s 9 || exit $?\n'
-               '  exec 8>>.fixtures/campaign/campaign.lock || exit 1\n'
-               f'  flock -n -E {LOCK_HELD} -x 8 || exit $?\n'
-               f'  CAMPAIGN_DIR={q(directory)} CAMPAIGN_EPOCH={q(epoch)} bash .fixtures/{label}-{nonce}.sh\n'
-               '  code=$?\n'
-               f'  if [ "$code" -eq {LOCK_HELD} ]; then exit 1; fi\n'
-               '  exit "$code"\n'
-               ')\n'
-               'code=$?\n'
-               f'printf \'%s\\n\' "$code" >{signal}.exit.pending && mv {signal}.exit.pending {signal}.exit\n'
-               'exit "$code"')
-    return '\n'.join(lines) + '\n', wrapper + '\n'
-
-
-def run_preparation(remote, remote_root, project, host, label, folder, *, reset, session, poll=10, deadline=1800):
+def run_preparation(remote, remote_root, project, host, label, folder, *, reset, session, poll=PREPARATION_POLL, deadline=PREPARATION_SECONDS):
     """Run one fixture preparation on the VM and wait for its own exit signal.
 
     Returns the execution's nonce, also recorded in `folder`. Raises
@@ -297,7 +234,7 @@ def run_preparation(remote, remote_root, project, host, label, folder, *, reset,
     script, wrapper = fixture_scripts(remote_root, project, host, label, nonce, reset=reset,
                                       directory=session.directory, epoch=session.epoch)
     quoted = shlex.quote(remote_root)
-    remote.run(f'cd {quoted} && umask 077 && mkdir -p .fixtures/signals .fixtures/campaign')
+    remote.run(f'cd {quoted} && {shell_umask("private_file")} && mkdir -p .fixtures/signals .fixtures/campaign')
     check_owned(remote, [remote_root, f'{remote_root}/.fixtures', f'{remote_root}/.fixtures/signals',
                          f'{remote_root}/.fixtures/campaign'])
     remote.write(f'{remote_root}/.fixtures/{label}-{nonce}.sh', script)
@@ -305,7 +242,7 @@ def run_preparation(remote, remote_root, project, host, label, folder, *, reset,
     check_owned(remote, [f'{remote_root}/.fixtures/{label}-{nonce}.sh', f'{remote_root}/.fixtures/{label}-{nonce}-run.sh'])
     remote.run(f'cd {quoted} && '
                f'(nohup bash .fixtures/{label}-{nonce}-run.sh >/dev/null 2>&1 </dev/null & echo started)')
-    limit = time.monotonic() + deadline
+    limit = Deadline(deadline)
     while True:
         # The exit signal is compared byte for byte with what the wrapper
         # writes (the code and one newline); the output of a remote command
@@ -318,7 +255,7 @@ def run_preparation(remote, remote_root, project, host, label, folder, *, reset,
                 raise ValueError('the fixture preparation left a malformed exit signal')
             result = framed.group(1)
             break
-        if time.monotonic() >= limit:
+        if limit.expired():
             raise TimeoutError('fixture preparation timed out')
         time.sleep(poll)
     if result == str(LOCK_HELD):
@@ -358,57 +295,6 @@ def reset_fixtures(remote, remote_root, project, host, folder, session, **timing
 def expected_inputs(files):
     """Expected digest of every file of an attempt's input directory, by relative path."""
     return {name: digest(path) for name, path in sorted(files.items())}
-
-
-def checkout_command(remote_root, revision):
-    """VM command that checks out `revision` from `source.bundle` in
-    `remote_root`, if not done yet, and verifies it.
-
-    It runs under umask 022: nothing of the checkout is writable by group or
-    others whatever the account's umask, while the fixture containers can
-    still read the files they mount. `tree_unshared_command` checks it after.
-    """
-    q = shlex.quote
-    return (f'cd {q(remote_root)} && umask 022 && if test ! -d .git; then git init -q && git fetch -q source.bundle HEAD '
-            f'&& git checkout -q --detach FETCH_HEAD; fi && test "$(git rev-parse HEAD)" = {q(revision)} '
-            '&& test -z "$(git status --porcelain --untracked-files=no)"')
-
-
-def extract_inputs_command(remote_inputs, distribution):
-    """VM command that extracts the Linux distribution among the inputs and
-    makes the two binaries executable, all private to the account: modes come
-    from umask 077, never from the archive, whatever the account's umask."""
-    q = shlex.quote
-    return (f'cd {q(remote_inputs)} && umask 077 && tar --no-same-permissions -xzf linux-input.tar.gz && '
-            f'chmod u+x baseline/plenora-storage {q(distribution + "/plenora-storage")}')
-
-
-def runner_bootstrap(work, inputs, bundle, revision, fixtures):
-    """The first lines of the runner container: its own source, verified.
-
-    Copies the source bundle from the input directory `inputs` into `work`,
-    in the container's own filesystem, checks the copy against the digest
-    `bundle` and checks out `revision` from it; then copies every fixture file
-    of `fixtures` (path under `.fixtures/` to digest) into the checkout and
-    checks it. Any difference stops the container before the runner starts:
-    from here on nothing is read from the host source tree.
-    """
-    q = shlex.quote
-    lines = ['set -euo pipefail',
-             f'work={q(work)}',
-             f'inputs={q(inputs)}',
-             'mkdir -- "$work"',
-             'cp -- "$inputs/source.bundle" "$work/source.bundle"',
-             f'printf "%s  %s\\n" {q(bundle)} "$work/source.bundle" | sha256sum -c --quiet -',
-             'git init -q "$work/source"',
-             'git -C "$work/source" fetch -q "$work/source.bundle" HEAD',
-             'git -C "$work/source" checkout -q --detach FETCH_HEAD',
-             f'test "$(git -C "$work/source" rev-parse HEAD)" = {q(revision)}']
-    for name, value in sorted(fixtures.items()):
-        lines += [f'install -D -m 644 -- "$inputs/fixtures/"{q(name)} "$work/source/.fixtures/"{q(name)}',
-                  f'printf "%s  %s\\n" {q(value)} "$work/source/.fixtures/"{q(name)} | sha256sum -c --quiet -']
-    lines.append('test -z "$(git -C "$work/source" status --porcelain)"')
-    return lines
 
 
 def export_runner_output(remote, container, folder):
@@ -516,8 +402,8 @@ def run(config_path, output, retries, reason, connect_host=None):
 
         def workflows(path):
             for key in ('candidate_run', 'ci_run'):
-                deadline = time.monotonic() + 4 * 3600
-                while time.monotonic() < deadline:
+                deadline = Deadline(WORKFLOW_SECONDS)
+                while not deadline.expired():
                     report = gh('run', 'view', str(config[key]), '--json', 'headSha,status,conclusion')
                     if report['headSha'] != revision:
                         raise ValueError('workflow describes a different source revision')
@@ -526,7 +412,7 @@ def run(config_path, output, retries, reason, connect_host=None):
                         if report['conclusion'] != 'success':
                             raise ValueError('required workflow did not pass')
                         break
-                    time.sleep(30)
+                    time.sleep(REMOTE_POLL_SECONDS)
                 else:
                     raise TimeoutError('workflow deadline exceeded')
 
@@ -574,14 +460,14 @@ def run(config_path, output, retries, reason, connect_host=None):
         try:
             def prepare(path):
                 bundle = path / 'source.bundle'
-                logged(['git', 'bundle', 'create', str(bundle), 'HEAD'], path, cwd=ROOT)
+                source_bundle(bundle, path, revision)
                 session.check(remote)
-                remote.run('umask 077 && mkdir -p ' + q(remote_root))
+                remote.run(shell_umask('private_file') + ' && mkdir -p ' + q(remote_root))
                 check_owned(remote, [remote_root])
                 remote.upload(bundle, remote_root + '/source.bundle')
                 # A dedicated directory may only contain this campaign's checkout.
                 remote.run(checkout_command(remote_root, revision))
-                remote.run(f'cd {q(remote_root)} && umask 077 && mkdir -p .fixtures')
+                remote.run(f'cd {q(remote_root)} && {shell_umask("private_file")} && mkdir -p .fixtures')
                 check_owned(remote, [remote_root, remote_root + '/.fixtures'])
                 # Nothing of the checkout, the scripts and configurations the
                 # preparations run, may be writable by group or others.
@@ -639,8 +525,7 @@ def run(config_path, output, retries, reason, connect_host=None):
                 nonce = reset_fixtures(remote, remote_root, project, config['host'], path, session)
                 for name in RUNNER_FIXTURES:
                     remote.download(f'{remote_root}/.fixtures/{name}', path / 'fixtures' / name)
-                logged(['git', 'bundle', 'create', str(path / 'source.bundle'), 'HEAD'], path, cwd=ROOT,
-                       name='bundle.log')
+                source_bundle(path / 'source.bundle', path, revision, name='bundle.log')
                 # Every input of this attempt lives in a directory of this
                 # epoch, which no other admission writes, and the runner gets
                 # the digest of every file in it: an upload of another
@@ -660,7 +545,7 @@ def run(config_path, output, retries, reason, connect_host=None):
                     'volumes': {'campaign-registry': {'external': True, 'name': config['registry_volume']}}}
                 # Override the target mounts explicitly; the Compose service defines
                 # the same destinations, which Compose replaces by target path.
-                (path / 'compose.campaign.json').write_text(json.dumps(override), encoding='utf-8')
+                write_json(path / 'compose.campaign.json', override)
                 if any(item.is_dir() for item in linux.iterdir()):
                     raise ValueError('the Linux distribution must be a flat directory')
                 fixtures = {f'fixtures/{name}': path / 'fixtures' / name for name in RUNNER_FIXTURES}
@@ -672,7 +557,7 @@ def run(config_path, output, retries, reason, connect_host=None):
                 write_json(path / 'expected-inputs.json', expected)
                 remote_inputs = remote_root + '/' + inputs
                 session.check(remote)
-                remote.run(f'umask 077 && mkdir -p {q(remote_root + "/.fixtures/inputs")} && mkdir {q(remote_inputs)} '
+                remote.run(f'{shell_umask("private_file")} && mkdir -p {q(remote_root + "/.fixtures/inputs")} && mkdir {q(remote_inputs)} '
                            f'{q(remote_inputs + "/baseline")} {q(remote_inputs + "/fixtures")} '
                            f'{q(remote_inputs + "/fixtures/extended")}')
                 check_owned(remote, [remote_root, remote_root + '/.fixtures', remote_root + '/.fixtures/inputs',
@@ -716,12 +601,12 @@ def run(config_path, output, retries, reason, connect_host=None):
                 remote.run(compose + ' run -d --no-deps --label ' + q(f'{LABEL}={session.directory}') + ' --name '
                            + q(container) + ' storage-rust bash -e -c ' + q(setup))
                 write_json(path / 'container.json', {'name': container})
-                deadline = time.monotonic() + 6 * 3600
-                while time.monotonic() < deadline:
+                deadline = Deadline(VM_SECONDS)
+                while not deadline.expired():
                     status = strict_json.loads(remote.run('docker inspect --format ' + q('{{json .State}}') + ' ' + q(container)))
                     if not status['Running']:
                         break
-                    time.sleep(30)
+                    time.sleep(REMOTE_POLL_SECONDS)
                 else:
                     raise TimeoutError('VM campaign deadline exceeded')
                 # Logs and evidence come straight from the container, through

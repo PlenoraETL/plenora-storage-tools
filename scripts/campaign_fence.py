@@ -42,9 +42,13 @@ import subprocess
 import sys
 import time
 
-LOCK_HELD = 75
-FENCED = 77
-LABEL = 'plenora.campaign'
+from campaign_model import (LOCK_HELD, FENCED, LABEL, LEASE_SECONDS, LEASE_MARGIN,
+    RENEW_SECONDS, KILL_SECONDS, POLL_SECONDS, STALL_SECONDS, ADMISSION_SECONDS,
+    EXIT_SECONDS, LEASE_WAIT_LIMIT, COUNTER_LIMIT, EPOCH, ROOT_PATH,
+    CampaignBusy, CampaignFenced, CampaignLost, Session, epoch_bytes, transition, PROCESS_POLL_SECONDS)
+from campaign_shell import (OWNERSHIP_LINES, owned_command, tree_unshared_command,
+    admission_command, private_root_command, fence_lines)
+
 # The controller considers its lease valid for LEASE_SECONDS after it SENT a
 # renewal that the admission acknowledged; the VM records the lease as
 # lasting LEASE_SECONDS + LEASE_MARGIN after it RECEIVED it, on its boot clock
@@ -63,34 +67,11 @@ LABEL = 'plenora.campaign'
 # supervisor is never delayed by more than STALL_SECONDS, so that a poll,
 # the stall and the kill fit in the margin together with the clock drift
 # (POLL_SECONDS + STALL_SECONDS + KILL_SECONDS < LEASE_MARGIN).
-LEASE_SECONDS = 60
-LEASE_MARGIN = 30
-RENEW_SECONDS = 10
-KILL_SECONDS = 10
-POLL_SECONDS = 1
-STALL_SECONDS = 9
 # Bounded waits on the admission channel: the first line may come after the
 # wait for a previous lease; the exit status of a refused admission at once.
-ADMISSION_SECONDS = 3600 + 120
-EXIT_SECONDS = 30
 # The longest wait an admission accepts for a recorded lease: a larger value
 # is not a lease this protocol wrote.
-LEASE_WAIT_LIMIT = 3600
-COUNTER_LIMIT = 999999999999999999
 ERROR_NO_MORE_FILES = 18
-EPOCH = r'(0|[1-9][0-9]{0,17})-[0-9a-f]{32}'
-
-
-class CampaignBusy(Exception):
-    """Another admission, or an activity it left behind, holds the VM; nothing was touched."""
-
-
-class CampaignFenced(RuntimeError):
-    """The epoch changed: this activity no longer holds the VM, its result is void."""
-
-
-class CampaignLost(RuntimeError):
-    """The controller lost its admission or its lease while a local activity was running."""
 
 
 # Shell functions shared by the VM-side checks. They inspect a path itself,
@@ -103,24 +84,7 @@ class CampaignLost(RuntimeError):
 # Access control lists come from `getfacl`, never from a listing: the path
 # must have exactly the three base entries. Without `getfacl` (package
 # `acl`) nothing is accepted.
-OWNERSHIP_LINES = [
-    'fail() { echo "campaign-refusal: $1" >&2; exit 1; }',
-    'command -v getfacl >/dev/null || fail acl-missing',
-    'owner() { local value; value=$(stat -c %u -- "$1") || fail cannot-inspect; '
-    '[[ "$value" =~ ^[0-9]+$ ]] || fail cannot-inspect; printf %s "$value"; }',
-    'base_acl=$\'^user::[-r][-w][-x]\\ngroup::[-r][-w][-x]\\nother::[-r][-w][-x]$\'',
-    'unshared() { local mode acl; mode=$(stat -c %a -- "$1") || fail cannot-inspect; '
-    '[[ "$mode" =~ ^[0-7]{3,4}$ ]] || fail cannot-inspect; '
-    '(( (8#$mode & 8#022) == 0 )) || fail writable-by-others; '
-    'acl=$(getfacl --absolute-names --omit-header -- "$1") || fail acl-unreadable; '
-    '[[ "$acl" =~ $base_acl ]] || fail acl; }',
-    'trusted() { local value; [ ! -L "$1" ] && [ -d "$1" ] || fail not-a-directory; '
-    'value=$(owner "$1"); { [ "$value" = 0 ] || [ "$value" = "$(id -u)" ]; } || fail foreign-owner; '
-    'unshared "$1"; }',
-    'owned() { local value; [ ! -L "$1" ] && { [ -d "$1" ] || [ -f "$1" ]; } '
-    '|| fail not-a-file; '
-    'value=$(owner "$1"); [ "$value" = "$(id -u)" ] || fail foreign-owner; unshared "$1"; }',
-]
+
 # The reason of a refusal travels as a fixed code on standard error, never
 # as a path or a value; the controller turns it into one of these messages.
 REFUSALS = {
@@ -173,63 +137,6 @@ def run_check(remote, command, expected, what):
 
 # Characters allowed in the VM root path, controller and VM alike: no
 # control character, no space, nothing a shell or a line reader could split.
-ROOT_PATH = r'[A-Za-z0-9._/-]+'
-
-
-def owned_command(paths):
-    """VM command that prints `owned` only if every path is a directory or
-    regular file of this user, not a link, not writable by others."""
-    script = '\n'.join(['set -euo pipefail', *OWNERSHIP_LINES, 'for path in "$@"; do owned "$path"; done',
-                        'echo owned'])
-    return 'bash -c ' + shlex.quote(script) + ' campaign-owned ' + ' '.join(shlex.quote(path) for path in paths)
-
-
-def tree_unshared_command(root, prune=None):
-    """Check files, directories and link targets, including owner and ACL.
-
-    Follow links inside the root tree only; refuse dangling links, loops,
-    special files and mount boundaries. `prune` has its own checks.
-    """
-    script = '\n'.join([
-        'set -euo pipefail',
-        *OWNERSHIP_LINES,
-        'root=$1; prune=${2:-}',
-        'boundary=$(realpath -e -- "$root" && printf .) || fail cannot-inspect',
-        "boundary=${boundary%$'\\n.'}",
-        'inside() { [[ "$1" = "$boundary" || "$1" = "$boundary/"* ]] || fail outside-tree; }',
-        # Confinement is deliberately stricter than checking the final inode:
-        # an external writable directory can replace even an owned 0600 file.
-        # Check each link's spelling before realpath hides an escape/re-entry;
-        # all links reached by the walk undergo this same check.
-        'confined_link() { local rest cursor part resolved;',
-        '  rest=$(readlink -- "$1" && printf .) || fail cannot-inspect;',
-        "  rest=${rest%$'\\n.'}; cursor=${1%/*};",
-        '  if [[ "$rest" = /* ]]; then inside "$rest"; rest=${rest#"$boundary"}; cursor=$boundary; fi;',
-        '  while [ -n "$rest" ]; do',
-        '    part=${rest%%/*}; if [[ "$rest" = */* ]]; then rest=${rest#*/}; else rest=; fi;',
-        '    case "$part" in ""|.) continue;; ..) cursor=${cursor%/*};; *) cursor="$cursor/$part";; esac;',
-        '    inside "$cursor";',
-        '    resolved=$(realpath -e -- "$cursor" && printf .) || fail cannot-inspect;',
-        "    resolved=${resolved%$'\\n.'}; inside \"$resolved\"; cursor=$resolved;",
-        '  done;',
-        '}',
-        'device=$(stat -Lc %d -- "$root") || fail cannot-inspect',
-        '[[ "$device" =~ ^[0-9]+$ ]] || fail cannot-inspect',
-        'walk() { if [ -n "$prune" ]; then',
-        '  find -L "$root" -xdev -path "$prune" -prune -o -print0',
-        'else find -L "$root" -xdev -print0; fi; }',
-        'walk | while IFS= read -r -d "" path; do',
-        '  if [ -L "$path" ]; then confined_link "$path"; fi',
-        '  target=$(realpath -e -- "$path" && printf .) || fail cannot-inspect',
-        "  target=${target%$'\\n.'}",
-        '  inside "$target"',
-        '  [ "$(stat -c %d -- "$target")" = "$device" ] || fail cannot-inspect',
-        '  owned "$target"',
-        'done',
-        'echo unshared',
-    ])
-    return ('bash -c ' + shlex.quote(script) + ' campaign-tree ' + shlex.quote(root)
-            + (' ' + shlex.quote(prune) if prune else ''))
 
 
 def check_tree_unshared(remote, root, prune=None):
@@ -242,196 +149,10 @@ def check_owned(remote, paths):
     run_check(remote, owned_command(paths), 'owned', 'campaign state on the VM was refused')
 
 
-def admission_command(vm_root, lease=LEASE_SECONDS + LEASE_MARGIN):
-    """The VM side of an admission.
-
-    Creates the campaign directory with its first epoch if it does not exist,
-    takes the exclusive lock (LOCK_HELD on contention, flock's own code for
-    any other lock error), waits for the end of the previous lease, refuses
-    while a labelled runner container exists (LOCK_HELD; a failing `docker ps`
-    is an error), replaces the epoch and records this admission's lease of
-    `lease` seconds. Then it converts to the shared lock and checks the epoch
-    again: flock converts by releasing and taking again, and if another
-    admission came in between, this one exits with LOCK_HELD instead of
-    announcing an epoch that is no longer its own. Last it prints
-    `locked <epoch> <directory>` and renews the lease on every `renew` line,
-    answering `renewed`, for as long as the channel is open.
-    """
-    script = '\n'.join([
-        'set -euo pipefail',
-        'shopt -s inherit_errexit',
-        'umask 077',
-        *OWNERSHIP_LINES,
-        'root=$(realpath -m -- "$1")',
-        'directory="$root/.campaign"',
-        f'lease={int(lease)}',
-        'boot() { local id; id=$(cat /proc/sys/kernel/random/boot_id); '
-        '[[ "$id" =~ ^[0-9a-f-]{36}$ ]] || { echo "unreadable boot id" >&2; exit 1; }; printf %s "$id"; }',
-        'boot_clock() { local value rest; read -r value rest </proc/uptime; value=${value%%.*}; '
-        '[[ "$value" =~ ^[0-9]{1,12}$ ]] || { echo "unreadable boot clock" >&2; exit 1; }; printf %s "$value"; }',
-        'token() { local hex; hex=$(od -An -N16 -tx1 /dev/urandom | tr -d " \\n"); '
-        '[[ "$hex" =~ ^[0-9a-f]{32}$ ]] || { echo "random source failed" >&2; exit 1; }; printf %s "$1-$hex"; }',
-        'write() { printf "%s\\n" "$2" >"$directory/$1.pending"; mv "$directory/$1.pending" "$directory/$1"; }',
-        # The value must match the pattern and the file must hold exactly it
-        # and one newline, compared byte for byte: a command substitution
-        # alone would drop NUL bytes and trailing newlines.
-        'strict() { local value; value=$(cat "$directory/$1") || { echo "unreadable campaign $1" >&2; exit 1; }; '
-        '[[ "$value" =~ $2 ]] && printf "%s\\n" "$value" | cmp -s - "$directory/$1" '
-        '|| { echo "malformed campaign $1" >&2; exit 1; }; printf %s "$value"; }',
-        f"epoch_pattern='^{EPOCH}$'",
-        "lease_pattern='^(none|[0-9a-f-]{36} [0-9]{1,12})$'",
-        'record_lease() { write lease "$(boot) $(( $(boot_clock) + 1 + lease ))"; }',
-        # The root exists and was checked private (private_root_command).
-        'owned "$root"',
-        # First start only: the directory appears with its lock, first epoch
-        # and an empty lease at once, or not at all.
-        'if ! test -e "$directory" && ! test -L "$directory"; then',
-        '  staging=$(mktemp -d "$root/.campaign.init.XXXXXXXX")',
-        '  : >"$staging/lock"',
-        '  printf "%s\\n" "$(token 0)" >"$staging/epoch"',
-        '  printf "none\\n" >"$staging/lease"',
-        '  mv -T -- "$staging" "$directory" || { rm -rf -- "$staging"; test -d "$directory"; }',
-        'fi',
-        # Every piece of state, checked as itself: a link anywhere stops here.
-        'for path in "$directory" "$directory/lock" "$directory/epoch" "$directory/lease"; do owned "$path"; done',
-        'exec 9<"$directory/lock"',
-        f'flock -n -E {LOCK_HELD} -x 9',
-        'previous=$(strict lease "$lease_pattern")',
-        'if [ "$previous" != none ]; then',
-        '  if [ "${previous%% *}" = "$(boot)" ]; then wait=$(( ${previous##* } - $(boot_clock) )); '
-        'else wait=$lease; fi',
-        f'  [ "$wait" -le {LEASE_WAIT_LIMIT} ] || {{ echo "recorded lease end out of range" >&2; exit 1; }}',
-        '  if [ "$wait" -gt 0 ]; then echo "waiting for the end of the previous lease" >&2; sleep "$wait"; fi',
-        'fi',
-        f'if ! containers=$(docker ps -aq --filter "label={LABEL}=$directory" --filter status=created '
-        '--filter status=running --filter status=restarting); then',
-        '  echo "cannot list the runner containers" >&2; exit 1',
-        'fi',
-        'if [ -n "$containers" ]; then',
-        f'  echo "a runner container of this VM root exists" >&2; exit {LOCK_HELD}',
-        'fi',
-        'current=$(strict epoch "$epoch_pattern")',
-        'counter=${current%%-*}',
-        f'[ "$counter" -lt {COUNTER_LIMIT} ] || {{ echo "campaign epoch counter exhausted" >&2; exit 1; }}',
-        'epoch=$(token $(( counter + 1 )))',
-        'write epoch "$epoch"',
-        'record_lease',
-        f'flock -n -E {LOCK_HELD} -s 9',
-        '[ "$(strict epoch "$epoch_pattern")" = "$epoch" ] '
-        f'|| {{ echo "another controller was admitted during the lock conversion" >&2; exit {LOCK_HELD}; }}',
-        'echo "locked $epoch $directory"',
-        'while IFS= read -r line; do',
-        '  [ "$line" = renew ] || { echo "unexpected admission request" >&2; exit 1; }',
-        '  record_lease',
-        '  echo renewed',
-        'done',
-    ])
-    return f'exec bash -c {shlex.quote(script)} admission {shlex.quote(vm_root)}'
-
-
-def private_root_command(vm_root, top='/'):
-    """The VM side of the privacy check of `vm_root`, run before the admission.
-
-    The configured path must be canonical (absolute, no `.`, `..`, empty or
-    trailing components). The check walks down from `top`, `/` for every
-    campaign (tests stop it at a directory whose permissions they control):
-    every directory that exists is checked, by lstat, before anything is
-    looked at or created below it, and must belong to root or to this user,
-    not be a link, not be writable by group or others and have no access
-    control list. A level that does not exist is created with mode 700 under
-    umask 077, so it is never open to others, not even for an instant; if it
-    appears meanwhile, the check stops. Nothing that exists is ever changed.
-    The root itself must belong to this user with mode 700. Prints `private`
-    when it holds; otherwise exits 1, leaving only the private levels it
-    created.
-    """
-    script = '\n'.join([
-        'set -euo pipefail',
-        'umask 077',
-        'root=$1',
-        'top=$2',
-        *OWNERSHIP_LINES,
-        f'[[ "$root" =~ ^{ROOT_PATH}$ && "$top" =~ ^{ROOT_PATH}$ ]] '
-        '|| fail characters',
-        '[[ "$root" == /* && "$root" != */ && "$root/" != *//* && "$root/" != */./* && "$root/" != */../* ]] '
-        '|| fail not-canonical',
-        'if [ "$top" = / ]; then current=; rest=${root#/}; else',
-        '  [[ "$root" == "$top"/* ]] || fail outside-top',
-        '  current=$top; rest=${root#"$top"/}',
-        'fi',
-        'trusted "${current:-/}"',
-        # Component by component with parameter expansion: no line reader.
-        'while [ -n "$rest" ]; do',
-        '  part=${rest%%/*}',
-        '  if [ "$part" = "$rest" ]; then rest=; else rest=${rest#*/}; fi',
-        '  current="$current/$part"',
-        '  if test -e "$current" || test -L "$current"; then',
-        '    trusted "$current"',
-        '  else',
-        '    mkdir -m 700 -- "$current" || fail appeared',
-        '  fi',
-        'done',
-        '[ "$current" = "$root" ] || fail not-walked',
-        '[ "$(stat -c "%u %a" -- "$root")" = "$(id -u) 700" ] || fail root-mode',
-        'echo private',
-    ])
-    return f'bash -c {shlex.quote(script)} private {shlex.quote(vm_root)} {shlex.quote(top)}'
-
-
 def check_private_root(remote, vm_root):
     """Refuse a VM root that another user could write; see `private_root_command`."""
     run_check(remote, private_root_command(vm_root), 'private',
               'the VM root was refused, nothing was created below the refused directory')
-
-
-class Session:
-    """The controller's admission: its channel, epoch, VM directory and lease."""
-
-    def __init__(self, channel, reader, epoch, directory, granted, *, lease=LEASE_SECONDS, clock=time.monotonic):
-        self.channel, self.reader, self.epoch, self.directory = channel, reader, epoch, directory
-        self.lease, self.clock = lease, clock
-        self.lease_until = granted + lease
-
-    def alive(self):
-        """Whether local work may go on: the admission channel is open and the
-        lease, by the controller's clock, has not ended."""
-        return (not self.channel.closed and not self.channel.exit_status_ready()
-                and self.clock() < self.lease_until)
-
-    def renew(self, *, strict=False):
-        """Extend the lease through the admission process, or raise CampaignLost.
-
-        `strict`, while local work runs: once the validity of the last
-        confirmed renewal has elapsed nothing is sent and the lease is lost,
-        whatever the admission would answer now.
-        """
-        sent = self.clock()
-        if strict and sent >= self.lease_until:
-            raise CampaignLost('the lease ended before it was renewed; local work stops')
-        try:
-            if self.channel.closed or self.channel.exit_status_ready():
-                raise EOFError
-            self.channel.sendall(b'renew\n')
-            reply = self.reader.readline()
-        except Exception:  # every failure of the channel is a lost admission
-            reply = ''
-        if reply.strip() != 'renewed':
-            raise CampaignLost('the campaign admission on the VM did not renew its lease; nothing more is done')
-        self.lease_until = sent + self.lease
-
-    def check(self, remote):
-        """Fail unless this admission still holds the VM, checked on the VM.
-
-        No local work runs here, so a lease that lapsed between two checks is
-        renewed. The epoch is compared byte for byte: the file is framed by a
-        marker on both sides, so no whitespace is lost on the way.
-        """
-        self.renew()
-        path = shlex.quote(self.directory + '/epoch')
-        current = remote.run(f'printf x && cat {path} && printf x')
-        if current != 'x' + self.epoch + '\nx':
-            raise CampaignFenced('another controller was admitted on this VM; this campaign stops and its '
-                                 'pending result is not recorded')
 
 
 @contextmanager
@@ -443,6 +164,7 @@ def admission(remote, vm_root, *, clock=time.monotonic):
     """
     granted = clock()
     channel, reader, first = remote.hold(admission_command(vm_root), ADMISSION_SECONDS)
+    session = None
     try:
         fields = first.split(' ', 2)
         if len(fields) != 3 or fields[0] != 'locked' or not re.fullmatch(EPOCH, fields[1]):
@@ -450,16 +172,19 @@ def admission(remote, vm_root, *, clock=time.monotonic):
             while not channel.exit_status_ready():
                 if time.monotonic() >= limit:
                     raise RuntimeError('the VM admission neither started nor ended; nothing was touched')
-                time.sleep(0.05)
+                time.sleep(PROCESS_POLL_SECONDS)
             code = channel.recv_exit_status()
             if code == LOCK_HELD:
                 raise CampaignBusy('another controller, or an activity it left on the VM, holds this VM root; '
                                    'nothing was touched')
             raise RuntimeError(f'the VM admission failed (exit code {code}); nothing was touched')
         channel.settimeout(RENEW_SECONDS)
-        yield Session(channel, reader, fields[1], fields[2], granted, clock=clock)
+        session = Session(channel, reader, fields[1], fields[2], granted, clock=clock)
+        yield session
     finally:
         channel.close()
+        if session is not None:
+            session.status = transition('session', session.status, 'close')
 
 
 class ProcessTree:
@@ -516,7 +241,7 @@ class ProcessTree:
         while remaining():
             if time.monotonic() >= limit:
                 raise RuntimeError('the local process tree did not terminate; stop it before any new admission')
-            time.sleep(0.05)
+            time.sleep(PROCESS_POLL_SECONDS)
 
     def close(self):
         if self.job is not None:
@@ -742,7 +467,7 @@ def held(directory, epoch):
             except OSError as error:
                 raise RuntimeError('the campaign epoch cannot be read (' + type(error).__name__ + '); nothing '
                                    'more is recorded') from None
-            if current != (epoch + '\n').encode('ascii'):
+            if current != epoch_bytes(epoch):
                 raise CampaignFenced('another controller was admitted on this VM; this run is void and its '
                                      'result is not recorded')
 
@@ -751,14 +476,3 @@ def held(directory, epoch):
             yield fence
         finally:
             fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
-
-
-def fence_lines(directory_variable='CAMPAIGN_DIR', epoch_variable='CAMPAIGN_EPOCH'):
-    """Shell function `fence` for preparation scripts: exits with FENCED once
-    the epoch file is not exactly the epoch and one newline, and with 1 if it
-    cannot be read. `cmp` compares bytes; a shell variable would lose NUL
-    bytes and trailing newlines."""
-    return [f'fence() {{ local status=0; printf "%s\\n" "${epoch_variable}" '
-            f'| cmp -s - "${directory_variable}/epoch" || status=$?; case $status in 0) ;; '
-            f'1) echo "campaign epoch changed" >&2; exit {FENCED};; '
-            f'*) echo "campaign epoch unreadable" >&2; exit 1;; esac; }}']

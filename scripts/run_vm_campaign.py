@@ -10,6 +10,9 @@ import sys
 import tempfile
 import venv
 
+from campaign_model import (PERMISSIONS, PERFORMANCE_ROUND_TIMEOUT, PERFORMANCE_PHASE_TIMEOUT,
+    TRANSFER_ROUND_TIMEOUT, TRANSFER_PHASE_TIMEOUT, COMMAND_TIMEOUT,
+    COMMAND_GRACE_SECONDS, SOAK_INTERVAL_SECONDS)
 from campaign_fence import held, CampaignBusy, CampaignFenced
 from campaign_state import Campaign, digest, exclusive, logged, write_json
 from check_disk_space import GIB, inspect
@@ -18,7 +21,7 @@ from soak_policy import SOAK_DURATION_SECONDS
 from performance_order import SCHEME
 from versioning import parse_version
 from proof_collection import Collection
-from proof_sources import passed_names
+from campaign_model import CAMPAIGN_PHASES
 
 ROOT = Path(__file__).resolve().parents[1]
 # The container's own filesystem: no host directory is mounted there, so
@@ -30,9 +33,9 @@ PRIVATE_ROOT = Path('/tmp')
 # (qualify_local_faults.py, user 65534) to prove permission faults, so every
 # directory down to them lets others pass, without listing it, and the
 # binaries let others run them.
-PASSABLE = 0o711
-EXECUTABLE = 0o755
-READABLE = 0o644
+PASSABLE = PERMISSIONS["runner_directory"].mode
+EXECUTABLE = PERMISSIONS["runner_binary"].mode
+READABLE = PERMISSIONS["fixture_file"].mode
 TARGET = 'x86_64-unknown-linux-gnu'
 PERFORMANCE_ORDER = SCHEME
 # A multiple of four, so ABBA gives every provider the same number of first
@@ -40,12 +43,7 @@ PERFORMANCE_ORDER = SCHEME
 PERFORMANCE_POLICY = strict_json.loads((ROOT / 'scripts/performance-policy.json').read_text())
 PERFORMANCE_ROUNDS = PERFORMANCE_POLICY['minimum_paired_measurement_rounds']
 PERFORMANCE_WARMUP_ROUNDS = PERFORMANCE_POLICY['paired_warmup_rounds']
-PERFORMANCE_ROUND_TIMEOUT = 300
-PERFORMANCE_PHASE_TIMEOUT = 7500
-TRANSFER_ROUND_TIMEOUT = 10800
-TRANSFER_PHASE_TIMEOUT = 14400
-COMMAND_TIMEOUT = 14400
-PHASES = tuple(sorted(passed_names('scripts/run_vm_campaign.py', function='phase')))
+PHASES = tuple(sorted(CAMPAIGN_PHASES['run_vm_campaign.py']))
 SPOOLED_PHASES = tuple(name for name in PHASES if name.startswith('spooled-'))
 
 
@@ -319,7 +317,7 @@ def measure(folder, baseline, private, output, fixture_state, retries, reason, b
                     '--round-timeout', PERFORMANCE_ROUND_TIMEOUT if paired else TRANSFER_ROUND_TIMEOUT,
                     '--phase-timeout', PERFORMANCE_PHASE_TIMEOUT if paired else TRANSFER_PHASE_TIMEOUT,
                     *pair, *(['--spool-uploads'] if spool_uploads else []),
-                    timeout=(PERFORMANCE_PHASE_TIMEOUT if paired else TRANSFER_PHASE_TIMEOUT) + 60)
+                    timeout=(PERFORMANCE_PHASE_TIMEOUT if paired else TRANSFER_PHASE_TIMEOUT) + COMMAND_GRACE_SECONDS)
 
         def qualify(path):
             # Qualified in the private directory; only its reports become
@@ -363,7 +361,7 @@ def measure(folder, baseline, private, output, fixture_state, retries, reason, b
                     path, size=size, workers=workers, rounds=rounds, spool_uploads=True))
                 prepared[f'transfers-spooled/{name}.json'] = result / 'report.json'
         soak = phase('soak', lambda path: command(path, 'stress_python.py', '--wheel', wheel, '--workers', 4,
-                     '--interval-seconds', 30, '--duration-seconds', SOAK_DURATION_SECONDS,
+                     '--interval-seconds', SOAK_INTERVAL_SECONDS, '--duration-seconds', SOAK_DURATION_SECONDS,
                      *(['--both-upload-modes'] if spooled else []),
                      '--output', path / 'report.json', python=installed_python(private)), dependencies=('install-sdk',))
         collection.finish(output / 'collection.json')

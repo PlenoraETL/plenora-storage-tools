@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-umask 022
 cd "$(dirname "$0")/.."
+profile=$(python3 scripts/campaign_shell.py fixture_file)
+eval "$profile"
 mkdir -p .fixtures/extended
 trap 'status=$?; tail -n 30 .fixtures/extended/certificate-generation.log >&2; exit "$status"' ERR
 python3 scripts/fixture_tls.py ftps --output .fixtures/extended > .fixtures/extended/certificate-generation.log 2>&1

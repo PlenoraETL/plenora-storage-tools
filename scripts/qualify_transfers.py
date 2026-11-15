@@ -3,6 +3,7 @@
 Linux fixture gate. Defaults to 1 GiB for streaming paths; buffered providers
 retain their documented 64 MiB limit. Each report identifies the tested binary.
 """
+from campaign_model import TRANSFER_ROUND_TIMEOUT, TRANSFER_PHASE_TIMEOUT
 import argparse
 from concurrent.futures import as_completed
 from qualification_watchdog import WorkerPool, Watchdog, diagnostic, entrypoint, positive_seconds
@@ -192,8 +193,8 @@ def main():
                         help='initial recorded rounds excluded from performance statistics; --rounds remains measured rounds')
     parser.add_argument('--spool-uploads', action='store_true')
     parser.add_argument('--timeout', type=positive_seconds, default=600)
-    parser.add_argument('--round-timeout', type=positive_seconds, default=10800)
-    parser.add_argument('--phase-timeout', type=positive_seconds, default=14400)
+    parser.add_argument('--round-timeout', type=positive_seconds, default=TRANSFER_ROUND_TIMEOUT)
+    parser.add_argument('--phase-timeout', type=positive_seconds, default=TRANSFER_PHASE_TIMEOUT)
     parser.add_argument('--rss-limit-mib', type=int, default=256)
     parser.add_argument('--output', type=Path, default=ROOT / 'target/release-readiness/large-transfers.json')
     parser.add_argument('--baseline-binary', type=Path,

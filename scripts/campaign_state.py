@@ -1,32 +1,11 @@
 """Exclusive, artifact-bound phase ledger with immutable attempts and explicit retries."""
 from contextlib import contextmanager
-import hashlib
-import json
-import strict_json
 import os
 from pathlib import Path
-import re
 import subprocess
 import time
+from campaign_model import Campaign, digest, write_json, CHILD_REAP_SECONDS, transition
 from qualification_watchdog import kill_descendants, positive_seconds
-
-
-def digest(path):
-    value = hashlib.sha256()
-    with Path(path).open('rb') as stream:
-        for block in iter(lambda: stream.read(1024**2), b''):
-            value.update(block)
-    return value.hexdigest()
-
-
-def write_json(path, value):
-    temporary = path.with_suffix('.pending')
-    with temporary.open('w', encoding='utf-8', newline='\n') as stream:
-        json.dump(value, stream, indent=2)
-        stream.write('\n')
-        stream.flush()
-        os.fsync(stream.fileno())
-    temporary.replace(path)
 
 
 @contextmanager
@@ -55,94 +34,12 @@ def exclusive(folder):
                 fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
 
-class Campaign:
-    """Use under exclusive(); changed identities or successful evidence fail closed."""
-
-    def __init__(self, folder, identity):
-        self.folder = Path(folder).resolve()
-        self.folder.mkdir(parents=True, exist_ok=True)
-        self.path = self.folder / 'campaign.json'
-        if self.path.exists():
-            self.state = strict_json.loads(self.path.read_text(encoding='utf-8'))
-            if self.state['identity'] != identity:
-                raise ValueError('campaign source, subjects or policy changed; use a new campaign')
-        else:
-            self.state = {'schema_version': 1, 'identity': identity, 'phases': {}}
-            self.save()
-
-    def save(self):
-        write_json(self.path, self.state)
-
-    def validate_retries(self, names, known):
-        """A retry names a known phase whose last attempt did not pass.
-
-        Passed evidence is immutable: rerunning a passed phase would let a
-        campaign keep measuring until a result suits it. A retry of a passed or
-        unknown phase is refused before anything runs, never ignored.
-        """
-        for name in names:
-            if name not in known:
-                raise ValueError(f'unknown phase in retry: {name}')
-            attempts = self.state['phases'].get(name, [])
-            if attempts and attempts[-1]['status'] == 'PASS':
-                raise ValueError(f'retry of a passed phase is refused: {name}; passed evidence is never '
-                                 'remeasured, start a new campaign to measure again')
-
-    def phase(self, name, action, *, retry=False, reason=None):
-        """Actions write evidence inside their attempt; failed evidence is never reused."""
-        if not re.fullmatch(r'[a-z][a-z0-9-]{0,63}', name):
-            raise ValueError('invalid phase name')
-        attempts = self.state['phases'].setdefault(name, [])
-        if attempts and attempts[-1]['status'] == 'PASS' and retry:
-            raise ValueError(f'retry of a passed phase is refused: {name}')
-        if attempts and attempts[-1]['status'] == 'PASS':
-            previous = attempts[-1]
-            folder = self.folder / name / str(len(attempts))
-            actual = self.inventory(folder)
-            if actual != previous['files']:
-                raise ValueError('successful phase evidence changed or disappeared')
-            return folder
-        if attempts and (not retry or not reason):
-            raise ValueError('unfinished or failed phase requires explicit retry and reason')
-        folder = self.folder / name / str(len(attempts) + 1)
-        folder.mkdir(parents=True, exist_ok=False)
-        attempt = {'status': 'RUNNING', 'started_unix': time.time(), 'retry_reason': reason if attempts else None}
-        attempts.append(attempt)
-        self.save()
-        try:
-            action(folder)
-            attempt['files'] = self.inventory(folder)
-            if not attempt['files']:
-                raise ValueError('phase produced no evidence')
-            attempt['status'] = 'PASS'
-        except BaseException as error:
-            attempt.update(status='FAIL', failure_type=type(error).__name__)
-            raise
-        finally:
-            attempt['finished_unix'] = time.time()
-            self.save()
-        return folder
-
-    @staticmethod
-    def inventory(folder):
-        files = {}
-        for path in sorted(folder.rglob('*')):
-            if path.is_symlink():
-                if not path.resolve().is_relative_to(folder.resolve()) or not path.exists():
-                    raise ValueError('campaign evidence link escapes its attempt or is broken')
-                files[path.relative_to(folder).as_posix()] = 'symlink:' + hashlib.sha256(os.readlink(path).encode()).hexdigest()
-                continue
-            if path.is_file():
-                files[path.relative_to(folder).as_posix()] = digest(path)
-        return files
-
-
 def logged(command, folder, *, cwd=None, env=None, name='command.log', timeout=None):
     """Keep diagnostics local; the public failure contains no subprocess arguments."""
     if timeout is not None:
         positive_seconds(timeout)
     started = time.monotonic()
-    state = {'status': 'RUNNING', 'timeout_seconds': timeout}
+    state = {'status': transition('phase', 'NEW', 'start'), 'timeout_seconds': timeout}
     status_path = folder / (name + '.status.json')
     write_json(status_path, state)
     with (folder / name).open('wb') as stream:
@@ -153,9 +50,11 @@ def logged(command, folder, *, cwd=None, env=None, name='command.log', timeout=N
             state['pid'] = process.pid
             write_json(status_path, state)
             state['returncode'] = process.wait(timeout=timeout)
-            state['status'] = 'PASS' if process.returncode == 0 else 'FAIL'
+            state['status'] = transition('phase', state['status'],
+                                         'success' if process.returncode == 0 else 'failure')
         except BaseException as error:
-            state.update(status='TIMEOUT' if isinstance(error, subprocess.TimeoutExpired) else 'FAIL',
+            state.update(status=transition('phase', state['status'],
+                                          'timeout' if isinstance(error, subprocess.TimeoutExpired) else 'failure'),
                          failure_type=type(error).__name__)
             stream.write(b'\nFAIL campaign child watchdog or wait failure; remote effect unknown; inspect before retry\n')
             stream.flush()
@@ -163,7 +62,7 @@ def logged(command, folder, *, cwd=None, env=None, name='command.log', timeout=N
                 kill_descendants(process.pid)
                 process.kill()
                 try:
-                    state['returncode'] = process.wait(timeout=5)
+                    state['returncode'] = process.wait(timeout=CHILD_REAP_SECONDS)
                 except subprocess.TimeoutExpired:
                     state['reap_timeout'] = True
             raise RuntimeError('campaign child watchdog or wait failed; inspect the protected attempt log') from None

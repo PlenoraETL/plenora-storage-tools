@@ -1,3 +1,2 @@
-"""Provisional soak duration for every version; revisit before final release."""
-
-SOAK_DURATION_SECONDS = 7200
+"""Compatibility import of the campaign time policy."""
+from campaign_model import SOAK_DURATION_SECONDS
