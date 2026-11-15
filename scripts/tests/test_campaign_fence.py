@@ -532,38 +532,38 @@ class InputTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.inputs = Path(self.temporary.name) / 'inputs'
-        for name, text in (('baseline/plenora-storage', 'old'), ('compose.campaign.json', '{}'),
+        for name, text in (('fixtures/input', 'fixture'), ('compose.campaign.json', '{}'),
                            ('dist/3.0.0/x/plenora-storage', 'new')):
             (self.inputs / name).parent.mkdir(parents=True, exist_ok=True)
             (self.inputs / name).write_text(text)
         self.expected = release_campaign.expected_inputs(
-            {name: self.inputs / name for name in ('baseline/plenora-storage', 'compose.campaign.json',
+            {name: self.inputs / name for name in ('fixtures/input', 'compose.campaign.json',
                                                    'dist/3.0.0/x/plenora-storage')})
-        self.baseline = self.inputs / 'baseline/plenora-storage'
+        self.auxiliary = self.inputs / 'fixtures/input'
 
     def tearDown(self):
         self.temporary.cleanup()
 
     def test_only_the_exact_inputs_pass(self):
-        run_vm_campaign.check_inputs(self.inputs, self.expected, self.baseline)
+        run_vm_campaign.check_inputs(self.inputs, self.expected)
         (self.inputs / 'extra').write_text('x')
         with self.assertRaises(ValueError):
-            run_vm_campaign.check_inputs(self.inputs, self.expected, self.baseline)
+            run_vm_campaign.check_inputs(self.inputs, self.expected)
         (self.inputs / 'extra').unlink()
-        self.baseline.write_text('other controller')
+        self.auxiliary.write_text('other controller')
         with self.assertRaises(ValueError):
-            run_vm_campaign.check_inputs(self.inputs, self.expected, self.baseline)
+            run_vm_campaign.check_inputs(self.inputs, self.expected)
         with self.assertRaises(ValueError):
-            run_vm_campaign.check_inputs(self.inputs, {**self.expected, 'missing': 'f' * 64}, self.baseline)
+            run_vm_campaign.check_inputs(self.inputs, {**self.expected, 'missing': 'f' * 64})
 
     def test_an_input_replaced_during_a_phase_voids_it(self):
-        fence = run_vm_campaign.input_fence(lambda: None, self.inputs, self.expected, self.baseline)
+        fence = run_vm_campaign.input_fence(lambda: None, self.inputs, self.expected)
         with tempfile.TemporaryDirectory() as temporary:
             campaign = Campaign(Path(temporary), {'subject': 'same'})
 
             def measured(path):
                 (path / 'report.json').write_text('measured')
-                self.baseline.write_text('uploaded late by another controller')
+                self.auxiliary.write_text('uploaded late by another controller')
             with self.assertRaises(ValueError):
                 run_vm_campaign.fenced_phase(campaign, fence, 'performance-ab', measured)
             self.assertEqual(campaign.state['phases']['performance-ab'][-1]['status'], 'FAIL')
@@ -571,19 +571,19 @@ class InputTests(unittest.TestCase):
     def test_measured_bytes_come_from_private_copies(self):
         with tempfile.TemporaryDirectory() as root:
             folder = self.inputs / 'dist/3.0.0/x'
-            private, candidate, baseline, copies = run_vm_campaign.private_inputs(
-                folder, self.baseline, self.inputs, self.expected, root=Path(root))
-            self.assertEqual(set(copies), {'baseline/plenora-storage', 'dist/3.0.0/x/plenora-storage'})
+            private, candidate, copies = run_vm_campaign.private_inputs(
+                folder, self.inputs, self.expected, root=Path(root))
+            self.assertEqual(set(copies), {'dist/3.0.0/x/plenora-storage'})
             self.assertTrue(private.is_relative_to(Path(root)))
             # Replaced on the host during a measurement, then restored.
-            self.baseline.write_text('swapped')
+            self.auxiliary.write_text('swapped')
             (folder / 'plenora-storage').write_text('swapped')
-            self.assertEqual((baseline.read_text(), (candidate / 'plenora-storage').read_text()), ('old', 'new'))
+            self.assertEqual((candidate / 'plenora-storage').read_text(), 'new')
             run_vm_campaign.check_private(copies, self.expected)
-            self.baseline.write_text('old')
+            self.auxiliary.write_text('fixture')
             (folder / 'plenora-storage').write_text('new')
             # A change that reaches a private copy is detected at the next fence.
-            baseline.write_text('changed')
+            (candidate / 'plenora-storage').write_text('changed')
             with self.assertRaises(ValueError):
                 run_vm_campaign.check_private(copies, self.expected)
 
@@ -595,29 +595,28 @@ class InputTests(unittest.TestCase):
         (campaign_dir / 'epoch').write_text(EPOCH + '\n')
         seen = {}
 
-        def measure(folder, baseline, private, *arguments):
+        def measure(folder, private, *arguments):
             fence = arguments[-3]
-            seen.update(folder=folder, baseline=baseline, private=private)
+            seen.update(folder=folder, private=private)
             self.assertEqual((folder / 'plenora-storage').read_text(), 'new')
-            self.baseline.write_text('swapped on the host')
-            self.assertEqual(baseline.read_text(), 'old')
+            self.auxiliary.write_text('swapped on the host')
+            self.assertEqual((folder / 'plenora-storage').read_text(), 'new')
             with self.assertRaises(ValueError):
                 fence()
-            self.baseline.write_text('old')
+            self.auxiliary.write_text('fixture')
             fence()
         with patch.object(run_vm_campaign, 'measure', measure):
-            run_vm_campaign.run(self.inputs / 'dist/3.0.0/x', self.baseline, Path(self.temporary.name) / 'out', [],
+            run_vm_campaign.run(self.inputs / 'dist/3.0.0/x', Path(self.temporary.name) / 'out', [],
                                 None, [], 'n0nce', campaign_dir, EPOCH, self.inputs, self.expected,
                                 Path(self.temporary.name) / 'fixture-state')
         self.assertTrue(seen['folder'].is_relative_to(seen['private']))
-        self.assertTrue(seen['baseline'].is_relative_to(seen['private']))
         self.assertFalse(seen['private'].is_relative_to(self.inputs))
         self.assertFalse(seen['private'].exists())
 
     def test_inputs_already_replaced_when_copied_stop_the_run(self):
-        self.baseline.write_text('swapped before the copy')
+        (self.inputs / 'dist/3.0.0/x/plenora-storage').write_text('swapped before the copy')
         with tempfile.TemporaryDirectory() as root, self.assertRaises(ValueError):
-            run_vm_campaign.private_inputs(self.inputs / 'dist/3.0.0/x', self.baseline, self.inputs, self.expected,
+            run_vm_campaign.private_inputs(self.inputs / 'dist/3.0.0/x', self.inputs, self.expected,
                                            root=Path(root))
 
     def test_selected_evidence_must_be_what_its_phase_recorded(self):
@@ -1537,12 +1536,12 @@ class UnprivilegedExecutionTests(unittest.TestCase):
         private.chmod(0o711)
         previous = os.umask(0o077)
         try:
-            directory, candidate, baseline, _ = run_vm_campaign.private_inputs(
-                self.folder, self.inputs / 'baseline/plenora-storage', self.inputs, self.expected, root=private)
+            directory, candidate, _ = run_vm_campaign.private_inputs(
+                self.folder, self.inputs, self.expected, root=private)
             qualified = run_vm_campaign.qualification_copy(directory, candidate, '3.0.0')
         finally:
             os.umask(previous)
-        return [candidate / 'plenora-storage', baseline, qualified / 'plenora-storage']
+        return [candidate / 'plenora-storage', qualified / 'plenora-storage']
 
     def test_every_private_binary_is_reachable_and_executable_by_others_and_writable_by_none(self):
         for binary in self.copies():
@@ -1583,20 +1582,19 @@ class SelectedEvidenceTests(unittest.TestCase):
         self.candidate = digest(self.linux / 'plenora-storage')
         (self.linux / 'release-manifest.json').write_text(json.dumps(
             {'artifacts': [{'name': 'plenora-storage', 'sha256': self.candidate}]}))
-        self.identity = {'revision': 'r' * 40, 'baseline_sha256': 'b' * 64}
-        self.expected = {'baseline/plenora-storage': 'b' * 64}
+        self.identity = {'revision': 'r' * 40, 'policy_id': 'storage-release-cycles-v1'}
+        self.expected = {'candidate/plenora-storage': self.candidate}
 
     def tearDown(self):
         self.temporary.cleanup()
 
-    def result(self, *, epoch=EPOCH, nonce='n0nce', baseline_sha='b' * 64, inputs=None, report_baseline='b' * 64,
+    def result(self, *, epoch=EPOCH, nonce='n0nce', policy_id='storage-release-cycles-v1', inputs=None, artifact_sha=None,
                ledger_epoch=EPOCH):
         """A downloaded attempt: selected evidence, its report and the runner ledger."""
         result = self.folder / 'result'
         shutil.rmtree(result, ignore_errors=True)
         selected = result / 'selected'
-        for name, value in (('gates/performance/baseline.json', {'binary_sha256': report_baseline}),
-                            ('gates/performance/candidate.json', {'binary_sha256': self.candidate}),
+        for name, value in (('gates/transfers/large.json', {'binary_sha256': self.candidate}),
                             ('linux-qualification/qualification.json', {'status': 'PASS'})):
             (selected / name).parent.mkdir(parents=True, exist_ok=True)
             (selected / name).write_text(json.dumps(value))
@@ -1605,8 +1603,8 @@ class SelectedEvidenceTests(unittest.TestCase):
         (selected / 'report.json').write_text(json.dumps({
             'status': 'PASS', 'inputs': self.expected if inputs is None else inputs, 'epoch': epoch,
             'fixture_nonce': nonce, 'files': files,
-            'identity': {'source_revision': 'r' * 40, 'baseline_binary_sha256': baseline_sha,
-                         'artifacts': {'plenora-storage': self.candidate}}}))
+            'identity': {'source_revision': 'r' * 40, 'policy_id': policy_id,
+                         'artifacts': {'plenora-storage': artifact_sha or self.candidate}}}))
         (result / 'vm-campaign.json').write_text(json.dumps(
             {'selected': {'report_sha256': digest(selected / 'report.json'), 'epoch': ledger_epoch}}))
         return result
@@ -1618,7 +1616,7 @@ class SelectedEvidenceTests(unittest.TestCase):
     def test_only_this_attempts_complete_evidence_of_its_binaries_passes(self):
         self.check(self.result())
         older = '6-' + '1' * 32
-        for options in ({'baseline_sha': 'c' * 64}, {'inputs': {}}, {'report_baseline': 'c' * 64},
+        for options in ({'policy_id': 'old-policy'}, {'inputs': {}}, {'artifact_sha': 'c' * 64},
                         {'epoch': older, 'ledger_epoch': older}, {'nonce': 'other'}):
             with self.subTest(options=options), self.assertRaises(ValueError):
                 self.check(self.result(**options))

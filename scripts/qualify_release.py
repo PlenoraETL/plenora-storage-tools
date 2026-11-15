@@ -3,6 +3,7 @@ import argparse
 import json
 import strict_json
 from pathlib import Path
+from soak_policy import RELEASE_POLICY_ID
 import re
 import shutil
 import subprocess
@@ -167,6 +168,7 @@ def main():
             assert digest(destination) == entry['sha256'], 'evidence changed while archiving'
     receipt = {'schema_version': 2, 'component': 'plenora-storage-tools', 'version': output.name,
                'status': 'qualified_for_publication', 'source_revision': revision,
+               'evidence_policy': RELEASE_POLICY_ID,
                'source_sha256': source_digest(), 'advisory_database': audit['database'],
                'qualification_scope': qualification_scope(),
                'platforms': records, 'additional_gates': additional}

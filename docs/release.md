@@ -7,7 +7,7 @@ disco: `spooled-qualification.json`, `spooled-regressions.json` e
 permessi negati durante la preparazione di put e copy, senza modifiche alla
 destinazione o residui temporanei. Il validatore finale richiede inoltre
 `transfers-spooled/{large,workers4,workers16}.json` e un soak che eserciti
-entrambe le modalità nelle stesse due ore. I workflow CI e candidato eseguono
+entrambe le modalità nei 40 cicli misurati della policy 4.0.0, dopo 5 cicli di warm-up. I workflow CI e candidato eseguono
 i nuovi test per target; la campagna VM e il workflow reliability eseguono
 i trasferimenti e il soak. I gate restano obbligatori per ogni candidato;
 il [resoconto 2.1.0](release-2.1.0.md) registra le prove dei suoi artefatti finali.

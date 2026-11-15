@@ -10,15 +10,14 @@ import sys
 import tempfile
 import venv
 
-from campaign_model import (PERMISSIONS, PERFORMANCE_ROUND_TIMEOUT, PERFORMANCE_PHASE_TIMEOUT,
+from campaign_model import (PERMISSIONS,
     TRANSFER_ROUND_TIMEOUT, TRANSFER_PHASE_TIMEOUT, COMMAND_TIMEOUT,
-    COMMAND_GRACE_SECONDS, SOAK_INTERVAL_SECONDS)
+    COMMAND_GRACE_SECONDS)
 from campaign_fence import held, CampaignBusy, CampaignFenced
 from campaign_state import Campaign, digest, exclusive, logged, write_json
 from check_disk_space import GIB, inspect
 from check_memory import available as available_memory, inspect as inspect_memory
-from soak_policy import SOAK_DURATION_SECONDS
-from performance_order import SCHEME
+from soak_policy import POLICY as SOAK_POLICY, RELEASE_POLICY_ID
 from versioning import parse_version
 from proof_collection import Collection
 from campaign_model import CAMPAIGN_PHASES
@@ -37,12 +36,6 @@ PASSABLE = PERMISSIONS["runner_directory"].mode
 EXECUTABLE = PERMISSIONS["runner_binary"].mode
 READABLE = PERMISSIONS["fixture_file"].mode
 TARGET = 'x86_64-unknown-linux-gnu'
-PERFORMANCE_ORDER = SCHEME
-# A multiple of four, so ABBA gives every provider the same number of first
-# runs as baseline and as candidate.
-PERFORMANCE_POLICY = strict_json.loads((ROOT / 'scripts/performance-policy.json').read_text())
-PERFORMANCE_ROUNDS = PERFORMANCE_POLICY['minimum_paired_measurement_rounds']
-PERFORMANCE_WARMUP_ROUNDS = PERFORMANCE_POLICY['paired_warmup_rounds']
 PHASES = tuple(sorted(CAMPAIGN_PHASES['run_vm_campaign.py']))
 SPOOLED_PHASES = tuple(name for name in PHASES if name.startswith('spooled-'))
 
@@ -54,7 +47,7 @@ def phases_for(version):
 
 
 
-def identity(folder, baseline):
+def identity(folder):
     manifest = strict_json.loads((folder / 'release-manifest.json').read_text())
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     if (manifest['target'] != TARGET or manifest['source_revision'] != revision or not manifest['source_committed']
@@ -64,13 +57,8 @@ def identity(folder, baseline):
     if any(subjects[row['name']] != row['sha256'] for row in manifest['artifacts']):
         raise ValueError('campaign distribution bytes differ from manifest')
     return {'source_revision': revision, 'version': manifest['version'], 'artifacts': subjects,
-            'baseline_binary_sha256': digest(baseline), 'soak_seconds': SOAK_DURATION_SECONDS,
-            'performance_warmup_rounds': PERFORMANCE_WARMUP_ROUNDS,
-            'performance_policy': PERFORMANCE_POLICY,
-            'performance_rounds': PERFORMANCE_ROUNDS, 'performance_order': PERFORMANCE_ORDER,
-            'watchdogs': {'performance_round': PERFORMANCE_ROUND_TIMEOUT,
-                          'performance_phase': PERFORMANCE_PHASE_TIMEOUT,
-                          'transfer_round': TRANSFER_ROUND_TIMEOUT,
+            'policy_id': RELEASE_POLICY_ID, 'soak_policy': SOAK_POLICY,
+            'watchdogs': {'transfer_round': TRANSFER_ROUND_TIMEOUT,
                           'transfer_phase': TRANSFER_PHASE_TIMEOUT, 'command': COMMAND_TIMEOUT},
             'large_transfer_rounds': 2}
 
@@ -92,9 +80,9 @@ def check_fixture_state(output, nonce):
                          'nothing was measured')
 
 
-def check_inputs(inputs, expected, baseline):
+def check_inputs(inputs, expected):
     """Every file of this attempt's input directory, and nothing else, has the
-    digest the controller expects; so has the baseline binary as mounted.
+    digest the controller expects.
 
     The directory belongs to the epoch of this runner's admission; a file of
     another controller in it, or a changed byte, stops the run before its
@@ -107,17 +95,16 @@ def check_inputs(inputs, expected, baseline):
             raise ValueError('campaign inputs contain an entry that is not a regular file; nothing is recorded')
         if path.is_file():
             found[path.relative_to(inputs).as_posix()] = digest(path)
-    if found != expected or digest(baseline) != expected.get('baseline/plenora-storage'):
+    if found != expected:
         raise ValueError('campaign inputs differ from the ones the controller uploaded; nothing is recorded')
 
 
-def private_inputs(folder, baseline, inputs, expected, root=PRIVATE_ROOT):
-    """Copy the candidate distribution and the baseline into a directory of
+def private_inputs(folder, inputs, expected, root=PRIVATE_ROOT):
+    """Copy the candidate distribution into a directory of
     this container that no host directory reaches, and check every copy
     against the digest the controller expects.
 
-    Returns the private directory, the candidate folder, the baseline binary
-    and the copies by input name. Every measurement uses only these copies:
+    Returns the private directory, the candidate folder and the copies by input name. Every measurement uses only these copies:
     a file replaced on the host and restored during a phase never reaches a
     measured byte. A copy that differs from the expected digest, because the
     host file had already changed, stops the run.
@@ -126,8 +113,8 @@ def private_inputs(folder, baseline, inputs, expected, root=PRIVATE_ROOT):
     prefix = folder.relative_to(inputs).as_posix() + '/'
     private = Path(tempfile.mkdtemp(prefix='plenora-campaign-', dir=root))
     private.chmod(PASSABLE)
-    candidate, baseline_copy = private / 'candidate', private / 'baseline' / 'plenora-storage'
-    for directory in (candidate, baseline_copy.parent):
+    candidate = private / 'candidate'
+    for directory in (candidate,):
         directory.mkdir()
         directory.chmod(PASSABLE)
     copies = {}
@@ -139,13 +126,11 @@ def private_inputs(folder, baseline, inputs, expected, root=PRIVATE_ROOT):
             raise ValueError('the candidate distribution must be a flat directory')
         shutil.copyfile(folder / relative, candidate / relative)
         copies[name] = candidate / relative
-    shutil.copyfile(baseline, baseline_copy)
-    copies['baseline/plenora-storage'] = baseline_copy
     check_private(copies, expected)
-    binaries = {candidate / 'plenora-storage', baseline_copy}
+    binaries = {candidate / 'plenora-storage'}
     for path in copies.values():
         path.chmod(EXECUTABLE if path in binaries else READABLE)
-    return private, candidate, baseline_copy, copies
+    return private, candidate, copies
 
 
 def qualification_copy(private, folder, version):
@@ -198,11 +183,11 @@ def select_evidence(campaign, output, sources):
     return files
 
 
-def input_fence(epoch_fence, inputs, expected, baseline):
+def input_fence(epoch_fence, inputs, expected):
     """The runner's fence: the admission epoch, then every input digest."""
     def fence():
         epoch_fence()
-        check_inputs(inputs, expected, baseline)
+        check_inputs(inputs, expected)
     return fence
 
 
@@ -229,7 +214,7 @@ def require_private(root, output):
             raise ValueError('the VM runner must run from its private checkout and write its private output')
 
 
-def run(folder, baseline, output, retries, reason, backend_data, fixture_nonce, campaign_dir, epoch, inputs,
+def run(folder, output, retries, reason, backend_data, fixture_nonce, campaign_dir, epoch, inputs,
         expected, fixture_state):
     # Shared hold of the VM campaign lock for the whole run, then the epoch of
     # this runner's admission (campaign_fence): no controller is admitted while
@@ -240,25 +225,25 @@ def run(folder, baseline, output, retries, reason, backend_data, fixture_nonce, 
     # Then everything is measured from private copies of the inputs, checked
     # again at every fence.
     with held(campaign_dir, epoch) as epoch_fence:
-        host_fence = input_fence(epoch_fence, inputs, expected, baseline)
+        host_fence = input_fence(epoch_fence, inputs, expected)
         host_fence()
-        private, candidate, private_baseline, copies = private_inputs(folder, baseline, inputs, expected)
+        private, candidate, copies = private_inputs(folder, inputs, expected)
         try:
             def fence():
                 host_fence()
                 check_private(copies, expected)
-            measure(candidate, private_baseline, private, output, fixture_state, retries, reason, backend_data,
+            measure(candidate, private, output, fixture_state, retries, reason, backend_data,
                     fixture_nonce, fence, expected, epoch)
         finally:
             shutil.rmtree(private)
 
 
-def measure(folder, baseline, private, output, fixture_state, retries, reason, backend_data, fixture_nonce, fence,
+def measure(folder, private, output, fixture_state, retries, reason, backend_data, fixture_nonce, fence,
             expected, epoch):
     if sys.platform != 'linux':
         raise ValueError('VM campaign requires Linux')
-    folder, baseline, output = folder.resolve(), baseline.resolve(), output.resolve()
-    subject = identity(folder, baseline)
+    folder, output = folder.resolve(), output.resolve()
+    subject = identity(folder)
     spooled = parse_version(subject['version']).requires((2, 1, 0))
     binary = folder / 'plenora-storage'
     wheels = list(folder.glob('*.whl'))
@@ -298,7 +283,7 @@ def measure(folder, baseline, private, output, fixture_state, retries, reason, b
             logged([str(python), str(ROOT / 'scripts' / script), *map(str, arguments)],
                    path, cwd=ROOT, env=environment, timeout=timeout)
 
-        def transfers(path, *, size, workers, rounds, spool_uploads=False, paired=False):
+        def transfers(path, *, size, workers, rounds, spool_uploads=False):
             space = inspect(spaces, size, workers, spool_uploads=spool_uploads)
             write_json(path / 'disk-space.json', space)
             if space['status'] != 'PASS':
@@ -309,15 +294,11 @@ def measure(folder, baseline, private, output, fixture_state, retries, reason, b
                 write_json(path / 'memory.json', memory)
                 if memory['status'] != 'PASS':
                     raise ValueError('insufficient memory for the GCS fixture peak; no transfer started')
-            # A paired run measures baseline and candidate alternately, slot by
-            # slot, so a drift of the environment weighs the same on both.
-            pair = (['--warmup-rounds', PERFORMANCE_WARMUP_ROUNDS, '--baseline-binary', baseline, '--baseline-output', path / 'baseline.json',
-                     '--output', path / 'candidate.json'] if paired else ['--output', path / 'report.json'])
             command(path, 'qualify_transfers.py', '--bytes', size, '--workers', workers, '--rounds', rounds,
-                    '--round-timeout', PERFORMANCE_ROUND_TIMEOUT if paired else TRANSFER_ROUND_TIMEOUT,
-                    '--phase-timeout', PERFORMANCE_PHASE_TIMEOUT if paired else TRANSFER_PHASE_TIMEOUT,
-                    *pair, *(['--spool-uploads'] if spool_uploads else []),
-                    timeout=(PERFORMANCE_PHASE_TIMEOUT if paired else TRANSFER_PHASE_TIMEOUT) + COMMAND_GRACE_SECONDS)
+                    '--round-timeout', TRANSFER_ROUND_TIMEOUT,
+                    '--phase-timeout', TRANSFER_PHASE_TIMEOUT,
+                    '--output', path / 'report.json', *(['--spool-uploads'] if spool_uploads else []),
+                    timeout=TRANSFER_PHASE_TIMEOUT + COMMAND_GRACE_SECONDS)
 
         def qualify(path):
             # Qualified in the private directory; only its reports become
@@ -345,11 +326,6 @@ def measure(folder, baseline, private, output, fixture_state, retries, reason, b
             write_json(path / 'wheel.json', {'sha256': digest(wheel)})
 
         phase('install-sdk', sdk)
-        paired = phase('performance-ab', lambda path: transfers(path, size=1024**2, workers=4,
-                                                                rounds=PERFORMANCE_ROUNDS, paired=True))
-        old, new = paired / 'baseline.json', paired / 'candidate.json'
-        comparison = phase('performance-compare', lambda path: command(path, 'check_performance.py',
-                           old, new, '--output', path / 'report.json'), dependencies=('performance-ab',))
         large = phase('transfers-large', lambda path: transfers(path, size=GIB, workers=1, rounds=2))
         four = phase('transfers-workers4', lambda path: transfers(path, size=1024**2, workers=4, rounds=2))
         sixteen = phase('transfers-workers16', lambda path: transfers(path, size=1024**2, workers=16, rounds=1))
@@ -360,14 +336,14 @@ def measure(folder, baseline, private, output, fixture_state, retries, reason, b
                 result = phase('spooled-' + name, lambda path: transfers(
                     path, size=size, workers=workers, rounds=rounds, spool_uploads=True))
                 prepared[f'transfers-spooled/{name}.json'] = result / 'report.json'
+        calibration = phase('calibrate-resources', lambda path: command(path, 'calibrate_cycles.py',
+                            '--output', path / 'report.json'))
         soak = phase('soak', lambda path: command(path, 'stress_python.py', '--wheel', wheel, '--workers', 4,
-                     '--interval-seconds', SOAK_INTERVAL_SECONDS, '--duration-seconds', SOAK_DURATION_SECONDS,
+                     '--cycles', SOAK_POLICY['cycles'], '--warmup-cycles', SOAK_POLICY['warmup_cycles'],
                      *(['--both-upload-modes'] if spooled else []),
-                     '--output', path / 'report.json', python=installed_python(private)), dependencies=('install-sdk',))
+                     '--output', path / 'report.json', python=installed_python(private)), dependencies=('install-sdk', 'calibrate-resources'))
         collection.finish(output / 'collection.json')
-        selected = {'performance/baseline.json': old,
-                    'performance/candidate.json': new, 'performance/report.json': comparison / 'report.json',
-                    'transfers/large.json': large / 'report.json', 'transfers/workers4.json': four / 'report.json',
+        selected = {'soak/calibration.json': calibration / 'report.json', 'transfers/large.json': large / 'report.json', 'transfers/workers4.json': four / 'report.json',
                     'transfers/workers16.json': sixteen / 'report.json', 'soak/report.json': soak / 'report.json', **prepared}
         sources = {'gates/' + name: (source.parent, source) for name, source in selected.items()}
         qualified_target = qualified / 'dist' / subject['version'] / TARGET
@@ -389,7 +365,6 @@ def measure(folder, baseline, private, output, fixture_state, retries, reason, b
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('distribution', type=Path)
-    parser.add_argument('--baseline-binary', required=True, type=Path)
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--backend-data', type=Path, action='append', default=[])
     parser.add_argument('--retry-phase', action='append', default=[])
@@ -406,5 +381,5 @@ if __name__ == '__main__':
                         help='JSON object: digest of every file of the input directory, by relative path')
     args = parser.parse_args()
     require_private(ROOT, args.output)
-    run(args.distribution, args.baseline_binary, args.output, args.retry_phase, args.retry_reason, args.backend_data,
+    run(args.distribution, args.output, args.retry_phase, args.retry_reason, args.backend_data,
         args.fixture_nonce, args.campaign_dir, args.epoch, args.inputs, args.expected_inputs, args.fixture_state)

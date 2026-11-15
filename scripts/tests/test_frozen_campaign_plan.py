@@ -16,9 +16,9 @@ from filesystem_paths import canonical_path
 
 # Reviewed phase contract; shared by expectations and receipt export. Actual
 # phases come from executing the functions, not from their AST inventories.
-VM_PHASES = ('qualify-linux', 'install-sdk', 'performance-ab', 'performance-compare',
+VM_PHASES = ('qualify-linux', 'install-sdk',
              'transfers-large', 'transfers-workers4', 'transfers-workers16',
-             'spooled-large', 'spooled-workers4', 'spooled-workers16', 'soak')
+             'spooled-large', 'spooled-workers4', 'spooled-workers16', 'calibrate-resources', 'soak')
 CONTROLLER_PHASES = ('workflows', 'download', 'assemble', 'prepare-vm',
                      'qualify-windows', 'qualify-vm', 'seal')
 
@@ -30,12 +30,12 @@ class CampaignPlanTests(unittest.TestCase):
             candidate, private, output, fixtures = (root / n for n in ('candidate', 'private', 'output', 'fixtures'))
             for folder in (candidate, private, fixtures):
                 folder.mkdir()
-            binary, wheel, baseline = candidate / 'plenora-storage', candidate / 'fixture.whl', root / 'baseline'
-            for path in (binary, wheel, baseline):
+            binary, wheel = candidate / 'plenora-storage', candidate / 'fixture.whl'
+            for path in (binary, wheel):
                 path.write_bytes(path.name.encode())
             subject = {'version': '4.0.0', 'source_revision': 'a' * 40,
                        'artifacts': {p.name: state.digest(p) for p in (binary, wheel)},
-                       'baseline_binary_sha256': state.digest(baseline)}
+                       'policy_id': 'storage-release-cycles-v1'}
             (candidate / 'release-manifest.json').write_text(json.dumps(subject))
             (fixtures / 'fixture-state.json').write_text(json.dumps({'kind': 'reset', 'nonce': 'this-reset'}))
             observed = []
@@ -58,7 +58,7 @@ class CampaignPlanTests(unittest.TestCase):
             stack.enter_context(patch.object(vm, 'available_memory', return_value=10**15))
             stack.enter_context(patch.object(vm, 'inspect_memory', return_value={'status': 'PASS'}))
             fence = Mock()
-            vm.measure(candidate, baseline, private, output, fixtures, [], None, [], 'this-reset',
+            vm.measure(candidate, private, output, fixtures, [], None, [], 'this-reset',
                        fence, {'candidate': state.digest(binary)}, 'epoch-1')
             ledger = json.loads((output / 'campaign.json').read_text())
             self.assertEqual(tuple(ledger['phases']), VM_PHASES)
@@ -73,9 +73,6 @@ class CampaignPlanTests(unittest.TestCase):
                     self.assertEqual(canonical_path(kwargs['env']['PLENORA_CLI_BIN']), canonical_path(binary))
                     limit = float(argv[argv.index('--phase-timeout') + 1])
                     self.assertEqual(kwargs['timeout'], limit + 60)
-                    if phase == 'performance-ab':
-                        self.assertEqual(canonical_path(argv[argv.index('--baseline-binary') + 1]), canonical_path(baseline))
-                        self.assertIn('--warmup-rounds', argv)
                     self.assertEqual('--spool-uploads' in argv, phase.startswith('spooled-'))
             selected = json.loads((output / 'selected/report.json').read_text())
             self.assertEqual(selected['epoch'], 'epoch-1')
@@ -94,10 +91,9 @@ class CampaignPlanTests(unittest.TestCase):
         # collection. External phase bodies are deliberately not qualification.
         with tempfile.TemporaryDirectory() as temp, ExitStack() as stack:
             root = Path(temp)
-            config_path, baseline = root / 'config.json', root / 'baseline'
+            config_path = root / 'config.json'
             config_path.write_text('{}')
-            baseline.write_bytes(b'baseline')
-            config = {'baseline_binary': str(baseline), 'vm_root': '/fixture', 'host': 'fixture.invalid'}
+            config = {'vm_root': '/fixture', 'host': 'fixture.invalid'}
             phases = []
             class ObservedCampaign(state.Campaign):
                 def phase(self, name, action, **kwargs):

@@ -11,6 +11,7 @@ import json
 import strict_json
 import os
 from pathlib import Path, PurePosixPath
+from soak_policy import RELEASE_POLICY_ID
 import re
 import shlex
 import shutil
@@ -192,7 +193,7 @@ def source_bundle(path, folder, revision, *, name='command.log'):
 def configuration(path):
     config = strict_json.loads(path.read_text())
     allowed = {'repository', 'host', 'port', 'user', 'known_hosts', 'ssh_key', 'vm_root',
-               'runner_image', 'registry_volume', 'candidate_run', 'ci_run', 'baseline_binary'}
+               'runner_image', 'registry_volume', 'candidate_run', 'ci_run'}
     if set(config) - allowed:
         raise ValueError('unknown campaign option; passwords must not be stored in configuration')
     for key in ('candidate_run', 'ci_run'):
@@ -343,7 +344,7 @@ def check_selected(result, identity, linux, expected, ledger, epoch, nonce):
     listed in the report with its digest, and nothing else; the report must
     be the one whose digest the ledger recorded, of this epoch and fixture
     reset, so an earlier valid report put in its place is refused; and the
-    identity and the binary digests of the paired performance reports must
+    identity and candidate artifact digests must
     match the campaign's.
     """
     selected = result / 'selected'
@@ -361,15 +362,11 @@ def check_selected(result, identity, linux, expected, ledger, epoch, nonce):
     subject = report.get('identity', {})
     manifest = strict_json.loads((linux / 'release-manifest.json').read_text())
     artifacts = {row['name']: digest(linux / row['name']) for row in manifest['artifacts']}
-    performance = result / 'selected/gates/performance'
-    baseline = strict_json.loads((performance / 'baseline.json').read_text())
-    candidate = strict_json.loads((performance / 'candidate.json').read_text())
     if (report.get('status') != 'PASS' or subject.get('source_revision') != identity['revision']
-            or subject.get('baseline_binary_sha256') != identity['baseline_sha256']
-            or subject.get('artifacts') != artifacts or report.get('inputs') != expected
-            or baseline.get('binary_sha256') != identity['baseline_sha256']
-            or candidate.get('binary_sha256') != digest(linux / 'plenora-storage')):
-        raise ValueError('the VM evidence does not describe this campaign\'s binaries; nothing is sealed')
+            or subject.get('policy_id') != RELEASE_POLICY_ID
+            or subject.get('artifacts') != artifacts or report.get('inputs') != expected):
+        raise ValueError('the VM evidence does not describe this campaign candidate; nothing is sealed')
+
 
 
 def run(config_path, output, retries, reason, connect_host=None):
@@ -380,10 +377,9 @@ def run(config_path, output, retries, reason, connect_host=None):
     if subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip():
         raise ValueError('release campaign requires clean committed source')
     version = workspace_version().native
-    baseline = Path(config['baseline_binary']).resolve()
     output = output.resolve()
     identity = {'revision': revision, 'version': version, 'configuration_sha256': digest(config_path),
-                'baseline_sha256': digest(baseline)}
+                'policy_id': RELEASE_POLICY_ID}
     remote_root = config['vm_root'].rstrip('/') + '/' + version + '-' + revision[:12]
     project = 'storage-q-' + revision[:12]
     q = shlex.quote
@@ -519,7 +515,7 @@ def run(config_path, output, retries, reason, connect_host=None):
                     write_json(path / 'transport.json', {'logical_host': config['host'], 'connect_host': connect_host,
                                'host_key_sha256': hashlib.sha256(host_key.asbytes()).hexdigest(), 'reason': reason})
                 # Every VM attempt starts on recreated fixtures, so the
-                # performance phase never measures servers that earlier work
+                # transfer phases never measure servers that earlier work
                 # left with accumulated state. The reset is recorded with the
                 # attempt, and only once every fixture answered.
                 nonce = reset_fixtures(remote, remote_root, project, config['host'], path, session)
@@ -539,7 +535,6 @@ def run(config_path, output, retries, reason, connect_host=None):
                 override = {'services': {'storage-rust': {'image': config['runner_image'],
                     'volumes': [remote_root + ':/workspace', remote_root + '/.fixtures/runner-target:/workspace/target',
                                 'campaign-registry:/usr/local/cargo/registry',
-                                remote_root + '/' + inputs + '/baseline:/baseline:ro',
                                 'minio-data:/fixture-disks/minio:ro', 'sftp-data:/fixture-disks/sftp:ro', 'ftp-data:/fixture-disks/ftp:ro',
                                 session.directory + ':/campaign:ro']}},
                     'volumes': {'campaign-registry': {'external': True, 'name': config['registry_volume']}}}
@@ -549,8 +544,7 @@ def run(config_path, output, retries, reason, connect_host=None):
                 if any(item.is_dir() for item in linux.iterdir()):
                     raise ValueError('the Linux distribution must be a flat directory')
                 fixtures = {f'fixtures/{name}': path / 'fixtures' / name for name in RUNNER_FIXTURES}
-                expected = expected_inputs({'baseline/plenora-storage': baseline,
-                                            'linux-input.tar.gz': archive,
+                expected = expected_inputs({'linux-input.tar.gz': archive,
                                             'source.bundle': path / 'source.bundle', **fixtures,
                                             'compose.campaign.json': path / 'compose.campaign.json',
                                             **{f'{distribution}/{item.name}': item for item in linux.iterdir()}})
@@ -558,11 +552,10 @@ def run(config_path, output, retries, reason, connect_host=None):
                 remote_inputs = remote_root + '/' + inputs
                 session.check(remote)
                 remote.run(f'{shell_umask("private_file")} && mkdir -p {q(remote_root + "/.fixtures/inputs")} && mkdir {q(remote_inputs)} '
-                           f'{q(remote_inputs + "/baseline")} {q(remote_inputs + "/fixtures")} '
+                           f'{q(remote_inputs + "/fixtures")} '
                            f'{q(remote_inputs + "/fixtures/extended")}')
                 check_owned(remote, [remote_root, remote_root + '/.fixtures', remote_root + '/.fixtures/inputs',
                                      remote_inputs])
-                remote.upload(baseline, remote_inputs + '/baseline/plenora-storage')
                 remote.upload(path / 'source.bundle', remote_inputs + '/source.bundle')
                 for name, local in fixtures.items():
                     remote.upload(local, remote_inputs + '/' + name)
@@ -581,7 +574,7 @@ def run(config_path, output, retries, reason, connect_host=None):
                 # container's filesystem, writes every evidence there and
                 # measures fresh: a VM attempt never resumes earlier phases.
                 command = ['python3', 'scripts/run_vm_campaign.py', f'{mounted}/{distribution}',
-                           '--baseline-binary', '/baseline/plenora-storage', '--output', RUNNER_OUTPUT,
+                           '--output', RUNNER_OUTPUT,
                            '--fixture-state', '/workspace/.fixtures/campaign',
                            '--inputs', mounted, '--expected-inputs', json.dumps(expected, sort_keys=True),
                            '--fixture-nonce', nonce, '--campaign-dir', '/campaign',
@@ -641,7 +634,7 @@ def run(config_path, output, retries, reason, connect_host=None):
                                    assembled / 'dist' / version / TARGETS['windows'])
                 evidence = path / 'evidence'
                 shutil.copytree(assembled / 'evidence', evidence)
-                gates = ['performance', 'transfers', 'soak']
+                gates = ['transfers', 'soak']
                 if parse_version(version).requires((2, 1, 0)):
                     gates.append('transfers-spooled')
                 for name in gates:
