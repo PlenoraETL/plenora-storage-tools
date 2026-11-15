@@ -1,6 +1,6 @@
 # Changelog
 
-## 4.0.0
+## 4.0.0 — 2026-11-15
 
 - Breaking: Python minimum is now 3.14, with cp314 ABI3 wheels; Python <3.14 is no longer supported. `.python-version` defines the CI, SDK and release runtime policy.
 - Adopt the approved Plenora dependency snapshot and Linux CI checker; align exact public dependency pins, base64 0.23.1 and proptest 1.12.0.
