@@ -12,6 +12,7 @@ import campaign_state as state
 import run_vm_campaign as vm
 import release_campaign as controller
 from frozen_proofs import detail
+from filesystem_paths import canonical_path
 
 # Reviewed phase contract; shared by expectations and receipt export. Actual
 # phases come from executing the functions, not from their AST inventories.
@@ -69,11 +70,11 @@ class CampaignPlanTests(unittest.TestCase):
                 self.assertEqual(attempts[0]['files'], state.Campaign.inventory(output / phase / '1'))
             for phase, argv, kwargs in observed:
                 if 'qualify_transfers.py' in Path(argv[1]).name:
-                    self.assertEqual(kwargs['env']['PLENORA_CLI_BIN'], str(binary.resolve()))
+                    self.assertEqual(canonical_path(kwargs['env']['PLENORA_CLI_BIN']), canonical_path(binary))
                     limit = float(argv[argv.index('--phase-timeout') + 1])
                     self.assertEqual(kwargs['timeout'], limit + 60)
                     if phase == 'performance-ab':
-                        self.assertEqual(argv[argv.index('--baseline-binary') + 1], str(baseline.resolve()))
+                        self.assertEqual(canonical_path(argv[argv.index('--baseline-binary') + 1]), canonical_path(baseline))
                         self.assertIn('--warmup-rounds', argv)
                     self.assertEqual('--spool-uploads' in argv, phase.startswith('spooled-'))
             selected = json.loads((output / 'selected/report.json').read_text())

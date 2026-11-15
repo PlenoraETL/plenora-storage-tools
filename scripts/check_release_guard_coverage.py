@@ -1,6 +1,6 @@
 """Fail closed when a release guard invocation loses its PR CI counterpart."""
 import ast
-import json
+import strict_json
 from functools import lru_cache
 import re
 from pathlib import Path
@@ -79,11 +79,11 @@ def parse_workflow(text):
                 raise ValueError('invalid single quoted scalar')
             return value[1:-1].replace("''", "'")
         if value.startswith('"'):
-            return json.loads(value)
+            return strict_json.loads(value)
         if value[0] in '&*!>|{}%@`~' or re.search(r':(?:\s|$)', value):
             raise ValueError('unsupported workflow scalar')
         if value in ('true', 'false', 'null') or re.fullmatch(r'-?(?:0|[1-9][0-9]*)', value):
-            return json.loads(value)
+            return strict_json.loads(value)
         if re.fullmatch(r'[-+]?[0-9][0-9.eExobA-F+-]*', value):
             raise ValueError('unsupported numeric scalar; quote string values')
         return value
