@@ -2,6 +2,7 @@
 from contextlib import ExitStack
 from copy import deepcopy
 import hashlib
+import gzip
 import io
 import json
 from pathlib import Path
@@ -29,14 +30,14 @@ def archive(entries, zipped=False):
     if zipped:
         with zipfile.ZipFile(buffer, 'w') as out:
             for name, data in entries:
-                out.writestr(name, data)
+                out.writestr(zipfile.ZipInfo(name), data)
     else:
-        with tarfile.open(fileobj=buffer, mode='w:gz') as out:
+        with tarfile.open(fileobj=buffer, mode='w') as out:
             for name, data in entries:
                 info = tarfile.TarInfo(name)
                 info.size = len(data)
                 out.addfile(info, io.BytesIO(data))
-    return buffer.getvalue()
+    return buffer.getvalue() if zipped else gzip.compress(buffer.getvalue(), mtime=0)
 
 
 def corpus():

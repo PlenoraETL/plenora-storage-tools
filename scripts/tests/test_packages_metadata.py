@@ -1,5 +1,6 @@
 import bz2
 import gzip
+from test_packages import gzip_bytes
 import io
 import lzma
 from pathlib import Path
@@ -37,14 +38,14 @@ class HiddenMetadataRegressionTests(GitSnapshotTestCase):
                             header.pax_headers = {'comment': value}
                         stream.addfile(header, io.BytesIO(b'safe'))
                 with self.subTest(extension=extension, private=value == pem), self.assertRaises(ValueError):
-                    gate.scan_distribution(gzip.compress(out.getvalue()), name)
+                    gate.scan_distribution(gzip_bytes(out.getvalue()), name)
 
     def test_raw_stream_checks_padding_trailers_and_zip_comments(self):
         pem = b'-----BEGIN PRIVATE KEY-----\nYWJj\n'
         raw = gzip.decompress(archive([('a', b'a')]))
         for offset in (513, len(raw)):
             candidate = raw[:offset] + pem + raw[offset+len(pem):]
-            for compress in (lambda b: b, gzip.compress, bz2.compress, lzma.compress):
+            for compress in (lambda b: b, gzip_bytes, bz2.compress, lzma.compress):
                 with self.subTest(offset=offset, compress=compress), self.assertRaisesRegex(ValueError, 'padding|terminator'):
                     gate.members(compress(candidate))
         out = io.BytesIO(archive([('a', b'a')], True))

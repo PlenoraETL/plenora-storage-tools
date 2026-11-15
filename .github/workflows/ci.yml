@@ -75,6 +75,10 @@ jobs:
           dpkg -S "$(readlink -f "$(command -v getfacl)")" | grep -q '^acl: '
       - run: python3 scripts/check_contract_adoption.py
       - run: python3 scripts/check_release_guard_coverage.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ci-executor-contracts
+          path: target/ci-executor-receipts.json
       - run: python3 -m unittest discover -s scripts/tests -v
         env:
           PLENORA_REQUIRE_REAL_ACL: '1'
@@ -265,13 +269,15 @@ jobs:
         with:
           name: release-package-regression
           path: target/release-package-regression
-      - run: python scripts/check_release_packages.py target/release-package-regression
+      - id: verify-crate-packages
+        run: python scripts/check_release_packages.py target/release-package-regression
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: guard-candidate-*
           merge-multiple: true
           path: target/candidate-recheck
       - name: Exercise candidate and publication guards on the built bytes
+        id: verify-release-packages
         run: |
           version="$(python scripts/release_version.py)"
           python scripts/check_release_packages.py "target/candidate-recheck/$version" --release

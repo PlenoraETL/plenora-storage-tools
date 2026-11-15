@@ -217,65 +217,34 @@ def invocations(job):
 
 
 def check(candidate=None, release=None, ci=None):
-    candidate = jobs('release-candidate.yml') if candidate is None else candidate
-    release = jobs('release.yml') if release is None else release
-    ci = jobs('ci.yml') if ci is None else ci
-    expected = {
-        ('release-candidate.yml', 'python-compatibility'): [('check_installed_sdk', '')],
-        ('release-candidate.yml', 'linux'): [('build_release', ''), ('qualify_target', '')],
-        ('release-candidate.yml', 'windows'): [('build_release', ''), ('qualify_windows_candidate', '')],
-        ('release.yml', 'qualify'): [('release_publication', 'prepare'), ('release_publication', 'upload')],
-        ('release.yml', 'publish'): [('release_publication', 'publish')],
-    }
-    actual = {(workflow, name): invocations(job)
-              for workflow, collection in [('release-candidate.yml', candidate), ('release.yml', release)]
-              for name, job in collection.items() if invocations(job)}
-    if actual != expected:
-        raise ValueError('release guard invocation changed; extend the PR regression mapping')
-    for collection in (candidate, ci):
-        sdk = collection['python-compatibility']
-        if (invocations(sdk) != [('check_installed_sdk', '')]
-                or 'os: [ubuntu-24.04, windows-latest]' not in sdk
-                or 'python-version-file: .python-version' not in sdk
-                or 'downloaded-wheel --coverage --typing' not in sdk):
-            raise ValueError('installed wheel guard missing its two-platform CI counterpart')
-    pairs = [('linux', 'docker-conformance'), ('windows', 'native-windows')]
-    for source, destination in pairs:
-        runner = re.search(r'^    runs-on: (.+)$', candidate[source], re.M).group(1)
-        if '    runs-on: ' + runner + '\n' not in ci[destination]:
-            raise ValueError('candidate and CI guard operating systems differ')
-        for invocation in invocations(candidate[source]):
-            if invocation not in invocations(ci[destination]):
-                raise ValueError('candidate guard invocation missing from PR CI')
-        if source == 'linux':
-            for job in (candidate[source], ci[destination]):
-                if 'docker compose -f docker-compose.yml -f compose.extended.yml run --rm --no-deps storage-rust bash -c' not in job:
-                    raise ValueError('Linux candidate guard must run in the same Bookworm service')
-        if 'name: guard-candidate-' + source not in ci[destination] or 'path: dist/' not in ci[destination]:
-            raise ValueError('complete candidate outputs must reach the recheck runner')
-    recheck = ci['release-package-recheck']
-    for token in ('runs-on: ubuntu-24.04', 'pattern: guard-candidate-*', 'merge-multiple: true',
-                  'needs: [release-package-build, docker-conformance, native-windows]',
-                  'python scripts/check_release_packages.py "target/candidate-recheck/$version" --release'):
-        if token not in recheck:
-            raise ValueError('publication guard regression missing its complete built inputs')
-    for name in ('qualify', 'publish'):
-        if 'runs-on: ubuntu-24.04' not in release[name]:
-            raise ValueError('publication and PR guard operating systems differ')
-    # Publication and PR invoke the same verifier; do not silently bypass it or
-    # add a new direct classifier call outside the coverage mapping.
-    tree = ast.parse((ROOT / 'scripts/release_publication.py').read_text(encoding='utf-8'))
-    for name in ('prepare', 'upload', 'publish'):
-        node = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == name)
-        calls = [n.func.id for n in ast.walk(node) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)]
-        if calls.count('verify_publication') != 1 or 'verify_distribution' in calls:
-            raise ValueError('publication guard must use the CI-exercised verification script')
-    regression = (ROOT / 'scripts/check_release_packages.py').read_text(encoding='utf-8')
-    if "with_name('verify_release.py')" not in regression or 'verify_publication([*public, bundle, receipt])' not in regression:
-        raise ValueError('PR regression no longer exercises target and publication entry points')
-    for (workflow, name), calls in actual.items():
-        print(f'{workflow}:{name}: {calls} -> PR CI covered')
+    from ci_plan import workflows, compile_plan
+    from ci_policy import check as check_policy
+    from ci_contract import source_subject, handoff, boundaries
+    from ci_shell import contracts
+    documents = workflows(ROOT)
+    # Legacy callers supply raw job views; parse those with the same reader.
+    for name, supplied in [('release-candidate.yml', candidate), ('release.yml', release), ('ci.yml', ci)]:
+        if supplied is not None:
+            documents[name] = parse_workflow('jobs:\n' + ''.join(
+                '  ' + key + ':\n' + value for key, value in supplied.items()))
+    graph = compile_plan(documents)
+    check_policy(graph, invocations)
+    subject = source_subject(ROOT)
+    result = {'scope': 'offline-executor-contract', 'subject': subject, 'plan': graph,
+              'handoff': handoff(graph, subject), 'boundaries': boundaries(ROOT, subject),
+              'shell': contracts(graph, invocations)}
+    if source_subject(ROOT)['sources'] != subject['sources']:
+        raise ValueError('sources changed during execution')
+    return result
 
 
 if __name__ == '__main__':
-    check()
+    import argparse
+    import json
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--output', type=Path, default=ROOT / 'target/ci-executor-receipts.json')
+    args = parser.parse_args()
+    result = check()
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(json.dumps(result, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+    print('PASS offline executor contracts; hosted Actions and Rust builds not executed')
