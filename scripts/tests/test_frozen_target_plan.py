@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import qualify_target as target
 import campaign_state
 from frozen_proofs import detail
+from filesystem_paths import canonical_path
 
 COMMON = ['check_webdav_fixture.py', 'qualify_cli.py', 'qualify_extended.py',
           'qualify_extended_faults.py', 'audit_release_readiness.py',
@@ -49,9 +50,9 @@ class TargetPlanTests(unittest.TestCase):
                                'status': 'FAIL' if fail and name == 'qualify_cli.py' else 'PASS'}
                         observed.append(row)
                         if name not in ('pip-install', 'verify_release.py'):
-                            self.assertEqual(kwargs['env']['PLENORA_CLI_BIN'], str(binary.resolve()))
+                            self.assertEqual(canonical_path(kwargs['env']['PLENORA_CLI_BIN']), canonical_path(binary))
                         if name == 'qualify_python.py':
-                            self.assertEqual(argv[argv.index('--wheel') + 1], str(wheel.resolve()))
+                            self.assertEqual(canonical_path(argv[argv.index('--wheel') + 1]), canonical_path(wheel))
                         if row['status'] == 'FAIL':
                             raise subprocess.CalledProcessError(3, 'synthetic failure')
                         if 'stdout' in kwargs:

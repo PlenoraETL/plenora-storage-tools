@@ -8,12 +8,14 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import tomllib
 import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import package_source as source
 from frozen_proofs import detail
+from filesystem_paths import canonical_path
 
 
 class SourceRunnerTests(unittest.TestCase):
@@ -42,14 +44,18 @@ class SourceRunnerTests(unittest.TestCase):
                     else:
                         self.assertEqual(argv[:4], ['cargo', 'run', '--offline', '--manifest-path'])
                         consumer = Path(kwargs['cwd'])
-                        self.assertEqual(Path(argv[4]), consumer / 'Cargo.toml')
-                        self.assertNotEqual(consumer, source.ROOT)
+                        self.assertEqual(canonical_path(argv[4]), canonical_path(consumer / 'Cargo.toml'))
+                        self.assertNotEqual(canonical_path(consumer), canonical_path(source.ROOT))
                         extracted = consumer.parent / 'extracted/plenora-storage-4.0.0'
                         self.assertEqual({p.relative_to(extracted).as_posix(): p.read_bytes()
                                           for p in extracted.rglob('*') if p.is_file()}, committed)
                         manifest = (consumer / 'Cargo.toml').read_text()
                         self.assertNotIn('[patch.', manifest)
-                        self.assertIn(str(extracted / 'crates/plenora-storage-core').replace('\\', '\\\\'), manifest)
+                        dependencies = tomllib.loads(manifest)['dependencies']
+                        self.assertEqual(
+                            {name: canonical_path(value['path']) for name, value in dependencies.items()},
+                            {name: canonical_path(extracted / 'crates' / name)
+                             for name in ('plenora-storage-core', 'plenora-storage-engine')})
                         self.assertEqual(kwargs['env']['RUSTUP_TOOLCHAIN'], '1.98.1')
                         self.assertEqual(kwargs['env']['CARGO_TERM_COLOR'], 'never')
                         kwargs['stdout'].write(b'observed fake tool\n')
