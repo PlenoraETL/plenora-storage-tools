@@ -51,7 +51,6 @@ use suppaftp::{
     types::FileType,
     types::Response,
 };
-use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use tokio::io::{
     AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader,
 };

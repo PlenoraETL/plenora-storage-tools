@@ -2,12 +2,11 @@
 
 use super::{
     ArtifactMetadata, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, CLEANUP_BUDGET, Digest,
-    ErrorCategory, ErrorPhase, IntegrityMetadata, Metadata, ObjectMetadata, OffsetDateTime,
-    OperationContext, Ordering, PROVIDER_ID, Packet, ProviderListRequest, RawSftpSession,
-    RemoteEffect, RetryDisposition, Rfc3339, SftpError, SftpSession, Sha256, StatusCode,
-    StorageError, StorageResult, SystemTime, TEMPORARY_NAME_NONCE, TransferResult,
-    configuration_error, list_scan_limit_error, map_sftp_error, stream_error, transfer_limit_error,
-    validate_key,
+    ErrorCategory, ErrorPhase, IntegrityMetadata, Metadata, ObjectMetadata, OperationContext,
+    Ordering, PROVIDER_ID, Packet, ProviderListRequest, RawSftpSession, RemoteEffect,
+    RetryDisposition, SftpError, SftpSession, Sha256, StatusCode, StorageError, StorageResult,
+    SystemTime, TEMPORARY_NAME_NONCE, TransferResult, configuration_error, list_scan_limit_error,
+    map_sftp_error, stream_error, transfer_limit_error, validate_key,
 };
 
 pub async fn qualify_atomic_session(session: &RawSftpSession) -> StorageResult<()> {
@@ -289,7 +288,7 @@ pub fn public_metadata(key: String, metadata: &Metadata) -> ObjectMetadata {
 }
 
 pub fn format_system_time(value: SystemTime) -> Option<String> {
-    OffsetDateTime::from(value).format(&Rfc3339).ok()
+    plenora_storage_core::rfc3339_from_system_time(value)
 }
 
 pub fn transfer_result(key: String, bytes_transferred: u64, digest: Sha256) -> TransferResult {
