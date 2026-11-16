@@ -35,7 +35,7 @@ class CampaignPlanTests(unittest.TestCase):
                 path.write_bytes(path.name.encode())
             subject = {'version': '4.0.0', 'source_revision': 'a' * 40,
                        'artifacts': {p.name: state.digest(p) for p in (binary, wheel)},
-                       'policy_id': 'storage-release-cycles-v1'}
+                       'policy_id': 'storage-release-cycles-v2'}
             (candidate / 'release-manifest.json').write_text(json.dumps(subject))
             (fixtures / 'fixture-state.json').write_text(json.dumps({'kind': 'reset', 'nonce': 'this-reset'}))
             observed = []

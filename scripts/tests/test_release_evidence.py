@@ -53,7 +53,8 @@ def soak():
                 warmup_completed=POLICY['warmup_cycles'], providers=list(PROVIDERS), samples=samples,
                 cycle_matrix=[[dict(mode='buffered', provider=p, workers=4, resources=resources.copy()) for p in PROVIDERS] for _ in samples],
                 lifecycle=[[dict(mode='buffered', cancel_phase='resolver', **{k: resources.copy() for k in ('close_before','close_after','cancel_before','cancel_after')})] for _ in samples],
-                analysis=analyze(samples), before_open=resources.copy(), after_close=resources.copy(),
+                warmup_lifecycle=[dict(mode='buffered', cancel_phase='resolver', close_after=resources.copy(), cancel_after=resources.copy())],
+                after_warmup=resources.copy(), analysis=analyze(samples), before_open=resources.copy(), after_close=resources.copy(),
                 after_cancel=resources.copy(), after_provider={p: resources.copy() for p in PROVIDERS})
 
 
@@ -130,7 +131,7 @@ class ReleaseEvidenceTests(unittest.TestCase):
         samples = soak()['samples']
         leaking = [dict(row, rss_bytes=row['rss_bytes'] + i * 1024**2) for i, row in enumerate(samples)]
         self.write('soak/calibration.json', dict(status='PASS', policy=POLICY, platform='Linux-fixture', python='3.14.6 fixture',
-            normal=[dict(status='PASS', samples=samples, analysis=analyze(samples)) for _ in range(3)],
+            normal=[dict(status='PASS', after_warmup=samples[0], samples=samples, analysis=analyze(samples)) for _ in range(3)],
             leak_control=dict(status='FAIL', samples=leaking, injected_bytes_per_cycle=1024**2),
             harness_sha256=hashlib.sha256((ROOT / 'scripts/calibrate_cycles.py').read_bytes()).hexdigest(),
             policy_sha256=hashlib.sha256((ROOT / 'scripts/soak_policy.py').read_bytes()).hexdigest()))
@@ -250,7 +251,7 @@ class ReleaseEvidenceTests(unittest.TestCase):
         report.update(upload_modes=['buffered', 'private_file'],
                       completed_cycles_by_mode={'buffered': 40, 'private_file': 40},
                       after_mode_provider={mode: deepcopy(report['after_provider']) for mode in ('buffered', 'private_file')})
-        for rows in report['lifecycle']:
+        for rows in [report['warmup_lifecycle'], *report['lifecycle']]:
             rows.extend(dict(row, mode='private_file') for row in list(rows))
         for cells in report['cycle_matrix']:
             cells.extend(dict(cell, mode='private_file') for cell in list(cells))

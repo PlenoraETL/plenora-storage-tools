@@ -1,7 +1,7 @@
 # Campagna di qualifica riprendibile
 
 Dalla 2.0.1 il coordinamento della VM è versionato, insieme ai gate, e non
-richiede script con commit o identificativi Actions incorporati. La policy corrente è `storage-release-cycles-v1`: 5 cicli di warm-up e 40 misurati, senza durata minima. Account cloud reali rimangono fuori dal perimetro.
+richiede script con commit o identificativi Actions incorporati. La policy corrente è `storage-release-cycles-v2`: 5 cicli di warm-up e 40 misurati, senza durata minima. Account cloud reali rimangono fuori dal perimetro.
 
 ## Criterio 4.0.0 a cicli
 
@@ -10,15 +10,40 @@ verificatore richiedono la stessa policy, senza waiver. Ogni ciclo misura
 RSS, fd, thread e temporanei posseduti dopo le operazioni, per 9 provider,
 2 strategie e 4 worker. Conserva serie, matrice, quartili e residui dopo
 close e cancellazione in volo al resolver WebDAV, prima dell'accesso remoto,
-sincronizzata con eventi. Le altre prove della suite SDK installata restano. Un ciclo omesso, un residuo o una crescita eccessiva fallisce.
+sincronizzata con eventi. Le altre prove della suite SDK installata restano. Un ciclo omesso, un temporaneo residuo o una crescita eccessiva fallisce.
 I tetti restano +128 MiB RSS, +16 fd, +16 thread; temporanei residui zero.
 La crescita fra primo e ultimo quartile è al più 16 MiB, 2 fd e 2 thread.
+La policy SDK `storage-sdk-cycles-v2` registra `after_warmup` alla fine del
+quinto warm-up e `warmup_lifecycle` con gli stati dopo close/cancel per
+ciascuna modalità. Il residuo finale si confronta con `after_warmup`; ogni
+close/cancel misurato si confronta con la stessa fase e modalità del quinto
+warm-up, mai con il before della singola operazione. Il riferimento resta
+fisso: tolleranze +16 MiB RSS, +2 fd, +2 thread; temporanei sempre zero,
+anche nei riferimenti. I quartili e i tetti assoluti della serie restano
+invariati. `before_open` e i before per operazione sono dati diagnostici.
+Pool stabili e caricamenti iniziali non sono accumulo; un fd/thread o
+1 MiB trattenuti a ogni ciclo continuano a fallire. Riferimenti mancanti o
+policy v1 sono rifiutati, senza fallback implicito al primo campione.
+
+La regressione `scripts/tests/fixtures/soak-campaign-4.0.0-resources.json`
+estrae soltanto le risorse dal report della campagna Linux reale (fonte e
+SHA-256 inclusi). La crescita RSS fra quartili è 1.306.624 byte, fd 14 -> 14,
+thread 20,5 -> 20,5. Il report v1 non aveva snapshot del quinto warm-up:
+il replay usa esplicitamente il primo ciclo misurato, già dopo il warm-up,
+e passa con la nuova regola; varianti con accumulo falliscono. Questo test
+non promuove il vecchio FAIL e non sostituisce una nuova campagna v2 sulla
+wheel candidata. Il gate CI `product-quality` e quello Windows eseguono
+queste regressioni con la discovery dei test Python; il workflow reliability
+e la campagna VM usano il runner e validatore aggiornati.
+
 Non ci sono pause da 30 s né un fenomeno temporale che imponga due ore.
 
 La calibrazione sintetica locale (`scripts/calibrate_cycles.py`) e il leak
 control da 1 MiB/ciclo provano il misuratore, non i server: il rumore della
 VM e il lifecycle della wheel finale devono ancora essere misurati.
-Calibrazione locale Windows/Python 3.14: crescita RSS fra quartili
+Anche la calibrazione v2 salva il riferimento dopo cinque warm-up e
+confronta ciascun campione con le stesse tolleranze; non pretende pool vuoti.
+Misura storica della calibrazione v1 Windows/Python 3.14 (non evidenza v2): crescita RSS fra quartili
 237.568, 151.552 e 53.248 byte; handle, thread e temporanei: zero crescita.
 Il controllo da 1 MiB/ciclo ha prodotto 31.653.888 byte ed è stato rifiutato.
 Quaranta cicli danno finestre da dieci separate da trenta cicli: il controllo

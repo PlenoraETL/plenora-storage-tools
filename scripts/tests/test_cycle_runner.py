@@ -50,15 +50,25 @@ class RunnerTests(unittest.TestCase):
             module = importlib.util.module_from_spec(spec)
             output = root/'report.json'
             with patch.dict(sys.modules, plenora_storage=sdk): spec.loader.exec_module(module)
+            measurements = []
+            def measure():
+                row = dict(rss_bytes=1000 if not measurements else 30 * 1024**2 + len(measurements),
+                           threads=1 if not measurements else 4, file_descriptors=4 if not measurements else 10)
+                measurements.append(row)
+                return row.copy()
             with patch.object(module.sys, 'platform', 'linux'), patch.object(module.sys,'argv',
                     ['stress_python.py','--wheel',str(wheel),'--output',str(output),'--both-upload-modes']), \
                     patch.object(module, 'fixture', side_effect=lambda p, local:({'provider':p},{})), \
-                    patch.object(module, 'resources', return_value=dict(rss_bytes=1000, threads=4, file_descriptors=10)), \
+                    patch.object(module, 'resources', side_effect=measure), \
                     patch.dict(module.os.environ), patch('builtins.print'):
                 module.main()
             report = json.loads(output.read_text())
             validate_soak(report, hashlib.sha256(wheel.read_bytes()).hexdigest(), '4.0.0', both_upload_modes=True)
             self.assertEqual(report['completed_cycles'],40)
             self.assertEqual(objects,{})
+            # Each warmup: 18 provider samples, 8 lifecycle samples, 1 end sample.
+            self.assertEqual(report['after_warmup']['rss_bytes'], measurements[5 * 27]['rss_bytes'])
+            self.assertLess(report['after_warmup']['rss_bytes'], report['samples'][0]['rss_bytes'])
+            self.assertEqual(report['warmup_lifecycle'][1]['close_after']['rss_bytes'], measurements[5 * 27 - 1]['rss_bytes'])
 
 if __name__ == '__main__': unittest.main()

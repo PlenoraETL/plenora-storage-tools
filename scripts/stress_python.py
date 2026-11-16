@@ -167,6 +167,9 @@ def main():
                     current = sample()
                     if iteration < args.warmup_cycles:
                         report['warmup_completed'] += 1
+                        if report['warmup_completed'] == args.warmup_cycles:
+                            report['after_warmup'] = current
+                            report['warmup_lifecycle'] = lifecycle
                     else:
                         report['samples'].append(current)
                         report['cycle_matrix'].append(cells)
