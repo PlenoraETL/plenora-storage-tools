@@ -368,11 +368,11 @@ def checkout_command(remote_root, revision):
 
 def extract_inputs_command(remote_inputs, distribution):
     """VM command that extracts the Linux distribution among the inputs and
-    makes the two binaries executable, all private to the account: modes come
+    makes the candidate binary executable, all private to the account: modes come
     from umask 077, never from the archive, whatever the account's umask."""
     q = shlex.quote
     return (f'cd {q(remote_inputs)} && {shell_umask("private_file")} && tar --no-same-permissions -xzf linux-input.tar.gz && '
-            f'chmod u+x baseline/plenora-storage {q(distribution + "/plenora-storage")}')
+            f'chmod u+x {q(distribution + "/plenora-storage")}')
 
 
 def runner_bootstrap(work, inputs, bundle, revision, fixtures):

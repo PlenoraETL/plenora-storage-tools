@@ -1288,9 +1288,6 @@ class PrivateCreationTests(unittest.TestCase):
             # As the controller creates them: umask 077.
             inputs = folder / 'inputs'
             inputs.mkdir(mode=0o700)
-            (inputs / 'baseline').mkdir(mode=0o700)
-            (inputs / 'baseline/plenora-storage').write_text('baseline')
-            (inputs / 'baseline/plenora-storage').chmod(0o600)
             with tarfile.open(inputs / 'linux-input.tar.gz', 'w:gz') as stream:
                 stream.add(folder / 'staged' / 'dist', arcname='dist')
             (inputs / 'linux-input.tar.gz').chmod(0o600)
