@@ -6,11 +6,12 @@ disco: `spooled-qualification.json`, `spooled-regressions.json` e
 `spooled-local-faults.json` su Linux. Quest'ultimo verifica anche ENOSPC e
 permessi negati durante la preparazione di put e copy, senza modifiche alla
 destinazione o residui temporanei. Il validatore finale richiede inoltre
-`transfers-spooled/{large,workers4,workers16}.json` e un soak che eserciti
-entrambe le modalità nei 40 cicli misurati della policy 4.0.0, dopo 5 cicli di warm-up. I workflow CI e candidato eseguono
-i nuovi test per target; la campagna VM e il workflow reliability eseguono
-i trasferimenti e il soak. I gate restano obbligatori per ogni candidato;
-il [resoconto 2.1.0](release-2.1.0.md) registra le prove dei suoi artefatti finali.
+`transfers-spooled/{large,workers4,workers16}.json`. Per 4.0.0 la policy
+`storage-release-no-soak-v1` esclude soak e calibrazione dal runner e dal bundle.
+Gli strumenti restano eseguibili a mano; una campagna soak della famiglia ?
+prevista più avanti. I workflow CI e candidato eseguono i test per target;
+la campagna VM e il workflow reliability eseguono i trasferimenti.
+Il [resoconto 2.1.0](release-2.1.0.md) conserva le prove dei suoi artefatti finali.
 
 Dalla 2.0.1 la [campagna VM versionata](release-campaign.md) coordina download,
 fixture, prove dei due target e raccolta dei report con checkpoint verificati.

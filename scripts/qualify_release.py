@@ -3,7 +3,7 @@ import argparse
 import json
 import strict_json
 from pathlib import Path
-from soak_policy import RELEASE_POLICY_ID
+from campaign_model import RELEASE_POLICY_ID
 import re
 import shutil
 import subprocess

@@ -126,15 +126,6 @@ class ReleaseEvidenceTests(unittest.TestCase):
         self.write('transfers/large.json', transfer(1024**3, 1, 2))
         self.write('transfers/workers4.json', transfer(rounds=2))
         self.write('transfers/workers16.json', transfer(workers=16, rounds=1))
-        self.write('soak/report.json', soak())
-        from soak_policy import POLICY, analyze
-        samples = soak()['samples']
-        leaking = [dict(row, rss_bytes=row['rss_bytes'] + i * 1024**2) for i, row in enumerate(samples)]
-        self.write('soak/calibration.json', dict(status='PASS', policy=POLICY, platform='Linux-fixture', python='3.14.6 fixture',
-            normal=[dict(status='PASS', after_warmup=samples[0], samples=samples, analysis=analyze(samples)) for _ in range(3)],
-            leak_control=dict(status='FAIL', samples=leaking, injected_bytes_per_cycle=1024**2),
-            harness_sha256=hashlib.sha256((ROOT / 'scripts/calibrate_cycles.py').read_bytes()).hexdigest(),
-            policy_sha256=hashlib.sha256((ROOT / 'scripts/soak_policy.py').read_bytes()).hexdigest()))
         baseline = self.write('performance/baseline.json', transfer())
         candidate = self.write('performance/candidate.json', transfer())
         report = compare(transfer(), transfer(), BINARY, json.loads((ROOT / 'scripts/performance-policy.json').read_text()))
@@ -145,9 +136,9 @@ class ReleaseEvidenceTests(unittest.TestCase):
         self.bundle()
         files = validate_bundle(self.root, REVISION, self.subjects, '1.0.0rc1')
         self.assertTrue(any('/replay-' in entry['name'] for entry in files))
-        self.assertFalse(any(entry['name'].startswith('performance/') for entry in files))
+        self.assertFalse(any(entry['name'].startswith(('performance/', 'soak/')) for entry in files))
         self.assertFalse(any('/corpus/' in entry['name'] for entry in files))
-        for name in ['soak/report.json', 'transfers/workers16.json', 'fuzz/report.json',
+        for name in ['transfers/workers16.json', 'fuzz/report.json',
                      'coverage/rust-coverage.json',
                      f'api/{TARGETS[1]}/report.json', f'sdk/{TARGETS[1]}/3.14/sdk-tests.json']:
             with self.subTest(name=name):
@@ -156,6 +147,47 @@ class ReleaseEvidenceTests(unittest.TestCase):
                 path.unlink()
                 with self.assertRaises(ValueError):
                     validate_bundle(self.root, REVISION, self.subjects, '1.0.0rc1')
+                path.write_bytes(raw)
+
+    def test_bundle_rejects_unexecuted_soak_claim(self):
+        self.bundle()
+        self.write('soak/report.json', dict(status='PASS', completed_cycles=0))
+        with self.assertRaisesRegex(ValueError, 'soak evidence is outside'):
+            validate_bundle(self.root, REVISION, self.subjects, '4.0.0')
+
+    def test_400_bundle_without_soak_keeps_all_other_gates(self):
+        from scripts.tests.test_artifact_scan import ArtifactScanTests
+        from scripts.tests.test_disk_pressure import DiskPressureTests
+        self.bundle()
+        self.write('disk-pressure/report.json', DiskPressureTests().report())
+        for target in TARGETS:
+            scan = ArtifactScanTests()
+            scan.root, scan.target, scan.revision = self.root, target, REVISION
+            scan.prefix = 'native-components/' + target
+            scan.subjects = self.subjects[target]
+            scan.subjects['cli_archive_sha256'] = 'd' * 64
+            scan.bundle()
+        for name, size, workers, rounds in [('large', 1024**3, 1, 2),
+                                            ('workers4', 1024**2, 4, 2),
+                                            ('workers16', 1024**2, 16, 1)]:
+            report = transfer(size, workers, rounds)
+            report['spool_uploads'] = True
+            for row in report['results']:
+                if row['provider'] in BUFFERED:
+                    row['mode'] = 'private_file_roundtrip'
+                    row['measurements'].extend(dict(operation=op, status='PASS', peak_rss_bytes=1000,
+                                                   elapsed_seconds=1.0) for op in ('stat', 'copy'))
+            self.write(f'transfers-spooled/{name}.json', report)
+        files = validate_bundle(self.root, REVISION, self.subjects, '4.0.0')
+        self.assertFalse(any(entry['name'].startswith('soak/') for entry in files))
+        for entry in files:
+            path = self.root / entry['name']
+            raw = path.read_bytes()
+            path.unlink()
+            try:
+                with self.subTest(missing=entry['name']), self.assertRaises((ValueError, FileNotFoundError)):
+                    validate_bundle(self.root, REVISION, self.subjects, '4.0.0')
+            finally:
                 path.write_bytes(raw)
 
     def test_fuzz_rejects_missing_replay_short_work_and_timed_exploration(self):

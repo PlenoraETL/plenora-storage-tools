@@ -19,13 +19,14 @@ passata a `qualify_release.py --evidence` aggiungere `gates/` con questa struttu
 | `coverage/coverage-summary.json`, `coverage/rust-coverage.json` | `coverage.sh`: commit pulito, contatori ricalcolati dal report LLVM e soglie per crate correnti |
 | `transfers/large.json` | `qualify_transfers.py`: 1 GiB, un worker, due round, nove provider con distinzione tra streaming riuscito e rifiuto previsto |
 | `transfers/workers4.json`, `transfers/workers16.json` | Stesso script: 1 MiB, rispettivamente quattro worker per almeno due round e sedici worker per almeno un round |
-| `soak/report.json`, `soak/calibration.json` | `stress_python.py`: stessa wheel Linux, campagna terminata, nove provider, almeno quattro worker e budget delle risorse rispettati |
 
 I target sono `x86_64-unknown-linux-gnu` e `x86_64-pc-windows-msvc`; i nomi Python
-sono `3.14`. La policy `storage-sdk-cycles-v2` richiede 5 cicli di warm-up
-separati e 40 cicli misurati. Lo schema 2 conserva campioni, matrice completa,
-quartili e risorse dopo close/cancel. Nessuna durata minima. Non sommare
-campagne parziali o riassegnare report a un'altra wheel.
+sono `3.14`. La policy 4.0.0 `storage-release-no-soak-v1` non richiede
+soak né calibrazione. Una directory `soak` fra i gate è rifiutata, anche se
+contiene un riepilogo PASS: le prove manuali rimangono separate e la ricevuta
+non dichiara un soak superato. Restano obbligatori anche i trasferimenti
+`transfers-spooled/{large,workers4,workers16}.json` con gli stessi budget,
+l'inventario nativo dei due target e `disk-pressure/report.json`.
 
 Il validatore rilegge log, contatori e hash; non accetta il solo `PASS` di un
 riepilogo. I report devono comunque provenire da esecuzioni fidate: un digest

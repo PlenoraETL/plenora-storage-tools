@@ -1,12 +1,10 @@
-"""Release cycle policy and fail-closed resource oracle (runtime quartile model)."""
+"""Manual SDK cycle policy and fail-closed resource oracle (runtime quartile model)."""
 from statistics import median
-
-RELEASE_POLICY_ID = 'storage-release-cycles-v2'
 
 # Forty samples yield two ten-sample windows separated by 30 cycles.
 # A retained 1 MiB/cycle therefore produces about 30 MiB of window growth,
 # exceeding 16 MiB while staying below the retained 128 MiB absolute cap.
-# Local allocator calibration is required evidence, not provider qualification.
+# Local allocator calibration checks this oracle, not provider qualification.
 POLICY = {
     'id': 'storage-sdk-cycles-v2', 'cycles': 40, 'warmup_cycles': 5,
     'absolute_growth': {'rss_bytes': 128 * 1024**2, 'file_descriptors': 16, 'threads': 16, 'temporary_files': 0},

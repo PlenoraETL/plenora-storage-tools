@@ -4,7 +4,7 @@ import hashlib
 import json
 import strict_json
 from pathlib import Path
-from soak_policy import RELEASE_POLICY_ID
+from campaign_model import RELEASE_POLICY_ID
 import shutil
 import subprocess
 import sys
@@ -51,6 +51,7 @@ def draft(tag):
 def qualified_files(release):
     """Only manifest and receipt entries may enter a public evidence archive."""
     receipt = strict_json.loads((release / 'release-qualification.json').read_text())
+    reject_soak_claim(receipt)
     require(receipt['status'] == 'qualified_for_publication' and receipt['schema_version'] == 2,
             'release receipt is not qualified')
     paths = {'release-qualification.json', 'SHA256SUMS'}
@@ -82,6 +83,12 @@ def qualified_files(release):
     return sorted(paths)
 
 
+def reject_soak_claim(receipt):
+    require(all('soak' not in entry['name'].replace('\\', '/').lower().split('/')
+                for entry in receipt['additional_gates']),
+            'soak evidence is outside this release policy')
+
+
 def check_files(directory):
     index = strict_json.loads((directory / 'publication-index.json').read_text())
     require(index['version'] == workspace_version().native, 'publication version differs')
@@ -90,6 +97,7 @@ def check_files(directory):
         require(digest(directory / name) == sha, 'publication artifact digest differs')
     require(bool(index['files']), 'empty publication inventory')
     receipt = strict_json.loads((directory / 'release-qualification.json').read_text())
+    reject_soak_claim(receipt)
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     require(receipt['version'] == index['version'] and receipt['source_revision'] == revision
             and receipt['status'] == 'qualified_for_publication' and receipt['schema_version'] == 2

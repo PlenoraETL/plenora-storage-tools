@@ -59,21 +59,6 @@ jobs:
       - name: Measure Rust coverage separately from the SMB fork
         if: ${{ inputs.coverage }}
         run: docker compose -f docker-compose.yml -f compose.extended.yml run --rm --no-deps storage-rust bash scripts/coverage.sh
-      - name: Check resource oracle sensitivity
-        run: python3 scripts/calibrate_cycles.py --output .fixtures/evidence/cycle-calibration.json
-      - name: Exercise a persistent installed Python engine
-        run: |
-          docker compose -f docker-compose.yml -f compose.extended.yml run --rm --no-deps \
-            storage-rust bash -c '
-              set -euo pipefail
-              cargo fetch --locked
-              python3 scripts/build_python.py --output .fixtures/soak-wheel
-              version="$(python3 scripts/release_version.py --python)"
-              target/python-sdk-test/bin/python scripts/stress_python.py \
-                --both-upload-modes \
-                --wheel .fixtures/soak-wheel/plenora_storage-"${version}"-*.whl \
-                --cycles 40 --warmup-cycles 5 --output .fixtures/evidence/soak-python.json
-            '
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

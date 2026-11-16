@@ -15,6 +15,8 @@ import shlex
 import time
 import strict_json
 
+RELEASE_POLICY_ID = 'storage-release-no-soak-v1'
+
 UNSHARED_WRITE_BITS = 0o022
 BASE_ACL = r'^user::[-r][-w][-x]\ngroup::[-r][-w][-x]\nother::[-r][-w][-x]$'
 
@@ -109,7 +111,7 @@ def require_preparation_sources(paths):
 CAMPAIGN_PHASES = {
     'run_vm_campaign.py': ('qualify-linux', 'install-sdk',
                           'transfers-large', 'transfers-workers4', 'transfers-workers16',
-                          'spooled-large', 'spooled-workers4', 'spooled-workers16', 'calibrate-resources', 'soak'),
+                          'spooled-large', 'spooled-workers4', 'spooled-workers16'),
     'release_campaign.py': ('workflows', 'download', 'assemble', 'prepare-vm',
                            'qualify-windows', 'qualify-vm', 'seal'),
 }
