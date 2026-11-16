@@ -11,7 +11,7 @@ import json
 import strict_json
 import os
 from pathlib import Path, PurePosixPath
-from soak_policy import RELEASE_POLICY_ID
+from campaign_model import RELEASE_POLICY_ID
 import re
 import shlex
 import shutil
@@ -634,7 +634,7 @@ def run(config_path, output, retries, reason, connect_host=None):
                                    assembled / 'dist' / version / TARGETS['windows'])
                 evidence = path / 'evidence'
                 shutil.copytree(assembled / 'evidence', evidence)
-                gates = ['transfers', 'soak']
+                gates = ['transfers']
                 if parse_version(version).requires((2, 1, 0)):
                     gates.append('transfers-spooled')
                 for name in gates:

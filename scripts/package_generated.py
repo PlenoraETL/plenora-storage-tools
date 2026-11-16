@@ -74,7 +74,6 @@ GENERATED_MEMBERS = {
         'evidence/gates/sdk/x86_64-unknown-linux-gnu/3.14/sdk-tests.log',
         'evidence/gates/sdk/x86_64-unknown-linux-gnu/3.14/sdk-typing.json',
         'evidence/gates/sdk/x86_64-unknown-linux-gnu/3.14/sdk-typing.log',
-        'evidence/gates/soak/report.json',
         'evidence/gates/transfers-spooled/large.json',
         'evidence/gates/transfers-spooled/workers16.json',
         'evidence/gates/transfers-spooled/workers4.json',

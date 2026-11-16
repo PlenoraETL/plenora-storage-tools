@@ -1,66 +1,38 @@
 # Campagna di qualifica riprendibile
 
-Dalla 2.0.1 il coordinamento della VM è versionato, insieme ai gate, e non
-richiede script con commit o identificativi Actions incorporati. La policy corrente è `storage-release-cycles-v2`: 5 cicli di warm-up e 40 misurati, senza durata minima. Account cloud reali rimangono fuori dal perimetro.
+Dalla 2.0.1 il coordinamento della VM è versionato insieme ai gate. Per 4.0.0
+la policy corrente è `storage-release-no-soak-v1`, definita in
+`scripts/campaign_model.py`. Le identità di controller, runner e ricevuta
+impediscono di riutilizzare una campagna con la precedente policy a cicli.
+Account cloud reali rimangono fuori dal perimetro.
 
-## Criterio 4.0.0 a cicli
+## Cancello 4.0.0 senza soak
 
-Fonte eseguibile: `scripts/soak_policy.py`, schema report 2. Il runner e il
-verificatore richiedono la stessa policy, senza waiver. Ogni ciclo misura
-RSS, fd, thread e temporanei posseduti dopo le operazioni, per 9 provider,
-2 strategie e 4 worker. Conserva serie, matrice, quartili e residui dopo
-close e cancellazione in volo al resolver WebDAV, prima dell'accesso remoto,
-sincronizzata con eventi. Le altre prove della suite SDK installata restano. Un ciclo omesso, un temporaneo residuo o una crescita eccessiva fallisce.
-I tetti restano +128 MiB RSS, +16 fd, +16 thread; temporanei residui zero.
-La crescita fra primo e ultimo quartile è al più 16 MiB, 2 fd e 2 thread.
-La policy SDK `storage-sdk-cycles-v2` registra `after_warmup` alla fine del
-quinto warm-up e `warmup_lifecycle` con gli stati dopo close/cancel per
-ciascuna modalità. Il residuo finale si confronta con `after_warmup`; ogni
-close/cancel misurato si confronta con la stessa fase e modalità del quinto
-warm-up, mai con il before della singola operazione. Il riferimento resta
-fisso: tolleranze +16 MiB RSS, +2 fd, +2 thread; temporanei sempre zero,
-anche nei riferimenti. I quartili e i tetti assoluti della serie restano
-invariati. `before_open` e i before per operazione sono dati diagnostici.
-Pool stabili e caricamenti iniziali non sono accumulo; un fd/thread o
-1 MiB trattenuti a ogni ciclo continuano a fallire. Riferimenti mancanti o
-policy v1 sono rifiutati, senza fallback implicito al primo campione.
+Decisione del titolare del 16/11/2026: «il soak non fa parte del cancello di questa release; una campagna soak della famiglia è prevista più avanti».
+Le precedenti campagne bocciate dal criterio del soak conservano i loro esiti:
+questa decisione non trasforma un FAIL in PASS e non qualifica nuovi artefatti.
 
-La regressione `scripts/tests/fixtures/soak-campaign-4.0.0-resources.json`
-estrae soltanto le risorse dal report della campagna Linux reale (fonte e
-SHA-256 inclusi). La crescita RSS fra quartili è 1.306.624 byte, fd 14 -> 14,
-thread 20,5 -> 20,5. Il report v1 non aveva snapshot del quinto warm-up:
-il replay usa esplicitamente il primo ciclo misurato, già dopo il warm-up,
-e passa con la nuova regola; varianti con accumulo falliscono. Questo test
-non promuove il vecchio FAIL e non sostituisce una nuova campagna v2 sulla
-wheel candidata. Il gate CI `product-quality` e quello Windows eseguono
-queste regressioni con la discovery dei test Python; il workflow reliability
-e la campagna VM usano il runner e validatore aggiornati.
+Il runner VM esegue `qualify-linux`, `install-sdk`, `transfers-large`,
+`transfers-workers4`, `transfers-workers16`, `spooled-large`,
+`spooled-workers4`, `spooled-workers16`. Non esegue `calibrate-resources`
+né `soak`, e non esporta evidenze soak. Il bundle non richiede calibrazione
+o soak e rifiuta una directory `soak` fra i gate: non può attestare una
+prova omessa. Anche il workflow reliability mantiene solo trasferimenti e
+coverage opzionale. Le qualifiche Windows e gli altri workflow restano invariati.
 
-Non ci sono pause da 30 s né un fenomeno temporale che imponga due ore.
+Restano 1 GiB con un worker e due round, 1 MiB con quattro worker e due round,
+1 MiB con sedici worker e un round, per entrambe le strategie di upload.
+Il fuzz di release rigioca ogni seed e completa 10.000 esecuzioni per target
+ASan. Lease, fence, timeout, cleanup e timer del prodotto restano invariati.
 
-La calibrazione sintetica locale (`scripts/calibrate_cycles.py`) e il leak
-control da 1 MiB/ciclo provano il misuratore, non i server: il rumore della
-VM e il lifecycle della wheel finale devono ancora essere misurati.
-Anche la calibrazione v2 salva il riferimento dopo cinque warm-up e
-confronta ciascun campione con le stesse tolleranze; non pretende pool vuoti.
-Misura storica della calibrazione v1 Windows/Python 3.14 (non evidenza v2): crescita RSS fra quartili
-237.568, 151.552 e 53.248 byte; handle, thread e temporanei: zero crescita.
-Il controllo da 1 MiB/ciclo ha prodotto 31.653.888 byte ed è stato rifiutato.
-Quaranta cicli danno finestre da dieci separate da trenta cicli: il controllo
-atteso da circa 30 MiB supera 16 MiB e resta sotto il tetto di 128 MiB.
-Il margine sul massimo rumore locale osservato è oltre 36 volte (includendo 456.704 byte di un run locale precedente); non è una
-stima del rumore dei provider. La VM ripete calibrazione e controllo prima
-del soak; un fallimento non cambia automaticamente le soglie.
-Il report `target/PROVE-CICLI.md` conserva log, limiti e identità locali.
-Il fuzz di release rigioca ogni seed/regressione e completa 10.000 esecuzioni
-per target ASan; il lavoro non dimostra completezza dei rami. La ricerca a
-300 secondi rimane nel workflow periodico e non soddisfa il gate di release.
-
-ST-4 mantiene 1 GiB, 1 MiB, 4/16 worker, buffered/private-file e i due ABI:
-attraversano limiti di buffering, spool, concorrenza e packaging distinti.
-ST-5 mantiene lease, fence, diagnosi e kill dell'albero; il timeout è un FAIL.
-ST-6 rimuove la sola pausa del soak: i test reali di timeout, keepalive e
-cleanup e i timer del prodotto restano invariati, senza estenderne i claim.
+`stress_python.py`, `soak_policy.py`, `calibrate_cycles.py` e i relativi test
+rimangono nel repository, eseguibili a mano secondo [reliability.md](reliability.md).
+La policy manuale SDK `storage-sdk-cycles-v2` conserva 5 warm-up, 40 cicli,
+matrici provider/strategie e controlli di risorse e lifecycle. Le regressioni
+sintetiche e il replay delle risorse sono test degli strumenti, non evidenze
+di un soak superato dalla release. I report manuali vanno conservati separatamente
+dal bundle. Le sezioni storiche qui sotto descrivono le campagne precedenti e
+non aggiungono obblighi al cancello 4.0.0.
 
 ## Prerequisiti
 

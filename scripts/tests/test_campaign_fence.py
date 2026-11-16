@@ -1579,13 +1579,13 @@ class SelectedEvidenceTests(unittest.TestCase):
         self.candidate = digest(self.linux / 'plenora-storage')
         (self.linux / 'release-manifest.json').write_text(json.dumps(
             {'artifacts': [{'name': 'plenora-storage', 'sha256': self.candidate}]}))
-        self.identity = {'revision': 'r' * 40, 'policy_id': 'storage-release-cycles-v2'}
+        self.identity = {'revision': 'r' * 40, 'policy_id': 'storage-release-no-soak-v1'}
         self.expected = {'candidate/plenora-storage': self.candidate}
 
     def tearDown(self):
         self.temporary.cleanup()
 
-    def result(self, *, epoch=EPOCH, nonce='n0nce', policy_id='storage-release-cycles-v2', inputs=None, artifact_sha=None,
+    def result(self, *, epoch=EPOCH, nonce='n0nce', policy_id='storage-release-no-soak-v1', inputs=None, artifact_sha=None,
                ledger_epoch=EPOCH):
         """A downloaded attempt: selected evidence, its report and the runner ledger."""
         result = self.folder / 'result'

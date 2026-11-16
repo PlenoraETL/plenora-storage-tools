@@ -50,8 +50,9 @@ Il contratto comune Python è incluso nel manifest della wheel, con test della
 distribuzione installata. Esistono gate distinti per parser fuzz, coverage Rust
 per crate e coverage Python sulla wheel installata, descritti nelle
 [prove di affidabilità](reliability.md). Il [gate finale](release-evidence-bundle.md)
-richiede l'aggregazione dei report. Per 4.0.0 la policy a cicli sostituisce
-il soak a tempo e il confronto prestazionale obbligato con release precedenti.
+richiede l'aggregazione dei report. Per 4.0.0 la policy `storage-release-no-soak-v1` esclude il soak e la sua
+calibrazione dal cancello; gli strumenti restano manuali per una successiva
+campagna della famiglia. Il confronto con release precedenti non è obbligatorio.
 La coverage Rust del prodotto è ora distinta dai test e dispone di una baseline
 misurata e di un gate nella CI ordinaria. La
 [pubblicazione 1.0.0](https://github.com/PlenoraETL/plenora-storage-tools/actions/runs/36396706695)

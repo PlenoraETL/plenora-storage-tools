@@ -33,7 +33,7 @@ class FrozenArtifactTests(unittest.TestCase):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(b'qualified fixture')
             (root / 'release-qualification.json').write_text(json.dumps({
-                'status': 'qualified_for_publication', 'evidence_policy': 'storage-release-cycles-v2', 'schema_version': 2,
+                'status': 'qualified_for_publication', 'evidence_policy': 'storage-release-no-soak-v1', 'schema_version': 2,
                 'platforms': platforms, 'additional_gates': [{'name': 'result.json', 'sha256': digest}]}))
             selected = publication.qualified_files(root)
             self.assertTrue({p.relative_to(root).as_posix() for p in bound} <= set(selected))

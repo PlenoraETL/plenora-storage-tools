@@ -14,7 +14,7 @@ from pathlib import Path
 from check_installed_sdk import enforce_coverage, test_count
 from check_rust_api import packages
 from check_test_layout import check as check_test_layout
-from soak_policy import validate_cycles, validate_calibration, POLICY as CYCLE_POLICY
+from soak_policy import validate_cycles, POLICY as CYCLE_POLICY
 from fixture_connections import BUFFERED, PROVIDERS
 from fuzz_parsers import TARGETS as FUZZ_TARGETS, stats, RUNS, FUZZ_POLICY
 from summarize_coverage import apply_thresholds, summarize
@@ -128,6 +128,8 @@ subjects maps target triples to binary_sha256 and wheel_sha256 from manifests
 already checked by verify_release.py. No caller-supplied waiver is accepted.
 """
     evidence = Evidence(root)
+    require(not (evidence.root / 'soak').exists(),
+            'soak evidence is outside this release policy; keep manual campaigns separate')
     version_core = tuple(map(int, re.match(r'(\d+)\.(\d+)\.(\d+)', python_version).groups()))
     if version_core >= (2, 0, 1):
         validate_disk_pressure(evidence.json('disk-pressure/report.json'), revision, subjects[TARGETS[0]]['binary_sha256'])
@@ -245,13 +247,4 @@ already checked by verify_release.py. No caller-supplied waiver is accepted.
             clean_source(report, revision)
             validate_transfers(report, linux['binary_sha256'], size=size, workers=workers,
                                rounds=max(rounds, 2) if name == 'large' else rounds, spool_uploads=True)
-    calibration = evidence.json('soak/calibration.json')
-    validate_calibration(calibration)
-    require(calibration.get('platform', '').startswith('Linux') and calibration.get('python', '').startswith('3.14.'),
-            'release calibration must describe the Linux Python 3.14 runner')
-    for key, name in [('harness_sha256', 'calibrate_cycles.py'), ('policy_sha256', 'soak_policy.py')]:
-        require(calibration[key] == hashlib.sha256((ROOT / 'scripts' / name).read_bytes()).hexdigest(),
-                'calibration harness differs')
-    validate_soak(evidence.json('soak/report.json'), linux['wheel_sha256'], python_version,
-                  both_upload_modes=version_core >= (2, 1, 0))
     return [{'name': name, 'sha256': digest} for name, digest in sorted(evidence.files.items())]

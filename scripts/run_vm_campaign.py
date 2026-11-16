@@ -17,7 +17,7 @@ from campaign_fence import held, CampaignBusy, CampaignFenced
 from campaign_state import Campaign, digest, exclusive, logged, write_json
 from check_disk_space import GIB, inspect
 from check_memory import available as available_memory, inspect as inspect_memory
-from soak_policy import POLICY as SOAK_POLICY, RELEASE_POLICY_ID
+from campaign_model import RELEASE_POLICY_ID
 from versioning import parse_version
 from proof_collection import Collection
 from campaign_model import CAMPAIGN_PHASES
@@ -57,7 +57,7 @@ def identity(folder):
     if any(subjects[row['name']] != row['sha256'] for row in manifest['artifacts']):
         raise ValueError('campaign distribution bytes differ from manifest')
     return {'source_revision': revision, 'version': manifest['version'], 'artifacts': subjects,
-            'policy_id': RELEASE_POLICY_ID, 'soak_policy': SOAK_POLICY,
+            'policy_id': RELEASE_POLICY_ID,
             'watchdogs': {'transfer_round': TRANSFER_ROUND_TIMEOUT,
                           'transfer_phase': TRANSFER_PHASE_TIMEOUT, 'command': COMMAND_TIMEOUT},
             'large_transfer_rounds': 2}
@@ -336,15 +336,9 @@ def measure(folder, private, output, fixture_state, retries, reason, backend_dat
                 result = phase('spooled-' + name, lambda path: transfers(
                     path, size=size, workers=workers, rounds=rounds, spool_uploads=True))
                 prepared[f'transfers-spooled/{name}.json'] = result / 'report.json'
-        calibration = phase('calibrate-resources', lambda path: command(path, 'calibrate_cycles.py',
-                            '--output', path / 'report.json'))
-        soak = phase('soak', lambda path: command(path, 'stress_python.py', '--wheel', wheel, '--workers', 4,
-                     '--cycles', SOAK_POLICY['cycles'], '--warmup-cycles', SOAK_POLICY['warmup_cycles'],
-                     *(['--both-upload-modes'] if spooled else []),
-                     '--output', path / 'report.json', python=installed_python(private)), dependencies=('install-sdk', 'calibrate-resources'))
         collection.finish(output / 'collection.json')
-        selected = {'soak/calibration.json': calibration / 'report.json', 'transfers/large.json': large / 'report.json', 'transfers/workers4.json': four / 'report.json',
-                    'transfers/workers16.json': sixteen / 'report.json', 'soak/report.json': soak / 'report.json', **prepared}
+        selected = {'transfers/large.json': large / 'report.json', 'transfers/workers4.json': four / 'report.json',
+                    'transfers/workers16.json': sixteen / 'report.json', **prepared}
         sources = {'gates/' + name: (source.parent, source) for name, source in selected.items()}
         qualified_target = qualified / 'dist' / subject['version'] / TARGET
         for source in sorted(qualified_target.glob('*.json')):

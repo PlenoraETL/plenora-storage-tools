@@ -185,7 +185,15 @@ Il runner rifiuta output già esistenti e non considera PASS un'uscita senza
 evidenza di esecuzione strumentata. Le dipendenze sono scaricate prima; la
 compilazione e la campagna usano il lockfile senza accesso alla rete.
 
-## Durata dello SDK
+## Durata dello SDK (manuale, fuori dal cancello 4.0.0)
+
+Decisione del 16/11/2026: «il soak non fa parte del cancello di questa release; una campagna soak della famiglia è prevista più avanti».
+Runner di release e workflow reliability non eseguono soak o calibrazione.
+Gli script `stress_python.py`, `soak_policy.py`, `calibrate_cycles.py` e i loro
+test restano disponibili; i report manuali non entrano nel bundle di release.
+La calibrazione si esegue a mano con
+`python3 scripts/calibrate_cycles.py --output target/manual-soak-calibration.json`.
+Le fixture dei nove provider devono essere disponibili prima del soak.
 
 ```sh
 python3 scripts/build_python.py --output .fixtures/soak-wheel
@@ -199,11 +207,11 @@ i nove provider. Ogni ciclo verifica put/copy/get, checksum e cleanup; dopo il
 warm-up impone crescita massima di 128 MiB RSS, 16 descrittori e 16 thread.
 Il report identifica la wheel effettivamente installata e registra risorse per
 provider, picchi e avanzamento. `RUNNING` non equivale a una prova superata.
-Per 4.0.0 il criterio è `storage-sdk-cycles-v2`: 5 cicli di warm-up e 40
-misurati, senza pause o durata minima. Runner e gate condividono
+Per lo strumento manuale il criterio è `storage-sdk-cycles-v2`: 5 cicli di warm-up e 40
+misurati, senza pause o durata minima. Runner manuale e validatore condividono
 `scripts/soak_policy.py`. Serie, crescita fra quartili, tetti assoluti e
 residui dopo close/cancel devono tutti rispettare il criterio deciso prima.
-Il workflow esegue anche calibrazione sintetica e leak-control; questo non
+La calibrazione manuale esegue prove sintetiche e leak-control; questo non
 qualifica i provider reali. Nessun engine asyncio persistente è qualificato
 attraverso questo soak sincrono.
 

@@ -30,17 +30,12 @@ arbitrary remote servers.
 
 ## Release evidence policy
 
-`storage-release-cycles-v2` replaces the timed SDK soak with 5 warm-up and
-40 measured cycles, resource quartiles and close/cancel accumulation checks.
-SDK policy `storage-sdk-cycles-v2` captures the reference after the fifth
-warm-up, including separate close/cancel states for each upload mode. Final
-and per-cycle lifecycle growth is bounded against those fixed references by
-16 MiB RSS, 2 descriptors and 2 threads; owned temporary files must always
-be zero. Stable runtime pools are allowed; accumulating resources still fail.
-The real Linux campaign resource replay and its injected-leak variants run
-in the script test gates. The original report lacks warm-up snapshots, so
-its explicit first-measured-cycle replay is regression evidence only, not
-a retrospective qualification. A fresh v2 campaign is required.
+`storage-release-no-soak-v1` removes soak and its calibration from the release
+campaign and required evidence. The bundle cannot claim a passed soak.
+Owner decision, 16 November 2026: «il soak non fa parte del cancello di questa release; una campagna soak della famiglia è prevista più avanti».
+The manual tools `stress_python.py`, `soak_policy.py`, `calibrate_cycles.py`
+and their tests remain available for that later work. Earlier campaign
+failures retain their original results; this change is not qualification evidence.
 Parser release evidence replays all seeds and uses a 10,000-execution budget
 per ASan target; timed exploration remains scheduled separately. Previous
 release binaries and performance A/B are no longer release dependencies.

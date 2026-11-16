@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import campaign_state as state
 import run_vm_campaign as vm
 import release_campaign as controller
@@ -18,7 +19,7 @@ from filesystem_paths import canonical_path
 # phases come from executing the functions, not from their AST inventories.
 VM_PHASES = ('qualify-linux', 'install-sdk',
              'transfers-large', 'transfers-workers4', 'transfers-workers16',
-             'spooled-large', 'spooled-workers4', 'spooled-workers16', 'calibrate-resources', 'soak')
+             'spooled-large', 'spooled-workers4', 'spooled-workers16')
 CONTROLLER_PHASES = ('workflows', 'download', 'assemble', 'prepare-vm',
                      'qualify-windows', 'qualify-vm', 'seal')
 
@@ -35,7 +36,7 @@ class CampaignPlanTests(unittest.TestCase):
                 path.write_bytes(path.name.encode())
             subject = {'version': '4.0.0', 'source_revision': 'a' * 40,
                        'artifacts': {p.name: state.digest(p) for p in (binary, wheel)},
-                       'policy_id': 'storage-release-cycles-v2'}
+                       'policy_id': 'storage-release-no-soak-v1'}
             (candidate / 'release-manifest.json').write_text(json.dumps(subject))
             (fixtures / 'fixture-state.json').write_text(json.dumps({'kind': 'reset', 'nonce': 'this-reset'}))
             observed = []
@@ -78,6 +79,12 @@ class CampaignPlanTests(unittest.TestCase):
             self.assertEqual(selected['epoch'], 'epoch-1')
             self.assertEqual(selected['fixture_nonce'], 'this-reset')
             self.assertEqual(selected['identity'], ledger['identity'])
+            self.assertEqual({name for name in selected['files'] if name.startswith('gates/')}, {
+                f'gates/{prefix}/{name}.json'
+                for prefix in ('transfers', 'transfers-spooled')
+                for name in ('large', 'workers4', 'workers16')})
+            self.assertFalse(any('stress_python.py' in arg or 'calibrate_cycles.py' in arg
+                                 for _, argv, _ in observed for arg in argv))
             self.assertEqual(ledger['selected']['report_sha256'], state.digest(output / 'selected/report.json'))
             for name, sha in selected['files'].items():
                 self.assertEqual(state.digest(output / 'selected' / name), sha)
