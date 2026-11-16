@@ -10,7 +10,7 @@ import sys
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
-from soak_policy import POLICY, analyze
+from soak_policy import POLICY, analyze, residual
 
 
 def resources():
@@ -71,6 +71,8 @@ def probe(leak=False):
         for cycle in range(POLICY['warmup_cycles'] + POLICY['cycles']):
             with ThreadPoolExecutor(4) as pool:
                 list(pool.map(operation, range(4)))
+            if cycle == POLICY['warmup_cycles'] - 1:
+                after_warmup = dict(resources(), temporary_files=sum(p.is_file() for p in root.iterdir()))
             if cycle >= POLICY['warmup_cycles']:
                 if leak:
                     retained.append(bytearray(b'x' * 1024**2))
@@ -79,11 +81,13 @@ def probe(leak=False):
                 samples.append(row)
     try:
         result = analyze(samples)
+        for row in samples:
+            residual(after_warmup, row)
         status = 'PASS'
     except ValueError:
         result = None
         status = 'FAIL'
-    return dict(status=status, samples=samples, analysis=result, elapsed_seconds=time.monotonic()-started,
+    return dict(status=status, after_warmup=after_warmup, samples=samples, analysis=result, elapsed_seconds=time.monotonic()-started,
                 injected_bytes_per_cycle=1024**2 if leak else 0)
 
 

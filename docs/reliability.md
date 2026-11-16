@@ -199,7 +199,7 @@ i nove provider. Ogni ciclo verifica put/copy/get, checksum e cleanup; dopo il
 warm-up impone crescita massima di 128 MiB RSS, 16 descrittori e 16 thread.
 Il report identifica la wheel effettivamente installata e registra risorse per
 provider, picchi e avanzamento. `RUNNING` non equivale a una prova superata.
-Per 4.0.0 il criterio è `storage-sdk-cycles-v1`: 5 cicli di warm-up e 40
+Per 4.0.0 il criterio è `storage-sdk-cycles-v2`: 5 cicli di warm-up e 40
 misurati, senza pause o durata minima. Runner e gate condividono
 `scripts/soak_policy.py`. Serie, crescita fra quartili, tetti assoluti e
 residui dopo close/cancel devono tutti rispettare il criterio deciso prima.

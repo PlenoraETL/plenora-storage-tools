@@ -22,7 +22,7 @@ passata a `qualify_release.py --evidence` aggiungere `gates/` con questa struttu
 | `soak/report.json`, `soak/calibration.json` | `stress_python.py`: stessa wheel Linux, campagna terminata, nove provider, almeno quattro worker e budget delle risorse rispettati |
 
 I target sono `x86_64-unknown-linux-gnu` e `x86_64-pc-windows-msvc`; i nomi Python
-sono `3.14`. La policy `storage-sdk-cycles-v1` richiede 5 cicli di warm-up
+sono `3.14`. La policy `storage-sdk-cycles-v2` richiede 5 cicli di warm-up
 separati e 40 cicli misurati. Lo schema 2 conserva campioni, matrice completa,
 quartili e risorse dopo close/cancel. Nessuna durata minima. Non sommare
 campagne parziali o riassegnare report a un'altra wheel.

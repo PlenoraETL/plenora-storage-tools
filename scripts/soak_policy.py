@@ -1,14 +1,14 @@
 """Release cycle policy and fail-closed resource oracle (runtime quartile model)."""
 from statistics import median
 
-RELEASE_POLICY_ID = 'storage-release-cycles-v1'
+RELEASE_POLICY_ID = 'storage-release-cycles-v2'
 
 # Forty samples yield two ten-sample windows separated by 30 cycles.
 # A retained 1 MiB/cycle therefore produces about 30 MiB of window growth,
 # exceeding 16 MiB while staying below the retained 128 MiB absolute cap.
 # Local allocator calibration is required evidence, not provider qualification.
 POLICY = {
-    'id': 'storage-sdk-cycles-v1', 'cycles': 40, 'warmup_cycles': 5,
+    'id': 'storage-sdk-cycles-v2', 'cycles': 40, 'warmup_cycles': 5,
     'absolute_growth': {'rss_bytes': 128 * 1024**2, 'file_descriptors': 16, 'threads': 16, 'temporary_files': 0},
     'window_growth': {'rss_bytes': 16 * 1024**2, 'file_descriptors': 2, 'threads': 2, 'temporary_files': 0},
 }
@@ -43,24 +43,35 @@ def validate_cycles(report):
     if report.get('analysis') != actual:
         raise ValueError('resource summary differs from samples')
     for label in ('after_cancel', 'after_close'):
-        residual(report['before_open'], report[label])
+        residual(report['after_warmup'], report[label])
     if len(report['lifecycle']) != POLICY['cycles']:
         raise ValueError('lifecycle cycle inventory incomplete')
+    reference = report['warmup_lifecycle']
+    modes = report.get('upload_modes', ['buffered'])
+    if [row['mode'] for row in reference] != modes:
+        raise ValueError('warmup lifecycle strategy inventory incomplete')
+    for row in reference:
+        if row.get('cancel_phase') != 'resolver':
+            raise ValueError('warmup cancellation boundary missing')
+        for phase in ('cancel', 'close'):
+            residual(row[phase + '_after'], row[phase + '_after'])
     for cycle in report['lifecycle']:
         if [row['mode'] for row in cycle] != report.get('upload_modes', ['buffered']):
             raise ValueError('lifecycle strategy inventory incomplete')
-        for row in cycle:
+        for row, baseline in zip(cycle, reference):
             if row.get('cancel_phase') != 'resolver':
                 raise ValueError('cancellation did not prove the in-flight resolver boundary')
             for phase in ('cancel', 'close'):
-                residual(row[phase + '_before'], row[phase + '_after'])
+                residual(baseline[phase + '_after'], row[phase + '_after'])
 
 
 def residual(before, after):
+    """Bound accumulation from a fixed post-warmup state, not operation deltas."""
     for key in POLICY['absolute_growth']:
-        limit = POLICY['window_growth'][key] if key == 'rss_bytes' else 0
+        limit = POLICY['window_growth'][key]
         if (type(before[key]) is not int or before[key] < 0 or type(after[key]) is not int
-                or after[key] < 0 or after[key] > before[key] + limit):
+                or after[key] < 0 or after[key] > before[key] + limit
+                or (key == 'temporary_files' and (before[key] != 0 or after[key] != 0))):
             raise ValueError('owned resource residue: ' + key)
 
 
@@ -70,6 +81,8 @@ def validate_calibration(report):
     for run in report['normal']:
         if run['status'] != 'PASS' or analyze(run['samples']) != run['analysis']:
             raise ValueError('calibration noise failed')
+        for row in run['samples']:
+            residual(run['after_warmup'], row)
     control = report['leak_control']
     if control['status'] != 'FAIL' or control['injected_bytes_per_cycle'] != 1024**2:
         raise ValueError('missing leak control')

@@ -1,0 +1,1687 @@
+{
+  "source": "C:\\pg\\storage-camp2\\target\\campaign-4.0.0-cycles\\qualify-vm\\1\\output\\soak\\1\\report.json",
+  "source_sha256": "e89e547044c506a959211ede2a2e5c12ea6231dad31c56de7707a6190d605c47",
+  "scope": "Resource-only extraction; original FAIL unchanged. No warmup snapshots were recorded. Replay uses first measured cycle as explicit post-warmup reference; not release evidence.",
+  "report": {
+    "schema_version": 2,
+    "policy": {
+      "id": "storage-sdk-cycles-v1",
+      "cycles": 40,
+      "warmup_cycles": 5,
+      "absolute_growth": {
+        "rss_bytes": 134217728,
+        "file_descriptors": 16,
+        "threads": 16,
+        "temporary_files": 0
+      },
+      "window_growth": {
+        "rss_bytes": 16777216,
+        "file_descriptors": 2,
+        "threads": 2,
+        "temporary_files": 0
+      }
+    },
+    "completed_cycles": 40,
+    "warmup_completed": 5,
+    "samples": [
+      {
+        "rss_bytes": 61403136,
+        "threads": 24,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 62078976,
+        "threads": 19,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 62390272,
+        "threads": 20,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 62521344,
+        "threads": 23,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 62533632,
+        "threads": 23,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 62726144,
+        "threads": 22,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 62763008,
+        "threads": 20,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 62844928,
+        "threads": 20,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 62861312,
+        "threads": 21,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 62885888,
+        "threads": 20,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 62898176,
+        "threads": 21,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63029248,
+        "threads": 18,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63094784,
+        "threads": 20,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63111168,
+        "threads": 21,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63135744,
+        "threads": 18,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63229952,
+        "threads": 18,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63238144,
+        "threads": 20,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63275008,
+        "threads": 20,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63295488,
+        "threads": 19,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63307776,
+        "threads": 19,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63324160,
+        "threads": 20,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63336448,
+        "threads": 20,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63348736,
+        "threads": 19,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63365120,
+        "threads": 21,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63389696,
+        "threads": 20,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63401984,
+        "threads": 20,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63451136,
+        "threads": 17,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63512576,
+        "threads": 21,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63586304,
+        "threads": 24,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63721472,
+        "threads": 19,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63746048,
+        "threads": 18,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63815680,
+        "threads": 19,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63823872,
+        "threads": 19,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63848448,
+        "threads": 20,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63930368,
+        "threads": 21,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63942656,
+        "threads": 20,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63959040,
+        "threads": 22,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63971328,
+        "threads": 21,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 63983616,
+        "threads": 22,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      },
+      {
+        "rss_bytes": 64008192,
+        "threads": 21,
+        "file_descriptors": 14,
+        "temporary_files": 0
+      }
+    ],
+    "lifecycle": [
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 61403136,
+            "threads": 24,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 61403136,
+            "threads": 27,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 61403136,
+            "threads": 24,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 61403136,
+            "threads": 28,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 62078976,
+            "threads": 19,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 62078976,
+            "threads": 22,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 62078976,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 62078976,
+            "threads": 23,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 62390272,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 62390272,
+            "threads": 23,
+            "file_descriptors": 19,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 62390272,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 62390272,
+            "threads": 24,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 62521344,
+            "threads": 23,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 62521344,
+            "threads": 26,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 62521344,
+            "threads": 23,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 62521344,
+            "threads": 27,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 62529536,
+            "threads": 23,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 62529536,
+            "threads": 26,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 62533632,
+            "threads": 23,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 62533632,
+            "threads": 27,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 62722048,
+            "threads": 22,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 62722048,
+            "threads": 25,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 62726144,
+            "threads": 22,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 62726144,
+            "threads": 26,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 62758912,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 62758912,
+            "threads": 23,
+            "file_descriptors": 19,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 62763008,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 62763008,
+            "threads": 24,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 62844928,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 62844928,
+            "threads": 23,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 62844928,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 62844928,
+            "threads": 24,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 62861312,
+            "threads": 21,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 62861312,
+            "threads": 24,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 62861312,
+            "threads": 21,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 62861312,
+            "threads": 25,
+            "file_descriptors": 19,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 62885888,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 62885888,
+            "threads": 23,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 62885888,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 62885888,
+            "threads": 24,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 62898176,
+            "threads": 21,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 62898176,
+            "threads": 24,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 62898176,
+            "threads": 21,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 62898176,
+            "threads": 25,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63029248,
+            "threads": 18,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63029248,
+            "threads": 21,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63029248,
+            "threads": 18,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63029248,
+            "threads": 22,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63094784,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63094784,
+            "threads": 23,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63094784,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63094784,
+            "threads": 24,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63111168,
+            "threads": 21,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63107072,
+            "threads": 24,
+            "file_descriptors": 19,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63111168,
+            "threads": 21,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63111168,
+            "threads": 25,
+            "file_descriptors": 19,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63135744,
+            "threads": 18,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63131648,
+            "threads": 21,
+            "file_descriptors": 19,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63135744,
+            "threads": 18,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63135744,
+            "threads": 22,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63225856,
+            "threads": 18,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63225856,
+            "threads": 21,
+            "file_descriptors": 19,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63229952,
+            "threads": 18,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63225856,
+            "threads": 22,
+            "file_descriptors": 19,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63238144,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63238144,
+            "threads": 23,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63238144,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63238144,
+            "threads": 24,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63275008,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63275008,
+            "threads": 23,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63275008,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63275008,
+            "threads": 24,
+            "file_descriptors": 19,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63295488,
+            "threads": 19,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63291392,
+            "threads": 22,
+            "file_descriptors": 19,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63295488,
+            "threads": 19,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63295488,
+            "threads": 23,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63307776,
+            "threads": 19,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63303680,
+            "threads": 22,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63307776,
+            "threads": 19,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63307776,
+            "threads": 23,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63320064,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63320064,
+            "threads": 23,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63320064,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63320064,
+            "threads": 24,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63336448,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63336448,
+            "threads": 23,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63336448,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63336448,
+            "threads": 24,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63348736,
+            "threads": 19,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63348736,
+            "threads": 22,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63348736,
+            "threads": 19,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63348736,
+            "threads": 23,
+            "file_descriptors": 19,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63365120,
+            "threads": 21,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63365120,
+            "threads": 24,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63365120,
+            "threads": 21,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63365120,
+            "threads": 25,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63389696,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63385600,
+            "threads": 23,
+            "file_descriptors": 19,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63389696,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63389696,
+            "threads": 24,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63393792,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63393792,
+            "threads": 23,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63397888,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63397888,
+            "threads": 24,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63451136,
+            "threads": 17,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63451136,
+            "threads": 20,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63451136,
+            "threads": 17,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63451136,
+            "threads": 21,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63512576,
+            "threads": 21,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63512576,
+            "threads": 24,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63512576,
+            "threads": 21,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63512576,
+            "threads": 25,
+            "file_descriptors": 19,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63586304,
+            "threads": 24,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63586304,
+            "threads": 27,
+            "file_descriptors": 19,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63586304,
+            "threads": 24,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63586304,
+            "threads": 28,
+            "file_descriptors": 19,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63721472,
+            "threads": 19,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63717376,
+            "threads": 22,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63721472,
+            "threads": 19,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63721472,
+            "threads": 23,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63741952,
+            "threads": 18,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63741952,
+            "threads": 21,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63746048,
+            "threads": 18,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63746048,
+            "threads": 22,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63815680,
+            "threads": 19,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63815680,
+            "threads": 22,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63815680,
+            "threads": 19,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63815680,
+            "threads": 23,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63823872,
+            "threads": 19,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63823872,
+            "threads": 22,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63823872,
+            "threads": 19,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63823872,
+            "threads": 23,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63848448,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63848448,
+            "threads": 23,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63848448,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63848448,
+            "threads": 24,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63930368,
+            "threads": 21,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63930368,
+            "threads": 24,
+            "file_descriptors": 19,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63930368,
+            "threads": 21,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63930368,
+            "threads": 25,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63942656,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63942656,
+            "threads": 23,
+            "file_descriptors": 19,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63942656,
+            "threads": 20,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63942656,
+            "threads": 24,
+            "file_descriptors": 19,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63959040,
+            "threads": 22,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63959040,
+            "threads": 25,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63959040,
+            "threads": 22,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63959040,
+            "threads": 25,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63971328,
+            "threads": 21,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63971328,
+            "threads": 24,
+            "file_descriptors": 19,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63971328,
+            "threads": 21,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63971328,
+            "threads": 25,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63983616,
+            "threads": 22,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63979520,
+            "threads": 25,
+            "file_descriptors": 19,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 63983616,
+            "threads": 22,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 63983616,
+            "threads": 26,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        }
+      ],
+      [
+        {
+          "mode": "buffered",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 64008192,
+            "threads": 21,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 64004096,
+            "threads": 24,
+            "file_descriptors": 18,
+            "temporary_files": 0
+          }
+        },
+        {
+          "mode": "private_file",
+          "cancel_phase": "resolver",
+          "close_after": {
+            "rss_bytes": 64008192,
+            "threads": 21,
+            "file_descriptors": 14,
+            "temporary_files": 0
+          },
+          "cancel_after": {
+            "rss_bytes": 64008192,
+            "threads": 25,
+            "file_descriptors": 19,
+            "temporary_files": 0
+          }
+        }
+      ]
+    ],
+    "analysis": {
+      "rss_bytes": {
+        "first_quartile": 62629888.0,
+        "last_quartile": 63936512.0,
+        "window_growth": 1306624.0,
+        "growth_per_cycle": 43554.13333333333,
+        "peak": 64008192,
+        "baseline": 61403136
+      },
+      "file_descriptors": {
+        "first_quartile": 14.0,
+        "last_quartile": 14.0,
+        "window_growth": 0.0,
+        "growth_per_cycle": 0.0,
+        "peak": 14,
+        "baseline": 14
+      },
+      "threads": {
+        "first_quartile": 20.5,
+        "last_quartile": 20.5,
+        "window_growth": 0.0,
+        "growth_per_cycle": 0.0,
+        "peak": 24,
+        "baseline": 24
+      },
+      "temporary_files": {
+        "first_quartile": 0.0,
+        "last_quartile": 0.0,
+        "window_growth": 0.0,
+        "growth_per_cycle": 0.0,
+        "peak": 0,
+        "baseline": 0
+      }
+    },
+    "before_open": {
+      "rss_bytes": 37507072,
+      "threads": 1,
+      "file_descriptors": 4,
+      "temporary_files": 0
+    },
+    "after_close": {
+      "rss_bytes": 63340544,
+      "threads": 1,
+      "file_descriptors": 6,
+      "temporary_files": 0
+    },
+    "after_cancel": {
+      "rss_bytes": 63340544,
+      "threads": 1,
+      "file_descriptors": 6,
+      "temporary_files": 0
+    },
+    "upload_modes": [
+      "buffered",
+      "private_file"
+    ]
+  }
+}

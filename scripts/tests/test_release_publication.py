@@ -49,7 +49,7 @@ class PublicationTests(unittest.TestCase):
             for name in names:
                 (root / name).write_bytes(b'artifact')
             receipt = dict(version=version, source_revision='a' * 40, schema_version=2,
-                           status='qualified_for_publication', evidence_policy='storage-release-cycles-v1', platforms=platforms,
+                           status='qualified_for_publication', evidence_policy='storage-release-cycles-v2', platforms=platforms,
                            additional_gates=[{'name': 'fixture', 'sha256': 'b' * 64}])
             receipt_path = root / 'release-qualification.json'
             receipt_path.write_text(json.dumps(receipt))
@@ -81,7 +81,7 @@ class PublicationTests(unittest.TestCase):
                 index_path.write_text(json.dumps(index))
                 with self.assertRaises(ValueError):
                     publication.check_files(root)
-                receipt['evidence_policy'] = 'storage-release-cycles-v1'
+                receipt['evidence_policy'] = 'storage-release-cycles-v2'
                 receipt['status'] = 'RUNNING'
                 receipt_path.write_text(json.dumps(receipt))
                 index['files'][receipt_path.name] = publication.digest(receipt_path)
