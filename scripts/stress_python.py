@@ -9,15 +9,15 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+import threading
 import time
 import uuid
 import zipfile
 
 import plenora_storage
-from plenora_storage import Connection, Engine, EngineConfig, StorageError
+from plenora_storage import Connection, Engine, EngineConfig, StorageError, CancellationToken
 from fixture_connections import ATOMIC, PROVIDERS, fixture
-from soak_policy import SOAK_DURATION_SECONDS
-from campaign_model import SOAK_INTERVAL_SECONDS
+from soak_policy import POLICY, analyze, validate_cycles
 
 
 def resources():
@@ -30,23 +30,22 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--wheel', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--duration-seconds', type=int, default=SOAK_DURATION_SECONDS,
-                        help='Soak duration (default: 2 hours for every version; provisional policy)')
+    parser.add_argument('--cycles', type=int, default=POLICY['cycles'])
+    parser.add_argument('--warmup-cycles', type=int, default=POLICY['warmup_cycles'])
     parser.add_argument('--workers', type=int, default=4)
-    parser.add_argument('--interval-seconds', type=float, default=SOAK_INTERVAL_SECONDS)
     parser.add_argument('--both-upload-modes', action='store_true',
-                        help='Exercise persistent default and private-file engines within the same soak duration')
+                        help='Exercise persistent default and private-file engines for every declared cycle')
     args = parser.parse_args()
-    if sys.platform != 'linux' or args.duration_seconds <= 0 or args.workers <= 0 or args.interval_seconds < 0:
-        parser.error('requires Linux and positive duration/workers, with a nonnegative interval')
+    if sys.platform != 'linux' or args.cycles != POLICY['cycles'] or args.warmup_cycles != POLICY['warmup_cycles'] or args.workers != 4:
+        parser.error('requires Linux and the declared cycle policy')
     installed = Path(plenora_storage.__file__).parent
     with zipfile.ZipFile(args.wheel) as archive:
         for name in archive.namelist():
             if name.startswith('plenora_storage/') and not name.endswith('/'):
                 assert (installed / name.removeprefix('plenora_storage/')).read_bytes() == archive.read(name), 'installed wheel differs'
-    report = {'schema_version': 1, 'status': 'RUNNING', 'wheel': args.wheel.name,
+    report = {'schema_version': 2, 'status': 'RUNNING', 'wheel': args.wheel.name,
               'wheel_sha256': hashlib.sha256(args.wheel.read_bytes()).hexdigest(),
-              'version': plenora_storage.version(), 'duration_seconds': args.duration_seconds,
+              'version': plenora_storage.version(), 'policy': POLICY, 'samples': [], 'cycle_matrix': [], 'lifecycle': [], 'warmup_completed': 0,
               'started_utc': datetime.now(timezone.utc).isoformat(),
               'workers': args.workers, 'payload_bytes': 65536, 'completed_cycles': 0,
               'providers': list(PROVIDERS), 'scope': 'persistent synchronous SDK, fixture servers, Linux'}
@@ -66,6 +65,7 @@ def main():
     try:
         with tempfile.TemporaryDirectory(prefix='storage-soak-') as temporary:
             root = Path(temporary)
+            os.environ['TMPDIR'] = str(root)
             local = root / 'storage'
             local.mkdir()
             source = root / 'input'
@@ -79,6 +79,12 @@ def main():
                 connections[provider] = Connection(**document)
                 credentials[f'fixture:{provider}'] = material
             prefix = 'qualification/soak-' + uuid.uuid4().hex
+            def sample():
+                value = resources()
+                value['temporary_files'] = sum(p.is_file() for p in root.rglob('*') if p != source)
+                return value
+
+            report['before_open'] = sample()
             policy = EngineConfig(allow_insecure_http=True, allow_insecure_ftp=True, allow_private_network=True)
             with ExitStack() as engines_stack, \
                     ThreadPoolExecutor(max_workers=args.workers) as pool:
@@ -99,6 +105,7 @@ def main():
                         transfer = engine.get(connection, copied, output, overwrite=True, timeout_ms=60000)
                         assert transfer['checksum']['value'] == checksum and output.read_bytes() == payload
                     finally:
+                        output.unlink(missing_ok=True)
                         errors = []
                         for owned_key in [key, copied]:
                             try:
@@ -108,33 +115,80 @@ def main():
                         if errors and sys.exc_info()[0] is None:
                             raise errors[0]
 
-                while True:
+                for iteration in range(args.warmup_cycles + args.cycles):
+                    cells = []
                     for mode in modes:
                         for provider in PROVIDERS:
                             tasks = [pool.submit(cycle, provider, worker, mode) for worker in range(args.workers)]
                             for task in tasks:
                                 task.result()
-                            current = resources()
+                            current = sample()
                             report.setdefault('after_provider', {})[provider] = current
                             report['after_mode_provider'][mode][provider] = current
-                        report['completed_cycles_by_mode'][mode] += 1
-                    current = resources()
-                    if 'baseline' not in report:
-                        report['baseline'] = current
-                        report['peak'] = dict(current)
-                    for name, value in current.items():
-                        report['peak'][name] = max(report['peak'][name], value)
-                    report['latest'] = current
-                    # Fixed budgets after warmup; no allowance grows with cycle count.
-                    assert current['rss_bytes'] <= report['baseline']['rss_bytes'] + 128 * 1024**2, 'RSS grew beyond soak budget'
-                    assert current['file_descriptors'] <= report['baseline']['file_descriptors'] + 16, 'descriptor count grew beyond soak budget'
-                    assert current['threads'] <= report['baseline']['threads'] + 16, 'thread count grew beyond soak budget'
-                    report['completed_cycles'] += 1
+                            cells.append(dict(mode=mode, provider=provider, workers=args.workers, resources=current))
+                        if iteration >= args.warmup_cycles:
+                            report['completed_cycles_by_mode'][mode] += 1
+                    lifecycle = []
+                    for mode in modes:
+                        close_before = sample()
+                        entered, release = threading.Event(), threading.Event()
+                        def resolver(reference):
+                            entered.set()
+                            if not release.wait(10):
+                                raise RuntimeError('cancellation fixture did not release resolver')
+                            return credentials[reference]
+                        cancelled_key = f'{prefix}/{mode}/cancelled'
+                        with Engine(policy, credential_resolver=resolver,
+                                    spool_uploads=(mode == 'private_file')) as transient:
+                            cancel_before = sample()
+                            token = CancellationToken()
+                            task = pool.submit(transient.put, connections['webdav'], cancelled_key, source,
+                                               overwrite=True, publication_policy='best_effort',
+                                               cancellation=token, timeout_ms=60000)
+                            try:
+                                if not entered.wait(10):
+                                    raise ValueError('cancellation did not reach the resolver boundary')
+                                token.cancel()
+                            finally:
+                                release.set()
+                            try:
+                                task.result(timeout=10)
+                            except StorageError as error:
+                                assert error.category == 'cancelled'
+                            else:
+                                raise ValueError('cancelled transfer unexpectedly completed')
+                            finally:
+                                engines[mode].delete(connections['webdav'], cancelled_key,
+                                                     ignore_missing=True, timeout_ms=60000)
+                            cancel_after = sample()
+                        lifecycle.append(dict(mode=mode, cancel_phase='resolver',
+                                              close_before=close_before, close_after=sample(),
+                                              cancel_before=cancel_before, cancel_after=cancel_after))
+                    current = sample()
+                    if iteration < args.warmup_cycles:
+                        report['warmup_completed'] += 1
+                    else:
+                        report['samples'].append(current)
+                        report['cycle_matrix'].append(cells)
+                        report['lifecycle'].append(lifecycle)
+                        report['completed_cycles'] += 1
                     save()
-                    remaining = args.duration_seconds - (time.monotonic() - started)
-                    if remaining <= 0:
-                        break
-                    time.sleep(min(args.interval_seconds, remaining))
+                report['analysis'] = analyze(report['samples'])
+            report['after_close'] = sample()
+            # A pre-cancelled operation is a deterministic lifecycle boundary;
+            # in-flight cancellation remains covered by the installed SDK suite.
+            with Engine(policy) as cancelled_engine:
+                token = CancellationToken()
+                token.cancel()
+                try:
+                    cancelled_engine.put(connections['local'], 'cancelled', source, overwrite=True,
+                                              publication_policy='atomic_required', cancellation=token)
+                except StorageError as error:
+                    assert error.category == 'cancelled'
+                else:
+                    raise ValueError('cancelled transfer unexpectedly completed')
+            report['after_cancel'] = sample()
+            validate_cycles(report)
             report['status'] = 'PASS'
     except BaseException as error:
         report['status'] = 'FAIL'

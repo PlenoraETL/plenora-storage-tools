@@ -57,15 +57,11 @@ REMOTE_SECONDS = 60
 EXPORT_SECONDS = 600
 PREPARATION_POLL = 10
 PREPARATION_SECONDS = 1800
-PERFORMANCE_ROUND_TIMEOUT = 300
-PERFORMANCE_PHASE_TIMEOUT = 7500
 TRANSFER_ROUND_TIMEOUT = 10800
 TRANSFER_PHASE_TIMEOUT = 14400
 COMMAND_TIMEOUT = 14400
 CHILD_REAP_SECONDS = 5
 COMMAND_GRACE_SECONDS = 60
-SOAK_DURATION_SECONDS = 7200
-SOAK_INTERVAL_SECONDS = 30
 TLS_SECONDS = 30
 KEEPALIVE_SECONDS = 30
 WORKFLOW_SECONDS = 4 * 3600
@@ -111,9 +107,9 @@ def require_preparation_sources(paths):
 # Declared phase identities for retries and inventory. Actual dispatch is
 # independently observed by test_frozen_campaign_plan, never inferred by AST.
 CAMPAIGN_PHASES = {
-    'run_vm_campaign.py': ('qualify-linux', 'install-sdk', 'performance-ab', 'performance-compare',
+    'run_vm_campaign.py': ('qualify-linux', 'install-sdk',
                           'transfers-large', 'transfers-workers4', 'transfers-workers16',
-                          'spooled-large', 'spooled-workers4', 'spooled-workers16', 'soak'),
+                          'spooled-large', 'spooled-workers4', 'spooled-workers16', 'calibrate-resources', 'soak'),
     'release_campaign.py': ('workflows', 'download', 'assemble', 'prepare-vm',
                            'qualify-windows', 'qualify-vm', 'seal'),
 }

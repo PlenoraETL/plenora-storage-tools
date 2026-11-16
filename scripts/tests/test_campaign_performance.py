@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[2]
 POLICY = json.loads((ROOT / 'scripts/performance-policy.json').read_text())
 CURRENT_POLICY = POLICY
 POLICY = dict(POLICY, schema_version=2)  # Historical no-warmup algorithm tests.
-ROUNDS, WORKERS = run_vm_campaign.PERFORMANCE_ROUNDS, 4
+ROUNDS, WORKERS = CURRENT_POLICY['minimum_paired_measurement_rounds'], 4
 BINARIES = {'baseline': 'a' * 64, 'candidate': 'b' * 64}
 ENVIRONMENT = {'machine': 'x86_64', 'kernel': 'test', 'cpu_count': 8, 'cpu_model': 'test', 'fixture_sha256': 'c' * 64}
 OPERATIONS = ('test', 'put', 'get', 'stat', 'copy', 'delete', 'delete')
@@ -208,16 +208,12 @@ class PairedOrderTests(unittest.TestCase):
             compare(baseline, {k: v for k, v in candidate.items() if k != 'paired_measurement'},
                     BINARIES['candidate'], POLICY)
 
-    def test_release_evidence_from_3_0_0_requires_a_paired_run(self):
+    def test_transfer_gate_rejects_diagnostic_pairing(self):
         baseline, candidate = measured(alternated(ROUNDS), ROUNDS, linear(0.0))
-        release_evidence.require_paired_performance((2, 1, 0), baseline, candidate)
-        with self.assertRaises(ValueError):
-            release_evidence.require_paired_performance((3, 0, 0), baseline, candidate)
         pair(baseline, candidate)
-        release_evidence.require_paired_performance((3, 0, 0), baseline, candidate)
         with self.assertRaises(ValueError):
-            release_evidence.validate_transfers(candidate, BINARIES['candidate'], size=1024**2, workers=WORKERS,
-                                                rounds=1)
+            release_evidence.validate_transfers(candidate, BINARIES['candidate'], size=1024**2,
+                                                workers=WORKERS, rounds=1)
 
 
 class WarmupTests(unittest.TestCase):
@@ -366,11 +362,11 @@ class RetryTests(unittest.TestCase):
     def test_a_retry_of_a_passed_phase_is_refused_not_ignored(self):
         with tempfile.TemporaryDirectory() as temporary:
             campaign = Campaign(Path(temporary), {'subject': 'same'})
-            campaign.phase('performance-ab', lambda path: (path / 'report.json').write_text('passed'))
+            campaign.phase('transfers-workers4', lambda path: (path / 'report.json').write_text('passed'))
             with self.assertRaises(ValueError):
-                campaign.validate_retries(['performance-ab'], run_vm_campaign.PHASES)
+                campaign.validate_retries(['transfers-workers4'], run_vm_campaign.PHASES)
             with self.assertRaises(ValueError):
-                campaign.phase('performance-ab', lambda path: self.fail('remeasured'), retry=True, reason='again')
+                campaign.phase('transfers-workers4', lambda path: self.fail('remeasured'), retry=True, reason='again')
             with self.assertRaises(ValueError):
                 campaign.validate_retries(['performance-baseline'], run_vm_campaign.PHASES)
 
@@ -378,16 +374,17 @@ class RetryTests(unittest.TestCase):
                 (path / 'report.json').write_text('failed')
                 raise RuntimeError('budget')
             with self.assertRaises(RuntimeError):
-                campaign.phase('performance-compare', failure)
-            campaign.validate_retries(['performance-compare'], run_vm_campaign.PHASES)
-            result = campaign.phase('performance-compare', lambda path: (path / 'report.json').write_text('ok'),
+                campaign.phase('transfers-workers16', failure)
+            campaign.validate_retries(['transfers-workers16'], run_vm_campaign.PHASES)
+            result = campaign.phase('transfers-workers16', lambda path: (path / 'report.json').write_text('ok'),
                                     retry=True, reason='compare again')
             self.assertEqual(result.name, '2')
 
     def test_phases_follow_the_version(self):
-        self.assertIn('performance-ab', run_vm_campaign.PHASES)
+        self.assertIn('transfers-workers4', run_vm_campaign.PHASES)
         self.assertNotIn('performance-baseline', run_vm_campaign.PHASES)
-        self.assertEqual(run_vm_campaign.PERFORMANCE_ORDER, SCHEME)
+        self.assertNotIn('performance-ab', run_vm_campaign.PHASES)
+        self.assertNotIn('performance-compare', run_vm_campaign.PHASES)
         self.assertNotIn('spooled-large', run_vm_campaign.phases_for('2.0.1'))
         self.assertIn('spooled-large', run_vm_campaign.phases_for('3.0.0'))
 

@@ -4,6 +4,7 @@ import hashlib
 import json
 import strict_json
 from pathlib import Path
+from soak_policy import RELEASE_POLICY_ID
 import shutil
 import subprocess
 import sys
@@ -92,6 +93,7 @@ def check_files(directory):
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     require(receipt['version'] == index['version'] and receipt['source_revision'] == revision
             and receipt['status'] == 'qualified_for_publication' and receipt['schema_version'] == 2
+            and receipt.get('evidence_policy') == RELEASE_POLICY_ID
             and bool(receipt['additional_gates']), 'publication receipt is not current and qualified')
     require(len(receipt['platforms']) == len(TARGETS)
             and {p['target'] for p in receipt['platforms']} == set(TARGETS), 'publication targets are incomplete')

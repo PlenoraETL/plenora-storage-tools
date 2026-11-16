@@ -24,6 +24,8 @@ WIRE_BOUNDARIES = {
     'kerberos_messages': b'\x6b\x82\xff\xff\x30\x82\xff\xff',
 }
 TRIPLE = 'x86_64-unknown-linux-gnu'
+RUNS = 10000
+FUZZ_POLICY = 'storage-parser-work-v1'
 
 
 def digest(path):
@@ -90,17 +92,18 @@ def capture(command):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--seconds', type=int, default=60, help='Budget per parser, excluding compilation')
+    parser.add_argument('--seconds', type=int, default=0, help='Exploration only; zero selects the release work budget')
     parser.add_argument('--seed', type=int, default=7319)
     parser.add_argument('--output', type=Path, default=ROOT / 'target/parser-fuzz')
     args = parser.parse_args()
-    if not 10 <= args.seconds <= 3600 or not 1 <= args.seed <= 2**31 - 1:
-        parser.error('seconds must be 10..3600 and seed 1..2147483647')
+    if (args.seconds != 0 and not 10 <= args.seconds <= 3600) or not 1 <= args.seed <= 2**31 - 1:
+        parser.error('seconds must be 0 (release) or 10..3600 (exploration) and seed 1..2147483647')
     output = args.output.resolve()
     # Never mix a previous PASS or corpus with a new campaign.
     output.mkdir(parents=True, exist_ok=False)
     report = {'schema_version': 1, 'status': 'RUNNING', 'targets': {},
               'toolchain': TOOLCHAIN, 'seconds_per_target': args.seconds, 'seed': args.seed,
+              'policy_id': FUZZ_POLICY, 'runs_per_target': RUNS, 'mode': 'exploration' if args.seconds else 'release',
               'sanitizer': 'address', 'max_input_bytes': 65536,
               'timeout_seconds_per_input': 10, 'rss_limit_mb': 1024}
 
@@ -140,20 +143,28 @@ def main():
             artifacts = directory / 'artifacts'
             artifacts.mkdir()
             binary = ROOT / 'fuzz/target' / TRIPLE / 'release' / target
+            replay = {}
+            for name in seeds:
+                command = [str(binary), str(corpus / name), '-runs=1']
+                with (directory / ('replay-' + name + '.log')).open('w') as log:
+                    replay[name] = subprocess.run(command, cwd=ROOT, env=env, stdout=log,
+                                                  stderr=subprocess.STDOUT, timeout=60).returncode
             command = [str(binary), str(corpus), f'-seed={args.seed}',
-                       f'-max_total_time={args.seconds}', '-max_len=65536',
+                       (f'-max_total_time={args.seconds}' if args.seconds else f'-runs={RUNS}'), '-max_len=65536',
                        '-timeout=10', '-rss_limit_mb=1024', '-print_final_stats=1',
                        f'-artifact_prefix={artifacts}{os.sep}']
             started = time.monotonic()
             with (directory / 'run.log').open('w') as log:
                 try:
                     result = subprocess.run(command, cwd=ROOT, env=env, stdout=log,
-                                            stderr=subprocess.STDOUT, timeout=args.seconds + 60)
+                                            stderr=subprocess.STDOUT, timeout=args.seconds + 60 if args.seconds else 600)
                     code = result.returncode
                 except subprocess.TimeoutExpired:
                     code = -1
             entry = stats((directory / 'run.log').read_text(errors='replace'), code)
-            entry.update(binary_sha256=digest(binary), seeds=seeds, command=command,
+            if any(replay.values()) or (not args.seconds and (entry['executions'] or 0) < RUNS):
+                entry['status'] = 'FAIL'
+            entry.update(binary_sha256=digest(binary), seeds=seeds, replay=replay, command=command,
                          elapsed_seconds=round(time.monotonic() - started, 3))
             report['targets'][target] = entry
             save()

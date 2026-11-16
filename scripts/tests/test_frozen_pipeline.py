@@ -188,7 +188,7 @@ class PipelineTests(unittest.TestCase):
                 (folder / 'release-manifest.json').write_text(json.dumps({'artifacts': artifacts}))
                 platforms.append({'target': target, 'evidence': []})
             (source / 'release-qualification.json').write_text(json.dumps({
-                'schema_version': 2, 'status': 'qualified_for_publication',
+                'schema_version': 2, 'status': 'qualified_for_publication', 'evidence_policy': 'storage-release-cycles-v1',
                 'platforms': platforms, 'additional_gates': []}))
             incoming = root / 'input.tar.gz'
             with tarfile.open(incoming, 'w:gz') as stream:
@@ -232,7 +232,7 @@ class PipelineTests(unittest.TestCase):
             for name in names:
                 (root / name).write_bytes(b'artifact')
             receipt = {'version': version, 'source_revision': 'a' * 40, 'schema_version': 2,
-                       'status': 'qualified_for_publication', 'platforms': platforms,
+                       'status': 'qualified_for_publication', 'evidence_policy': 'storage-release-cycles-v1', 'platforms': platforms,
                        'additional_gates': [{'name': 'fixture', 'sha256': 'b' * 64}]}
             (root / 'release-qualification.json').write_text(json.dumps(receipt))
             names.append('release-qualification.json')

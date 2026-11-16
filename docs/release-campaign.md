@@ -1,13 +1,46 @@
 # Campagna di qualifica riprendibile
 
 Dalla 2.0.1 il coordinamento della VM è versionato, insieme ai gate, e non
-richiede script con commit o identificativi Actions incorporati. La durata
-del soak resta 7200 secondi. Account cloud reali rimangono fuori dal perimetro.
+richiede script con commit o identificativi Actions incorporati. La policy corrente è `storage-release-cycles-v1`: 5 cicli di warm-up e 40 misurati, senza durata minima. Account cloud reali rimangono fuori dal perimetro.
+
+## Criterio 4.0.0 a cicli
+
+Fonte eseguibile: `scripts/soak_policy.py`, schema report 2. Il runner e il
+verificatore richiedono la stessa policy, senza waiver. Ogni ciclo misura
+RSS, fd, thread e temporanei posseduti dopo le operazioni, per 9 provider,
+2 strategie e 4 worker. Conserva serie, matrice, quartili e residui dopo
+close e cancellazione in volo al resolver WebDAV, prima dell'accesso remoto,
+sincronizzata con eventi. Le altre prove della suite SDK installata restano. Un ciclo omesso, un residuo o una crescita eccessiva fallisce.
+I tetti restano +128 MiB RSS, +16 fd, +16 thread; temporanei residui zero.
+La crescita fra primo e ultimo quartile è al più 16 MiB, 2 fd e 2 thread.
+Non ci sono pause da 30 s né un fenomeno temporale che imponga due ore.
+
+La calibrazione sintetica locale (`scripts/calibrate_cycles.py`) e il leak
+control da 1 MiB/ciclo provano il misuratore, non i server: il rumore della
+VM e il lifecycle della wheel finale devono ancora essere misurati.
+Calibrazione locale Windows/Python 3.14: crescita RSS fra quartili
+237.568, 151.552 e 53.248 byte; handle, thread e temporanei: zero crescita.
+Il controllo da 1 MiB/ciclo ha prodotto 31.653.888 byte ed è stato rifiutato.
+Quaranta cicli danno finestre da dieci separate da trenta cicli: il controllo
+atteso da circa 30 MiB supera 16 MiB e resta sotto il tetto di 128 MiB.
+Il margine sul massimo rumore locale osservato è oltre 36 volte (includendo 456.704 byte di un run locale precedente); non è una
+stima del rumore dei provider. La VM ripete calibrazione e controllo prima
+del soak; un fallimento non cambia automaticamente le soglie.
+Il report `target/PROVE-CICLI.md` conserva log, limiti e identità locali.
+Il fuzz di release rigioca ogni seed/regressione e completa 10.000 esecuzioni
+per target ASan; il lavoro non dimostra completezza dei rami. La ricerca a
+300 secondi rimane nel workflow periodico e non soddisfa il gate di release.
+
+ST-4 mantiene 1 GiB, 1 MiB, 4/16 worker, buffered/private-file e i due ABI:
+attraversano limiti di buffering, spool, concorrenza e packaging distinti.
+ST-5 mantiene lease, fence, diagnosi e kill dell'albero; il timeout è un FAIL.
+ST-6 rimuove la sola pausa del soak: i test reali di timeout, keepalive e
+cleanup e i timer del prodotto restano invariati, senza estenderne i claim.
 
 ## Prerequisiti
 
 Il coordinatore viene eseguito su Windows, dove prova la distribuzione Windows;
-la VM Linux dedicata esegue fixture, trasferimenti, prestazioni e soak.
+la VM Linux dedicata esegue fixture, trasferimenti e cicli SDK.
 Servono Git, GitHub CLI autenticato, Python 3.14 e:
 
 ```powershell
@@ -90,18 +123,16 @@ Salvare la configurazione sotto `target/`, escluso da Git. Esempio di struttura:
   "runner_image": "plenora-storage-runner:qualified",
   "registry_volume": "storage-rust-cargo-registry",
   "candidate_run": "123456789",
-  "ci_run": "123456790",
-  "baseline_binary": "dist/2.0.0/x86_64-unknown-linux-gnu/plenora-storage"
+  "ci_run": "123456790"
 }
 ```
 
 I valori identificano risorse reali dell'operatore; gli ID di esempio non sono
 evidenze. Il checkout deve essere pulito e corrispondere ai due workflow riusciti.
-La CLI di baseline deve provenire da una precedente distribuzione verificata.
-Il suo digest entra nell'identità della campagna.
+Non si richiede una distribuzione precedente. Il sigillo lega i digest del candidato e la nuova policy.
 
 ```powershell
-python scripts/release_campaign.py --config target/campaign.json --output target/campaign-2.0.1
+python scripts/release_campaign.py --config target/campaign.json --output target/campaign-4.0.0-cycles
 ```
 
 Il comando scarica e verifica i materiali Actions, crea un checkout dedicato
@@ -116,11 +147,16 @@ del laboratorio incorporati nello script. Per preparazioni manuali impostare
 
 `scripts/run_vm_campaign.py` è il runner Linux interno. Usa gli artefatti
 immutabili come input e scrive i report in tentativi distinti. Qualifica della
-CLI, installazione SDK, misura prestazionale, confronto, trasferimenti e soak
+CLI, installazione SDK, trasferimenti e cicli SDK
 hanno fasi separate. Le prove Windows e Linux coprono gli stessi nove provider
 nel perimetro delle fixture.
 
-### Prestazioni: misura alternata
+### Archivio della policy prestazionale precedente
+
+Quanto segue conserva la motivazione e i risultati storici della policy A/B.
+Non è un requisito della 4.0.0: fasi, download e digest della baseline sono
+rimossi dalla campagna corrente. Nessun SLO prestazionale sostitutivo è dichiarato.
+
 
 La fase `performance-ab` misura baseline e candidato nella stessa esecuzione,
 16 round iniziali di riscaldamento e poi 32 round di misura, con 4 worker.
@@ -302,11 +338,11 @@ annunciarsi, e se non è più il suo esce con 75 senza aver annunciato niente.
 
 Ogni tentativo `qualify-vm` carica i suoi input in una directory della
 propria epoca, `.fixtures/inputs/<gettone>/`, creata vuota (una directory che
-esiste già è un errore): binario di baseline, archivio e distribuzione Linux,
+esiste già è un errore): archivio e distribuzione Linux,
 override di Compose con i mount. Il controller calcola il digest di ogni file e
 li passa tutti al runner sulla riga di comando (`--expected-inputs`). Il
 runner verifica che nella directory ci siano esattamente quei file con quei
-digest, e che il binario di baseline montato abbia il suo, prima di iniziare e
+digest prima di iniziare e
 a ogni controllo dell'epoca, quindi prima e dopo ogni fase.
 
 Il runner non esegue né misura file dell'host. Prima di avviarlo, il comando del
@@ -396,7 +432,7 @@ La connessione è autenticata dalla host key verificata.
   verificato;
 - **i file delle fixture letti dal runner** (CA, certificato FTPS, fingerprint
   SFTP): copie private verificate;
-- **i byte misurati:** binario candidato, baseline e wheel sono copie private
+- **i byte misurati:** binario candidato e wheel sono copie private
   verificate, e anche la qualifica Linux e l'SDK usano solo quelle copie;
 - **le evidenze:** ledger, report e file selezionati non passano mai da una
   directory dell'host. Il controller richiede l'insieme esatto dei file con i
@@ -640,6 +676,13 @@ della pubblicazione. La sola preparazione dei file di release non lo esegue.
 
 ## Arresti della misura e watchdog
 
+Per 4.0.0 i watchdog restano massimi operativi, non durate minime.
+Non si riducono i limiti di trasferimento senza tempi osservati sulle stesse
+fixture. La tabella A/B e le due ore qui sotto descrivono la policy precedente.
+Il reset cambia il nonce delle fixture: non si riusano fasi VM di un altro reset.
+Le fasi locali già sigillate restano riutilizzabili a identità invariata.
+
+
 L'indagine sulle copie in `target/hang` della campagna 3.0.3 trova entrambi
 i report `RUNNING`, 1248 risultati baseline e 1251 candidato: nel round 35
 (indice 34) sono stati salvati tre worker GCS candidato, dopo i PASS Azure.
@@ -748,7 +791,7 @@ perché un ledger lasciato sull'host da un tentativo precedente non sarebbe una
 fonte affidabile. Per ripetere la parte VM si chiede un nuovo tentativo:
 
 ```powershell
-python scripts/release_campaign.py --config target/campaign.json --output target/campaign-2.0.1 --retry-phase qualify-vm --retry-reason "Spazio del laboratorio ripristinato"
+python scripts/release_campaign.py --config target/campaign.json --output target/campaign-4.0.0-cycles --retry-phase qualify-vm --retry-reason "Spazio del laboratorio ripristinato"
 ```
 
 I tentativi precedenti restano presenti. Il retry crea una nuova directory,
@@ -780,7 +823,7 @@ evidenze o cache per aggirare il controllo.
 Usare il percorso del bundle restituito dal coordinatore:
 
 ```powershell
-python scripts/publish_qualified.py --bundle target/campaign-2.0.1/seal/1/qualification-input.tar.gz --output target/publication-2.0.1 --repository PlenoraETL/plenora-storage-tools --notes docs/release-notes-2.0.1.md
+python scripts/publish_qualified.py --bundle target/campaign-4.0.0-cycles/seal/1/qualification-input.tar.gz --output target/publication-2.0.1 --repository PlenoraETL/plenora-storage-tools --notes docs/release-notes-2.0.1.md
 ```
 
 La pubblicazione rivalida il bundle prima di creare tag e bozza, conserva il

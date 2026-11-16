@@ -109,10 +109,8 @@ class ModelTests(unittest.TestCase):
             self.assertEqual((model.LEASE_SECONDS, model.LEASE_MARGIN, model.RENEW_SECONDS,
                               model.KILL_SECONDS, model.POLL_SECONDS, model.STALL_SECONDS),
                              (60, 30, 10, 10, 1, 9))
-            self.assertEqual((run_vm_campaign.PERFORMANCE_ROUND_TIMEOUT,
-                              run_vm_campaign.PERFORMANCE_PHASE_TIMEOUT,
-                              run_vm_campaign.TRANSFER_ROUND_TIMEOUT,
-                              run_vm_campaign.TRANSFER_PHASE_TIMEOUT), (300, 7500, 10800, 14400))
+            self.assertEqual((run_vm_campaign.TRANSFER_ROUND_TIMEOUT,
+                              run_vm_campaign.TRANSFER_PHASE_TIMEOUT), (10800, 14400))
             self.assertEqual(release_campaign.Remote.stream.__defaults__, (600,))
         observe()
         with patch.object(model, 'LEASE_MARGIN', 1):

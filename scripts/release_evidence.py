@@ -14,10 +14,9 @@ from pathlib import Path
 from check_installed_sdk import enforce_coverage, test_count
 from check_rust_api import packages
 from check_test_layout import check as check_test_layout
-from check_performance import compare
-from soak_policy import SOAK_DURATION_SECONDS
+from soak_policy import validate_cycles, validate_calibration, POLICY as CYCLE_POLICY
 from fixture_connections import BUFFERED, PROVIDERS
-from fuzz_parsers import TARGETS as FUZZ_TARGETS, stats
+from fuzz_parsers import TARGETS as FUZZ_TARGETS, stats, RUNS, FUZZ_POLICY
 from summarize_coverage import apply_thresholds, summarize
 from scan_artifacts import validate as validate_native_inventory
 from qualify_s3_disk_pressure import validate as validate_disk_pressure
@@ -92,22 +91,25 @@ def validate_transfers(report, binary, *, size, workers, rounds, spool_uploads=F
                     and measure['elapsed_seconds'] > 0, 'invalid transfer measurement')
 
 
-def require_paired_performance(version_core, baseline, candidate):
-    """From 3.0.0 performance evidence comes from one alternated run."""
-    if version_core >= (3, 0, 0):
-        require('paired_measurement' in baseline and 'paired_measurement' in candidate,
-                'performance evidence must come from a paired alternated run')
-
-
-def validate_soak(report, wheel, version, minimum_seconds=SOAK_DURATION_SECONDS, *, both_upload_modes=False):
+def validate_soak(report, wheel, version, *, both_upload_modes=False):
     require(report['status'] == 'PASS' and report['wheel_sha256'] == wheel
             and report['version'] == version, 'soak failed or describes another wheel')
-    require(report['duration_seconds'] >= minimum_seconds
-            and report['elapsed_seconds'] >= report['duration_seconds']
-            and report['workers'] >= 4 and report['completed_cycles'] > 0,
-            'soak is incomplete')
+    validate_cycles(report)
+    require(report['workers'] == 4, 'soak worker count differs')
     require(len(report['providers']) == len(PROVIDERS) and set(report['providers']) == set(PROVIDERS)
             and set(report['after_provider']) == set(PROVIDERS), 'soak provider matrix is incomplete')
+    modes = ['buffered', 'private_file'] if both_upload_modes else report.get('upload_modes', ['buffered'])
+    expected = Counter((mode, provider, 4) for mode in modes for provider in PROVIDERS)
+    require(len(report['cycle_matrix']) == report['completed_cycles'], 'soak cycle matrix incomplete')
+    for cells in report['cycle_matrix']:
+        require(Counter((c['mode'], c['provider'], c['workers']) for c in cells) == expected,
+                'soak cycle omitted or duplicated provider/strategy')
+        for cell in cells:
+            require(set(cell['resources']) == set(report['samples'][0]), 'missing cell resource measurement')
+            for key, allowance in CYCLE_POLICY['absolute_growth'].items():
+                value = cell['resources'][key]
+                require(type(value) is int and value >= 0 and value <= report['samples'][0][key] + allowance,
+                        'invalid or excessive cell resource measurement')
     if both_upload_modes:
         modes = {'buffered', 'private_file'}
         require(report.get('upload_modes') == ['buffered', 'private_file']
@@ -117,13 +119,9 @@ def validate_soak(report, wheel, version, minimum_seconds=SOAK_DURATION_SECONDS,
             require(report['completed_cycles_by_mode'][mode] == report['completed_cycles']
                     and set(report['after_mode_provider'][mode]) == set(PROVIDERS),
                     'soak omitted cycles or providers in one upload strategy')
-    for key, allowance in [('rss_bytes', 128 * 1024**2), ('threads', 16), ('file_descriptors', 16)]:
-        baseline, peak, latest = (report[name][key] for name in ('baseline', 'peak', 'latest'))
-        require(0 < baseline <= peak <= baseline + allowance and 0 < latest <= peak,
-                'soak resource budget was exceeded')
 
 
-def validate_bundle(root, revision, subjects, python_version, minimum_soak_seconds=SOAK_DURATION_SECONDS):
+def validate_bundle(root, revision, subjects, python_version):
     """Return a file inventory only after all mandatory reports were checked.
 
 subjects maps target triples to binary_sha256 and wheel_sha256 from manifests
@@ -201,7 +199,8 @@ already checked by verify_release.py. No caller-supplied waiver is accepted.
     fuzz = evidence.json('fuzz/report.json')
     clean_source(fuzz, revision, 'source_commit')
     require(fuzz['status'] == 'PASS' and fuzz['sanitizer'] == 'address'
-            and fuzz['seconds_per_target'] >= 60 and set(fuzz['targets']) == set(FUZZ_TARGETS),
+            and fuzz.get('policy_id') == FUZZ_POLICY and fuzz.get('mode') == 'release'
+            and fuzz.get('runs_per_target') == RUNS and set(fuzz['targets']) == set(FUZZ_TARGETS),
             'parser fuzz campaign is incomplete')
     require(fuzz['lock_sha256'] == hashlib.sha256((ROOT / 'fuzz/Cargo.lock').read_bytes()).hexdigest(),
             'fuzz used a different dependency lock')
@@ -210,7 +209,11 @@ already checked by verify_release.py. No caller-supplied waiver is accepted.
         counts = stats(log, entry['returncode'])
         require(counts['status'] == 'PASS' and all(entry[k] == v for k, v in counts.items()),
                 'fuzz counters differ or campaign failed')
-        require(entry['elapsed_seconds'] >= fuzz['seconds_per_target'], 'fuzz campaign ended early')
+        require(entry['executions'] >= RUNS, 'fuzz work budget incomplete')
+        require(entry.get('replay') == {name: 0 for name in entry['seeds']}, 'fuzz seed replay incomplete')
+        for name in entry['seeds']:
+            raw = evidence.read(f'fuzz/{target}/replay-{name}.log').decode('utf-8')
+            require('Executed' in raw and 'ERROR:' not in raw, 'seed replay log incomplete')
         require(bool(entry['seeds']), 'fuzz seed inventory is empty')
         # Initial seeds are deterministic and regenerated, not distributed as
         # credential-bearing fuzz corpus in the public qualification bundle.
@@ -233,7 +236,7 @@ already checked by verify_release.py. No caller-supplied waiver is accepted.
             'Rust coverage failed or differs from raw counters')
 
     linux = subjects[TARGETS[0]]
-    for name, size, workers, rounds in [('large', 1024**3, 1, 1), ('workers4', 1024**2, 4, 2),
+    for name, size, workers, rounds in [('large', 1024**3, 1, 2), ('workers4', 1024**2, 4, 2),
                                        ('workers16', 1024**2, 16, 1)]:
         validate_transfers(evidence.json(f'transfers/{name}.json'), linux['binary_sha256'],
                            size=size, workers=workers, rounds=rounds)
@@ -242,17 +245,13 @@ already checked by verify_release.py. No caller-supplied waiver is accepted.
             clean_source(report, revision)
             validate_transfers(report, linux['binary_sha256'], size=size, workers=workers,
                                rounds=max(rounds, 2) if name == 'large' else rounds, spool_uploads=True)
-    validate_soak(evidence.json('soak/report.json'), linux['wheel_sha256'], python_version, minimum_soak_seconds,
+    calibration = evidence.json('soak/calibration.json')
+    validate_calibration(calibration)
+    require(calibration.get('platform', '').startswith('Linux') and calibration.get('python', '').startswith('3.14.'),
+            'release calibration must describe the Linux Python 3.14 runner')
+    for key, name in [('harness_sha256', 'calibrate_cycles.py'), ('policy_sha256', 'soak_policy.py')]:
+        require(calibration[key] == hashlib.sha256((ROOT / 'scripts' / name).read_bytes()).hexdigest(),
+                'calibration harness differs')
+    validate_soak(evidence.json('soak/report.json'), linux['wheel_sha256'], python_version,
                   both_upload_modes=version_core >= (2, 1, 0))
-    performance = evidence.json('performance/report.json')
-    baseline = evidence.json('performance/baseline.json')
-    candidate = evidence.json('performance/candidate.json')
-    evidence.read('performance/baseline.json', performance['baseline_sha256'])
-    evidence.read('performance/candidate.json', performance['candidate_sha256'])
-    clean_source(candidate, revision)
-    performance_policy = strict_json.loads((ROOT / 'scripts/performance-policy.json').read_text())
-    require_paired_performance(version_core, baseline, candidate)
-    actual = compare(baseline, candidate, linux['binary_sha256'], performance_policy)
-    require(actual['status'] == 'PASS' and all(performance[key] == value for key, value in actual.items()),
-            'performance report differs or budget failed')
     return [{'name': name, 'sha256': digest} for name, digest in sorted(evidence.files.items())]

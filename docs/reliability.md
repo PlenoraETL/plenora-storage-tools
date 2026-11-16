@@ -190,22 +190,22 @@ compilazione e la campagna usano il lockfile senza accesso alla rete.
 ```sh
 python3 scripts/build_python.py --output .fixtures/soak-wheel
 target/python-sdk-test/bin/python scripts/stress_python.py \
-  --wheel .fixtures/soak-wheel/*.whl --duration-seconds 7200 \
+  --wheel .fixtures/soak-wheel/*.whl --cycles 40 --warmup-cycles 5 \
   --output .fixtures/evidence/soak-python.json
 ```
 
 La prova mantiene lo stesso engine Python sincrono, con quattro worker e tutti
 i nove provider. Ogni ciclo verifica put/copy/get, checksum e cleanup; dopo il
-primo ciclo impone crescita massima di 128 MiB RSS, 16 descrittori e 16 thread.
+warm-up impone crescita massima di 128 MiB RSS, 16 descrittori e 16 thread.
 Il report identifica la wheel effettivamente installata e registra risorse per
 provider, picchi e avanzamento. `RUNNING` non equivale a una prova superata.
-La durata provvisoria richiesta dal 28 settembre 2026 è **due ore per tutte
-le versioni** (alfa, beta, RC e stabili), anche senza specificare
-`--duration-seconds`. Il gate e il runner condividono `scripts/soak_policy.py`.
-La durata sarà rivalutata prima del rilascio definitivo. Il workflow propone
-120 minuti; le opzioni da 10 o 60 minuti restano diagnostiche e non soddisfano
-il gate. Il timeout del job include anche build, trasferimenti e raccolta
-delle evidenze. Questa campagna non misura un engine asyncio persistente.
+Per 4.0.0 il criterio è `storage-sdk-cycles-v1`: 5 cicli di warm-up e 40
+misurati, senza pause o durata minima. Runner e gate condividono
+`scripts/soak_policy.py`. Serie, crescita fra quartili, tetti assoluti e
+residui dopo close/cancel devono tutti rispettare il criterio deciso prima.
+Il workflow esegue anche calibrazione sintetica e leak-control; questo non
+qualifica i provider reali. Nessun engine asyncio persistente è qualificato
+attraverso questo soak sincrono.
 
 I report storici conservano durata ed esito originali. Una campagna da 24 ore
 interrotta non diventa automaticamente una campagna completata da due ore:

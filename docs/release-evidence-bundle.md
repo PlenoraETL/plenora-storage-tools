@@ -15,66 +15,29 @@ passata a `qualify_release.py --evidence` aggiungere `gates/` con questa struttu
 | --- | --- |
 | `api/<target>/report.json` e i sette `.txt` | `check_rust_api.py`: Linux e Windows, commit pulito, confronto delle API con la baseline e digest dei testi |
 | `sdk/<target>/<python>/sdk-tests.json`, `sdk-tests.log`, `coverage.json`, `sdk-typing.json`, `sdk-typing.log` | `check_installed_sdk.py --coverage --typing`: due combinazioni di target e CPython 3.14, stessa wheel qualificata per target, test senza skip, coverage e consumer statico |
-| `fuzz/report.json`, `<parser>/run.log`, `<parser>/corpus/<seed>` | `fuzz_parsers.py`: quattro parser, ASan, almeno 60 secondi per parser, contatori dei log e digest dei seed originali; conservare anche il corpus evoluto nell'archivio della campagna |
+| `fuzz/report.json`, `<parser>/run.log`, `<parser>/replay-<seed>.log` | `fuzz_parsers.py`: otto target, ASan, replay di tutti i seed e 10.000 esecuzioni per target, contatori dei log e digest dei seed originali; conservare anche il corpus evoluto nell'archivio della campagna |
 | `coverage/coverage-summary.json`, `coverage/rust-coverage.json` | `coverage.sh`: commit pulito, contatori ricalcolati dal report LLVM e soglie per crate correnti |
-| `transfers/large.json` | `qualify_transfers.py`: 1 GiB, un worker, nove provider con distinzione tra streaming riuscito e rifiuto previsto |
+| `transfers/large.json` | `qualify_transfers.py`: 1 GiB, un worker, due round, nove provider con distinzione tra streaming riuscito e rifiuto previsto |
 | `transfers/workers4.json`, `transfers/workers16.json` | Stesso script: 1 MiB, rispettivamente quattro worker per almeno due round e sedici worker per almeno un round |
-| `soak/report.json` | `stress_python.py`: stessa wheel Linux, campagna terminata, nove provider, almeno quattro worker e budget delle risorse rispettati |
-| `performance/baseline.json`, `performance/candidate.json`, `performance/report.json` | Due campagne indipendenti e confronto descritto sotto |
+| `soak/report.json`, `soak/calibration.json` | `stress_python.py`: stessa wheel Linux, campagna terminata, nove provider, almeno quattro worker e budget delle risorse rispettati |
 
 I target sono `x86_64-unknown-linux-gnu` e `x86_64-pc-windows-msvc`; i nomi Python
-sono `3.14`. Dal 28 settembre 2026 la soglia
-provvisoria del soak è **due ore per tutte le versioni**, incluse alfa, beta,
-RC e stabili, come definito in `scripts/soak_policy.py`. La durata sarà
-rivalutata prima del rilascio definitivo. Non sommare campagne parziali e non riassegnare
-un report a un'altra wheel, anche se deriva dallo stesso commit.
+sono `3.14`. La policy `storage-sdk-cycles-v1` richiede 5 cicli di warm-up
+separati e 40 cicli misurati. Lo schema 2 conserva campioni, matrice completa,
+quartili e risorse dopo close/cancel. Nessuna durata minima. Non sommare
+campagne parziali o riassegnare report a un'altra wheel.
 
 Il validatore rilegge log, contatori e hash; non accetta il solo `PASS` di un
 riepilogo. I report devono comunque provenire da esecuzioni fidate: un digest
 non è una firma del runner. I soli file consumati vengono registrati nella
 ricevuta e copiati sotto `dist/<version>/evidence/gates/`.
 
-## Confronto delle prestazioni
+## Prestazioni del candidato
 
-Sul runner dedicato, con le fixture preparate e `PLENORA_CLI_BIN` riferito al
-binario scelto, eseguire una campagna baseline e una campagna candidata separate:
-
-```sh
-python3 scripts/qualify_transfers.py --bytes 1048576 --workers 4 --rounds 5 --output .fixtures/evidence/performance/baseline.json
-python3 scripts/qualify_transfers.py --bytes 1048576 --workers 4 --rounds 5 --output .fixtures/evidence/performance/candidate.json
-python3 scripts/check_performance.py .fixtures/evidence/performance/baseline.json .fixtures/evidence/performance/candidate.json --output .fixtures/evidence/performance/report.json
-```
-
-La prima baseline può essere misurata sullo stesso binario del candidato, in
-un'esecuzione indipendente. Per gli aggiornamenti si conserva la baseline del
-binario di riferimento: non sostituirla con una nuova misura del candidato per
-nascondere una regressione. Cambiamenti di hardware, kernel o definizioni delle
-fixture richiedono una nuova baseline dichiarata. Il report registra questi
-dati senza nomi host, endpoint o credenziali.
-
-La policy 2 consente +10% sulla mediana dei tempi, +20% sul p95 e +10%
-sul massimo RSS per coppia provider/operazione, con almeno cinque round e lo
-stesso numero di campioni. Per i tempi il margine è il maggiore tra quello
-percentuale e 10 ms sulla mediana / 20 ms sul p95. La
-[calibrazione](performance-calibration.md) conserva i campioni che hanno
-motivato il margine assoluto e il fallimento WebDAV che resta rilevato.
-È un budget di regressione, non uno SLO di throughput già qualificato.
-Un fallimento va indagato e le revisioni della policy richiedono dati conservati.
-Il workflow [reliability](../.github/workflows/reliability.yml) espone l'opzione
-`performance` per eseguire due campagne e il confronto sullo stesso runner.
-
-Per misurare distribuzioni già costruite, lo stesso workflow accetta
-`candidate_run`, `baseline_tag` e `baseline_sha256`. Il primo identifica una
-esecuzione riuscita di `release-candidate`; gli altri identificano una release
-stabile pubblicata e il digest atteso della sua CLI Linux. Il job scarica gli
-artefatti, verifica i digest e usa il checkout pulito del candidato. Esegue
-trenta round da 1 MiB con quattro worker per ciascun binario, sulle stesse
-fixture, senza ricompilare i binari misurati. Pubblica i tre report originali,
-le identità e le verifiche di spazio nell'artefatto
-`qualified-performance-evidence`. Questa modalità esegue solo il confronto
-prestazionale; qualifica per target, trasferimenti grandi e soak hanno le
-proprie prove obbligatorie. La [2.1.0](release-2.1.0.md) ne conserva un'esecuzione
-completa riferita ai propri artefatti.
+4.0.0 non impone una baseline di una release precedente né un SLO assoluto
+non calibrato. Restano tempi osservati, checksum e tetti RSS dei trasferimenti.
+Gli strumenti A/B sono solo diagnostici; nessun loro file è richiesto dal seal.
+Le ricevute storiche conservano la propria policy.
 
 ## Pubblicazione
 

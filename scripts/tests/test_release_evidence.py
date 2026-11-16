@@ -45,11 +45,16 @@ def transfer(size=1024**2, workers=4, rounds=5):
 
 
 def soak():
-    resources = dict(rss_bytes=1000, threads=4, file_descriptors=10)
-    return dict(status='PASS', wheel_sha256=WHEEL, version='1.0.0rc1', duration_seconds=7200,
-                elapsed_seconds=7201, workers=4, completed_cycles=1, providers=list(PROVIDERS),
-                after_provider={p: resources.copy() for p in PROVIDERS}, baseline=resources.copy(),
-                peak=resources.copy(), latest=resources.copy())
+    from soak_policy import POLICY, analyze
+    resources = dict(rss_bytes=1000, threads=4, file_descriptors=10, temporary_files=0)
+    samples = [resources.copy() for _ in range(POLICY['cycles'])]
+    return dict(schema_version=2, policy=deepcopy(POLICY), status='PASS', wheel_sha256=WHEEL,
+                version='1.0.0rc1', elapsed_seconds=1, workers=4, completed_cycles=POLICY['cycles'],
+                warmup_completed=POLICY['warmup_cycles'], providers=list(PROVIDERS), samples=samples,
+                cycle_matrix=[[dict(mode='buffered', provider=p, workers=4, resources=resources.copy()) for p in PROVIDERS] for _ in samples],
+                lifecycle=[[dict(mode='buffered', cancel_phase='resolver', **{k: resources.copy() for k in ('close_before','close_after','cancel_before','cancel_after')})] for _ in samples],
+                analysis=analyze(samples), before_open=resources.copy(), after_close=resources.copy(),
+                after_cancel=resources.copy(), after_provider={p: resources.copy() for p in PROVIDERS})
 
 
 class ReleaseEvidenceTests(unittest.TestCase):
@@ -97,16 +102,18 @@ class ReleaseEvidenceTests(unittest.TestCase):
                                               line_percent=100, branch_percent=100) for name in modules})))
         targets = {}
         for target in FUZZ_TARGETS:
-            self.write(f'fuzz/{target}/run.log', b'#120 DONE cov: 54\nstat::number_of_executed_units: 120\n')
+            self.write(f'fuzz/{target}/run.log', b'#10000 DONE cov: 54\nstat::number_of_executed_units: 10000\n')
             from fuzz_parsers import boundary_seeds
             corpus = self.root / f'fuzz/{target}/corpus'
             shutil.copytree(ROOT / 'fuzz/seeds' / target, corpus)
             boundary_seeds(target, corpus)
             seeds = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in corpus.iterdir()}
-            targets[target] = dict(status='PASS', returncode=0, executions=120, coverage_edges=54,
-                                   elapsed_seconds=61, seeds=seeds)
+            for name in seeds:
+                self.write(f'fuzz/{target}/replay-{name}.log', b'Executed seed in 0 ms\n')
+            targets[target] = dict(status='PASS', returncode=0, executions=10000, coverage_edges=54,
+                                   elapsed_seconds=1, seeds=seeds, replay={name: 0 for name in seeds})
         self.write('fuzz/report.json', dict(status='PASS', source_commit=REVISION, dirty=False,
-                   sanitizer='address', seconds_per_target=60, targets=targets,
+                   sanitizer='address', policy_id='storage-parser-work-v1', mode='release', runs_per_target=10000, targets=targets,
                    lock_sha256=hashlib.sha256((ROOT / 'fuzz/Cargo.lock').read_bytes()).hexdigest()))
         raw = {'data': [{'files': [dict(filename=f'/workspace/crates/{crate}/src/lib.rs',
                                       summary={'lines': {'count': 100, 'covered': 100}})
@@ -115,10 +122,18 @@ class ReleaseEvidenceTests(unittest.TestCase):
         summary = apply_thresholds(summarize(raw), self.policy['rust_lines'])
         summary.update(source_revision=REVISION, dirty=False, raw_report_sha256=digest)
         self.write('coverage/coverage-summary.json', summary)
-        self.write('transfers/large.json', transfer(1024**3, 1, 1))
+        self.write('transfers/large.json', transfer(1024**3, 1, 2))
         self.write('transfers/workers4.json', transfer(rounds=2))
         self.write('transfers/workers16.json', transfer(workers=16, rounds=1))
         self.write('soak/report.json', soak())
+        from soak_policy import POLICY, analyze
+        samples = soak()['samples']
+        leaking = [dict(row, rss_bytes=row['rss_bytes'] + i * 1024**2) for i, row in enumerate(samples)]
+        self.write('soak/calibration.json', dict(status='PASS', policy=POLICY, platform='Linux-fixture', python='3.14.6 fixture',
+            normal=[dict(status='PASS', samples=samples, analysis=analyze(samples)) for _ in range(3)],
+            leak_control=dict(status='FAIL', samples=leaking, injected_bytes_per_cycle=1024**2),
+            harness_sha256=hashlib.sha256((ROOT / 'scripts/calibrate_cycles.py').read_bytes()).hexdigest(),
+            policy_sha256=hashlib.sha256((ROOT / 'scripts/soak_policy.py').read_bytes()).hexdigest()))
         baseline = self.write('performance/baseline.json', transfer())
         candidate = self.write('performance/candidate.json', transfer())
         report = compare(transfer(), transfer(), BINARY, json.loads((ROOT / 'scripts/performance-policy.json').read_text()))
@@ -128,10 +143,11 @@ class ReleaseEvidenceTests(unittest.TestCase):
     def test_complete_bundle_records_raw_files_and_rejects_every_missing_gate(self):
         self.bundle()
         files = validate_bundle(self.root, REVISION, self.subjects, '1.0.0rc1')
-        self.assertEqual(len(files), 34 + len(TARGETS) * len(PYTHONS) * 5)
+        self.assertTrue(any('/replay-' in entry['name'] for entry in files))
+        self.assertFalse(any(entry['name'].startswith('performance/') for entry in files))
         self.assertFalse(any('/corpus/' in entry['name'] for entry in files))
         for name in ['soak/report.json', 'transfers/workers16.json', 'fuzz/report.json',
-                     'coverage/rust-coverage.json', 'performance/baseline.json',
+                     'coverage/rust-coverage.json',
                      f'api/{TARGETS[1]}/report.json', f'sdk/{TARGETS[1]}/3.14/sdk-tests.json']:
             with self.subTest(name=name):
                 path = self.root / name
@@ -140,6 +156,18 @@ class ReleaseEvidenceTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     validate_bundle(self.root, REVISION, self.subjects, '1.0.0rc1')
                 path.write_bytes(raw)
+
+    def test_fuzz_rejects_missing_replay_short_work_and_timed_exploration(self):
+        self.bundle()
+        original = json.loads((self.root / 'fuzz/report.json').read_text())
+        for mutate in (lambda r: r.update(mode='exploration'),
+                       lambda r: r.update(runs_per_target=9999),
+                       lambda r: r['targets'][FUZZ_TARGETS[0]]['replay'].popitem()):
+            report = deepcopy(original)
+            mutate(report)
+            self.write('fuzz/report.json', report)
+            with self.assertRaises(ValueError):
+                validate_bundle(self.root, REVISION, self.subjects, '1.0.0rc1')
 
     def test_fuzz_seed_hashes_are_verified_without_distributing_credentials(self):
         self.bundle()
@@ -179,23 +207,21 @@ class ReleaseEvidenceTests(unittest.TestCase):
 
     def test_soak_must_finish_on_exact_wheel_and_preserve_resource_limits(self):
         validate_soak(soak(), WHEEL, '1.0.0rc1')
-        for change in (lambda r: r.update(status='RUNNING'), lambda r: r.update(elapsed_seconds=7199),
+        for change in (lambda r: r.update(status='RUNNING'), lambda r: r['samples'].pop(),
                        lambda r: r.update(wheel_sha256='wrong'), lambda r: r.update(completed_cycles=0),
-                       lambda r: r['peak'].update(file_descriptors=100)):
+                       lambda r: r['samples'][-1].update(file_descriptors=100)):
             report = soak()
             change(report)
             with self.assertRaises(ValueError):
                 validate_soak(report, WHEEL, '1.0.0rc1')
 
-    def test_two_hours_are_required_for_every_version_stage(self):
-        for version in ('1.0.0a1', '1.0.0b1', '1.0.0rc1', '1.0.0'):
-            with self.subTest(version=version):
-                report = soak()
-                report.update(version=version, duration_seconds=7200, elapsed_seconds=7200)
-                validate_soak(report, WHEEL, version)
-                report.update(duration_seconds=7199, elapsed_seconds=7199)
-                with self.assertRaises(ValueError):
-                    validate_soak(report, WHEEL, version)
+    def test_cycles_not_elapsed_time_determine_completion(self):
+        report = soak()
+        report['elapsed_seconds'] = 0.1
+        validate_soak(report, WHEEL, report['version'])
+        report['warmup_completed'] -= 1
+        with self.assertRaises(ValueError):
+            validate_soak(report, WHEEL, report['version'])
 
     def test_private_file_transfers_cannot_reuse_default_or_partial_evidence(self):
         report = transfer(1024**3, 1, 2)
@@ -222,12 +248,16 @@ class ReleaseEvidenceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_soak(report, WHEEL, report['version'], both_upload_modes=True)
         report.update(upload_modes=['buffered', 'private_file'],
-                      completed_cycles_by_mode={'buffered': 1, 'private_file': 1},
+                      completed_cycles_by_mode={'buffered': 40, 'private_file': 40},
                       after_mode_provider={mode: deepcopy(report['after_provider']) for mode in ('buffered', 'private_file')})
+        for rows in report['lifecycle']:
+            rows.extend(dict(row, mode='private_file') for row in list(rows))
+        for cells in report['cycle_matrix']:
+            cells.extend(dict(cell, mode='private_file') for cell in list(cells))
         validate_soak(report, WHEEL, report['version'], both_upload_modes=True)
         for change in (lambda r: r['completed_cycles_by_mode'].update(private_file=0),
                        lambda r: r['after_mode_provider']['private_file'].pop('azure'),
-                       lambda r: r.update(duration_seconds=7199, elapsed_seconds=7199)):
+                       lambda r: r['samples'].pop()):
             bad = deepcopy(report)
             change(bad)
             with self.assertRaises(ValueError):
