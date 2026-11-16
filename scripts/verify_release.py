@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 from versioning import parse_version
 from package_cli import verify_archive
+from package_source import content_digest
 from check_packages import verify_distribution
 from qualify_local_faults import validate_report as validate_local_faults
 from release_scope import validate_scope
@@ -42,6 +43,7 @@ def main():
     manifests = sorted(args.directory.glob('*/release-manifest.json'))
     assert manifests, 'no release manifests'
     sources = set()
+    source_contents = set()
     results = []
     for path in manifests:
         folder = path.parent
@@ -71,6 +73,7 @@ def main():
             assert source_report['status'] == 'PASS'
             assert source_report['source_revision'] == manifest['source_revision']
             assert sums[source_report['archive']] == source_report['archive_sha256']
+            source_contents.add(content_digest(folder / source_report['archive']))
             assert sums['source-consumer.log'] == source_report['log_sha256']
         if parse_version(manifest['version']).requires((0, 2, 1)):
             sbom = strict_json.loads((folder / 'storage-sbom.cdx.json').read_text())
@@ -113,6 +116,7 @@ def main():
         results.append({'target': manifest['target'], 'artifacts': len(manifest['artifacts']),
                         'qualification_present': qualification_path.exists(), 'status': 'PASS'})
     assert len(sources) == 1, 'source snapshots differ across targets'
+    assert len(source_contents) <= 1, 'source archive contents differ across targets'
     print(json.dumps({'source_sha256': sources.pop(), 'results': results}, indent=2))
 
 

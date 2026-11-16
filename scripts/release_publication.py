@@ -12,7 +12,7 @@ import tarfile
 import tempfile
 import zipfile
 
-from package_source import extract
+from package_source import extract, content_digest
 from check_release_packages import verify_publication
 from release_evidence import TARGETS, require
 from versioning import workspace_version
@@ -22,6 +22,17 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def shared_source(release, version):
+    """Select the qualified Linux bytes; compare only canonical source content."""
+    name = f'plenora-storage-{version}-source.tar.gz'
+    selected = release / 'x86_64-unknown-linux-gnu' / name
+    expected = content_digest(selected)
+    for target in TARGETS:
+        require(content_digest(release / target / name) == expected,
+                'shared source contents differ')
+    return selected
 
 
 def target_documents(version, target):
@@ -141,13 +152,13 @@ def prepare(archive, output, tag):
                 require(built.get(name) == digest(folder / name), 'target document is not a qualified artifact')
                 shutil.copyfile(folder / name, output / public)
                 names.append(public)
-            for path in [cli, wheels[0], folder / f'plenora-storage-{version}-source.tar.gz']:
+            for path in [cli, wheels[0]]:
                 destination = output / path.name
-                if destination.exists():
-                    require(digest(destination) == digest(path), 'shared source artifacts differ')
-                else:
-                    shutil.copyfile(path, destination)
-                    names.append(path.name)
+                shutil.copyfile(path, destination)
+                names.append(path.name)
+        source_archive = shared_source(release, version)
+        shutil.copyfile(source_archive, output / source_archive.name)
+        names.append(source_archive.name)
         shutil.copyfile(release / 'release-qualification.json', output / 'release-qualification.json')
         names.append('release-qualification.json')
         bundle = output / f'plenora-storage-{version}-qualification.tar.gz'

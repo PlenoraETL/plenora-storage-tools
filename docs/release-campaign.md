@@ -129,7 +129,7 @@ evidenze. Il checkout deve essere pulito e corrispondere ai due workflow riuscit
 Non si richiede una distribuzione precedente. Il sigillo lega i digest del candidato e la nuova policy.
 
 ```powershell
-python scripts/release_campaign.py --config target/campaign.json --output target/campaign-4.0.0-cycles
+python scripts/release_campaign.py --config target/campaign.json --output target/campaign-4.0.0-run
 ```
 
 Il comando scarica e verifica i materiali Actions, crea un checkout dedicato
@@ -788,7 +788,7 @@ perché un ledger lasciato sull'host da un tentativo precedente non sarebbe una
 fonte affidabile. Per ripetere la parte VM si chiede un nuovo tentativo:
 
 ```powershell
-python scripts/release_campaign.py --config target/campaign.json --output target/campaign-4.0.0-cycles --retry-phase qualify-vm --retry-reason "Spazio del laboratorio ripristinato"
+python scripts/release_campaign.py --config target/campaign.json --output target/campaign-4.0.0-run --retry-phase qualify-vm --retry-reason "Spazio del laboratorio ripristinato"
 ```
 
 I tentativi precedenti restano presenti. Il retry crea una nuova directory,
@@ -815,12 +815,36 @@ del laboratorio, non una soglia dichiarata del protocollo. Lo spazio viene
 ricontrollato anche nei retry. Nessun comando cancella automaticamente dati,
 evidenze o cache per aggirare il controllo.
 
+## Controlli iniziali e chiusura delle fixture
+
+Prima di interrogare i workflow o scaricare gli artefatti, il coordinatore
+confronta tutti i file tracciati con i blob del commit, senza filtri Git né
+normalizzazione EOL. Anche il runner Linux esegue questo preflight: un seme
+CRLF o qualsiasi altro file alterato viene rifiutato subito. `git status`
+non sostituisce questo confronto. Tutto `fuzz/seeds/**` è binario negli attributi.
+I comandi Git sul checkout VM impostano una umask che esclude scritture di
+gruppo e altri; il controllo finale dello stato usa la umask privata 077.
+
+Il checkout della campagna sull'host Windows deve avere i byte esatti del commit:
+crearlo senza conversione dei fine riga, per esempio
+`git -c core.autocrlf=false -c core.eol=lf worktree add --detach <percorso> <commit>`
+(o `clone` con le stesse opzioni). Un checkout con `core.autocrlf=true` viene
+rifiutato dal preflight.
+
+Alla chiusura della fase VM e anche in caso di errore, prima di lasciare
+l'ammissione, il coordinatore esegue `docker compose down --remove-orphans`
+sul solo progetto della campagna. Non usa prune e conserva volumi, cache ed
+evidenze. Il comando verifica epoch e lock: se l'ammissione è cambiata, o la
+VM non è raggiungibile, la pulizia fallisce esplicitamente; non tocca il lavoro
+del nuovo controller. Un arresto forzato del processo non esegue il finally:
+in quel caso verificare e chiudere manualmente il progetto rimasto attivo.
+
 ## Pubblicazione
 
 Usare il percorso del bundle restituito dal coordinatore:
 
 ```powershell
-python scripts/publish_qualified.py --bundle target/campaign-4.0.0-cycles/seal/1/qualification-input.tar.gz --output target/publication-2.0.1 --repository PlenoraETL/plenora-storage-tools --notes docs/release-notes-2.0.1.md
+python scripts/publish_qualified.py --bundle target/campaign-4.0.0-run/seal/1/qualification-input.tar.gz --output target/publication-4.0.0 --repository PlenoraETL/plenora-storage-tools --notes docs/release-notes-4.0.0.md
 ```
 
 La pubblicazione rivalida il bundle prima di creare tag e bozza, conserva il

@@ -182,7 +182,9 @@ class PipelineTests(unittest.TestCase):
                          *publication.target_documents('4.0.0', target)]
                 artifacts = []
                 for name in names:
-                    data = b'shared-source' if name.endswith('-source.tar.gz') else (target + name).encode()
+                    # The shared source asset is compared on its uncompressed stream.
+                    data = (gzip.compress(b'shared-source', mtime=0) if name.endswith('-source.tar.gz')
+                            else (target + name).encode())
                     (folder / name).write_bytes(data)
                     artifacts.append({'name': name, 'sha256': digest(data)})
                 (folder / 'release-manifest.json').write_text(json.dumps({'artifacts': artifacts}))

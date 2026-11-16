@@ -109,6 +109,8 @@ class CampaignPlanTests(unittest.TestCase):
                                          {'phase': name, 'identity': self.state['identity'],
                                           'scope': 'dispatch-only'}), **kwargs)
             remote, session = Mock(), Mock()
+            session.directory, session.epoch = '/fixture/.campaign', '1-' + 'a' * 32
+            stack.enter_context(patch.object(controller, 'check_checkout_bytes'))
             stack.enter_context(patch.object(controller.sys, 'platform', 'win32'))
             stack.enter_context(patch.object(controller, 'configuration', return_value=config))
             stack.enter_context(patch.object(controller, 'Campaign', ObservedCampaign))

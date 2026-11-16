@@ -42,3 +42,29 @@ release binaries and performance A/B are no longer release dependencies.
 No absolute performance SLO is claimed. Large transfers, spool boundaries,
 concurrency, platform ABIs and real timeout/keepalive tests remain required.
 Local oracle calibration is not a qualification of the final 4.0.0 artifacts.
+
+## Correzioni del processo di pubblicazione
+
+
+Per 4.0.0 il sorgente condiviso si confronta sul flusso tar non compresso:
+SHA-256 del tar prodotto da `git archive`, identico su ogni piattaforma per nomi,
+modi, ordine e date dei membri. Resta fuori solo il compressore gzip: CPython
+3.14 su Windows usa zlib-ng, su Linux zlib, e i byte compressi differiscono.
+Inventario e provenienza Git restano obbligatori.
+
+`verify_release.py` confronta questo digest tra target già durante l'assemblaggio;
+`release_publication.py` la ricontrolla e pubblica i byte originali del gzip
+Linux qualificato. I gzip Windows/Linux possono avere digest diversi (zlib-ng
+vs zlib): i due manifest e report consumer conservano i rispettivi digest e il
+bundle pubblico di qualifica conserva entrambi. Nessuna ricompressione cambia
+l'asset Linux o le sue attestazioni. CLI, wheel, crate, contratti, report e
+contenitori di qualifica mantengono digest esatti per target o singola istanza;
+non si pretende uguaglianza tra build indipendenti. Le SBOM vengono confrontate
+come oggetti JSON, preservando i digest esatti degli input e degli artefatti.
+
+La campagna rifiuta immediatamente byte tracciati diversi dai blob Git; tutti
+i semi fuzz sono binari. I comandi Git VM proteggono i permessi dell'index e
+il coordinatore chiude il progetto Compose anche su errore, prima di rilasciare
+l'ammissione. Queste modifiche richiedono nuovi RC, CI e campagna sul commit
+finale, quindi un nuovo input di pubblicazione: non qualificano retroattivamente
+gli artefatti del tentativo precedente.
