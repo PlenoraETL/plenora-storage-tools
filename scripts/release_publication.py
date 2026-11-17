@@ -131,6 +131,12 @@ def check_files(directory):
 
 def prepare(archive, output, tag):
     check_tag(tag)
+    assemble(archive, output)
+
+
+def assemble(archive, output):
+    """Everything prepare checks except the tag, so the local preflight can run
+    it on the sealed bundle before any tag or draft exists."""
     output.mkdir(parents=True, exist_ok=False)
     with tempfile.TemporaryDirectory(prefix='storage-qualification-input-') as temporary:
         source = extract(archive, temporary, 'qualification')
@@ -227,6 +233,33 @@ def smoke(directory):
                         '--coverage', '--typing', '--output', str(ROOT / 'target/release-download-smoke')], check=True)
 
 
+ATTESTED_PREDICATES = ('https://slsa.dev/provenance/v1', 'https://cyclonedx.org/bom')
+
+
+def attested_files(directory):
+    """The five distributed files signed by release-candidate.yml."""
+    version = workspace_version().native
+    files = [*sorted(directory.glob('*.whl')), directory / f'plenora-storage-{version}-source.tar.gz',
+             directory / f'plenora-storage-{version}-{TARGETS[0]}.tar.gz',
+             directory / f'plenora-storage-{version}-{TARGETS[1]}.zip']
+    require(len(files) == 5 and all(path.is_file() for path in files), 'attested distribution files missing')
+    return files
+
+
+def attestations(directory, repository):
+    """Provenance and SBOM attestations of the exact files, from the candidate
+    workflow at the checked-out revision on GitHub-hosted runners."""
+    revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+    signer = f'{repository}/.github/workflows/release-candidate.yml'
+    for path in attested_files(directory):
+        for predicate in ATTESTED_PREDICATES:
+            result = subprocess.run(['gh', 'attestation', 'verify', str(path), '--repo', repository,
+                                     '--signer-workflow', signer, '--source-digest', revision,
+                                     '--deny-self-hosted-runners', '--predicate-type', predicate],
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            require(result.returncode == 0, 'distribution attestation missing or invalid')
+
+
 def upload(directory, tag):
     draft(tag)
     index = check_files(directory)
@@ -260,8 +293,10 @@ def publish(directory, tag):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['bundle', 'draft', 'prepare', 'smoke', 'smoke-cli', 'upload', 'publish'])
+    parser.add_argument('action', choices=['bundle', 'draft', 'prepare', 'attestations', 'smoke', 'smoke-cli',
+                                           'upload', 'publish'])
     parser.add_argument('--tag')
+    parser.add_argument('--repository')
     parser.add_argument('--directory', type=Path)
     parser.add_argument('--archive', type=Path)
     parser.add_argument('--evidence', type=Path)
@@ -273,6 +308,8 @@ if __name__ == '__main__':
         draft(args.tag)
     elif args.action == 'prepare':
         prepare(args.archive, args.directory.resolve(), args.tag)
+    elif args.action == 'attestations':
+        attestations(args.directory.resolve(), args.repository)
     elif args.action == 'smoke':
         smoke(args.directory.resolve())
     elif args.action == 'smoke-cli':
