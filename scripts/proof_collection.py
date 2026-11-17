@@ -1,5 +1,6 @@
 """Collect independent checks; never convert a failed prerequisite into PASS."""
 from contextlib import contextmanager
+import sys
 from campaign_model import write_json, transition
 
 
@@ -28,4 +29,11 @@ class Collection:
             output.parent.mkdir(parents=True, exist_ok=True)
             write_json(output, {'status': 'PASS' if passed else 'FAIL', 'results': self.results})
         if not passed:
+            # The report may live where the caller cannot read it (a container
+            # filesystem): name the failed cases in the log too. Case names are
+            # code literals and failure_type an exception class, never data.
+            for row in self.results:
+                if row['status'] != 'PASS':
+                    print(f"FAIL case {row['name']}: {row.get('failure_type', 'not completed')}",
+                          file=sys.stderr, flush=True)
             raise RuntimeError('qualification checks failed; inspect the collection report')
