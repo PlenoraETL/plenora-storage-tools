@@ -1,0 +1,4 @@
+[advisories]
+# Riesame: 2027-02-13; owner: manutentori della famiglia Plenora.
+# unmaintained, non vulnerabile, nessuna versione sicura; migrazione di famiglia a jiff/time pianificata
+ignore = ["RUSTSEC-2026-0543", "RUSTSEC-2026-0542"]
