@@ -49,7 +49,7 @@ def check(graph, invocations):
     if publication != {'qualify', 'publish'}:
         raise ValueError('publication guard invocation changed')
     for name, required in [('qualify', [('release_publication', 'prepare'), ('release_publication', 'upload')]),
-                           ('publish', [('release_publication', 'publish')])]:
+                           ('publish', [('release_publication', 'attestations'), ('release_publication', 'publish')])]:
         value = job('release.yml', name)
         if value['runs-on'] != 'ubuntu-24.04' or calls(value) != required:
             raise ValueError('publication counterpart differs')

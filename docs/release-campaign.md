@@ -849,6 +849,11 @@ python scripts/publish_qualified.py --bundle target/campaign-4.0.0-run/seal/1/qu
 
 La pubblicazione rivalida il bundle prima di creare tag e bozza, conserva il
 checkpoint del workflow e non sostituisce tag o input di qualifica differenti.
+Prima del tag esegue anche ciò che il workflow ripete senza bisogno del tag:
+l'assemblaggio degli asset pubblici con gli inventari chiusi
+(`release_publication.assemble`), lo smoke di CLI e SDK del target dell'host e
+la verifica delle attestazioni dei cinque file distribuiti
+(`release_publication.py attestations`, la stessa funzione del workflow).
 Una bozza della stessa campagna può essere ripresa. Il workflow verifica gli
 asset scaricati su entrambi i target prima della pubblicazione; il comando
 controlla poi nuovamente i checksum e la ricevuta pubblica. Un workflow fallito

@@ -10,12 +10,15 @@ import tempfile
 import time
 
 from campaign_state import digest, exclusive, write_json
-from release_publication import check_files, extract
+from release_publication import assemble, attestations, check_files, extract, smoke
 from versioning import ROOT, workspace_version
 
 
-def validate_input(bundle, version, log):
-    """Requalify before creating any public tag or GitHub draft."""
+def validate_input(bundle, version, log, repository):
+    """Run, before creating any public tag or GitHub draft, every check the
+    release workflow repeats that does not need the tag: requalification,
+    assembly of the public assets with their closed inventories, the CLI and
+    SDK smoke of this host's target and the candidate attestations."""
     with tempfile.TemporaryDirectory(prefix='storage-publication-preflight-') as temporary:
         source = extract(bundle, temporary, 'qualification')
         with log.open('wb') as stream:
@@ -24,6 +27,13 @@ def validate_input(bundle, version, log):
                                     cwd=ROOT, stdout=stream, stderr=subprocess.STDOUT)
         if result.returncode:
             raise ValueError('publication input did not qualify; no tag or draft created')
+        publication = Path(temporary) / 'publication'
+        try:
+            assemble(bundle, publication)
+            smoke(publication)
+            attestations(publication, repository)
+        except (ValueError, OSError, subprocess.CalledProcessError) as error:
+            raise ValueError('publication assets did not pass the workflow checks; no tag or draft created') from error
 
 
 def publish(bundle, output, repository, notes, retry_workflow=False):
@@ -44,7 +54,7 @@ def publish(bundle, output, repository, notes, retry_workflow=False):
         state = strict_json.loads(state_path.read_text()) if state_path.exists() else {'identity': identity}
         if state['identity'] != identity:
             raise ValueError('publication inputs changed')
-        validate_input(bundle, version, output / 'preflight.log')
+        validate_input(bundle, version, output / 'preflight.log', repository)
 
         def save(status, **values):
             state.update(status=status, **values)
