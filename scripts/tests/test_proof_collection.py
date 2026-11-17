@@ -27,6 +27,28 @@ class CollectionTests(unittest.TestCase):
             self.assertNotIn('private endpoint', output.read_text())
         self.assertEqual([r['status'] for r in collection.results], ['FAIL', 'PASS', 'FAIL'])
 
+    def test_failed_cases_are_named_in_the_log_without_messages(self):
+        import contextlib
+        import io
+        collection = Collection()
+        for name in ('first', 'second', 'third'):
+            with collection.case(name):
+                if name != 'second':
+                    raise ValueError('private endpoint and payload')
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr), self.assertRaises(RuntimeError):
+            collection.finish()
+        log = stderr.getvalue()
+        self.assertEqual(log.splitlines(), ['FAIL case first: ValueError', 'FAIL case third: ValueError'])
+        self.assertNotIn('private endpoint', log)
+        passed = io.StringIO()
+        with contextlib.redirect_stderr(passed):
+            ok = Collection()
+            with ok.case('only'):
+                pass
+            ok.finish()
+        self.assertEqual(passed.getvalue(), '')
+
     def test_interrupt_is_not_swallowed(self):
         with self.assertRaises(KeyboardInterrupt):
             with Collection().case('interrupted'):
