@@ -1,5 +1,9 @@
 [advisories]
-ignore = []
+# Riesame: 2027-02-13; owner: manutentori della famiglia Plenora.
+ignore = [
+    { id = "RUSTSEC-2026-0543", reason = "unmaintained, non vulnerabile, nessuna versione sicura; migrazione di famiglia a jiff/time pianificata" },
+    { id = "RUSTSEC-2026-0542", reason = "humantime unmaintained, non vulnerabile, nessuna versione sicura; sostituzione da pianificare con la migrazione di famiglia dei tipi temporali" },
+]
 yanked = "deny"
 
 [licenses]
