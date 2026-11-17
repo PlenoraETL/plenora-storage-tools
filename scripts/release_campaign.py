@@ -26,7 +26,9 @@ from campaign_fence import (FENCED, LABEL, LOCK_HELD, ROOT_PATH, CampaignBusy, C
                            admission, check_owned, check_private_root, check_tree_unshared, fence_lines,
                            supervised)
 from campaign_shell import (fixture_scripts, checkout_command, extract_inputs_command,
-                            runner_bootstrap, shell_umask)
+                            runner_bootstrap, shell_umask, checkout_status_command, teardown_command)
+from check_checkout_bytes import check as check_checkout_bytes
+from campaign_model import creation_profile
 from campaign_model import (PERMISSIONS, atomic_write, CONNECT_SECONDS, REMOTE_SECONDS,
     EXPORT_SECONDS, PREPARATION_POLL, PREPARATION_SECONDS, KEEPALIVE_SECONDS,
     RUNNER_ACTIVE, FIXTURE_STATE, Deadline, WORKFLOW_SECONDS, VM_SECONDS, REMOTE_POLL_SECONDS)
@@ -373,9 +375,11 @@ def run(config_path, output, retries, reason, connect_host=None):
     if sys.platform != 'win32':
         raise ValueError('orchestrator qualifies the Windows distribution locally; use a Windows host')
     config = configuration(config_path)
-    revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
-    if subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip():
-        raise ValueError('release campaign requires clean committed source')
+    with creation_profile('private_file'):
+        revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+        if subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip():
+            raise ValueError('release campaign requires clean committed source')
+        check_checkout_bytes(ROOT, revision)
     version = workspace_version().native
     output = output.resolve()
     identity = {'revision': revision, 'version': version, 'configuration_sha256': digest(config_path),
@@ -453,6 +457,7 @@ def run(config_path, output, retries, reason, connect_host=None):
         assembled = phase('assemble', assemble)
         remote = Remote(config, connect_host=connect_host)
         held = None
+        session = None
         try:
             def prepare(path):
                 bundle = path / 'source.bundle'
@@ -470,7 +475,7 @@ def run(config_path, output, retries, reason, connect_host=None):
                 check_tree_unshared(remote, remote_root, remote_root + '/.fixtures')
                 # Move the transport bundle into ignored campaign storage after checkout.
                 remote.run(f'cd {q(remote_root)} && mv source.bundle .fixtures/source.bundle')
-                remote.run(f'cd {q(remote_root)} && test -z "$(git status --porcelain)"')
+                remote.run(checkout_status_command(remote_root))
                 run_preparation(remote, remote_root, project, config['host'], 'prepare', path, reset=False,
                                 session=session)
                 remote.download(remote_root + '/.fixtures/extended/server.crt', path / 'fixture-ca.crt')
@@ -619,6 +624,8 @@ def run(config_path, output, retries, reason, connect_host=None):
             with qualifications.case('qualify-vm'):
                 vm_result = phase('qualify-vm', vm)
             session.check(remote)
+            remote.run(teardown_command(remote_root, project, session.directory, session.epoch))
+            session = None
             held.__exit__(None, None, None)
             held = None
             qualifications.finish(output / 'qualification-collection.json')
@@ -649,9 +656,15 @@ def run(config_path, output, retries, reason, connect_host=None):
             sealed = phase('seal', seal)
             print('Qualified bundle:', sealed / 'qualification-input.tar.gz', flush=True)
         finally:
-            if held is not None:
-                held.__exit__(None, None, None)
-            remote.client.close()
+            try:
+                if session is not None:
+                    remote.run(teardown_command(remote_root, project, session.directory, session.epoch))
+            finally:
+                try:
+                    if held is not None:
+                        held.__exit__(None, None, None)
+                finally:
+                    remote.client.close()
 
 
 def entrypoint(action):

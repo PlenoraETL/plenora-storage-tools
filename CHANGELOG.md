@@ -2,6 +2,9 @@
 
 ## 4.0.0 — 2026-11-15
 
+- Compare shared source archives by canonical file content and publish the exact qualified Linux gzip; retain platform-specific compressed digests and provenance.
+- Treat every fuzz seed as binary, reject working-tree/blob differences before campaign work, protect VM Git index permissions, and tear down the campaign Compose project on completion or failure.
+
 - Breaking: Python minimum is now 3.14, with cp314 ABI3 wheels; Python <3.14 is no longer supported. `.python-version` defines the CI, SDK and release runtime policy.
 - Adopt the approved Plenora dependency snapshot and Linux CI checker; align exact public dependency pins, base64 0.23.1 and proptest 1.12.0.
 - Align compatible transitive dependencies to the first-wave references; retain AWS-LC TLS and only the exceptions declared by the common manifest.

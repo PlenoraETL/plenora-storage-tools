@@ -21,6 +21,8 @@ from campaign_model import RELEASE_POLICY_ID
 from versioning import parse_version
 from proof_collection import Collection
 from campaign_model import CAMPAIGN_PHASES
+from campaign_model import creation_profile
+from check_checkout_bytes import check as check_checkout_bytes
 
 ROOT = Path(__file__).resolve().parents[1]
 # The container's own filesystem: no host directory is mounted there, so
@@ -49,9 +51,12 @@ def phases_for(version):
 
 def identity(folder):
     manifest = strict_json.loads((folder / 'release-manifest.json').read_text())
-    revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+    with creation_profile('private_file'):
+        revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+        check_checkout_bytes(ROOT, revision)
+        status = subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()
     if (manifest['target'] != TARGET or manifest['source_revision'] != revision or not manifest['source_committed']
-            or subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()):
+            or status):
         raise ValueError('campaign requires matching committed Linux artifacts and clean source')
     subjects = {row['name']: digest(folder / row['name']) for row in manifest['artifacts']}
     if any(subjects[row['name']] != row['sha256'] for row in manifest['artifacts']):

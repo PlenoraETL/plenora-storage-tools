@@ -16,6 +16,20 @@ from package_runner import run_consumer
 from check_packages import verify_distribution, registry, checkout_source_bytes, repository_snapshot
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def content_digest(archive):
+    """sha256 of the uncompressed tar stream of a source archive.
+
+    The tar comes from git archive and is identical on every platform (names,
+    modes, order, timestamps); only the gzip encoder differs (CPython 3.14 on
+    Windows uses zlib-ng). Comparing the tar keeps every member field in scope
+    and leaves out exactly the compressor. Callers still verify the
+    distribution inventory and the digest of the published bytes.
+    """
+    return hashlib.sha256(gzip.decompress(archive.read_bytes())).hexdigest()
+
+
 CONSUMER = '''use std::sync::Arc;
 use plenora_storage_core::{EngineConfig, EnvironmentCredentialResolver};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -85,7 +99,7 @@ def build(output, target_dir):
     prefix = f'plenora-storage-{version}'
     archive = output / f'{prefix}-source.tar.gz'
     # Git supplies committed bytes and stable timestamps on both platforms.
-    # Suppress gzip filename/time fields so the two source assets can agree.
+    # Suppress volatile headers; compressor bytes may still differ by platform.
     with tempfile.TemporaryDirectory(prefix='storage-source-build-') as temporary:
         work = Path(temporary)
         raw = work / 'source.tar'

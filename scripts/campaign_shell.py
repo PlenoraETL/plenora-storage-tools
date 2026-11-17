@@ -366,6 +366,29 @@ def checkout_command(remote_root, revision):
             '&& test -z "$(git status --porcelain --untracked-files=no)"')
 
 
+def checkout_status_command(remote_root):
+    return (f'cd {shlex.quote(remote_root)} && {shell_umask("private_file")} '
+            '&& test -z "$(git status --porcelain)"')
+
+
+def teardown_command(remote_root, project, directory, epoch):
+    """Stop only this Compose project, while the admission epoch is still held."""
+    q = shlex.quote
+    script = '\n'.join([
+        'set -euo pipefail', shell_umask('private_file'),
+        f'exec 9<{q(directory + "/lock")}',
+        f'flock -n -E {LOCK_HELD} -s 9',
+        f'CAMPAIGN_DIR={q(directory)}; CAMPAIGN_EPOCH={q(epoch)}',
+        *fence_lines(), 'fence',
+        # Preparation can fail before creating the checkout.
+        f'if [ -f {q(remote_root + "/docker-compose.yml")} ]; then',
+        f'  cd {q(remote_root)}',
+        f'  docker compose -p {q(project)} -f docker-compose.yml -f compose.extended.yml down --remove-orphans',
+        'fi',
+    ])
+    return 'bash -c ' + q(script)
+
+
 def extract_inputs_command(remote_inputs, distribution):
     """VM command that extracts the Linux distribution among the inputs and
     makes the candidate binary executable, all private to the account: modes come
@@ -386,7 +409,7 @@ def runner_bootstrap(work, inputs, bundle, revision, fixtures):
     from here on nothing is read from the host source tree.
     """
     q = shlex.quote
-    lines = ['set -euo pipefail',
+    lines = ['set -euo pipefail', shell_umask('fixture_file'),
              f'work={q(work)}',
              f'inputs={q(inputs)}',
              'mkdir -- "$work"',
