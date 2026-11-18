@@ -18,3 +18,7 @@ al dominio storage:
 Leggere `docs/database-alignment.md` per il perimetro, `docs/STATO.md` per
 l'inventario, `docs/release.md` per packaging e qualifica, i workflow per i gate.
 Non aggiornare i documenti storici per farli sembrare evidenze della release nuova.
+
+Per piano e ricevute locali seguire [CI locale](docs/release.md#ci-locale).
+`scripts/ci_locale.py` deriva i job dai workflow tramite `ci_plan.py`;
+un passo non eseguito non certifica il prodotto.

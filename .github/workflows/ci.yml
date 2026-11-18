@@ -18,6 +18,8 @@ jobs:
           python-version-file: .python-version
       - run: python3 scripts/check_python_version.py --runtime
       - run: python3 scripts/check_proof_inventory.py
+      - run: python3 scripts/ci_locale.py --piano
+      - run: python3 -m unittest discover -s scripts/tests -p test_ci_locale.py -v
       - if: always()
         run: python3 -m unittest discover -s scripts/tests -p test_proof_inventory.py -v
       - if: always()

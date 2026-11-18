@@ -1,5 +1,46 @@
 # Qualifica e distribuzione
 
+## CI locale
+
+`python scripts/ci_locale.py --piano --profilo pr` legge tutti i workflow e
+mostra anche i job esclusi dal profilo. Riusa `ci_plan.py` e il lettore limitato
+di `check_release_guard_coverage.py`, già impiegati da `ci_contract.py`;
+non aggiunge PyYAML o una seconda lista di gate. Matrici, chiamate riusabili,
+dipendenze e impostazioni originali sono conservate nel grafo. I filtri PR
+sono trattati come sovrainsieme, senza simulare un evento GitHub.
+
+`python scripts/ci_locale.py --esegui --profilo pr` scrive progressivamente
+`target/ci-locale/<corsa>/ricevuta.json`: schema 2, SHA, checkout modificato,
+digest delle fonti e del piano, comando originale e argv effettivi, toolchain
+richiesta, ambiente dichiarato con override, servizi, dipendenze ed esiti.
+Non conserva stdout/stderr o l'ambiente privato dell'host. Gli override sono
+`CARGO_BUILD_JOBS=4`, `CARGO_INCREMENTAL=0`, `GIT_OPTIONAL_LOCKS=0`,
+`RUSTUP_AUTO_INSTALL=0`.
+L'interprete selezionato sostituisce gli alias Python nei comandi semplici.
+Usare Python della versione in `.python-version` e un ambiente già predisposto
+con i requisiti del repository. Il runner non installa strumenti.
+
+L'interfaccia segue data/rest/IO/database: `--job` ripetibile, `--offline`,
+`--timeout` per passo, `--profilo pr|qualifica|release`. Qualifica e release
+ammettono solo `--piano`. Non è prevista l'abilitazione di servizi live:
+Docker, fixture e VM restano `NON ESEGUITO` con motivo. Anche piattaforme
+diverse, provisioning, action sconosciute, espressioni non supportate,
+artefatti e attestazioni Actions restano non eseguiti; nessuna pubblicazione.
+Un codice zero con prove saltate non produce PASS. I job aggregano tutti
+i passi: un successivo `always()` riuscito non cancella un fallimento.
+Exit 1 indica FAIL, exit 2 copertura incompleta, exit 0 esecuzione completa
+del profilo (oppure sola compilazione riuscita con `--piano`).
+
+La mappa dichiarativa accetta revisioni esatte delle action. Il checkout
+principale è verificato con `git rev-parse`, senza modifiche a `.git`.
+I workflow correnti usano i contratti vendorizzati: i digest sono controllati
+dal gate di adozione. Un eventuale checkout aggiuntivo di plenora-contracts
+deve già esistere in `.plenora-contracts`, avere il `ref` del source pin e
+superare la verifica dello SHA; nessun clone o fetch implicito.
+I test di controprova e la compilazione del piano sono collegati al job
+`proof-inventory`. Questa ricevuta locale non sostituisce qualifica reale,
+coverage, API, Windows o release quando i relativi passi non sono eseguiti.
+
 La serie 2.1 aggiunge report separati per la modalità preparata su
 disco: `spooled-qualification.json`, `spooled-regressions.json` e
 `spooled-python-qualification.json` su entrambi i target, più
