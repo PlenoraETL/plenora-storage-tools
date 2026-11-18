@@ -11,7 +11,7 @@ def digest(value):
 
 def workflows(root):
     return {p.name: read_workflow(p)
-            for p in sorted((root / '.github/workflows').glob('*.yml'))}
+            for p in sorted((root / '.github/workflows').glob('*.y*ml'))}
 
 
 def matrix(job):
