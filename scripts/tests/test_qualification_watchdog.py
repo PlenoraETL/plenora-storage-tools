@@ -11,8 +11,14 @@ from campaign_state import Campaign, logged
 from qualification_watchdog import positive_seconds
 
 
+# Guard against a hung child only: these tests assert on exit codes and reports,
+# never on speed. A tight value fails on a slow shared runner (20 s expired on
+# Windows CI); the watchdog timings under test are the ones passed to the child.
+HANG_GUARD_SECONDS = 600
+
+
 class WatchdogTests(unittest.TestCase):
-    def child(self, body, timeout=8):
+    def child(self, body, timeout=HANG_GUARD_SECONDS):
         return subprocess.run([sys.executable, '-u', '-c',
                                'import sys; sys.path.insert(0, ' + repr(str(SCRIPTS)) + ')\n' + body],
                               capture_output=True, text=True, timeout=timeout)
@@ -119,7 +125,7 @@ sys.argv = ['qualify_transfers', '--bytes', '1', '--providers', 'local', '--work
             '--rounds', '32', '--warmup-rounds', '16', '--baseline-binary', str(folder / 'binary'),
             '--baseline-output', str(folder / 'b.json'), '--output', str(folder / 'c.json')]
 q.entrypoint(q.main)
-'''.replace('OUTPUT', repr(temporary)), timeout=20)
+'''.replace('OUTPUT', repr(temporary)))
             self.assertEqual(result.returncode, 0, result.stderr)
             for name in ('b.json', 'c.json'):
                 report = json.loads((Path(temporary) / name).read_text())
