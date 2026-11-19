@@ -119,6 +119,9 @@
     )
 )]
 
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
+compile_error!("Plenora Storage supports only Linux and Windows");
+
 pub mod auth;
 mod bytes;
 pub mod client;

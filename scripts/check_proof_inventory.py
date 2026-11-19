@@ -49,23 +49,23 @@ def workflows(root=ROOT):
     ci = (root / '.github/workflows/ci.yml').read_text(encoding='utf-8')
     if not re.search(r'^  pull_request:\s*$', ci, re.M):
         raise ValueError('proof audit requires unconditional PR CI')
-    for command in ('python3 scripts/check_proof_inventory.py', 'python3 -m unittest discover -s scripts/tests -v'):
+    for command in ('python3 scripts/check_proof_inventory.py', 'python3 -m unittest discover -s scripts/tests -p test_workflow_policy.py -v'):
         if command not in ci:
             raise ValueError('proof PR job lost required command')
     for name, item in result.items():
         if 'schedule' in item['events']:
             for ref in item['references']:
                 if ref.startswith('./.github/workflows/') and ref not in ci:
-                    raise ValueError(name + ': scheduled reusable workflow has no PR counterpart')
-    reachable = {'ci.yml'}
-    while True:
-        expanded = reachable | {Path(ref).name for name in reachable
-                                for ref in result[name]['references'] if ref.startswith('./.github/workflows/')}
-        if expanded == reachable:
-            break
-        reachable = expanded
+                    raise ValueError(name + ': scheduled reusable workflow has no CI counterpart')
+    from ci_plan import workflows as read_workflows
+    from workflow_policy import automatic_jobs, check as check_policy
+    documents = read_workflows(root)
+    check_policy(documents)
+    reachable = {name for name, _ in automatic_jobs(documents, events=('pull_request',))}
+    manual = {name for name, _ in automatic_jobs(documents, events=('workflow_dispatch',))}
     for name in result:
-        result[name]['pr_reachable'] = name in reachable or 'pull_request' in result[name]['events']
+        result[name]['pr_reachable'] = name in reachable
+        result[name]['manual_reachable'] = name in manual
     return result
 
 
@@ -140,7 +140,7 @@ def check(root=ROOT):
     tests = {}
     scripts = {}
     all_workflows = '\n'.join((root / '.github/workflows' / n).read_text(encoding='utf-8')
-                              for n, w in workflow_inventory.items() if w['pr_reachable'])
+                              for n, w in workflow_inventory.items() if w['pr_reachable'] or w['manual_reachable'])
     for path in sorted((root / 'scripts').rglob('*.py')):
         relative = path.relative_to(root).as_posix()
         parsed = ast.parse(path.read_text(encoding='utf-8'))

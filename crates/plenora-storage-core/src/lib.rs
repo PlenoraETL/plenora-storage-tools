@@ -2,6 +2,9 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
+compile_error!("Plenora Storage supports only Linux and Windows");
+
 mod capability;
 mod control;
 mod credentials;

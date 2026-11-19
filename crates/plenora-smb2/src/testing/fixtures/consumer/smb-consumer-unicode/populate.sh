@@ -38,9 +38,8 @@ printf "Arabic text\n" > "$BASE/مستند.txt"
 
 # Characters SMB2 itself forbids in a name, stored the way every SMB client
 # that carries POSIX names stores them: substituted into the Unicode
-# private-use area at U+F000. These are the exact bytes macOS smbfs writes
-# (read off a QNAP TS-464 over SSH, 2026-08-05), so an app that lists this
-# directory and gets `who?.txt` back is byte-for-byte compatible with Finder.
+# private-use area at U+F000. Listing this fixture must decode the mapped
+# question mark back to `who?.txt`.
 #
 # ❌ Don't replace the octal escapes with the literal characters. Samba would
 # then hold a different name and the whole point of the fixture is gone.

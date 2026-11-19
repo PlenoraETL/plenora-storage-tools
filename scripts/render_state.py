@@ -42,6 +42,7 @@ def render():
     source = strict_json.loads((ROOT / 'contracts/upstream/source.json').read_text())
     lines += ['', '## Contratti bloccati', '', '```json', json.dumps(source, indent=2, sort_keys=True), '```', '',
               '## Superfici e limiti', '',
+              '- Piattaforme supportate: Linux e Windows; gli altri sistemi sono rifiutati in compilazione.',
               '- Rust: core neutrale e factory applicativa `plenora_storage_engine::build_engine`.',
               '- CLI: protocollo JSON e trasferimenti su file.',
               '- Runtime Binding: nel core, con resolver posseduti dal consumer.',

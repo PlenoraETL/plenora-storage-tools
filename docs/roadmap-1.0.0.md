@@ -18,7 +18,8 @@ Azure Blob, GCS, SMB e WebDAV. Il Runtime Binding rimane incluso nel core.
 Target iniziali: Windows x86_64 MSVC e Linux x86_64 con baseline Debian Bookworm.
 Rust minimo 1.92; la matrice CPython va qualificata dalla versione minima 3.10
 alle versioni effettivamente dichiarate. ABI3 non sostituisce i test di installazione.
-macOS, ARM64 e altri ambienti richiedono una qualifica successiva.
+ARM64 e altri ambienti richiedono una qualifica successiva.
+Nota di perimetro del 19 novembre 2026: sono supportati solo Linux e Windows.
 
 Artefatti GitHub previsti:
 

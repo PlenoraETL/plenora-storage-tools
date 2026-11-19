@@ -1,4 +1,4 @@
-"""Release/PR environment policy over executable workflow definitions."""
+"""Release/manual CI environment policy over executable workflow definitions."""
 from ci_plan import job_plan
 import shlex
 from ci_shell import recheck_steps
@@ -24,7 +24,7 @@ def check(graph, invocations):
                     if node['context']['workflow'] == 'release-candidate.yml'
                     and node['kind'] == 'step' and invocations(node['definition'].get('run', ''))}
     if release_jobs != set(counterparts):
-        raise ValueError('release guard invocation changed; extend PR counterparts')
+        raise ValueError('release guard invocation changed; extend manual CI counterparts')
     for source, destination in counterparts.items():
         candidate, ci = job('release-candidate.yml', source), job('ci.yml', destination)
         if candidate['runs-on'] != ci['runs-on'] or any(call not in calls(ci) for call in calls(candidate)):

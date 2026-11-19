@@ -235,9 +235,7 @@ pub struct FsInfo {
 ///
 /// A file manager showing `\\fs01\aleu_dfs` for a path the person typed as
 /// `\\lgs-net.com\aleu` is showing them a server they have never heard of.
-/// Every other client keeps the requested name (macOS reports
-/// `SERVER_NAME lgs-net.com` for exactly this mount), so a library that threw
-/// it away would make every consumer shadow it.
+/// Keeping the requested name lets consumers display the original namespace.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DfsOrigin {
     /// The UNC path the caller asked for, for example `\\lgs-net.com\aleu`.

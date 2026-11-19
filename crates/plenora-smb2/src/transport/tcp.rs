@@ -695,8 +695,7 @@ mod tests {
 
     /// Port 0 is not a port a TCP connection can be made to, and every stack
     /// rejects it in its own `connect` call without putting a packet on the
-    /// wire: `AddrNotAvailable` on macOS (35 µs), `ConnectionRefused` on Linux
-    /// (71 µs), `WSAEADDRNOTAVAIL` on Windows. Which kind it is varies, so
+    /// wire. The error kind varies between Linux and Windows, so
     /// tests here assert only that there *is* one.
     ///
     /// ❌ **Don't reach for a just-released ephemeral port instead.** It looks

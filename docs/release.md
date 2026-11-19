@@ -1,5 +1,25 @@
 # Qualifica e distribuzione
 
+## Prove su richiesta
+
+Le piattaforme supportate sono Linux e Windows. Gli altri sistemi sono
+rifiutati in compilazione, anche dalla libreria SMB autonoma.
+
+Su push e PR rimangono inventario, policy, dipendenze e controlli Rust
+(fmt, Clippy e test offline su Linux e Windows), con budget massimo di 30 minuti.
+Dal pulsante Run workflow di `ci.yml` si avviano anche coverage completa,
+fuzz/replay strumentato, API, qualita completa, conformance Docker, candidato
+Windows, wheel e riverifica dei pacchetti. I job dipendenti dagli artefatti
+restano nella stessa esecuzione manuale dei produttori.
+Lo schedule settimanale esegue solo le dipendenze; il fuzz esplorativo richiede
+l'avvio manuale di `scheduled.yml` o `parser-fuzz.yml`.
+`coverage.yml`, `reliability.yml` e `release-candidate.yml` conservano il loro
+avvio manuale. Soak e campagne non sono attivati da push o PR.
+Un job escluso non e una prova superata: i gate di qualifica e le soglie restano
+obbligatori quando si qualifica un candidato. Le ricevute storiche non cambiano.
+Il guardiano `test_workflow_policy.py`, eseguito in `quick-quality`, verifica
+anche le chiamate riusabili per impedire prove lunghe automatiche.
+
 ## CI locale
 
 `python scripts/ci_locale.py --piano --profilo pr` legge tutti i workflow e
@@ -119,7 +139,7 @@ marcato, senza ricevuta qualificata. Questa prova della guardia non sostituisce
 la qualifica, il soak o il roundtrip GitHub.
 
 `check_release_guard_coverage.py` confronta le invocazioni dirette e indirette nei
-workflow di rilascio con i percorsi CI, i runner e il passaggio degli artefatti;
+workflow di rilascio con i percorsi CI manuali di qualifica, i runner e il passaggio degli artefatti;
 i suoi test negativi rimuovono verifiche, cambiano piattaforma e aggiungono una
 nuova invocazione non coperta. `test_release_workflow.py` vincola inoltre toolchain,
 ordine dei prerequisiti e pin delle action. I log Cargo destinati agli artefatti

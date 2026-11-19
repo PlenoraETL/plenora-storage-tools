@@ -1,4 +1,4 @@
-"""Fail closed when a release guard invocation loses its PR CI counterpart."""
+"""Fail closed when a release guard invocation loses its manual CI counterpart."""
 import ast
 import strict_json
 from functools import lru_cache

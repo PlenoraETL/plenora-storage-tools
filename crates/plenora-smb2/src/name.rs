@@ -7,14 +7,9 @@
 //! to create such a name answers `STATUS_OBJECT_NAME_INVALID` (0xC0000033) and
 //! there is nothing the client can retry.
 //!
-//! Every SMB client that has to carry POSIX names solves this the same way, and
-//! has since Services for Macintosh: substitute each illegal character with a
-//! code point in the Unicode private-use area at U+F000, and substitute back on
-//! the way in. The server stores an ordinary legal name and never knows. **No
-//! server-side configuration is involved**, which is why matching the table
-//! exactly matters more than choosing a good one: a file written by this crate
-//! and the same file written by macOS Finder have to land on the same on-disk
-//! name, or the two clients disagree about what a share contains.
+//! Illegal characters are substituted with code points in the Unicode private-use
+//! area at U+F000, and substituted back on the way in. The server stores an
+//! ordinary legal name. No server-side configuration is involved.
 //!
 //! # The table
 //!
@@ -32,12 +27,6 @@
 //! substitutions. Leading and interior spaces and periods are legal and stay
 //! as they are.
 //!
-//! Verified against macOS 15 smbfs writing to a QNAP TS-464 (Samba) share on
-//! 2026-08-05, by creating probe files through the `/Volumes` mount and reading
-//! the resulting on-disk bytes over SSH on the NAS. The real name that started
-//! this, `"how_are_you_feeling?"_emojis.json`, is stored as
-//! `ef80a0 how_are_you_feeling ef80a5 ef80a0 _emojis.json`.
-//!
 //! # Always on
 //!
 //! [`encode_path`] runs on every path this crate puts on the wire and
@@ -51,13 +40,12 @@
 //!
 //! # Where the round trip is not exact
 //!
-//! Both gaps are inherent to the scheme and both match what macOS does, which
-//! is the point:
+//! Two gaps are inherent to the scheme:
 //!
 //! - **A local name that already holds U+F001–U+F029 goes out unchanged**, so
 //!   it reads back as the illegal character it stands for: `decode_name` of
 //!   `encode_name("a\u{F025}b")` is `a?b`, not the original. Escaping it
-//!   instead would put a name on the server that Finder renders differently.
+//!   instead would change the wire representation.
 //! - **U+F028 and U+F029 decode wherever they appear**, but only encode at the
 //!   end of a component, so a wire name carrying one in the middle (which only
 //!   a client that does not implement this scheme can produce) decodes to a
@@ -75,16 +63,11 @@
 //!
 //! U+F000 is deliberately **not** in the table, though the scheme nominally
 //! pairs it with NUL. Decoding it would hand a caller a name with an embedded
-//! NUL, which truncates in every C API it reaches -- macOS does exactly that
-//! and produces a cut-off name. Leaving it alone keeps the mapping symmetric
+//! NUL, which truncates in C APIs. Leaving it alone keeps the mapping symmetric
 //! and costs nothing, because no filesystem can hold a name containing NUL.
 //!
-//! This crate does **not** apply Unicode normalization. macOS smbfs converts
-//! decomposed names to NFC before sending (verified the same way, same date),
-//! because its local filesystem stores NFD; a cross-platform crate has no such
-//! local form to convert from, and an NFD name is perfectly legal on the wire.
-//! A consumer that wants byte-for-byte Finder parity on macOS should normalize
-//! to NFC before calling.
+//! This crate does **not** apply Unicode normalization. An NFD name is legal
+//! on the wire. Consumers that need NFC must normalize before calling.
 
 use std::borrow::Cow;
 
@@ -338,8 +321,7 @@ mod tests {
 
     #[test]
     fn a_trailing_marker_decodes_wherever_it_appears() {
-        // macOS does the same, verified on 2026-08-05: a wire name with
-        // U+F028 in the middle reads back with a space in the middle.
+        // A wire name with U+F028 in the middle reads back with a space in the middle.
         assert_eq!(decode_name("a\u{F028}b"), "a b");
         assert_eq!(decode_name("a\u{F029}b"), "a.b");
     }
@@ -429,10 +411,8 @@ mod tests {
     // ── The interop contract: exact bytes ─────────────────────────────
 
     #[test]
-    fn the_real_failing_name_matches_the_bytes_macos_wrote() {
-        // Read off a QNAP TS-464 over SSH on 2026-08-05, after macOS smbfs
-        // created the file through a /Volumes mount: the on-disk name is
-        // ef80a0 how_are_you_feeling ef80a5 ef80a0 _emojis.json (UTF-8).
+    fn quoted_name_matches_expected_wire_bytes() {
+        // Pin the UTF-8 bytes of the mapped quotes and question mark.
         let encoded = encode_name("\"how_are_you_feeling?\"_emojis.json");
         let mut expected = Vec::new();
         expected.extend_from_slice(&[0xEF, 0x80, 0xA0]);
