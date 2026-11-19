@@ -52,7 +52,7 @@ class ShellPlanTests(unittest.TestCase):
                     prefix = 'python() { "$FROZEN_PYTHON" "$FROZEN_PROBE" "$@"; }\n'
                     command = [shell, '-euo', 'pipefail', str(script)]
                 script.write_text(prefix + source, encoding='utf-8')
-                result = subprocess.run(command, cwd=root, env=env, capture_output=True, timeout=20)
+                result = subprocess.run(command, cwd=root, env=env, capture_output=True)
                 self.assertEqual(result.returncode, 0, result.stderr.decode(errors='replace'))
                 records = [json.loads(line) for line in trace.read_text().splitlines()] if trace.exists() else []
                 self.assertEqual([r['argv'] for r in records], [['scripts/release_version.py'], [verifier, *expected]])

@@ -4,6 +4,7 @@ Scope includes dev, optional and target-specific packages, not a claim that ever
 package is linked in every binary. Python has no third-party runtime dependency.
 OS packages and build tools are outside this inventory.
 """
+from canonical_digest import canonical_digest
 import argparse
 import hashlib
 import json
@@ -68,7 +69,7 @@ def render(artifacts=(), *, lockfile='Cargo.lock'):
             component['properties'].append({'name': 'plenora:vendored:provenance',
                                            'value': 'crates/plenora-smb2/PROVENANCE.md'})
             component['properties'].append({'name': 'plenora:vendored:provenance-sha256',
-                                           'value': digest(ROOT / 'crates/plenora-smb2/PROVENANCE.md')})
+                                           'value': canonical_digest(ROOT / 'crates/plenora-smb2/PROVENANCE.md')})
         components.append(component)
         resolved = []
         for dependency in package.get('dependencies', []):
@@ -96,7 +97,7 @@ def render(artifacts=(), *, lockfile='Cargo.lock'):
                          'properties': [{'name': 'plenora:inventory:scope',
                                          'value': f'{lockfile} union including dev, optional and all target dependencies; OS and externally installed build tools excluded'},
                                         {'name': 'plenora:lockfile:path', 'value': lockfile},
-                                        {'name': 'plenora:lockfile:sha256', 'value': digest(ROOT / lockfile)}]},
+                                        {'name': 'plenora:lockfile:sha256', 'value': canonical_digest(ROOT / lockfile)}]},
             'components': sorted(components, key=lambda value: value['bom-ref']),
             'dependencies': sorted(dependencies, key=lambda value: value['ref'])})
 
@@ -126,7 +127,7 @@ def render_qualification():
         roots.append(component['bom-ref'])
     for path in sorted((ROOT / 'scripts').glob('requirements-*.txt')):
         relative = path.relative_to(ROOT).as_posix()
-        properties.append({'name': 'plenora:declaration:sha256:' + relative, 'value': digest(path)})
+        properties.append({'name': 'plenora:declaration:sha256:' + relative, 'value': canonical_digest(path)})
         for line in path.read_text().splitlines():
             line = line.strip()
             if not line or line.startswith('#'):

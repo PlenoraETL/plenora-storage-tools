@@ -1,4 +1,6 @@
 """Offline executors used by the release coverage gate; never hosted CI results."""
+import private_git
+from canonical_digest import canonical_digest
 import io
 from pathlib import Path
 import sys
@@ -30,9 +32,9 @@ def source_subject(root):
     paths = [p for folder in ('scripts', '.github/workflows') for p in (root / folder).rglob('*')
              if p.is_file() and '__pycache__' not in p.parts and p.suffix != '.pyc']
     paths += [root / name for name in ('Cargo.toml', '.python-version', 'rust-toolchain.toml')]
-    revision = subprocess.check_output(['git', '-C', str(root), 'rev-parse', 'HEAD'],
+    revision = private_git.check_output(['git', '-C', str(root), 'rev-parse', 'HEAD'],
                                        text=True, stderr=subprocess.DEVNULL).strip()
-    return {'sources': {p.relative_to(root).as_posix(): sha(p.read_bytes()) for p in sorted(paths)},
+    return {'sources': {p.relative_to(root).as_posix(): canonical_digest(p) for p in sorted(paths)},
             'revision': revision, 'run': str(uuid.uuid4()), 'platform': sys.platform,
             'python': platform.python_version(),
             'scope': 'offline-executor-contract'}

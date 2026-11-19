@@ -1,3 +1,6 @@
+from contextlib import contextmanager
+from unittest.mock import patch
+import time
 import json
 from pathlib import Path
 import subprocess
@@ -15,6 +18,23 @@ from qualification_watchdog import positive_seconds
 # never on speed. A tight value fails on a slow shared runner (20 s expired on
 # Windows CI); the watchdog timings under test are the ones passed to the child.
 HANG_GUARD_SECONDS = 600
+
+
+@contextmanager
+def timeout_after_output(log, ready, requested_timeout=.5):
+    """Exercise real child cleanup only after the child's work is observable."""
+    original = subprocess.Popen.wait
+    def wait(process, timeout=None):
+        if timeout == requested_timeout:
+            while not log.exists() or not ready(log.read_text()):
+                if process.poll() is not None:
+                    raise AssertionError('child exited before the synchronization point')
+                time.sleep(0.01)
+            # Deterministic expired deadline, independent of process startup speed.
+            return original(process, timeout=0)
+        return original(process, timeout=timeout)
+    with patch.object(subprocess.Popen, 'wait', wait):
+        yield
 
 
 class WatchdogTests(unittest.TestCase):
@@ -125,7 +145,7 @@ sys.argv = ['qualify_transfers', '--bytes', '1', '--providers', 'local', '--work
             '--rounds', '32', '--warmup-rounds', '16', '--baseline-binary', str(folder / 'binary'),
             '--baseline-output', str(folder / 'b.json'), '--output', str(folder / 'c.json')]
 q.entrypoint(q.main)
-'''.replace('OUTPUT', repr(temporary)))
+'''.replace('OUTPUT', repr(temporary)), timeout=None)
             self.assertEqual(result.returncode, 0, result.stderr)
             for name in ('b.json', 'c.json'):
                 report = json.loads((Path(temporary) / name).read_text())
@@ -137,10 +157,11 @@ q.entrypoint(q.main)
     def test_parent_timeout_records_failure_and_stderr(self):
         with tempfile.TemporaryDirectory() as temporary:
             campaign = Campaign(Path(temporary), {'test': True})
-            with self.assertRaisesRegex(RuntimeError, 'watchdog'):
+            log = Path(temporary) / 'performance-ab/1/command.log'
+            with timeout_after_output(log, lambda text: 'stderr marker' in text), self.assertRaisesRegex(RuntimeError, 'watchdog'):
                 campaign.phase('performance-ab', lambda folder: logged(
                     [sys.executable, '-u', '-c',
-                     "import sys,time; print('stderr marker', file=sys.stderr); time.sleep(60)"],
+                     "import sys,time; print('stderr marker', file=sys.stderr); __import__('threading').Event().wait()"],
                     folder, timeout=.5))
             folder = Path(temporary) / 'performance-ab/1'
             state = json.loads((folder / 'command.log.status.json').read_text())
@@ -153,7 +174,7 @@ q.entrypoint(q.main)
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary)
             with self.assertRaises(RuntimeError):
-                logged([sys.executable, '-c', 'import os; os._exit(7)'], folder, timeout=2)
+                logged([sys.executable, '-c', 'import os; os._exit(7)'], folder)
             state = json.loads((folder / 'command.log.status.json').read_text())
             self.assertEqual((state['status'], state['returncode']), ('FAIL', 7))
 
@@ -166,8 +187,8 @@ q.entrypoint(q.main)
     def test_parent_timeout_kills_separate_session_descendant(self):
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary)
-            code = "import subprocess,sys,time; p=subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)'], start_new_session=True); print(p.pid,flush=True); time.sleep(60)"
-            with self.assertRaises(RuntimeError):
+            code = "import subprocess,sys,time; p=subprocess.Popen([sys.executable,'-c','import threading; threading.Event().wait()'], start_new_session=True); print(p.pid,flush=True); __import__('threading').Event().wait()"
+            with timeout_after_output(folder / 'command.log', lambda text: text.strip().isdigit(), requested_timeout=1), self.assertRaises(RuntimeError):
                 logged([sys.executable, '-u', '-c', code], folder, timeout=1)
             pid = int((folder / 'command.log').read_text().splitlines()[0])
             stat = Path(f'/proc/{pid}/stat')

@@ -19,7 +19,7 @@ SECRETS = ['plenora-dev-secret', 'plenora-sftp-secret', 'plenora-ftp-secret']
 def invoke(connection, flags, command, *args, expected=0):
     result = subprocess.run([str(BINARY), '--format', 'json',
         '--allow-private-network', *flags, command, '--connection', str(connection), *args],
-        capture_output=True, text=True, timeout=90)
+        capture_output=True, text=True)
     assert not result.stderr, result.stderr
     assert not any(secret in result.stdout for secret in SECRETS), 'secret in public output'
     assert len(result.stdout.splitlines()) == 1, result.stdout

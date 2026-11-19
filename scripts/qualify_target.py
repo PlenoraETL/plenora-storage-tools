@@ -9,12 +9,11 @@ import strict_json
 import os
 from pathlib import Path
 from versioning import parse_version
-import shutil
 import subprocess
 import sys
 import tempfile
 import venv
-from proof_collection import Collection
+from proof_collection import Collection, export_reports
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -67,9 +66,8 @@ def qualify(folder, host=None, ca=None, pin=None):
                 with (folder / output).open('wb') as stream:
                     subprocess.run(argv, cwd=ROOT, env=env, stdout=stream, check=True)
             else:
-                subprocess.run(argv, cwd=ROOT, env=env, check=True)
-                if source:
-                    shutil.copyfile(source, folder / output)
+                with export_reports([(source, folder / output)] if source else []):
+                    subprocess.run(argv, cwd=ROOT, env=env, check=True)
 
     command('webdav-fixture', [sys.executable, str(ROOT / 'scripts/check_webdav_fixture.py'),
             '--output', str(folder / 'webdav-fixture.json')], cwd=ROOT, env=env)

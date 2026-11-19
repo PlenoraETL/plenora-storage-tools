@@ -4,6 +4,7 @@ This is an objective debt check, not a score for prose quality. Descriptions of
 invariants, error effects and compatibility remain a human review responsibility.
 String fixtures containing marker words are not source comments.
 """
+import private_git
 import ast
 import io
 from pathlib import Path
@@ -46,7 +47,7 @@ def violations(path, source):
 
 
 def owned_files(root=ROOT):
-    names = subprocess.run(['git', 'ls-files', '--cached', '--others', '--exclude-standard'],
+    names = private_git.run(['git', 'ls-files', '--cached', '--others', '--exclude-standard'],
                            cwd=root, check=True, capture_output=True, text=True).stdout.splitlines()
     return sorted({root / name for name in names
                    if not (set(Path(name).parts) & EXCLUDED)

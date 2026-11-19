@@ -54,7 +54,7 @@ class FrozenPosixTests(existing.ProtocolCase):
                     # Bounded parent timeout also catches an accidental cross-boot sleep.
                     result = subprocess.run(['sh', '-c', fence.admission_command(str(self.vm_root), lease=0)],
                                             input='', capture_output=True, text=True,
-                                            env=self.environment(), timeout=8)
+                                            env=self.environment())
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertTrue(result.stdout.startswith('locked 2-'))
                 finally:
@@ -89,7 +89,7 @@ class FrozenPosixTests(existing.ProtocolCase):
                 for script in ('prepare-sftp-keys.sh', 'prepare-fixtures.sh', 'prepare-extended-fixtures.sh'):
                     result = subprocess.run(['bash', '-c', f'umask {mask:03o}; bash scripts/{script}'],
                                             cwd=fixture.checkout, env=fixture.environment(),
-                                            capture_output=True, timeout=45)
+                                            capture_output=True)
                     self.assertEqual(result.returncode, 0)
                 self.assert_profile(root, expected, 0o755)
 

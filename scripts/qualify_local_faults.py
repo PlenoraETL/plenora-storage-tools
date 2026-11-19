@@ -94,7 +94,7 @@ def main():
             def check(name, connection_file, operation, arguments, category, phase, effect='none', environment=None):
                 command = [str(binary), '--format', 'json', *(['--spool-uploads'] if args.spool_uploads else []),
                            operation, '--connection', str(connection_file), *map(str, arguments)]
-                process = subprocess.run(command, capture_output=True, text=True, timeout=30,
+                process = subprocess.run(command, capture_output=True, text=True,
                                          user=65534, group=65534, extra_groups=[], cwd=root, env=environment)
                 if process.returncode == 0 or process.stderr or len(process.stdout.splitlines()) != 1:
                     raise ValueError(f'{name}: expected one redacted error envelope')

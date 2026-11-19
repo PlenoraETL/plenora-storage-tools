@@ -4,6 +4,7 @@ Reports are evidence, not signatures. They must come from trusted qualification
 runs. Recompute counters and policy decisions from their attached raw files;
 never trust a summary's PASS alone or substitute another build of the same SHA.
 """
+from canonical_digest import canonical_digest
 from collections import Counter
 import hashlib
 import json
@@ -191,8 +192,7 @@ already checked by verify_release.py. No caller-supplied waiver is accepted.
             require(typing == sdk['typing'] and typing['status'] == 'PASS' and typing['mypy'] == '2.3.1'
                     and typing['wheel_sha256'] == sdk['wheel_sha256']
                     and typing['python'] == sdk['python'] and typing['platform'] == sdk['platform']
-                    and typing['consumer_sha256'] == hashlib.sha256(
-                        (ROOT / 'crates/plenora-storage-py/typing/consumer.py').read_bytes()).hexdigest(),
+                    and typing['consumer_sha256'] == canonical_digest(ROOT / 'crates/plenora-storage-py/typing/consumer.py'),
                     'SDK static consumer differs or failed')
             typing_log = evidence.read(folder + '/sdk-typing.log', typing['log_sha256']).decode('utf-8')
             require('Success: no issues found' in typing_log and ' error:' not in typing_log,
@@ -204,7 +204,7 @@ already checked by verify_release.py. No caller-supplied waiver is accepted.
             and fuzz.get('policy_id') == FUZZ_POLICY and fuzz.get('mode') == 'release'
             and fuzz.get('runs_per_target') == RUNS and set(fuzz['targets']) == set(FUZZ_TARGETS),
             'parser fuzz campaign is incomplete')
-    require(fuzz['lock_sha256'] == hashlib.sha256((ROOT / 'fuzz/Cargo.lock').read_bytes()).hexdigest(),
+    require(fuzz['lock_sha256'] == canonical_digest(ROOT / 'fuzz/Cargo.lock'),
             'fuzz used a different dependency lock')
     for target, entry in fuzz['targets'].items():
         log = evidence.read(f'fuzz/{target}/run.log').decode('utf-8')

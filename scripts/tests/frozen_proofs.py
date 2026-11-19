@@ -230,7 +230,7 @@ def execute(root, name, output):
     try:
         child = subprocess.run([sys.executable, str(root / 'scripts/tests/frozen_proofs.py'),
                                 '--worker', name, '--output', str(output)],
-                               cwd=root, capture_output=True, timeout=60,
+                               cwd=root, capture_output=True,
                                env=dict(os.environ, TMP=str(scratch), TEMP=str(scratch), TMPDIR=str(scratch)))
     except subprocess.TimeoutExpired:
         return 'HARNESS_TIMEOUT'

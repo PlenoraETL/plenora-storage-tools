@@ -66,7 +66,7 @@ def main():
                     connection.write_text(json.dumps(document))
                     arguments = ['stat', '--key', text] if mode == 1 else ['list', '--cursor', text]
                 result = subprocess.run([str(binary), '--format', 'json', *arguments,
-                                         '--connection', str(connection)], capture_output=True, timeout=5)
+                                         '--connection', str(connection)], capture_output=True)
                 assert not result.stderr, 'public CLI emitted unexpected stderr'
                 assert SECRET.encode() not in result.stdout, 'credential exposed in diagnostic'
                 assert len(result.stdout.splitlines()) == 1, 'expected one protocol envelope'

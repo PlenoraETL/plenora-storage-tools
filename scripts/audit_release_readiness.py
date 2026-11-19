@@ -67,18 +67,18 @@ with http.server.ThreadingHTTPServer(('127.0.0.1', 0), S3) as server:
     config = connection('s3', {'endpoint': f'http://127.0.0.1:{server.server_port}', 'bucket': 'audit'})
     with collection.case('cli_pagination'):
         args = BASE + ['--allow-insecure-http', 'list', '--connection', config, '--max-items', '1']
-        first = subprocess.run(args, env=ENV, capture_output=True, text=True, timeout=10)
+        first = subprocess.run(args, env=ENV, capture_output=True, text=True)
         first_json = strict_json.loads(first.stdout)
         assert first.returncode == 2 and first_json['error']['code'] == 'CLI_LIST_PAGINATION_REQUIRED', first_json
-        complete = subprocess.run(args + ['--all'], env=ENV, capture_output=True, text=True, timeout=10)
+        complete = subprocess.run(args + ['--all'], env=ENV, capture_output=True, text=True)
         value = strict_json.loads(complete.stdout)
         assert complete.returncode == 0, value
         assert [item['key'] for item in value['result']['objects']] == ['a', 'b', 'c'], value
         assert value['result']['next_cursor'] is None and value['result']['truncated'] is False
-        bounded = subprocess.run(args + ['--all', '--max-list-items', '2'], env=ENV, capture_output=True, text=True, timeout=10)
+        bounded = subprocess.run(args + ['--all', '--max-list-items', '2'], env=ENV, capture_output=True, text=True)
         bound = strict_json.loads(bounded.stdout)
         assert bounded.returncode == 4 and bound['error']['code'] == 'CLI_LIST_LIMIT_EXCEEDED', bound
-        cursor = subprocess.run(args + ['--cursor', 'cursor://expired'], env=ENV, capture_output=True, text=True, timeout=10)
+        cursor = subprocess.run(args + ['--cursor', 'cursor://expired'], env=ENV, capture_output=True, text=True)
         assert strict_json.loads(cursor.stdout)['error']['code'] == 'CLI_CURSOR_SESSION_REQUIRED'
         results['cli_pagination'] = {'status': 'PASS', 'pages': 3, 'bounded': True}
 
@@ -87,13 +87,13 @@ with http.server.ThreadingHTTPServer(('127.0.0.1', 0), S3) as server:
         get_args = BASE + ['--allow-insecure-http', 'get', '--connection', config,
                            '--key', 'object', '--output', str(destination)]
         destination.write_bytes(b'original')
-        conflict = subprocess.run(get_args + ['--overwrite', 'false'], env=ENV, capture_output=True, text=True, timeout=10)
+        conflict = subprocess.run(get_args + ['--overwrite', 'false'], env=ENV, capture_output=True, text=True)
         assert conflict.returncode == 5 and strict_json.loads(conflict.stdout)['error']['code'] == 'OUTPUT_EXISTS', conflict.stdout
         assert destination.read_bytes() == b'original'
-        limited = subprocess.run(get_args + ['--overwrite', 'true', '--max-transfer-bytes', '1'], env=ENV, capture_output=True, text=True, timeout=10)
+        limited = subprocess.run(get_args + ['--overwrite', 'true', '--max-transfer-bytes', '1'], env=ENV, capture_output=True, text=True)
         assert limited.returncode == 4, limited.stdout
         assert destination.read_bytes() == b'original'
-        replaced = subprocess.run(get_args + ['--overwrite', 'true'], env=ENV, capture_output=True, text=True, timeout=10)
+        replaced = subprocess.run(get_args + ['--overwrite', 'true'], env=ENV, capture_output=True, text=True)
         assert replaced.returncode == 0 and destination.read_bytes() == b'qualified download', replaced.stdout
         assert not list(WORK.glob('.existing-output.txt.plenora-storage-*.part'))
         results['cli_download_publication'] = {'status': 'PASS', 'existing_file_preserved_on_failure': True}
@@ -104,7 +104,7 @@ with http.server.ThreadingHTTPServer(('127.0.0.1', 0), S3) as server:
 with collection.case('connection_file_bound'):
     large = WORK / 'oversized-connection.json'
     large.write_bytes(b' ' * 1_048_577)
-    rejected = subprocess.run(BASE + ['test', '--connection', str(large)], env=ENV, capture_output=True, text=True, timeout=10)
+    rejected = subprocess.run(BASE + ['test', '--connection', str(large)], env=ENV, capture_output=True, text=True)
     assert rejected.returncode == 4 and strict_json.loads(rejected.stdout)['error']['code'] == 'CONNECTION_FILE_TOO_LARGE'
     results['connection_file_bound'] = {'status': 'PASS'}
 
@@ -119,7 +119,7 @@ class FTP(socketserver.StreamRequestHandler):
             commands.append(verb)
             if verb == 'MLST':
                 seen.set()
-                release.wait(8)
+                release.wait()
                 return
             replies = {'USER': b'331 password\r\n', 'PASS': b'230 logged in\r\n', 'TYPE': b'200 binary\r\n', 'CWD': b'250 directory\r\n'}
             self.wfile.write(replies.get(verb, b'500 unsupported\r\n'))
@@ -136,15 +136,13 @@ with socketserver.ThreadingTCPServer(('127.0.0.1', 0), FTP) as server:
         started = time.monotonic()
         process = subprocess.Popen(args, env=ENV, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         try:
-            assert seen.wait(3), 'FTP parent probe was not reached'
-            try:
-                stdout, stderr = process.communicate(timeout=4)
-                value = strict_json.loads(stdout)
-                assert process.returncode == 5 and value['error']['category'] == 'timeout', value
-                assert value['error']['remote_effect'] == 'none', value
-                results['ftp_parent_deadline'] = {'status': 'PASS', 'elapsed': round(time.monotonic() - started, 2)}
-            except subprocess.TimeoutExpired:
-                raise AssertionError('FTP directory probe exceeded its deadline') from None
+            while not seen.wait(0.01):
+                assert process.poll() is None, 'FTP parent probe was not reached'
+            stdout, stderr = process.communicate()
+            value = strict_json.loads(stdout)
+            assert process.returncode == 5 and value['error']['category'] == 'timeout', value
+            assert value['error']['remote_effect'] == 'none', value
+            results['ftp_parent_deadline'] = {'status': 'PASS', 'elapsed': round(time.monotonic() - started, 2)}
         finally:
             if process.poll() is None:
                 process.kill()

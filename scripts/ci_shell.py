@@ -69,7 +69,7 @@ export -f probe python python3 cargo cp update-ca-certificates docker
             command = [shell, '--noprofile', '--norc', '-euo', 'pipefail', str(script)]
         if not shell:
             raise ValueError('required contract shell unavailable')
-        result = subprocess.run(command, cwd=root, env=env, capture_output=True, timeout=20)
+        result = subprocess.run(command, cwd=root, env=env, capture_output=True)
         if result.returncode:
             raise ValueError('workflow shell contract failed')
         return [strict_json.loads(line) for line in trace.read_text().splitlines()] if trace.exists() else []

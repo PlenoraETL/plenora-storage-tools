@@ -41,7 +41,7 @@ class PreparationSourcesTests(unittest.TestCase):
                 ('fixture_tls.py', ['--help'], b'--output'),
             ):
                 result = subprocess.run([sys.executable, str(checkout / 'scripts' / script), *arguments],
-                                        cwd=checkout, env=env, capture_output=True, timeout=15)
+                                        cwd=checkout, env=env, capture_output=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn(expected, result.stdout)
 

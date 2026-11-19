@@ -1,5 +1,6 @@
 """Git source provenance; the injected port supplies repository identity and I/O."""
 import os
+from campaign_model import creation_profile
 import re
 import tempfile
 from pathlib import Path
@@ -22,7 +23,7 @@ def git_env(api):
     config = target / 'package-guard-gitconfig'
     lines = ['[safe]'] + ['\tdirectory = ' + path.as_posix() for path in trusted]
     config.write_text('\n'.join(lines) + '\n', encoding='utf-8')
-    return {**os.environ, 'GIT_CONFIG_GLOBAL': str(config)}
+    return {**os.environ, 'GIT_CONFIG_GLOBAL': str(config), 'GIT_OPTIONAL_LOCKS': '0'}
 
 
 def git_command(api, *args, work=None):
@@ -64,7 +65,7 @@ def release_checkout(api):
     """Isolated clone/worktree with release attributes and repository EOL config."""
     api.check_git_version()
     (api.ROOT / 'target').mkdir(exist_ok=True)
-    with tempfile.TemporaryDirectory(dir=api.ROOT / 'target', prefix='package-reference-') as tmp:
+    with creation_profile('private_file'), tempfile.TemporaryDirectory(dir=api.ROOT / 'target', prefix='package-reference-') as tmp:
         directory = Path(tmp)
         work = directory / 'work'
         result = api.subprocess.run(env=api.git_env(), args=api.git_command('clone', '--shared', '--no-checkout', '--no-reject-shallow',

@@ -1,4 +1,5 @@
 """Check a consumer outside the checkout against the installed SDK wheel."""
+from canonical_digest import canonical_digest
 import hashlib
 import importlib.metadata
 import json
@@ -43,7 +44,7 @@ def check(wheel, output):
     log.write_text(process.stdout + process.stderr, encoding='utf-8')
     report = dict(status='PASS' if process.returncode == 0 else 'FAIL', python=platform.python_version(),
                   platform=sys.platform, mypy=version, wheel_sha256=hashlib.sha256(wheel.read_bytes()).hexdigest(),
-                  consumer_sha256=hashlib.sha256(consumer.read_bytes()).hexdigest(),
+                  consumer_sha256=canonical_digest(consumer),
                   log_sha256=hashlib.sha256(log.read_bytes()).hexdigest())
     (output / 'sdk-typing.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
     if process.returncode:

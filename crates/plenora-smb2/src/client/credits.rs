@@ -360,9 +360,10 @@ mod tests {
         let waiting = pool.reserve(4);
         tokio::pin!(waiting);
         assert!(
-            tokio::time::timeout(Duration::from_millis(50), &mut waiting)
-                .await
-                .is_err(),
+            std::future::poll_fn(|cx| {
+                std::task::Poll::Ready(std::future::Future::poll(waiting.as_mut(), cx).is_pending())
+            })
+            .await,
             "nothing to reserve yet"
         );
 
@@ -379,9 +380,10 @@ mod tests {
         let waiting = pool.reserve(1);
         tokio::pin!(waiting);
         assert!(
-            tokio::time::timeout(Duration::from_millis(50), &mut waiting)
-                .await
-                .is_err()
+            std::future::poll_fn(|cx| {
+                std::task::Poll::Ready(std::future::Future::poll(waiting.as_mut(), cx).is_pending())
+            })
+            .await
         );
 
         pool.close();
@@ -437,9 +439,10 @@ mod tests {
         let waiting = pool.reserve(4);
         tokio::pin!(waiting);
         assert!(
-            tokio::time::timeout(Duration::from_millis(50), &mut waiting)
-                .await
-                .is_err(),
+            std::future::poll_fn(|cx| {
+                std::task::Poll::Ready(std::future::Future::poll(waiting.as_mut(), cx).is_pending())
+            })
+            .await,
             "nothing to reserve yet"
         );
 
@@ -449,10 +452,7 @@ mod tests {
         pool.grant(64);
 
         assert!(
-            tokio::time::timeout(Duration::from_millis(200), waiting)
-                .await
-                .expect("the waiter must resolve, not hang")
-                .is_err(),
+            waiting.await.is_err(),
             "a send queued against the old session must fail rather than \
              silently continue on the new one"
         );

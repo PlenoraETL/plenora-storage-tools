@@ -27,7 +27,7 @@ class ToolRunnerTests(unittest.TestCase):
                 command = [sys.executable, str(ROOT / 'scripts/run_logged.py'), str(log),
                            sys.executable, str(probe), str(code), *args]
                 result = subprocess.run(command, env=dict(os.environ, CARGO_TERM_COLOR='always'),
-                                        capture_output=True, timeout=10)
+                                        capture_output=True)
                 self.assertEqual(result.returncode, code)
                 observed = json.loads(log.read_text())
                 self.assertEqual(observed, {'argv': args, 'color': 'never', 'no_color': '1'})

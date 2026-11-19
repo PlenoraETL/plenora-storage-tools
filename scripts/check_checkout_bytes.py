@@ -1,4 +1,5 @@
 """Refuse tracked working bytes that differ from the committed Git blobs."""
+import private_git
 import os
 from pathlib import Path
 import subprocess
@@ -10,7 +11,7 @@ def check(root, revision='HEAD'):
     """No Git clean/smudge filters, index stat cache or EOL normalization."""
     root = Path(root)
     with creation_profile('private_file'):
-        tree = subprocess.check_output(['git', 'ls-tree', '-rz', '--full-tree', revision], cwd=root)
+        tree = private_git.check_output(['git', 'ls-tree', '-rz', '--full-tree', revision], cwd=root)
         records = []
         for entry in tree.split(b'\0'):
             if not entry:
@@ -21,7 +22,7 @@ def check(root, revision='HEAD'):
                 raise ValueError('checkout byte preflight requires tracked blobs')
             records.append((mode, oid, os.fsdecode(name)))
         # Batch reads preserve raw blob bytes, including NUL and CRLF.
-        result = subprocess.check_output(['git', 'cat-file', '--batch'], cwd=root,
+        result = private_git.check_output(['git', 'cat-file', '--batch'], cwd=root,
                                          input=b''.join(oid + b'\n' for _, oid, _ in records))
     cursor = 0
     for mode, oid, name in records:

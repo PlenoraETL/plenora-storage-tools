@@ -119,6 +119,37 @@ artefatti preparati diventano distribuibili quando `release-qualification.json`
 registra `qualified_for_publication` per i loro digest. Non pubblicare un
 artefatto prodotto da un checkout modificato o privo delle evidenze richieste.
 
+## Regole comuni per diagnostica e identita degli input
+
+I digest degli input testuali passano da `scripts/canonical_digest.py`: CRLF e
+CR diventano LF prima del calcolo. La regola comprende sorgenti, lockfile,
+requirements, policy e configurazioni; i checksum di distribuzioni, log e report
+conservati come artefatti continuano a identificare i byte esatti della singola
+istanza. I semi fuzz sono byte (`fuzz/seeds/** binary`), senza conversione.
+Il preflight della campagna confronta tutti i file tracciati con i blob Git,
+senza filtri o normalizzazione: un digest testuale canonico non autorizza un
+checkout diverso dal commit.
+
+`scripts/private_git.py` applica una umask privata ai processi Git POSIX e
+impedisce il refresh opzionale dell'indice anche nei controlli in sola lettura.
+Le proiezioni shell della campagna mantengono i profili di permesso del modello;
+il teardown Compose precede il rilascio dell'ammissione, anche su errore.
+
+`scripts/proof_collection.py` esporta i rapporti esplicitamente indicati anche
+quando il produttore fallisce e rimuove quelli precedenti prima della prova.
+Il runner VM e il controller Windows conservano `collection.json` nel tentativo,
+fuori dalla distribuzione pubblicabile. I workflow del candidato raccolgono le
+collection con `always()`. Le collection contengono nomi di casi e classi di
+errore, mai messaggi delle eccezioni.
+
+I test a lavoro finito attendono il risultato e verificano conteggi, stati e
+risposte. Le attese delle fixture dipendono dal lavoro osservato. Gli orologi
+virtuali e le deadline fornite al prodotto continuano a verificare il contratto
+temporale; non sono soglie di prestazione del runner. Le prove di processi
+intenzionalmente bloccati del watchdog mantengono la rete di sicurezza ampia
+esplicitamente dichiarata. Le regressioni sono scoperte dagli esistenti job
+unittest Linux/Windows (`test_post400.py` incluso) e dai test Cargo del workspace.
+
 ## Gate
 
 La riverifica di pubblicazione richiede Git, Rust 1.98.1 e la cache del registry:

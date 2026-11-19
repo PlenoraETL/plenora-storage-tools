@@ -2,10 +2,11 @@
 
 Exit 0: esecuzione completa; 1: FAIL; 2: NON ESEGUITO. Il piano non esegue gate.
 """
+import private_git
+from canonical_digest import canonical_digest
 import argparse
 from collections import Counter
 from datetime import datetime, timezone
-import hashlib
 import json
 import strict_json
 import os
@@ -47,7 +48,7 @@ SHELLS = {
 
 
 def git(root, *args):
-    return subprocess.check_output(['git', '-C', str(root), *args], text=True,
+    return private_git.check_output(['git', '-C', str(root), *args], text=True,
                                    stderr=subprocess.DEVNULL,
                                    env={**os.environ, **OVERRIDES}).strip()
 
@@ -104,7 +105,7 @@ def derive(root=ROOT, profile='pr'):
     if represented != expected:
         raise Unsupported('inventario job non rappresentato dal compilatore')
     return dict(schema=2, profile=profile, jobs=jobs, graph=graph,
-                sources={p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+                sources={p.relative_to(root).as_posix(): canonical_digest(p)
                          for folder in ('.github/workflows', 'scripts', 'contracts')
                          for p in (root / folder).rglob('*') if p.is_file()
                          and '__pycache__' not in p.parts and p.suffix != '.pyc'},

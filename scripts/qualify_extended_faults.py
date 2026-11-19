@@ -94,7 +94,7 @@ def main():
             command = [str(BINARY), '--format', 'json', '--allow-private-network', '--allow-insecure-http', *flags,
                        *(['--spool-uploads'] if options.spool_uploads else []),
                        operation, '--connection', str(connection), *args]
-            process = subprocess.run(command, capture_output=True, text=True, env=ENV, timeout=15)
+            process = subprocess.run(command, capture_output=True, text=True, env=ENV)
             assert not process.stderr and len(process.stdout.splitlines()) == 1, process
             assert SECRET not in process.stdout, 'credentials leaked'
             assert endpoint not in process.stdout and 'untrusted-backend-diagnostic' not in process.stdout, 'backend details leaked'

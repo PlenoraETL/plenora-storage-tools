@@ -1,4 +1,5 @@
 """Build a GitHub source bundle and compile an external Rust consumer from it."""
+import private_git
 import argparse
 import gzip
 import hashlib
@@ -91,10 +92,10 @@ def select_source_archive(raw, archive, prefix, *, checkout_bytes=False):
 def build(output, target_dir):
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
-    status = subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=normal'], cwd=ROOT)
+    status = private_git.check_output(['git', 'status', '--porcelain', '--untracked-files=normal'], cwd=ROOT)
     if status.strip():
         raise ValueError('source bundle requires a clean committed checkout')
-    revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+    revision = private_git.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     version = workspace_version().native
     prefix = f'plenora-storage-{version}'
     archive = output / f'{prefix}-source.tar.gz'
@@ -103,7 +104,7 @@ def build(output, target_dir):
     with tempfile.TemporaryDirectory(prefix='storage-source-build-') as temporary:
         work = Path(temporary)
         raw = work / 'source.tar'
-        subprocess.run(['git', '-c', 'core.autocrlf=false', '-c', 'core.eol=lf',
+        private_git.run(['git', '-c', 'core.autocrlf=false', '-c', 'core.eol=lf',
                         'archive', '--format=tar', f'--prefix={prefix}/',
                         f'--output={raw}', revision], cwd=ROOT, check=True)
         select_source_archive(raw, archive, prefix, checkout_bytes=True)

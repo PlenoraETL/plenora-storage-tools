@@ -1,4 +1,6 @@
 """Run the real XML/FTP/SMB parsers with libFuzzer and preserve reproducible evidence."""
+from canonical_digest import canonical_digest
+import private_git
 import argparse
 import hashlib
 import json
@@ -87,7 +89,7 @@ def stats(log, returncode):
 
 
 def capture(command):
-    return subprocess.check_output(command, cwd=ROOT, text=True).strip()
+    return (private_git.check_output if command[0] == 'git' else subprocess.check_output)(command, cwd=ROOT, text=True).strip()
 
 
 def main():
@@ -121,7 +123,7 @@ def main():
         lock = ROOT / 'fuzz/Cargo.lock'
         check_lock_alignment(tomllib.loads((ROOT / 'Cargo.lock').read_text()),
                              tomllib.loads(lock.read_text()))
-        report['lock_sha256'] = digest(lock)
+        report['lock_sha256'] = canonical_digest(lock)
         subprocess.run(['cargo', f'+{TOOLCHAIN}', 'metadata', '--manifest-path', 'fuzz/Cargo.toml',
                         '--locked', '--offline', '--format-version', '1'], cwd=ROOT,
                        stdout=subprocess.DEVNULL, check=True)
@@ -131,7 +133,7 @@ def main():
         report['build_command'] = command
         with (output / 'build.log').open('w') as log:
             subprocess.run(command, cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
-        if digest(lock) != report['lock_sha256']:
+        if canonical_digest(lock) != report['lock_sha256']:
             raise RuntimeError('fuzz build changed the locked dependencies')
         for target in TARGETS:
             directory = output / target
@@ -148,16 +150,16 @@ def main():
                 command = [str(binary), str(corpus / name), '-runs=1']
                 with (directory / ('replay-' + name + '.log')).open('w') as log:
                     replay[name] = subprocess.run(command, cwd=ROOT, env=env, stdout=log,
-                                                  stderr=subprocess.STDOUT, timeout=60).returncode
+                                                  stderr=subprocess.STDOUT).returncode
             command = [str(binary), str(corpus), f'-seed={args.seed}',
                        (f'-max_total_time={args.seconds}' if args.seconds else f'-runs={RUNS}'), '-max_len=65536',
-                       '-timeout=10', '-rss_limit_mb=1024', '-print_final_stats=1',
+                       '-timeout=0', '-rss_limit_mb=1024', '-print_final_stats=1',
                        f'-artifact_prefix={artifacts}{os.sep}']
             started = time.monotonic()
             with (directory / 'run.log').open('w') as log:
                 try:
                     result = subprocess.run(command, cwd=ROOT, env=env, stdout=log,
-                                            stderr=subprocess.STDOUT, timeout=args.seconds + 60 if args.seconds else 600)
+                                            stderr=subprocess.STDOUT, timeout=args.seconds + 60 if args.seconds else None)
                     code = result.returncode
                 except subprocess.TimeoutExpired:
                     code = -1

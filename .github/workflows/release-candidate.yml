@@ -185,6 +185,7 @@ jobs:
           path: |
             target/release-evidence/
             .fixtures/evidence/
+            target/release-readiness/*-collection.json
           include-hidden-files: true
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -259,7 +260,9 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: release-diagnostics-windows
-          path: target/release-evidence/
+          path: |
+            target/release-evidence/
+            target/release-readiness/*-collection.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: storage-candidate-windows

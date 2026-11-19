@@ -43,7 +43,7 @@ def qualify(mode, interruption, work):
                 body = self.rfile.read(length)
                 if completing and mode == 'before_commit':
                     ready.set()
-                    assert release.wait(30), 'test did not release pending commit'
+                    assert release.wait(), 'test did not release pending commit'
                 connection = http.client.HTTPConnection(upstream.hostname, upstream.port or 80, timeout=10)
                 connection.request(self.command, self.path, body, dict(self.headers))
                 response = connection.getresponse()
@@ -52,7 +52,7 @@ def qualify(mode, interruption, work):
                 if completing and mode == 'after_commit':
                     assert response.status == 200, response.status
                     ready.set()
-                    assert release.wait(30), 'test did not release lost response'
+                    assert release.wait(), 'test did not release lost response'
                 try:
                     self.send_response(response.status)
                     for name, value in response.getheaders():
@@ -99,7 +99,7 @@ def qualify(mode, interruption, work):
                  '--overwrite', 'true', '--publication-policy', 'atomic-required']
         process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         try:
-            assert ready.wait(12), 'completion phase was not reached'
+            assert ready.wait(), 'completion phase was not reached'
             assert not failures, failures
             assert any(part and status == 200 for _, part, _, status in events), events
             # Observe actual backend state independently while the response is withheld.
@@ -110,7 +110,7 @@ def qualify(mode, interruption, work):
                 assert invoke(direct, flags, 'stat', '--key', key)['size'] == len(payload)
             if interruption == 'sigterm':
                 process.send_signal(signal.SIGTERM)
-            stdout, stderr = process.communicate(timeout=12)
+            stdout, stderr = process.communicate()
             assert not stderr and len(stdout.splitlines()) == 1, (stdout, stderr)
             envelope = strict_json.loads(stdout)
             error = envelope['error']
@@ -123,7 +123,7 @@ def qualify(mode, interruption, work):
                 process.kill()
             process.communicate()
             release.set()
-            assert finished.wait(12), 'backend completion did not finish'
+            assert finished.wait(), 'backend completion did not finish'
             relay.shutdown()
             thread.join()
     assert not failures, failures

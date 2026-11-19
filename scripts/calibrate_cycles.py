@@ -1,8 +1,8 @@
 """Calibrate the cycle oracle locally; synthetic lifecycle, not provider qualification."""
+from canonical_digest import canonical_digest
 import argparse
 import ctypes
 import json
-import hashlib
 import os
 from pathlib import Path
 import platform
@@ -95,8 +95,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
-    report = dict(harness_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                  policy_sha256=hashlib.sha256(Path(__file__).with_name('soak_policy.py').read_bytes()).hexdigest(), policy=POLICY, platform=platform.platform(), python=sys.version,
+    report = dict(harness_sha256=canonical_digest(Path(__file__)),
+                  policy_sha256=canonical_digest(Path(__file__).with_name('soak_policy.py')), policy=POLICY, platform=platform.platform(), python=sys.version,
                   scope='synthetic local allocator and lifecycle noise; no SDK/provider qualification',
                   normal=[probe() for _ in range(3)], leak_control=probe(True))
     report['status'] = 'PASS' if all(r['status']=='PASS' for r in report['normal']) and report['leak_control']['status']=='FAIL' else 'FAIL'

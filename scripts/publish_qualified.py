@@ -1,4 +1,6 @@
 """Publish a sealed bundle through the gated workflow, resuming the same draft safely."""
+import private_git
+from canonical_digest import canonical_digest
 import argparse
 from datetime import datetime, timezone
 import json
@@ -48,7 +50,7 @@ def publish(bundle, output, repository, notes, retry_workflow=False):
     if command('git', 'status', '--porcelain') or command('git', 'ls-remote', 'origin', 'refs/heads/main').split()[0] != revision:
         raise ValueError('publication requires unchanged clean source on remote main')
     identity = {'source_revision': revision, 'version': version, 'bundle_sha256': digest(bundle),
-                'repository': repository, 'notes_sha256': digest(notes)}
+                'repository': repository, 'notes_sha256': canonical_digest(notes)}
     with exclusive(output):
         state_path = output / 'publication.json'
         state = strict_json.loads(state_path.read_text()) if state_path.exists() else {'identity': identity}
@@ -74,7 +76,7 @@ def publish(bundle, output, repository, notes, retry_workflow=False):
             if refs.get('refs/tags/' + tag + '^{}', refs.get('refs/tags/' + tag)) != revision:
                 raise ValueError('existing release tag identifies different source')
         else:
-            existing = subprocess.run(['git', 'show-ref', '--verify', '--quiet', 'refs/tags/' + tag], cwd=ROOT)
+            existing = private_git.run(['git', 'show-ref', '--verify', '--quiet', 'refs/tags/' + tag], cwd=ROOT)
             if existing.returncode == 1:
                 command('git', 'tag', '-a', tag, revision, '-m', 'Qualified Plenora Storage Tools ' + version)
             elif existing.returncode != 0 or command('git', 'rev-parse', tag + '^{}') != revision:

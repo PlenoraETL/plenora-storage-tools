@@ -66,7 +66,7 @@ def main():
                 command = [str(BINARY), '--format', 'json', '--allow-private-network', '--allow-insecure-http', *flags,
                            *(['--spool-uploads'] if options.spool_uploads else []),
                            operation, '--connection', str(connection), *map(str, arguments)]
-                result = subprocess.run(command, env=provider_env, capture_output=True, text=True, timeout=90)
+                result = subprocess.run(command, env=provider_env, capture_output=True, text=True)
                 assert not result.stderr, (provider, operation, result.stderr)
                 assert len(result.stdout.splitlines()) == 1, result.stdout
                 assert not any(secret in result.stdout for secret in ['plenora-fixture-secret', AZURE_KEY, 'fixture-token']), 'credential leaked'
@@ -122,7 +122,7 @@ def main():
                                    *(['--spool-uploads'] if options.spool_uploads else []),
                                    'put', '--connection', str(connection), '--key', race_key, '--input', str(input_path),
                                    '--overwrite', 'false', '--publication-policy', policy]
-                        process = subprocess.run(command, env=provider_env, capture_output=True, text=True, timeout=90)
+                        process = subprocess.run(command, env=provider_env, capture_output=True, text=True)
                         assert not process.stderr, process.stderr
                         return process.returncode, strict_json.loads(process.stdout)
                     with concurrent.futures.ThreadPoolExecutor(2) as pool:

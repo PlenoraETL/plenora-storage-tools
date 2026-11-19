@@ -32,10 +32,10 @@ except OSError:
 '''
             command = [sys.executable, '-c', body, str(SCRIPTS), temp]
             with state.exclusive(Path(temp)):
-                denied = subprocess.run(command, capture_output=True, timeout=10)
+                denied = subprocess.run(command, capture_output=True)
                 self.assertEqual(denied.returncode, 75)
                 self.assertFalse((Path(temp) / 'admitted').exists())
-            accepted = subprocess.run(command, capture_output=True, timeout=10)
+            accepted = subprocess.run(command, capture_output=True)
             self.assertEqual(accepted.returncode, 0)
             self.assertEqual((Path(temp) / 'admitted').read_text(), 'effect')
 
@@ -115,7 +115,7 @@ os.fsync, Path.replace = sync, publish
 s.write_json(Path(sys.argv[2]), {'generation': 2})
 '''
                 result = subprocess.run([sys.executable, '-c', body, str(SCRIPTS), str(path), boundary],
-                                        capture_output=True, timeout=10)
+                                        capture_output=True)
                 self.assertEqual(result.returncode, 73)
                 self.assertEqual(json.loads(path.read_text()), {'generation': generation})
 
@@ -130,7 +130,7 @@ with exclusive(Path(sys.argv[2])):
     Campaign(sys.argv[2], {'subject': 'fixture'}).phase('check', lambda p: os._exit(73))
 '''
             child = subprocess.run([sys.executable, '-c', body, str(SCRIPTS), temp],
-                                   capture_output=True, timeout=10)
+                                   capture_output=True)
             self.assertEqual(child.returncode, 73)
             with state.exclusive(Path(temp)):
                 campaign = state.Campaign(temp, {'subject': 'fixture'})

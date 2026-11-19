@@ -1,4 +1,5 @@
 """Qualify exact Linux distributions with resumable, separately recorded attempts."""
+import private_git
 import argparse
 import json
 import strict_json
@@ -19,7 +20,7 @@ from check_disk_space import GIB, inspect
 from check_memory import available as available_memory, inspect as inspect_memory
 from campaign_model import RELEASE_POLICY_ID
 from versioning import parse_version
-from proof_collection import Collection
+from proof_collection import Collection, export_reports
 from campaign_model import CAMPAIGN_PHASES
 from campaign_model import creation_profile
 from check_checkout_bytes import check as check_checkout_bytes
@@ -52,9 +53,9 @@ def phases_for(version):
 def identity(folder):
     manifest = strict_json.loads((folder / 'release-manifest.json').read_text())
     with creation_profile('private_file'):
-        revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+        revision = private_git.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
         check_checkout_bytes(ROOT, revision)
-        status = subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()
+        status = private_git.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()
     if (manifest['target'] != TARGET or manifest['source_revision'] != revision or not manifest['source_committed']
             or status):
         raise ValueError('campaign requires matching committed Linux artifacts and clean source')
@@ -309,11 +310,17 @@ def measure(folder, private, output, fixture_state, retries, reason, backend_dat
             # Qualified in the private directory; only its reports become
             # evidence of the phase.
             copy = qualification_copy(private, folder, subject['version'])
-            command(path, 'qualify_target.py', copy)
-            reports = path / 'dist' / subject['version'] / TARGET
-            reports.mkdir(parents=True)
-            for report in copy.glob('*.json'):
-                shutil.copyfile(report, reports / report.name)
+            # Export the sanitized internal inventory on FAIL as well as PASS.
+            report = ROOT / 'target/release-readiness' / (TARGET + '-collection.json')
+            with export_reports([(report, path / 'collection.json')]):
+                try:
+                    command(path, 'qualify_target.py', copy)
+                finally:
+                    reports = path / 'dist' / subject['version'] / TARGET
+                    reports.mkdir(parents=True, exist_ok=True)
+                    with export_reports(((report, reports / report.name)
+                                         for report in copy.glob('*.json')), fresh=False):
+                        pass
 
         qualified = phase('qualify-linux', qualify)
         sdk_environment = private / 'sdk'

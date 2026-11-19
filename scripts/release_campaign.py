@@ -4,6 +4,8 @@ Configuration contains locations and workflow IDs, never passwords. Authenticati
 uses verified SSH host keys with a private key or an interactive password prompt.
 Run again with the same configuration to resume verified successful phases.
 """
+import private_git
+from canonical_digest import canonical_digest
 import argparse
 from contextlib import contextmanager
 import getpass
@@ -36,7 +38,7 @@ from campaign_state import Campaign, digest, exclusive, logged, write_json
 from campaign_model import require_preparation_sources
 from versioning import parse_version, workspace_version
 from release_evidence import PYTHONS
-from proof_collection import Collection
+from proof_collection import Collection, export_reports
 from campaign_model import CAMPAIGN_PHASES
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -376,13 +378,13 @@ def run(config_path, output, retries, reason, connect_host=None):
         raise ValueError('orchestrator qualifies the Windows distribution locally; use a Windows host')
     config = configuration(config_path)
     with creation_profile('private_file'):
-        revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
-        if subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip():
+        revision = private_git.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+        if private_git.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip():
             raise ValueError('release campaign requires clean committed source')
         check_checkout_bytes(ROOT, revision)
     version = workspace_version().native
     output = output.resolve()
-    identity = {'revision': revision, 'version': version, 'configuration_sha256': digest(config_path),
+    identity = {'revision': revision, 'version': version, 'configuration_sha256': canonical_digest(config_path),
                 'policy_id': RELEASE_POLICY_ID}
     remote_root = config['vm_root'].rstrip('/') + '/' + version + '-' + revision[:12]
     project = 'storage-q-' + revision[:12]
@@ -502,10 +504,12 @@ def run(config_path, output, retries, reason, connect_host=None):
                 # and its lease do, and the epoch is checked on the VM at the
                 # end: a qualification during which another controller could
                 # reach the fixtures is not recorded.
-                supervised([sys.executable, str(ROOT / 'scripts/qualify_target.py'), str(folder), '--fixture-host',
-                            config['host'], '--ftps-ca', str(path / 'fixture-ca.crt'), '--host-pin',
-                            str(path / 'host-pin')],
-                           path / 'command.log', session, cwd=ROOT, env=dict(os.environ, PLENORA_WEBDAV_PORT='8088'))
+                report = ROOT / 'target/release-readiness' / (TARGETS['windows'] + '-collection.json')
+                with export_reports([(report, path / 'collection.json')]):
+                    supervised([sys.executable, str(ROOT / 'scripts/qualify_target.py'), str(folder), '--fixture-host',
+                                config['host'], '--ftps-ca', str(path / 'fixture-ca.crt'), '--host-pin',
+                                str(path / 'host-pin')],
+                               path / 'command.log', session, cwd=ROOT, env=dict(os.environ, PLENORA_WEBDAV_PORT='8088'))
                 session.check(remote)
 
             qualifications = Collection(fatal=(CampaignBusy, CampaignFenced))
@@ -650,8 +654,10 @@ def run(config_path, output, retries, reason, connect_host=None):
                                        (vm_result / 'output/selected/linux-qualification', TARGETS['linux'])]:
                     for report in source.glob('*.json'):
                         shutil.copyfile(report, release / target / report.name)
-                logged([sys.executable, str(ROOT / 'scripts/release_publication.py'), 'bundle', '--directory', str(release),
-                        '--evidence', str(evidence), '--archive', str(path / 'qualification-input.tar.gz')], path, cwd=ROOT)
+                report = ROOT / 'target/release-readiness/release-collection.json'
+                with export_reports([(report, path / 'release-collection.json')]):
+                    logged([sys.executable, str(ROOT / 'scripts/release_publication.py'), 'bundle', '--directory', str(release),
+                            '--evidence', str(evidence), '--archive', str(path / 'qualification-input.tar.gz')], path, cwd=ROOT)
 
             sealed = phase('seal', seal)
             print('Qualified bundle:', sealed / 'qualification-input.tar.gz', flush=True)

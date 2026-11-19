@@ -1,4 +1,5 @@
 """Inventory compiler-resolved Rust APIs and compare the committed, target-specific baseline."""
+import private_git
 import argparse
 import difflib
 import hashlib
@@ -14,7 +15,7 @@ RUST_VERSION = '1.98.1'
 
 
 def run(command, **kwargs):
-    return subprocess.run(command, cwd=ROOT, check=True, text=True, **kwargs)
+    return (private_git.run if command[0] == 'git' else subprocess.run)(command, cwd=ROOT, check=True, text=True, **kwargs)
 
 
 def differences(expected, actual):
