@@ -1,4 +1,5 @@
 """Prepare, smoke-test and publish only a fully qualified GitHub draft release."""
+import private_git
 import argparse
 import hashlib
 import json
@@ -47,8 +48,8 @@ def target_documents(version, target):
 
 def check_tag(tag):
     require(tag == 'v' + workspace_version().native, 'tag differs from workspace version')
-    revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
-    tagged = subprocess.check_output(['git', 'rev-parse', tag + '^{commit}'], cwd=ROOT, text=True).strip()
+    revision = private_git.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+    tagged = private_git.check_output(['git', 'rev-parse', tag + '^{commit}'], cwd=ROOT, text=True).strip()
     require(revision == tagged, 'checkout differs from release tag')
     return revision
 
@@ -109,7 +110,7 @@ def check_files(directory):
     require(bool(index['files']), 'empty publication inventory')
     receipt = strict_json.loads((directory / 'release-qualification.json').read_text())
     reject_soak_claim(receipt)
-    revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+    revision = private_git.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     require(receipt['version'] == index['version'] and receipt['source_revision'] == revision
             and receipt['status'] == 'qualified_for_publication' and receipt['schema_version'] == 2
             and receipt.get('evidence_policy') == RELEASE_POLICY_ID
@@ -249,7 +250,7 @@ def attested_files(directory):
 def attestations(directory, repository):
     """Provenance and SBOM attestations of the exact files, from the candidate
     workflow at the checked-out revision on GitHub-hosted runners."""
-    revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+    revision = private_git.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     signer = f'{repository}/.github/workflows/release-candidate.yml'
     for path in attested_files(directory):
         for predicate in ATTESTED_PREDICATES:

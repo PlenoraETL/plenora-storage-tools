@@ -2,10 +2,9 @@
 import argparse
 from pathlib import Path
 import os
-import shutil
 import subprocess
 import sys
-from proof_collection import Collection
+from proof_collection import Collection, export_reports
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -28,10 +27,9 @@ def check(directory):
             path = ROOT / 'target/release-readiness' / source if source else None
             if path:
                 path.unlink(missing_ok=True)
-            subprocess.run([sys.executable, str(ROOT / 'scripts' / script), *arguments],
-                           cwd=ROOT, env=env, check=True)
-            if path:
-                shutil.copyfile(path, folder / destination)
+            with export_reports([(path, folder / destination)] if path else []):
+                subprocess.run([sys.executable, str(ROOT / 'scripts' / script), *arguments],
+                               cwd=ROOT, env=env, check=True)
     with collection.case('verify-release'):
         subprocess.run([sys.executable, str(ROOT / 'scripts/verify_release.py'), str(directory)],
                        cwd=ROOT, check=True)

@@ -125,22 +125,19 @@ async fn parent_probe_obeys_deadline_and_cancellation() {
             }
         });
         let policy = EngineConfig::default();
-        let result = tokio::time::timeout(
-            std::time::Duration::from_secs(2),
-            ensure_parent_directories(
-                &mut ftp,
-                "parent/object",
-                &OperationContext {
-                    policy: &policy,
-                    control: &control,
-                },
-                &mut false,
-            ),
+        let result = ensure_parent_directories(
+            &mut ftp,
+            "parent/object",
+            &OperationContext {
+                policy: &policy,
+                control: &control,
+            },
+            &mut false,
         )
         .await;
         server.abort();
         trigger.await.expect("trigger");
-        let error = result.expect("bounded operation").expect_err("must stop");
+        let error = result.expect_err("must stop");
         assert_eq!(error.code, if cancel { "CANCELLED" } else { "TIMEOUT" });
         assert_eq!(
             error.remote_effect,

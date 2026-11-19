@@ -1,7 +1,7 @@
 """Check the single Python runtime policy and its release projections."""
 import argparse
 import ast
-import hashlib
+from canonical_digest import canonical_digest
 import strict_json
 import re
 import sys
@@ -60,7 +60,7 @@ def check(root=ROOT, runtime=False):
     for path in paths:
         name = path.relative_to(root).as_posix()
         if name in history and 'sha256' in history[name]:
-            if hashlib.sha256(path.read_bytes()).hexdigest() != history[name]['sha256']:
+            if canonical_digest(path) != history[name]['sha256']:
                 errors.append(name + ': historical evidence changed')
             continue
         found = [line for line in path.read_text(encoding='utf-8').splitlines() if old.search(line)]

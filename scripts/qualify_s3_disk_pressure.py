@@ -1,4 +1,6 @@
 """Reproduce MinIO disk pressure inside a bounded disposable tmpfs, never the host disk."""
+import private_git
+from canonical_digest import canonical_digest
 import argparse
 import hashlib
 import json
@@ -24,10 +26,10 @@ def require(condition, message):
 def qualify(binary, output):
     report = {'schema_version': 1, 'status': 'RUNNING',
               'binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(),
-              'source_revision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
-              'dirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()),
+              'source_revision': private_git.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
+              'dirty': bool(private_git.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()),
               'scope': 'disposable MinIO fixture with a 256 MiB tmpfs', 'results': []}
-    report['tool_sha256'] = {name: hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
+    report['tool_sha256'] = {name: canonical_digest(Path(__file__).with_name(name))
                             for name in ('qualify_s3_disk_pressure.py', 'fixture_s3.py')}
     output.parent.mkdir(parents=True, exist_ok=True)
     name = 'storage-pressure-' + uuid.uuid4().hex
@@ -90,7 +92,7 @@ print(json.dumps({'total_bytes': v.f_blocks * v.f_frsize, 'free_before': before,
             def copy():
                 result = subprocess.run([str(binary), '--format', 'json', '--allow-private-network', '--allow-insecure-http',
                     'copy', '--connection', str(connection), '--source-key', 'source', '--destination-key', 'destination',
-                    '--overwrite', 'true', '--publication-policy', 'atomic-required'], capture_output=True, env=env, timeout=60)
+                    '--overwrite', 'true', '--publication-policy', 'atomic-required'], capture_output=True, env=env)
                 require(not result.stderr and len(result.stdout.splitlines()) == 1, 'invalid public CLI response')
                 require(not any(value in result.stdout for value in [endpoint.encode(), b'plenora-dev-secret', sentinel, payload[:1024]]),
                         'public CLI response leaked fixture data')
@@ -130,7 +132,7 @@ def validate(report, revision, binary):
     require(report['status'] == 'PASS' and report['source_revision'] == revision and report['dirty'] is False,
             'disk pressure evidence must identify clean qualified source')
     require(report['binary_sha256'] == binary, 'disk pressure evidence uses a different binary')
-    require(report['tool_sha256'] == {name: hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
+    require(report['tool_sha256'] == {name: canonical_digest(Path(__file__).with_name(name))
                                     for name in ('qualify_s3_disk_pressure.py', 'fixture_s3.py')},
             'disk pressure tool identity differs')
     require(report['backend_error'] == {'http_status': 507, 'code': 'XMinioStorageFull'},

@@ -1,6 +1,7 @@
 """Collect independent checks; never convert a failed prerequisite into PASS."""
 from contextlib import contextmanager
 import sys
+import shutil
 from campaign_model import write_json, transition
 
 
@@ -37,3 +38,24 @@ class Collection:
                     print(f"FAIL case {row['name']}: {row.get('failure_type', 'not completed')}",
                           file=sys.stderr, flush=True)
             raise RuntimeError('qualification checks failed; inspect the collection report')
+
+
+@contextmanager
+def export_reports(reports, *, fresh=True):
+    """Export freshly produced reports even when the producer fails.
+
+    Explicit (source, destination) pairs prevent accidental temporary-file export.
+    Remove old sources before execution so a failed attempt cannot reuse PASS.
+    """
+    reports = list(reports)
+    if fresh:
+        for source, destination in reports:
+            source.unlink(missing_ok=True)
+            destination.unlink(missing_ok=True)
+    try:
+        yield
+    finally:
+        for source, destination in reports:
+            if source.is_file():
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, destination)

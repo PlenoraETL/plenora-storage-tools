@@ -1,4 +1,5 @@
 """Seal a local release only after both platform and dependency gates passed."""
+import private_git
 import argparse
 import json
 import strict_json
@@ -35,8 +36,8 @@ def main():
     for name in ('release-qualification.json', 'SHA256SUMS'):
         (output / name).unlink(missing_ok=True)
     subprocess.run([sys.executable, str(ROOT / 'scripts/verify_release.py'), str(output)], check=True)
-    revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
-    status = subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True)
+    revision = private_git.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+    status = private_git.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True)
     assert not status.strip(), 'qualification requires the final clean commit'
     audit_path = args.evidence / 'audit.json'
     audit = strict_json.loads(audit_path.read_text(encoding='utf-8'))

@@ -5,6 +5,8 @@ host. Preserve native Syft output, a CycloneDX view and the input digest. A
 successful scan can discover no packages: that is a documented detection limit,
 not proof that the binary contains no dependencies.
 """
+import private_git
+from canonical_digest import canonical_digest
 import argparse
 import hashlib
 import json
@@ -138,7 +140,7 @@ def scan_target(folder, output, syft, revision, *, development=False):
                          'cyclonedx': cdx_path.name, 'cyclonedx_sha256': digest(cdx_path)})
     report = {'schema_version': 1, 'status': 'DEVELOPMENT' if development else 'PASS',
               'source_revision': revision, 'dirty': development, 'version': version, 'target': target,
-              'scanner': {'name': 'syft', 'version': SYFT_VERSION, 'config_sha256': digest(CONFIG)},
+              'scanner': {'name': 'syft', 'version': SYFT_VERSION, 'config_sha256': canonical_digest(CONFIG)},
               'scope': 'extracted CLI archive and wheel; detected packages, not all linked or host dependencies',
               'results': rows}
     report_path.write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8', newline='\n')
@@ -150,7 +152,7 @@ def validate(evidence, prefix, revision, subjects):
     target = prefix.rsplit('/', 1)[-1]
     if (report['status'] != 'PASS' or report['source_revision'] != revision or report['dirty'] is not False
             or report['target'] != target or report['scanner'] != {
-                'name': 'syft', 'version': SYFT_VERSION, 'config_sha256': digest(CONFIG)}):
+                'name': 'syft', 'version': SYFT_VERSION, 'config_sha256': canonical_digest(CONFIG)}):
         raise ValueError('native inventory identity or scanner policy differs')
     rows = report['results']
     if len(rows) != 2 or {row['role'] for row in rows} != {'cli', 'wheel'}:
@@ -191,8 +193,8 @@ def main():
     parser.add_argument('--syft', default='syft')
     parser.add_argument('--development', action='store_true', help='Non-qualifying local scanner check')
     args = parser.parse_args()
-    revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
-    if not args.development and subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip():
+    revision = private_git.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+    if not args.development and private_git.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip():
         raise ValueError('qualification scans require a clean checkout')
     manifests = list(args.directory.rglob('release-manifest.json'))
     if not manifests:

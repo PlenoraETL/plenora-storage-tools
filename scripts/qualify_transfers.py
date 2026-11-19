@@ -3,6 +3,8 @@
 Linux fixture gate. Defaults to 1 GiB for streaming paths; buffered providers
 retain their documented 64 MiB limit. Each report identifies the tested binary.
 """
+import private_git
+from canonical_digest import canonical_bytes
 from campaign_model import TRANSFER_ROUND_TIMEOUT, TRANSFER_PHASE_TIMEOUT
 import argparse
 from concurrent.futures import as_completed
@@ -36,12 +38,12 @@ class OperationFailure(AssertionError):
 
 def measurement_environment():
     """Identify the test platform without recording host names or endpoints."""
-    fixture_files = subprocess.check_output(['git', 'ls-files', '--', 'docker'], cwd=ROOT, text=True).splitlines()
+    fixture_files = private_git.check_output(['git', 'ls-files', '--', 'docker'], cwd=ROOT, text=True).splitlines()
     sources = [ROOT / 'docker-compose.yml', ROOT / 'compose.extended.yml',
                *(ROOT / name for name in sorted(fixture_files))]
     fixture_hash = hashlib.sha256()
     for path in sources:
-        fixture_hash.update(path.relative_to(ROOT).as_posix().encode() + b'\0' + path.read_bytes())
+        fixture_hash.update(path.relative_to(ROOT).as_posix().encode() + b'\0' + canonical_bytes(path.read_bytes()))
     model = next((line.split(':', 1)[1].strip() for line in Path('/proc/cpuinfo').read_text().splitlines()
                   if line.startswith('model name')), platform.machine())
     return {'machine': platform.machine(), 'kernel': platform.release(), 'cpu_count': os.cpu_count(),
@@ -174,8 +176,8 @@ def new_report(binary, args):
     return {'schema_version': 1, 'binary_sha256': digest(binary), 'platform': sys.platform,
             'campaign_id': str(uuid.uuid4()), 'started_utc': datetime.now(timezone.utc).isoformat(),
             'environment': measurement_environment(),
-            'source_revision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
-            'dirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()),
+            'source_revision': private_git.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
+            'dirty': bool(private_git.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()),
             'memory_measurement': 'Linux RUSAGE_CHILDREN per fresh wrapper; includes process startup',
             'payload_bytes': args.bytes, 'workers': args.workers, 'rounds': args.rounds + args.warmup_rounds,
             'warmup_rounds': args.warmup_rounds,

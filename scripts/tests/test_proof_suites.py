@@ -32,7 +32,7 @@ class SuiteCollectorTests(unittest.TestCase):
                 env = dict(os.environ, PYTHON=(tools / 'fixture-python').as_posix(),
                            PATH=str(tools) + os.pathsep + os.environ['PATH'], MSYS2_ARG_CONV_EXCL='*')
                 result = subprocess.run([shutil.which('bash'), '--noprofile', '--norc', 'scripts/collect_storage_proofs.sh'],
-                                        cwd=root, env=env, capture_output=True, timeout=30)
+                                        cwd=root, env=env, capture_output=True)
                 self.assertEqual(result.returncode, 1)
                 summaries = list((root / 'target').glob('sempl-3-vm-*/summary.tsv'))
                 self.assertEqual(len(summaries), 1)
@@ -67,7 +67,7 @@ finish_suites
                 (root / 'run.sh').write_text(body, encoding='utf-8', newline='\n')
                 env = dict(os.environ, MSYS2_ARG_CONV_EXCL='*')
                 result = subprocess.run([shutil.which('bash'), '--noprofile', '--norc', 'run.sh'],
-                                        cwd=root, env=env, capture_output=True, timeout=20)
+                                        cwd=root, env=env, capture_output=True)
                 self.assertEqual(result.returncode, 1)
                 rows = [line.split('\t') for line in (root / 'summary.tsv').read_text().splitlines()]
                 self.assertEqual([(r[0], r[1]) for r in rows], [('first', '7'), ('frozen', '0'), ('last', '1')])

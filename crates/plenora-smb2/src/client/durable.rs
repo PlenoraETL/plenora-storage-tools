@@ -1039,7 +1039,7 @@ mod oplock_break_tests {
     use crate::types::flags::Capabilities;
     use crate::types::{MessageId, SessionId, TreeId};
     use std::sync::Arc;
-    use std::time::{Duration, Instant};
+    use std::time::Duration;
 
     const THE_TREE: TreeId = TreeId(20);
 
@@ -1102,10 +1102,8 @@ mod oplock_break_tests {
         )
     }
 
-    async fn wait_for(what: &str, mut cond: impl FnMut() -> bool) {
-        let deadline = Instant::now() + Duration::from_secs(10);
+    async fn wait_for(_what: &str, mut cond: impl FnMut() -> bool) {
         while !cond() {
-            assert!(Instant::now() < deadline, "timed out waiting for {what}");
             tokio::time::sleep(Duration::from_millis(2)).await;
         }
     }

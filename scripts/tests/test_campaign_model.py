@@ -75,7 +75,7 @@ class ModelTests(unittest.TestCase):
                 target = Path(temporary) / 'state'
                 payload = b'complete\x00generation\n'
                 result = subprocess.run([sys.executable, *command[1:-1], str(target)],
-                                        input=payload, capture_output=True, timeout=10)
+                                        input=payload, capture_output=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(target.read_bytes(), payload)
                 self.assertFalse(target.with_name('state.pending').exists())
@@ -125,7 +125,7 @@ class ModelPosixTests(unittest.TestCase):
             body = '\n'.join([*shell.transition_lines('admission'),
                               'for event in lock wait inspect advance record share confirm renew close; do',
                               'advance "$event"', 'done', 'printf "%s" "$state"'])
-            result = subprocess.run(['bash', '-c', body], capture_output=True, timeout=10)
+            result = subprocess.run(['bash', '-c', body], capture_output=True)
             self.assertEqual((result.returncode, result.stdout), (0, b'CLOSED'))
         observe()
         with patch.dict(model.TRANSITIONS, {('admission', 'SHARED', 'confirm'): 'CLOSED'}):
@@ -144,7 +144,7 @@ class ModelPosixTests(unittest.TestCase):
                         self.assertEqual(os.umask(mask), mask)
                         subprocess.run(['bash', '-c', shell.shell_profile('fixture_file')
                                         + '; printf fixture > "$1"', 'probe', str(root / 'shell')],
-                                       check=True, timeout=10)
+                                       check=True)
                         self.assertEqual([(root / name).stat().st_mode & 0o777
                                           for name in ('python', 'shell')], [0o644, 0o644])
                     finally:

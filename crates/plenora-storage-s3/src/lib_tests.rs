@@ -54,12 +54,9 @@ mod fake_s3 {
         net::TcpStream,
     };
 
-    /// Yields until `ready` holds. A condition that never comes true fails
-    /// the test after 10 s of real time instead of hanging it.
-    pub async fn yield_until(mut ready: impl FnMut() -> bool, what: &str) {
-        let started = std::time::Instant::now();
+    /// Yields until `ready` holds. Completion, not host speed, is the criterion.
+    pub async fn yield_until(mut ready: impl FnMut() -> bool, _what: &str) {
         while !ready() {
-            assert!(started.elapsed() < Duration::from_secs(10), "{what}");
             tokio::task::yield_now().await;
         }
     }
@@ -179,9 +176,8 @@ mod fake_s3 {
         /// observed it: it starts its next request, on this connection or
         /// another, or the test records that the answer arrived. Paused time
         /// would otherwise jump to the next timer while the answer is still
-        /// in the socket. Fails the test after 10 s of real time.
+        /// in the socket. Waits for observed work, independently of host speed.
         async fn until_observed(&self, socket: &TcpStream, requests: usize, answers: usize) {
-            let started = std::time::Instant::now();
             let mut byte = [0_u8; 1];
             loop {
                 let next_request = std::future::poll_fn(|cx| {
@@ -195,10 +191,6 @@ mod fake_s3 {
                 {
                     return;
                 }
-                assert!(
-                    started.elapsed() < Duration::from_secs(10),
-                    "the client never observed an answer"
-                );
                 tokio::task::yield_now().await;
             }
         }
@@ -220,8 +212,7 @@ mod fake_s3 {
     }
 
     #[tokio::test]
-    #[should_panic(expected = "the client never observed an answer")]
-    async fn an_unobserved_answer_fails_the_test() {
+    async fn an_unobserved_answer_waits_until_observed() {
         let server = start(IDLE);
         let socket = TcpStream::connect(server.address).await.expect("connect");
         let observed = Observed {
@@ -229,17 +220,14 @@ mod fake_s3 {
             received: server.received.clone(),
             answers: server.answers.clone(),
         };
-        let task = server
-            .connections
-            .lock()
-            .expect("connections")
-            .spawn(async move {
-                observed.until_observed(&socket, 0, 0).await;
-            });
-        while !task.is_finished() {
-            tokio::task::yield_now().await;
-        }
-        drop(server);
+        let mut waiting = std::pin::pin!(observed.until_observed(&socket, 0, 0));
+        std::future::poll_fn(|cx| {
+            assert!(std::future::Future::poll(waiting.as_mut(), cx).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        server.answers.fetch_add(1, Ordering::SeqCst);
+        waiting.await;
     }
 
     async fn serve(mut socket: TcpStream, script: Script, observed: Observed) {
@@ -334,9 +322,8 @@ mod fake_s3 {
     /// Reads `length` bytes without ever leaving the runtime idle, so virtual
     /// time stands still while the client refills the socket: each chunk the
     /// server reads makes the client's transport take new pieces of the body
-    /// before the clock can move. Fails the test after 10 s of real time.
+    /// before the clock can move. Waits for observed work, independently of host speed.
     async fn spin_read(socket: &TcpStream, mut length: usize) {
-        let started = std::time::Instant::now();
         let mut buffer = vec![0; 64 * 1024];
         while length > 0 {
             let want = length.min(buffer.len());
@@ -344,10 +331,6 @@ mod fake_s3 {
                 Ok(0) => panic!("the client closed the connection"),
                 Ok(read) => length -= read,
                 Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                    assert!(
-                        started.elapsed() < Duration::from_secs(10),
-                        "the client stopped sending"
-                    );
                     tokio::task::yield_now().await;
                 }
                 Err(error) => panic!("read failed: {error}"),

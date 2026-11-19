@@ -4,7 +4,7 @@ Diagnostics are fixed text: never interpolate document values or exceptions.
 The optional upstream checkout is read only; CI needs only vendored files.
 """
 import argparse
-import hashlib
+from canonical_digest import canonical_digest
 import json
 import strict_json
 from pathlib import Path
@@ -36,7 +36,7 @@ def check(upstream=None):
     for name, entry in lock['files'].items():
         path = (UPSTREAM / name).resolve()
         require(path.is_relative_to(UPSTREAM.resolve()), 'ADOPTION: invalid vendor path')
-        require(hashlib.sha256(path.read_bytes()).hexdigest() == entry['sha256'],
+        require(canonical_digest(path) == entry['sha256'],
                 'ADOPTION: vendor digest mismatch')
         if upstream:
             original = (upstream / entry['source']).resolve()

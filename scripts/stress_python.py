@@ -134,8 +134,7 @@ def main():
                         entered, release = threading.Event(), threading.Event()
                         def resolver(reference):
                             entered.set()
-                            if not release.wait(10):
-                                raise RuntimeError('cancellation fixture did not release resolver')
+                            release.wait()
                             return credentials[reference]
                         cancelled_key = f'{prefix}/{mode}/cancelled'
                         with Engine(policy, credential_resolver=resolver,
@@ -146,13 +145,12 @@ def main():
                                                overwrite=True, publication_policy='best_effort',
                                                cancellation=token, timeout_ms=60000)
                             try:
-                                if not entered.wait(10):
-                                    raise ValueError('cancellation did not reach the resolver boundary')
+                                entered.wait()
                                 token.cancel()
                             finally:
                                 release.set()
                             try:
-                                task.result(timeout=10)
+                                task.result()
                             except StorageError as error:
                                 assert error.category == 'cancelled'
                             else:

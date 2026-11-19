@@ -1,4 +1,6 @@
 """Build and verify immutable local release artifacts; never publishes them."""
+import private_git
+from canonical_digest import canonical_bytes
 import argparse
 import hashlib
 import json
@@ -26,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def run(*command, **kwargs):
-    return subprocess.run(command, cwd=ROOT, check=True, **kwargs)
+    return (private_git.run if command[0] == 'git' else subprocess.run)(command, cwd=ROOT, check=True, **kwargs)
 
 
 def digest(path):
@@ -45,7 +47,7 @@ def source_digest():
                      if path.is_file() and '__pycache__' not in path.parts)
     for path in sorted(files, key=lambda value: value.relative_to(ROOT).as_posix()):
         checksum.update(path.relative_to(ROOT).as_posix().encode() + b'\0')
-        checksum.update(path.read_bytes())
+        checksum.update(canonical_bytes(path.read_bytes()))
         checksum.update(b'\0')
     return checksum.hexdigest()
 
@@ -62,7 +64,7 @@ def main():
     target_dir = Path(metadata['target_directory'])
     output = ROOT / 'dist' / version / target
     output.mkdir(parents=True, exist_ok=True)
-    revision = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=ROOT, capture_output=True, text=True)
+    revision = private_git.run(['git', 'rev-parse', 'HEAD'], cwd=ROOT, capture_output=True, text=True)
     if not args.allow_dirty:
         assert revision.returncode == 0, 'a committed checkout is required'
         status = run('git', 'status', '--porcelain', '--untracked-files=normal', capture_output=True, text=True)

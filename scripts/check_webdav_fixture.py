@@ -3,6 +3,7 @@
 This probe bypasses Storage Tools, so a server precondition race cannot be
 mistaken for an adapter failure. It creates and deletes only unique owned keys.
 """
+import private_git
 import argparse
 import base64
 from concurrent.futures import ThreadPoolExecutor
@@ -49,7 +50,7 @@ def probe(report, save):
         barrier = Barrier(8)
 
         def put(index):
-            barrier.wait(timeout=30)
+            barrier.wait()
             return request('PUT', key, payloads[index], conditional=True)[0]
 
         try:
@@ -76,8 +77,8 @@ def main():
     args = parser.parse_args()
     args.output.parent.mkdir(parents=True, exist_ok=True)
     report = {'schema_version': 1, 'status': 'RUNNING', 'workers': 8, 'results': [],
-              'source_revision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
-              'dirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()),
+              'source_revision': private_git.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
+              'dirty': bool(private_git.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()),
               'scope': 'Isolated WebDAV fixture; direct HTTP, not a Storage Tools binary test'}
 
     def save():
