@@ -5,20 +5,25 @@
 Le piattaforme supportate sono Linux e Windows. Gli altri sistemi sono
 rifiutati in compilazione, anche dalla libreria SMB autonoma.
 
-Su push e PR rimangono inventario, policy, dipendenze e controlli Rust
-(fmt, Clippy e test offline su Linux e Windows), con budget massimo di 30 minuti.
-Dal pulsante Run workflow di `ci.yml` si avviano anche coverage completa,
-fuzz/replay strumentato, API, qualita completa, conformance Docker, candidato
-Windows, wheel e riverifica dei pacchetti. I job dipendenti dagli artefatti
-restano nella stessa esecuzione manuale dei produttori.
+Su push e PR girano inventario, policy, dipendenze, controlli Rust, API,
+replay fuzz, qualita completa, coverage, wheel e riverifica degli archivi Cargo.
+La selezione usa le durate misurate sull'ultimo run di main: queste prove
+richiedono meno di 30 minuti; i timeout conservano il margine operativo.
+Solo le prove lunghe `docker-conformance` e `native-windows` richiedono
+`workflow_dispatch`. La loro riverifica dei candidati completi rimane nella
+catena manuale, nel job separato `release-candidate-recheck`.
+La wheel Windows automatica viene prodotta da `python-wheel-windows`, senza
+attendere il candidato Windows. `release-package-recheck` attende soltanto
+`release-package-build`, mentre la riverifica completa attende tutti i produttori.
 Lo schedule settimanale esegue solo le dipendenze; il fuzz esplorativo richiede
 l'avvio manuale di `scheduled.yml` o `parser-fuzz.yml`.
 `coverage.yml`, `reliability.yml` e `release-candidate.yml` conservano il loro
-avvio manuale. Soak e campagne non sono attivati da push o PR.
+avvio manuale; coverage e richiamato anche dalla CI automatica.
+Soak e campagne non sono attivati da push o PR.
 Un job escluso non e una prova superata: i gate di qualifica e le soglie restano
 obbligatori quando si qualifica un candidato. Le ricevute storiche non cambiano.
 Il guardiano `test_workflow_policy.py`, eseguito in `quick-quality`, verifica
-anche le chiamate riusabili per impedire prove lunghe automatiche.
+anche le chiamate riusabili e impedisce che i job brevi dipendano dai manuali.
 
 ## CI locale
 
@@ -128,7 +133,7 @@ Le verifiche usano `qualify_windows_candidate.py` su Windows e `qualify_target.p
 nel servizio Debian Bookworm del candidato Linux; entrambi richiamano
 `verify_release.py`. Il candidato Windows e la CI condividono anche lo stesso
 script per i report localhost sul binario finale.
-`release-package-recheck`, un runner Ubuntu 24.04 separato con Python 3.14 e senza
+`release-candidate-recheck`, un runner Ubuntu 24.04 separato con Python 3.14 e senza
 cache Cargo del produttore, riceve entrambi i candidati e gli archivi Cargo.
 `check_release_packages.py --release` riesegue `verify_release.py`, verifica gli
 asset standalone e un contenitore con l'inventario completo della qualifica,

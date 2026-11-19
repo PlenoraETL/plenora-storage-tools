@@ -86,9 +86,9 @@ def contracts(graph, invocations, *, windows=None):
     for workflow, name in [('ci.yml', 'python-compatibility'), ('release-candidate.yml', 'python-compatibility'),
                            ('ci.yml', 'native-windows' if windows else 'docker-conformance'),
                            ('release-candidate.yml', 'windows' if windows else 'linux'),
-                           *([] if windows else [('ci.yml', 'release-package-recheck')])]:
+                           *([] if windows else [('ci.yml', 'release-candidate-recheck')])]:
         job = job_plan(graph, workflow, name)
-        if name == 'release-package-recheck':
+        if name == 'release-candidate-recheck':
             recheck_steps(job, invocations)
         for number, step in enumerate(job['steps']):
             calls = invocations(step.get('run', ''))
@@ -101,7 +101,7 @@ def contracts(graph, invocations, *, windows=None):
                 selected = building or ('qualify_windows_candidate', '') in calls
                 expected = ([['scripts/build_release.py']] if building else
                             [['scripts/release_version.py'], ['scripts/qualify_windows_candidate.py', 'dist/4.0.0']])
-            elif name == 'release-package-recheck':
+            elif name == 'release-candidate-recheck':
                 selected = ('check_release_packages', '') in calls
                 expected = RECHECK_COMMANDS.get(step.get('id'))
             else:

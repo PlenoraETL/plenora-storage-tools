@@ -20,8 +20,8 @@ class ReleaseGuardCoverageTests(unittest.TestCase):
             ('native-windows', 'runs-on: windows-latest', 'runs-on: ubuntu-latest'),
             ('docker-conformance', 'scripts/qualify_target.py', 'scripts/other.py'),
             ('docker-conformance', '--no-deps storage-rust bash -c', '--no-deps other bash -c'),
-            ('release-package-recheck', ' --release', ''),
-            ('release-package-recheck', 'merge-multiple: true', 'merge-multiple: false'),
+            ('release-candidate-recheck', ' --release', ''),
+            ('release-candidate-recheck', 'merge-multiple: true', 'merge-multiple: false'),
         ]:
             ci = copy.deepcopy(original)
             self.assertIn(old, ci[job])

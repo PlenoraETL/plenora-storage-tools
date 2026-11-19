@@ -44,16 +44,16 @@ def handoff(graph, subject):
                 'native-windows': ('dist/4.0.0/x86_64-pc-windows-msvc/subject.bin', b'windows'),
                 'release-package-build': ('target/package/fixture.crate', b'crate')}
     with tempfile.TemporaryDirectory(prefix='ci-handoff-') as temp:
-        roots = {name: Path(temp) / name for name in [*fixtures, 'release-package-recheck']}
+        roots = {name: Path(temp) / name for name in [*fixtures, 'release-candidate-recheck']}
         for name, (relative, data) in fixtures.items():
             path = roots[name] / relative
             path.parent.mkdir(parents=True)
             path.write_bytes(data)
             (roots[name] / 'producer-cache').write_bytes(b'not transferable')
-        roots['release-package-recheck'].mkdir()
+        roots['release-candidate-recheck'].mkdir()
         result = execute(plan, subject, ArtifactExecutor(roots), scope='local-artifact-contract')
         verify_execution(plan, subject, result, scope='local-artifact-contract')
-        consumer = roots['release-package-recheck']
+        consumer = roots['release-candidate-recheck']
         actual = {p.relative_to(consumer).as_posix(): sha(p.read_bytes())
                   for p in consumer.rglob('*') if p.is_file()}
         expected = {'target/candidate-recheck/4.0.0/x86_64-unknown-linux-gnu/subject.bin': sha(b'linux'),

@@ -4,10 +4,20 @@ from pathlib import Path
 MANUAL = "github.event_name == 'workflow_dispatch'"
 LONG_JOBS = {
     ('ci.yml', name) for name in (
-        'production-coverage', 'parser-fuzz', 'api-compatibility', 'product-quality',
-        'docker-conformance', 'native-windows', 'python-compatibility',
-        'release-package-build', 'release-package-recheck')
+        'docker-conformance', 'native-windows', 'release-candidate-recheck')
 } | {('scheduled.yml', 'parser-fuzz')}
+AUTOMATIC = {
+    'production-coverage', 'parser-fuzz', 'api-compatibility', 'product-quality',
+    'python-compatibility', 'release-package-build', 'release-package-recheck',
+    'dependencies', 'python-wheel-windows',
+}
+# Measured runtime, not timeout, determines automatic eligibility. Preserve
+# existing headroom, including manual parser exploration on the reusable job.
+BUDGETS = {('ci.yml', 'product-quality'): 40,
+           ('api-compatibility.yml', 'rust-api'): 40,
+           ('coverage.yml', 'rust-product'): 60,
+           ('parser-fuzz.yml', 'parsers'): 90}
+
 
 
 def automatic_jobs(documents, events=('push', 'pull_request', 'schedule')):
@@ -44,7 +54,18 @@ def check(documents):
         if ('workflow_dispatch' not in document.get('on', {})
                 or document['jobs'][key].get('if') != MANUAL):
             raise ValueError(f'{name}/{key}: requires manual dispatch')
+    ci = documents['ci.yml']
+    if not {'push', 'pull_request'} <= set(ci['on']):
+        raise ValueError('automatic CI events missing')
+    for key in AUTOMATIC:
+        job = ci['jobs'][key]
+        if 'if' in job:
+            raise ValueError(f'{key}: must remain automatic')
+        needs = job.get('needs', [])
+        needs = [needs] if isinstance(needs, str) else needs
+        if any(('ci.yml', parent) in LONG_JOBS for parent in needs):
+            raise ValueError(f'{key}: automatic job needs manual producer')
     for name, key in automatic_jobs(documents):
         job = documents[name]['jobs'][key]
-        if 'uses' not in job and job.get('timeout-minutes', 360) > 30:
+        if 'uses' not in job and job.get('timeout-minutes', 360) > BUDGETS.get((name, key), 30):
             raise ValueError(f'{name}/{key}: automatic budget exceeds 30 minutes')

@@ -101,7 +101,7 @@ di margine rispetto alla baseline, arrotondando verso il basso. Il denominatore
 è cambiato: queste soglie sostituiscono quelle che includevano il codice dei test,
 senza presentare il cambiamento della percentuale come una regressione funzionale.
 
-`coverage.sh`, eseguito dalla [CI manuale](../.github/workflows/coverage.yml)
+`coverage.sh`, eseguito dalla [CI automatica e manuale](../.github/workflows/coverage.yml)
 e dal workflow di affidabilità con `coverage=true`, impone le soglie correnti
 e rifiuta crate mancanti o non ancora censiti nella policy. Il
 report conserva commit, stato del checkout e digest del report LLVM originale.
@@ -139,7 +139,7 @@ sotto e dalle prove di durata.
 
 ## Fuzzing dei parser XML, FTP e SMB
 
-Il workflow [parser-fuzz](../.github/workflows/parser-fuzz.yml), richiamato dalla CI manuale
+Il workflow [parser-fuzz](../.github/workflows/parser-fuzz.yml), richiamato dalla CI automatica
 e da release-candidate, compila i parser effettivi di S3, Azure, WebDAV e FTP/FTPS con
 cargo-fuzz 0.13.2, libFuzzer 0.4.13 e AddressSanitizer. La toolchain nightly è
 fissata al 20 settembre 2026; non modifica la toolchain del prodotto.
@@ -163,7 +163,7 @@ docker run --rm --network none -v "$PWD:/workspace" -v storage-fuzz-registry:/us
   storage-parser-fuzz python3 scripts/fuzz_parsers.py --seconds 300 --output target/parser-fuzz-manual
 ```
 
-La CI manuale e il candidato eseguono replay e budget di lavoro con
+La CI automatica e il candidato eseguono replay e budget di lavoro con
 `seconds=0`. L'avvio diretto di `parser-fuzz.yml` usa per default 300 secondi
 per parser (40 minuti di esplorazione per otto target, oltre alla build).
 Il workflow [scheduled](../.github/workflows/scheduled.yml) esegue ogni lunedi

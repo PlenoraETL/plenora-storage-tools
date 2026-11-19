@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 class ArtifactFlowTests(unittest.TestCase):
     def test_recheck_consumes_both_candidates_and_crates_on_a_clean_runner(self):
         jobs = workflows(ROOT)['ci.yml']['jobs']
-        recheck = jobs['release-package-recheck']
+        recheck = jobs['release-candidate-recheck']
         fixtures = {'docker-conformance': ('dist/4.0.0/x86_64-unknown-linux-gnu/subject.bin', b'linux'),
                     'native-windows': ('dist/4.0.0/x86_64-pc-windows-msvc/subject.bin', b'windows'),
                     'release-package-build': ('target/package/fixture.crate', b'crate')}
@@ -73,7 +73,7 @@ class ArtifactFlowTests(unittest.TestCase):
                         target = destination / relative
                         target.parent.mkdir(parents=True, exist_ok=True)
                         target.write_bytes(data)
-                        observed.append({'job': 'release-package-recheck', 'step': number,
+                        observed.append({'job': 'release-candidate-recheck', 'step': number,
                                          'producer': asset['producer'], 'name': name,
                                          'path': target.relative_to(consumer).as_posix(),
                                          'sha256': hashlib.sha256(target.read_bytes()).hexdigest()})
