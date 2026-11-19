@@ -1,4 +1,4 @@
-"""Release/PR environment policy over executable workflow definitions."""
+"""Release/manual CI environment policy over executable workflow definitions."""
 from ci_plan import job_plan
 import shlex
 from ci_shell import recheck_steps
@@ -24,7 +24,7 @@ def check(graph, invocations):
                     if node['context']['workflow'] == 'release-candidate.yml'
                     and node['kind'] == 'step' and invocations(node['definition'].get('run', ''))}
     if release_jobs != set(counterparts):
-        raise ValueError('release guard invocation changed; extend PR counterparts')
+        raise ValueError('release guard invocation changed; extend manual CI counterparts')
     for source, destination in counterparts.items():
         candidate, ci = job('release-candidate.yml', source), job('ci.yml', destination)
         if candidate['runs-on'] != ci['runs-on'] or any(call not in calls(ci) for call in calls(candidate)):
@@ -53,7 +53,19 @@ def check(graph, invocations):
         value = job('release.yml', name)
         if value['runs-on'] != 'ubuntu-24.04' or calls(value) != required:
             raise ValueError('publication counterpart differs')
-    recheck = job('ci.yml', 'release-package-recheck')
+    archives = job('ci.yml', 'release-package-recheck')
+    if archives['runs-on'] != 'ubuntu-24.04' or archives['needs'] != ['release-package-build']:
+        raise ValueError('automatic archive recheck environment or producer differs')
+    if calls(archives) != [('check_release_packages', '')]:
+        raise ValueError('automatic archive recheck missing')
+    downloads = actions(archives, 'actions/download-artifact')
+    if len(downloads) != 1 or downloads[0]['with'] != {
+            'name': 'release-package-regression', 'path': 'target/release-package-regression'}:
+        raise ValueError('automatic archive recheck input differs')
+    command = next(s['run'] for s in archives['steps'] if s.get('id') == 'verify-crate-packages')
+    if shlex.split(command) != ['python', 'scripts/check_release_packages.py', 'target/release-package-regression']:
+        raise ValueError('automatic archive recheck command differs')
+    recheck = job('ci.yml', 'release-candidate-recheck')
     if recheck['runs-on'] != 'ubuntu-24.04' or set(recheck['needs']) != {
             'release-package-build', 'docker-conformance', 'native-windows'}:
         raise ValueError('recheck environment or producers differ')
@@ -75,6 +87,6 @@ def artifact_plan(graph):
         if len(steps) != 1:
             raise ValueError('missing or duplicate artifact producer')
         jobs[name] = dict(value, steps=steps, needs=[])
-    value = job_plan(graph, 'ci.yml', 'release-package-recheck')
-    jobs['release-package-recheck'] = dict(value, steps=actions(value, 'actions/download-artifact'))
+    value = job_plan(graph, 'ci.yml', 'release-candidate-recheck')
+    jobs['release-candidate-recheck'] = dict(value, steps=actions(value, 'actions/download-artifact'))
     return compile_plan({'ci.yml': {'jobs': jobs}})

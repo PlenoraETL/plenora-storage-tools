@@ -68,7 +68,7 @@ class PlanTests(unittest.TestCase):
             elif change == 'artifact':
                 jobs['proof-inventory']['steps'][-1]['with']['path'] = 'another-subject.json'
             else:
-                jobs['release-package-recheck']['needs'] = ['release-package-build']
+                jobs['release-candidate-recheck']['needs'] = ['release-package-build']
             with self.subTest(change=change), self.assertRaises(ValueError):
                 plan.verify(plan.compile_plan(mutated), subject, bundle)
         with self.assertRaises(ValueError):

@@ -1,11 +1,8 @@
 //! Fault injection: hostile-but-plausible servers.
 //!
-//! This class of bug survived a year of testing because nothing ever simulated
-//! a server that stays connected and stops cooperating. Every failure here is
-//! one that has actually been observed against real hardware — a QNAP TS-464
-//! that answered nothing while TCP stayed `ESTABLISHED`, a macOS laptop
-//! roaming between access points mid-copy — and none of them are reachable
-//! from a mock that only replays a canned conversation.
+//! Simulate servers that stay connected and stop cooperating, including TCP
+//! black holes during roaming or sleep. Canned conversations cannot cover
+//! these failure modes.
 //!
 //! **Every wait in this file is bounded and panics on expiry.** A test that
 //! can hang is worse than no test: it turns a red build into a wedged one, and
@@ -555,7 +552,7 @@ async fn a_server_that_dies_mid_transfer_is_declared_dead_and_every_waiter_told(
 }
 
 /// The Wi-Fi-roam / laptop-sleep case: TCP goes to a black hole with no RST,
-/// no FIN, and no error. Routine on macOS, and indistinguishable from a dead
+/// no FIN, and no error. This is indistinguishable from a dead
 /// server — which is the point, because the client should not need to
 /// distinguish them.
 ///

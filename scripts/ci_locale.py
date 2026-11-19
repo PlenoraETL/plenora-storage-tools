@@ -19,6 +19,7 @@ import sys
 import uuid
 
 from ci_plan import compile_plan, digest, workflows
+from workflow_policy import MANUAL
 from ci_locale_expr import Unsupported, evaluate, render, truth
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -79,20 +80,25 @@ def derive(root=ROOT, profile='pr'):
         if node['kind'] != 'job':
             continue
         ctx = node['context']
+        ancestors = [key[:m.start()] for m in re.finditer('/call/', key)] + [key]
+        manual = profile == 'pr' and any(
+            graph['nodes'][parent]['context']['job_settings'].get('if') == MANUAL
+            for parent in ancestors)
+        selected = key.split('/')[0] in roots and not manual
         steps = [dict(id=sid, **step) for sid, step in graph['nodes'].items()
                  if step['kind'] == 'step' and sid.rsplit('/step/', 1)[0] == key]
         for step in steps:
             definition = step['definition']
             step['availability'] = 'DA VERIFICARE'
             step['availability_reason'] = 'piano soltanto; nessun comando eseguito'
-            if key.split('/')[0] not in roots:
+            if not selected:
                 step.update(availability=NOT_RUN, availability_reason='fuori profilo')
             elif 'uses' in definition and ACTION_MAP.get(definition['uses']) not in {'checkout', 'python', 'rust'}:
                 step.update(availability=NOT_RUN, availability_reason='action non riprodotta localmente')
             elif re.search(r'\bdocker\b|fixtures|run_vm_campaign|scripts/verify.sh', definition.get('run', '')):
                 step.update(availability=NOT_RUN, availability_reason='fixture Docker o VM non riprodotta sull’host')
         jobs.append(dict(key=key, id=ctx['job'], matrix=ctx['matrix'], needs=node['needs'],
-                         selected=key.split('/')[0] in roots, context=ctx, steps=steps))
+                         selected=selected, context=ctx, steps=steps))
     represented = {(j['context']['workflow'], j['id']) for j in jobs}
     expected = {(w, j) for w, d in documents.items() for j in d['jobs']}
     if represented != expected:

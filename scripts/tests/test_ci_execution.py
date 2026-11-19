@@ -57,7 +57,7 @@ class ExecutionTests(unittest.TestCase):
     def test_bash_recheck_subjects_are_distinct_and_cannot_exchange_dispatch(self):
         documents = plan.workflows(ROOT)
         receipt = shell.contracts(plan.compile_plan(documents), coverage.invocations, windows=False)
-        rows = {r['executor']: r for r in receipt['rows'] if r['job'] == 'release-package-recheck'}
+        rows = {r['executor']: r for r in receipt['rows'] if r['job'] == 'release-candidate-recheck'}
         self.assertEqual(rows['verify-crate-packages']['observed'],
                          [['scripts/check_release_packages.py', 'target/release-package-regression']])
         self.assertEqual(rows['verify-release-packages']['observed'],
@@ -65,7 +65,7 @@ class ExecutionTests(unittest.TestCase):
                           'target/candidate-recheck/4.0.0', '--release']])
         for mutation in ('exchange', 'duplicate', 'missing', 'unreachable'):
             changed = deepcopy(documents)
-            job = changed['ci.yml']['jobs']['release-package-recheck']
+            job = changed['ci.yml']['jobs']['release-candidate-recheck']
             steps = shell.recheck_steps(job, coverage.invocations)
             crate, release = steps['verify-crate-packages'], steps['verify-release-packages']
             if mutation == 'exchange':
@@ -163,13 +163,13 @@ class ExecutionTests(unittest.TestCase):
         for change in ('merge', 'path', 'needs', 'upload'):
             mutated = deepcopy(documents)
             jobs = mutated['ci.yml']['jobs']
-            steps = policy.actions(jobs['release-package-recheck'], 'actions/download-artifact')
+            steps = policy.actions(jobs['release-candidate-recheck'], 'actions/download-artifact')
             if change == 'merge':
                 steps[-1]['with']['merge-multiple'] = False
             elif change == 'path':
                 steps[-1]['with']['path'] = 'wrong-subject'
             elif change == 'needs':
-                jobs['release-package-recheck']['needs'] = ['release-package-build']
+                jobs['release-candidate-recheck']['needs'] = ['release-package-build']
             else:
                 policy.actions(jobs['native-windows'], 'actions/upload-artifact')[0]['with']['path'] = 'producer-cache'
             with self.subTest(change=change), self.assertRaises(ValueError):
@@ -208,7 +208,7 @@ class ExecutionTests(unittest.TestCase):
         self.assertEqual(plan.compile_plan({'x': plan.parse_workflow(a)}),
                          plan.compile_plan({'x': plan.parse_workflow(b)}))
         mutated = deepcopy(docs)
-        job = mutated['ci.yml']['jobs']['release-package-recheck']
+        job = mutated['ci.yml']['jobs']['release-candidate-recheck']
         job['runs-on'] = 'windows-latest'
         job['steps'].append({'run': '# runs-on: ubuntu-24.04'})
         def reject():

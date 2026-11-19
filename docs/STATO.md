@@ -61,6 +61,7 @@ Le feature sono condivise da engine, CLI e binding Python. `default = full`;
 
 ## Superfici e limiti
 
+- Piattaforme supportate: Linux e Windows; gli altri sistemi sono rifiutati in compilazione.
 - Rust: core neutrale e factory applicativa `plenora_storage_engine::build_engine`.
 - CLI: protocollo JSON e trasferimenti su file.
 - Runtime Binding: nel core, con resolver posseduti dal consumer.

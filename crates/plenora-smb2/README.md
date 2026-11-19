@@ -6,8 +6,8 @@
 [![License](https://img.shields.io/crates/l/smb2)](https://github.com/vdavid/smb2/blob/main/LICENSE-MIT)
 [![MSRV](https://img.shields.io/badge/MSRV-1.85-blue)](https://blog.rust-lang.org/2025/02/20/Rust-1.85.0.html)
 
-A pure-Rust SMB2/3 client library with pipelined I/O. No C dependencies, no FFI. Faster than native macOS SMB in all
-operations: 1.3-5x faster on uploads, downloads, listings, and deletes.
+A pure-Rust SMB2/3 client library with pipelined I/O. No C dependencies, no FFI.
+This fork supports Linux and Windows only.
 
 I built this because I needed fast SMB access for [Cmdr](https://github.com/vdavid/cmdr) (my file manager), and the
 existing Rust SMB options weren't good enough. The `smb` crate works fine for listing files but downloads are painfully
@@ -19,7 +19,7 @@ we have more control to reach even better speeds.
 - Cross-compile without system lib headaches (no `libsmbclient`, no `-sys` crates)
 - Pipelined I/O by default, not as an afterthought
 - Async and runtime-agnostic (uses `futures` traits)
-- Works anywhere Rust compiles
+- Supports Linux and Windows
 
 ## What it does
 
@@ -39,7 +39,7 @@ we have more control to reach even better speeds.
 - Reconnection after network failures
 - Auto-flush on writes (data safety for family photos and company docs)
 - Filenames carrying characters SMB2 forbids (`?`, `*`, `"`, `:`, `<`, `>`, `\`, `|`, a trailing space or period),
-  mapped the way macOS does so a file is named the same here and in Finder
+  mapped into the Unicode private-use area for transport
 
 ## Filenames SMB2 won't carry
 
@@ -54,8 +54,7 @@ server stores an ordinary legal name and never knows, and **no server-side confi
 
 ```rust,no_run
 # async fn example(client: &mut smb2::SmbClient, share: &mut smb2::Tree) -> Result<(), smb2::Error> {
-// Just works. On the wire the name carries U+F025 where the `?` is, which is
-// byte for byte what macOS Finder writes for the same file.
+// On the wire the name carries U+F025 where the `?` is.
 client.write_file(share, r#""how are you?".json"#, b"...").await?;
 
 // And comes back the way you wrote it.
@@ -74,9 +73,7 @@ Two things to know:
 
 - **`/` is the only path separator.** A `\` is an ordinary character in a name and becomes U+F026, which is the only
   way a file named `a\b` can be opened at all. Write `dir/file.txt`, never `dir\file.txt`.
-- **No Unicode normalization.** macOS smbfs converts decomposed names to NFC before sending because its local
-  filesystem stores NFD; a cross-platform crate has no such local form to convert from, and an NFD name is perfectly
-  legal on the wire. If you want byte-for-byte Finder parity on macOS, normalize to NFC before calling.
+- **No Unicode normalization.** NFD names are legal on the wire. Consumers that need NFC must normalize before calling.
 
 ## Limitations
 
@@ -371,47 +368,6 @@ For advanced use cases, the underlying types are available:
 - `Tree`: Share-level file operations (take `&mut Connection`)
 - `NegotiatedParams`: Protocol parameters from negotiate
 
-## Performance
-
-Benchmarked against native macOS SMB (with F_NOCACHE to disable kernel page cache) and the `smb` crate on a QNAP NAS
-over Gigabit LAN, SMB 3.1.1:
-
-### Small files (100 × 100 KB)
-
-| Operation | native | smb2  | Speedup         |
-|-----------|--------|-------|-----------------|
-| Upload    | 3.69s  | 1.91s | **1.9x faster** |
-| List      | 47ms   | 21ms  | **2.2x faster** |
-| Download  | 3.10s  | 617ms | **5.0x faster** |
-| Delete    | 3.08s  | 1.03s | **3.0x faster** |
-
-### Medium files (10 × 10 MB)
-
-| Operation | native | smb2  | Speedup         |
-|-----------|--------|-------|-----------------|
-| Upload    | 1.66s  | 1.23s | **1.3x faster** |
-| List      | 27ms   | 19ms  | **1.4x faster** |
-| Download  | 4.00s  | 2.93s | **1.4x faster** |
-| Delete    | 301ms  | 128ms | **2.4x faster** |
-
-### Large files (3 × 50 MB)
-
-| Operation | native | smb2  | Speedup         |
-|-----------|--------|-------|-----------------|
-| Upload    | 1.69s  | 1.56s | ~parity         |
-| List      | 27ms   | 18ms  | **1.5x faster** |
-| Download  | 5.62s  | 1.11s | **5.1x faster** |
-| Delete    | 117ms  | 54ms  | **2.1x faster** |
-
-Key optimizations: compound requests (CREATE+READ+CLOSE in 1 round-trip), pipelined I/O with sliding window and adaptive
-chunk sizing, and 256-credit request for wide pipeline windows.
-
-**Note:** Native macOS download benchmarks use F_NOCACHE to bypass the kernel page cache. Without this, cached native
-reads appear ~20x faster because they skip the network entirely. F_NOCACHE gives a fair comparison of actual network I/O
-performance.
-
-The benchmark tool is included at `benchmarks/smb/`. Run with `cargo run -p smb-benchmark --release`.
-
 ## Comparison with existing libraries
 
 ### vs `smb` crate
@@ -439,7 +395,7 @@ which means system package management, cross-compilation headaches, and all the 
 
 - [smb2-cli](https://crates.io/crates/smb2-cli): a command-line client built on this crate, in the same repo under
   `crates/smb2-cli/`. Run `ls`, `stat`, `rm`, `rmdir`, `mv`, and file transfers against a share without mounting it,
-  and spread a batch over N connections. Bulk deletes go 34/s through a macOS mount and 500/s here.
+  and spread a batch over N connections.
 - [Cmdr](https://github.com/vdavid/cmdr): an AI-native file manager that uses `smb2` for SMB access.
 
 ## Implementation notes

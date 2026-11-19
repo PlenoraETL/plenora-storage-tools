@@ -26,7 +26,7 @@ if args == ['scripts/release_version.py']: print('4.0.0')
 class ShellPlanTests(unittest.TestCase):
     def test_ci_shell_reaches_verifier_with_exact_subject_and_rejects_unreachable_command(self):
         windows = sys.platform == 'win32'
-        job = 'native-windows' if windows else 'release-package-recheck'
+        job = 'native-windows' if windows else 'release-candidate-recheck'
         label = 'Verify the Windows candidate artifacts' if windows else 'Exercise candidate and publication guards on the built bytes'
         step = next(s for s in workflows(ROOT)['ci.yml']['jobs'][job]['steps'] if s.get('name') == label)
         body = step['run']

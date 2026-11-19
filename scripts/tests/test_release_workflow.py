@@ -55,7 +55,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
         channel = tomllib.loads((ROOT / 'rust-toolchain.toml').read_text())['toolchain']['channel']
         self.assertEqual(reference[1], channel)
         for job in (release['qualify'], release['publish'], ci['native-windows'],
-                    ci['release-package-build'], ci['release-package-recheck'],
+                    ci['release-package-build'], ci['release-package-recheck'], ci['release-candidate-recheck'],
                     jobs('release-candidate.yml')['windows']):
             self.assertEqual(prerequisites(job), reference)
         for name in ('qualify', 'publish'):
@@ -63,14 +63,14 @@ class ReleaseWorkflowTests(unittest.TestCase):
             self.assertEqual(checkout['ref'], '${{ inputs.tag }}')
             self.assertEqual(checkout['fetch-depth'], 0)
             self.assertEqual(release[name]['runs-on'], 'ubuntu-24.04')
-        self.assertEqual(ci['release-package-recheck']['runs-on'], 'ubuntu-24.04')
-        setup = actions(ci['release-package-recheck'], 'actions/setup-python')[0]
+        self.assertEqual(ci['release-candidate-recheck']['runs-on'], 'ubuntu-24.04')
+        setup = actions(ci['release-candidate-recheck'], 'actions/setup-python')[0]
         self.assertEqual(setup['with']['python-version-file'], '.python-version')
         self.assertEqual(actions(release['qualify'], 'actions/setup-python')[0], setup)
-        for job in (release['qualify'], ci['release-package-recheck']):
+        for job in (release['qualify'], ci['release-candidate-recheck']):
             self.assertIn('python -m pip install -r scripts/requirements-quality.txt', runs(job))
-        self.assertEqual(ci['release-package-recheck']['needs'], ['release-package-build', 'docker-conformance', 'native-windows'])
-        self.assertFalse(actions(ci['release-package-recheck'], 'actions/cache'))
+        self.assertEqual(ci['release-candidate-recheck']['needs'], ['release-package-build', 'docker-conformance', 'native-windows'])
+        self.assertFalse(actions(ci['release-candidate-recheck'], 'actions/cache'))
 
     def test_missing_or_late_prerequisites_are_rejected(self):
         original = jobs('release.yml')['qualify']
@@ -95,3 +95,14 @@ class ReleaseWorkflowTests(unittest.TestCase):
             if action and not action.startswith('./'):
                 with self.subTest(action=action):
                     self.assertRegex(action, r'^[\w./-]+@[0-9a-f]{40}$')
+
+    def test_automatic_consumers_have_independent_producers(self):
+        ci = jobs('ci.yml')
+        self.assertEqual(ci['release-package-recheck']['needs'], ['release-package-build'])
+        self.assertEqual(ci['python-compatibility']['needs'], ['product-quality', 'python-wheel-windows'])
+        wheel = actions(ci['python-wheel-windows'], 'actions/upload-artifact')[0]['with']
+        self.assertEqual(wheel['name'], 'python-wheel-windows')
+        self.assertEqual(wheel['path'], 'target/python-wheels/*.whl')
+        self.assertIn('python scripts/build_python.py --debug', runs(ci['python-wheel-windows']))
+        download = actions(ci['python-compatibility'], 'actions/download-artifact')[0]['with']
+        self.assertEqual(download['name'], "${{ runner.os == 'Windows' && 'python-wheel-windows' || 'python-wheel-linux' }}")

@@ -8207,8 +8207,7 @@ mod tests {
         }
 
         // Drain the set with a hard timeout. The test has hung on multiple
-        // CI runners (Ubuntu stable, Windows-2025 rust 1.85, macos-1.85
-        // historically). Until the root cause is understood, a hang turns
+        // CI runners. Until the root cause is understood, a hang turns
         // into a 30 s clean failure instead of a multi-hour CI stall — and
         // the panic dumps the smoking-gun state so the next failure has
         // diagnostic value.

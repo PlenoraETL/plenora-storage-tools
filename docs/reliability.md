@@ -101,7 +101,7 @@ di margine rispetto alla baseline, arrotondando verso il basso. Il denominatore
 è cambiato: queste soglie sostituiscono quelle che includevano il codice dei test,
 senza presentare il cambiamento della percentuale come una regressione funzionale.
 
-`coverage.sh`, eseguito dalla [CI ordinaria](../.github/workflows/coverage.yml)
+`coverage.sh`, eseguito dalla [CI automatica e manuale](../.github/workflows/coverage.yml)
 e dal workflow di affidabilità con `coverage=true`, impone le soglie correnti
 e rifiuta crate mancanti o non ancora censiti nella policy. Il
 report conserva commit, stato del checkout e digest del report LLVM originale.
@@ -139,8 +139,8 @@ sotto e dalle prove di durata.
 
 ## Fuzzing dei parser XML, FTP e SMB
 
-Il workflow [parser-fuzz](../.github/workflows/parser-fuzz.yml), richiamato da CI
-e release-candidate, compila i parser effettivi di S3, Azure, WebDAV e FTP/FTPS con
+Il workflow [parser-fuzz](../.github/workflows/parser-fuzz.yml), richiamato dalla CI automatica
+e da release-candidate, compila i parser effettivi di S3, Azure, WebDAV e FTP/FTPS con
 cargo-fuzz 0.13.2, libFuzzer 0.4.13 e AddressSanitizer. La toolchain nightly è
 fissata al 20 settembre 2026; non modifica la toolchain del prodotto.
 Gli ingressi `cfg(fuzzing)` esistono solo nelle build strumentate, senza feature
@@ -163,11 +163,13 @@ docker run --rm --network none -v "$PWD:/workspace" -v storage-fuzz-registry:/us
   storage-parser-fuzz python3 scripts/fuzz_parsers.py --seconds 300 --output target/parser-fuzz-manual
 ```
 
-Il budget CI è 60 secondi per parser, esclusa la compilazione. Il workflow
-[scheduled](../.github/workflows/scheduled.yml) ripete ogni lunedì la campagna con
-300 secondi per parser e l'audit delle dipendenze (cargo audit sui tre lockfile,
-cargo deny, audit del nome upstream SMB), così un advisory o un crate ritirato
-dopo l'ultimo push emerge entro una settimana. Ogni input ha
+La CI automatica e il candidato eseguono replay e budget di lavoro con
+`seconds=0`. L'avvio diretto di `parser-fuzz.yml` usa per default 300 secondi
+per parser (40 minuti di esplorazione per otto target, oltre alla build).
+Il workflow [scheduled](../.github/workflows/scheduled.yml) esegue ogni lunedi
+solo l'audit delle dipendenze; la campagna da 300 secondi richiede il suo avvio
+manuale. Un advisory o un crate ritirato dopo l'ultimo push continua quindi a
+essere cercato entro una settimana. Ogni input ha
 limite di 64 KiB, timeout di 10 secondi e budget RSS del processo di 1 GiB.
 FTP esercita anche il limite applicativo di 32 KiB per riga. La campagna non
 qualifica i limiti delle risposte HTTP complete (8/32 MiB), i server reali o

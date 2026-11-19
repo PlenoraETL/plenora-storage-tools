@@ -174,3 +174,7 @@ limiti supportati sono in [docs/release.md](docs/release.md).
 La distribuzione richiede `release-qualification.json` con stato
 `qualified_for_publication`, generato solo dopo i gate sul commit definitivo.
 Una build riuscita da sola non sostituisce questa qualifica.
+
+Piattaforme supportate: Linux e Windows. Gli altri sistemi sono rifiutati in
+compilazione. Le prove lunghe si avviano manualmente: vedere
+[CI e qualifica](docs/release.md#prove-su-richiesta).

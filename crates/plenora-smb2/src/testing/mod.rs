@@ -542,7 +542,7 @@ pub fn write_compose_files(dir: &Path) -> Result<()> {
         }
         fs::write(&path, file.contents).map_err(Error::Io)?;
 
-        #[cfg(unix)]
+        #[cfg(target_os = "linux")]
         if file.executable {
             use std::os::unix::fs::PermissionsExt;
             let perms = std::fs::Permissions::from_mode(0o755);
@@ -1146,7 +1146,7 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     #[test]
     fn write_compose_files_scripts_are_executable() {
         use std::os::unix::fs::PermissionsExt;

@@ -233,8 +233,7 @@ pub fn fuzz_error_context_walk(data: &[u8]) {
 /// on -- a listing hands back a name and the next call opens it -- and it is
 /// exactly the kind of contract a hand-written test set can leave a hole in.
 ///
-/// Two documented exemptions, both inherent to the scheme and both matching
-/// what macOS does: a name that already carries U+F001–U+F029 is not
+/// Two documented exemptions are inherent to the scheme: a name that already carries U+F001–U+F029 is not
 /// round-trip stable, and `encode_path` drops leading separators. Those
 /// inputs still have to encode without panicking and without emitting
 /// anything SMB2 rejects, so they are checked, just not for equality.
@@ -253,7 +252,7 @@ pub fn fuzz_name_round_trip(data: &[u8]) {
     }
 
     // The scheme owns U+F001–U+F029, so a name already holding one stands for
-    // something else after a round trip. Documented, and macOS agrees.
+    // something else after a round trip. This is part of the documented mapping.
     if name
         .chars()
         .any(|c| (0xF001..=0xF029).contains(&(c as u32)))

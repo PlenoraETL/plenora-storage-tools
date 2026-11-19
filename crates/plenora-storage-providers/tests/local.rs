@@ -390,7 +390,7 @@ async fn filesystem_aliases_and_traversal_cannot_write() {
     }
     assert_eq!(std::fs::read_dir(&f.root).unwrap().count(), 0);
 }
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 #[tokio::test]
 async fn symlink_escape_is_rejected_for_reads_and_writes() {
     let f = Fixture::new(100);

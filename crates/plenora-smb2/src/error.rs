@@ -640,7 +640,7 @@ fn classify_status(status: NtStatus) -> ErrorKind {
         // locked, password expired, or a time/workstation restriction). All mean
         // the same thing to a consumer: this logon won't work, supply different
         // credentials. A guest/anonymous SessionSetup that the server rejects
-        // (macOS smbd answers with STATUS_ACCOUNT_RESTRICTION) lands here too.
+        // with STATUS_ACCOUNT_RESTRICTION lands here too.
         NtStatus::LOGON_FAILURE
         | NtStatus::ACCOUNT_RESTRICTION
         | NtStatus::INVALID_LOGON_HOURS

@@ -1,7 +1,7 @@
 name: scheduled
 
 # Weekly, independent of pushes: advisories and yanked crates appear without a
-# commit, and the per-push parser replay and work budget are the release gate.
+# commit. Parser exploration requires an explicit manual request.
 on:
   schedule:
     - cron: '17 5 * * 1'
@@ -15,6 +15,7 @@ jobs:
     uses: ./.github/workflows/dependencies.yml
 
   parser-fuzz:
+    if: github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/parser-fuzz.yml
     with:
       seconds: '300'

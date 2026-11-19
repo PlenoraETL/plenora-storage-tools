@@ -140,7 +140,7 @@ async fn run() -> ExitCode {
         Ok(control) => control,
         Err(error) => return emit_error("cli-parse", "plenora-cli-error-v1", error),
     };
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     {
         let cancellation = control.cancellation.clone();
         tokio::spawn(async move {

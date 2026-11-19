@@ -1,5 +1,30 @@
 # Qualifica e distribuzione
 
+## Prove su richiesta
+
+Le piattaforme supportate sono Linux e Windows. Gli altri sistemi sono
+rifiutati in compilazione, anche dalla libreria SMB autonoma.
+
+Su push e PR girano inventario, policy, dipendenze, controlli Rust, API,
+replay fuzz, qualita completa, coverage, wheel e riverifica degli archivi Cargo.
+La selezione usa le durate misurate sull'ultimo run di main: queste prove
+richiedono meno di 30 minuti; i timeout conservano il margine operativo.
+Solo le prove lunghe `docker-conformance` e `native-windows` richiedono
+`workflow_dispatch`. La loro riverifica dei candidati completi rimane nella
+catena manuale, nel job separato `release-candidate-recheck`.
+La wheel Windows automatica viene prodotta da `python-wheel-windows`, senza
+attendere il candidato Windows. `release-package-recheck` attende soltanto
+`release-package-build`, mentre la riverifica completa attende tutti i produttori.
+Lo schedule settimanale esegue solo le dipendenze; il fuzz esplorativo richiede
+l'avvio manuale di `scheduled.yml` o `parser-fuzz.yml`.
+`coverage.yml`, `reliability.yml` e `release-candidate.yml` conservano il loro
+avvio manuale; coverage e richiamato anche dalla CI automatica.
+Soak e campagne non sono attivati da push o PR.
+Un job escluso non e una prova superata: i gate di qualifica e le soglie restano
+obbligatori quando si qualifica un candidato. Le ricevute storiche non cambiano.
+Il guardiano `test_workflow_policy.py`, eseguito in `quick-quality`, verifica
+anche le chiamate riusabili e impedisce che i job brevi dipendano dai manuali.
+
 ## CI locale
 
 `python scripts/ci_locale.py --piano --profilo pr` legge tutti i workflow e
@@ -108,7 +133,7 @@ Le verifiche usano `qualify_windows_candidate.py` su Windows e `qualify_target.p
 nel servizio Debian Bookworm del candidato Linux; entrambi richiamano
 `verify_release.py`. Il candidato Windows e la CI condividono anche lo stesso
 script per i report localhost sul binario finale.
-`release-package-recheck`, un runner Ubuntu 24.04 separato con Python 3.14 e senza
+`release-candidate-recheck`, un runner Ubuntu 24.04 separato con Python 3.14 e senza
 cache Cargo del produttore, riceve entrambi i candidati e gli archivi Cargo.
 `check_release_packages.py --release` riesegue `verify_release.py`, verifica gli
 asset standalone e un contenitore con l'inventario completo della qualifica,
@@ -119,7 +144,7 @@ marcato, senza ricevuta qualificata. Questa prova della guardia non sostituisce
 la qualifica, il soak o il roundtrip GitHub.
 
 `check_release_guard_coverage.py` confronta le invocazioni dirette e indirette nei
-workflow di rilascio con i percorsi CI, i runner e il passaggio degli artefatti;
+workflow di rilascio con i percorsi CI manuali di qualifica, i runner e il passaggio degli artefatti;
 i suoi test negativi rimuovono verifiche, cambiano piattaforma e aggiungono una
 nuova invocazione non coperta. `test_release_workflow.py` vincola inoltre toolchain,
 ordine dei prerequisiti e pin delle action. I log Cargo destinati agli artefatti
